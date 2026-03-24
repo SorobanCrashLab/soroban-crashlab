@@ -1,12 +1,36 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import RunHistoryTable from './RunHistoryTable';
+import Pagination from './Pagination';
+import { FuzzingRun, RunStatus } from './types';
+
+// Mock data for demonstration
+const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 25 }, (_, i) => ({
+  id: `run-${1000 + i}`,
+  status: (['completed', 'failed', 'running', 'cancelled'][i % 4]) as RunStatus,
+  duration: 120000 + (Math.random() * 3600000), // 2m to 1h
+  seedCount: Math.floor(10000 + Math.random() * 90000),
+})).reverse();
+
+const ITEMS_PER_PAGE = 10;
 
 export default function Home() {
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
   const [showHelp, setShowHelp] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const cardsContainerRef = useRef<HTMLDivElement>(null);
+
+  const totalPages = Math.ceil(MOCK_RUNS.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedRuns = MOCK_RUNS.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Focus the table container when page changes for accessibility
+    cardsContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const cards = [
     {
@@ -34,7 +58,7 @@ export default function Home() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don&apos;t handle if modal is open and it&apos;s not Escape
+      // Don't handle if modal is open and it's not Escape
       if (showDetailView && e.key !== 'Escape') return;
 
       switch (e.key) {
@@ -111,9 +135,9 @@ export default function Home() {
         </div>
       )}
 
-      <div 
+      <div
         ref={cardsContainerRef}
-        className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full"
+        className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mb-20"
         role="list"
         aria-label="Features"
       >
@@ -137,11 +161,10 @@ export default function Home() {
                   handleCardClick(index);
                 }
               }}
-              className={`border rounded-xl p-8 bg-white dark:bg-zinc-950 shadow-sm transition-all hover:shadow-md cursor-pointer ${
-                isSelected
-                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 dark:ring-offset-zinc-900'
-                  : 'border-black/[.08] dark:border-white/[.145]'
-              }`}
+              className={`border rounded-xl p-8 bg-white dark:bg-zinc-950 shadow-sm transition-all hover:shadow-md cursor-pointer ${isSelected
+                ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 dark:ring-offset-zinc-900'
+                : 'border-black/[.08] dark:border-white/[.145]'
+                }`}
             >
               <div className={`h-12 w-12 rounded-lg flex items-center justify-center mb-6 ${colorClasses[card.color as keyof typeof colorClasses]}`}>
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,6 +178,22 @@ export default function Home() {
             </div>
           );
         })}
+      </div>
+
+      {/* Run History Section */}
+      <div className="w-full mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">Recent Fuzzing Runs</h2>
+          <div className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-xs font-medium text-zinc-500">
+            {MOCK_RUNS.length} Total Runs
+          </div>
+        </div>
+        <RunHistoryTable runs={paginatedRuns} />
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
       </div>
 
       {/* Detail View Modal */}
@@ -172,11 +211,10 @@ export default function Home() {
           >
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
-                <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
-                  cards[selectedCardIndex].color === 'blue' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
+                <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${cards[selectedCardIndex].color === 'blue' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
                   cards[selectedCardIndex].color === 'purple' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' :
-                  'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                }`}>
+                    'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                  }`}>
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cards[selectedCardIndex].icon} />
                   </svg>

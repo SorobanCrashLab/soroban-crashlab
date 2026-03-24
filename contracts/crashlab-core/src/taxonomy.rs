@@ -256,12 +256,12 @@ mod tests {
     #[test]
     fn groups_seeds_into_correct_classes() {
         let seeds = vec![
-            seed(vec![]),           // EmptyInput
-            seed(vec![0xA0]),       // Auth
-            seed(vec![0xB5]),       // Auth
-            seed(vec![0x10]),       // Xdr
-            seed(vec![0x30]),       // State
-            seed(vec![0x70]),       // Budget
+            seed(vec![]),     // EmptyInput
+            seed(vec![0xA0]), // Auth
+            seed(vec![0xB5]), // Auth
+            seed(vec![0x10]), // Xdr
+            seed(vec![0x30]), // State
+            seed(vec![0x70]), // Budget
         ];
         let groups = group_by_class(&seeds);
 
@@ -290,9 +290,18 @@ mod tests {
 
     #[test]
     fn group_preserves_seed_order_within_class() {
-        let s1 = CaseSeed { id: 1, payload: vec![0xA1] };
-        let s2 = CaseSeed { id: 2, payload: vec![0xA2] };
-        let s3 = CaseSeed { id: 3, payload: vec![0xA3] };
+        let s1 = CaseSeed {
+            id: 1,
+            payload: vec![0xA1],
+        };
+        let s2 = CaseSeed {
+            id: 2,
+            payload: vec![0xA2],
+        };
+        let s3 = CaseSeed {
+            id: 3,
+            payload: vec![0xA3],
+        };
         let seeds = vec![s1.clone(), s2.clone(), s3.clone()];
 
         let groups = group_by_class(&seeds);

@@ -233,13 +233,10 @@ mod tests {
 
         assert_eq!(report.mismatches.len(), 2);
         // Enforce and RecordAllowNonroot must NOT appear together as a mismatch.
-        let has_enforce_vs_nonroot = report
-            .mismatches
-            .iter()
-            .any(|&(a, b)| {
-                (a == AuthMode::Enforce && b == AuthMode::RecordAllowNonroot)
-                    || (a == AuthMode::RecordAllowNonroot && b == AuthMode::Enforce)
-            });
+        let has_enforce_vs_nonroot = report.mismatches.iter().any(|&(a, b)| {
+            (a == AuthMode::Enforce && b == AuthMode::RecordAllowNonroot)
+                || (a == AuthMode::RecordAllowNonroot && b == AuthMode::Enforce)
+        });
         assert!(!has_enforce_vs_nonroot);
     }
 
@@ -299,6 +296,9 @@ mod tests {
     fn auth_mode_display_matches_spec_names() {
         assert_eq!(AuthMode::Enforce.to_string(), "enforce");
         assert_eq!(AuthMode::Record.to_string(), "record");
-        assert_eq!(AuthMode::RecordAllowNonroot.to_string(), "record_allow_nonroot");
+        assert_eq!(
+            AuthMode::RecordAllowNonroot.to_string(),
+            "record_allow_nonroot"
+        );
     }
 }

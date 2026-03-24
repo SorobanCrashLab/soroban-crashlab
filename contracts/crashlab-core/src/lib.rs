@@ -3,13 +3,28 @@ pub mod prng;
 pub mod reproducer;
 pub mod taxonomy;
 
-pub use auth_matrix::{collect_mismatched, run_matrix, AuthMode, MatrixReport, ModeResult};
-pub use prng::SeededPrng;
-pub use reproducer::{filter_ci_pack, FlakyDetector, ReproReport};
-pub use taxonomy::{classify_failure, group_by_class, FailureClass};
+pub use auth_matrix::{AuthMode, MatrixReport, ModeResult, collect_mismatched, run_matrix};
+pub use reproducer::{FlakyDetector, ReproReport, filter_ci_pack};
+pub use taxonomy::{FailureClass, classify_failure, group_by_class};
 
 pub mod seed_validator;
 pub use seed_validator::{SeedSchema, SeedValidationError, Validate};
+
+pub mod scheduler;
+pub use scheduler::{Mutator, SchedulerError, WeightedScheduler};
+
+/// Wrapper for the legacy bit-flipper mutation logic.
+pub struct DefaultMutator;
+
+impl Mutator for DefaultMutator {
+    fn name(&self) -> &'static str {
+        "bit-flipper"
+    }
+
+    fn mutate(&self, seed: &CaseSeed, _rng_state: &mut u64) -> CaseSeed {
+        mutate_seed(seed)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaseSeed {
@@ -65,10 +80,9 @@ pub fn mutate_seed(seed: &CaseSeed) -> CaseSeed {
 }
 
 pub fn classify(seed: &CaseSeed) -> CrashSignature {
-    let digest = seed
-        .payload
-        .iter()
-        .fold(seed.id, |acc, b| acc.wrapping_mul(1099511628211).wrapping_add(*b as u64));
+    let digest = seed.payload.iter().fold(seed.id, |acc, b| {
+        acc.wrapping_mul(1099511628211).wrapping_add(*b as u64)
+    });
 
     let category = if seed.payload.is_empty() {
         "empty-input"
@@ -80,7 +94,11 @@ pub fn classify(seed: &CaseSeed) -> CrashSignature {
 
     let signature_hash = compute_signature_hash(category, &seed.payload);
 
-    CrashSignature { category, digest, signature_hash }
+    CrashSignature {
+        category,
+        digest,
+        signature_hash,
+    }
 }
 
 pub fn to_bundle(seed: CaseSeed) -> CaseBundle {
@@ -132,8 +150,14 @@ mod tests {
     #[test]
     fn equivalent_failures_produce_identical_signature_hash() {
         // Same payload, different seed IDs → same signature_hash.
-        let seed_a = CaseSeed { id: 1, payload: vec![1, 2, 3] };
-        let seed_b = CaseSeed { id: 99, payload: vec![1, 2, 3] };
+        let seed_a = CaseSeed {
+            id: 1,
+            payload: vec![1, 2, 3],
+        };
+        let seed_b = CaseSeed {
+            id: 99,
+            payload: vec![1, 2, 3],
+        };
         let sig_a = classify(&seed_a);
         let sig_b = classify(&seed_b);
         assert_eq!(sig_a.category, sig_b.category);
@@ -142,8 +166,14 @@ mod tests {
 
     #[test]
     fn signature_hash_differs_across_categories() {
-        let empty = CaseSeed { id: 0, payload: vec![] };
-        let normal = CaseSeed { id: 0, payload: vec![1] };
+        let empty = CaseSeed {
+            id: 0,
+            payload: vec![],
+        };
+        let normal = CaseSeed {
+            id: 0,
+            payload: vec![1],
+        };
         let sig_empty = classify(&empty);
         let sig_normal = classify(&normal);
         assert_ne!(sig_empty.signature_hash, sig_normal.signature_hash);
