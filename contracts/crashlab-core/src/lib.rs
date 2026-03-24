@@ -1,4 +1,7 @@
+pub mod auth_matrix;
 pub mod reproducer;
+
+pub use auth_matrix::{collect_mismatched, run_matrix, AuthMode, MatrixReport, ModeResult};
 pub use reproducer::{filter_ci_pack, FlakyDetector, ReproReport};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
