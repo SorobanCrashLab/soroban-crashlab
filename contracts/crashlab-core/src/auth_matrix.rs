@@ -141,7 +141,7 @@ mod tests {
 
     fn sig(digest: u64) -> CrashSignature {
         CrashSignature {
-            category: "runtime-failure",
+            category: "runtime-failure".to_string(),
             digest,
             signature_hash: digest, // Using digest as a stable placeholder for tests
         }

@@ -126,7 +126,7 @@ mod tests {
 
     fn divergent_sig() -> CrashSignature {
         CrashSignature {
-            category: "runtime-failure",
+            category: "runtime-failure".to_string(),
             digest: 0xDEAD_BEEF,
             signature_hash: 0xDEAD_BEEF_CAFE_0000,
         }

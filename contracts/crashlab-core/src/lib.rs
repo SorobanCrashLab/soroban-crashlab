@@ -1,4 +1,5 @@
 pub mod auth_matrix;
+pub mod bundle_persist;
 pub mod reproducer;
 pub mod taxonomy;
 
@@ -11,6 +12,17 @@ pub use seed_validator::{SeedSchema, SeedValidationError, Validate};
 
 pub mod scheduler;
 pub use scheduler::{Mutator, SchedulerError, WeightedScheduler};
+
+pub mod env_fingerprint;
+pub use env_fingerprint::{
+    EnvironmentFingerprint, ReplayEnvironmentReport, check_bundle_replay_environment,
+    check_replay_environment,
+};
+
+pub use bundle_persist::{
+    read_case_bundle_json, save_case_bundle_json, write_case_bundle_json, BundlePersistError,
+    CaseBundleDocument, CASE_BUNDLE_SCHEMA_VERSION, SUPPORTED_BUNDLE_SCHEMAS,
+};
 
 /// Wrapper for the legacy bit-flipper mutation logic.
 pub struct DefaultMutator;
@@ -25,15 +37,15 @@ impl Mutator for DefaultMutator {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CaseSeed {
     pub id: u64,
     pub payload: Vec<u8>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CrashSignature {
-    pub category: &'static str,
+    pub category: String,
     pub digest: u64,
     /// Stable hash derived solely from `category` and payload bytes.
     ///
@@ -62,6 +74,20 @@ pub fn compute_signature_hash(category: &str, payload: &[u8]) -> u64 {
 pub struct CaseBundle {
     pub seed: CaseSeed,
     pub signature: CrashSignature,
+    /// Host environment captured when the bundle was produced, if enabled.
+    pub environment: Option<EnvironmentFingerprint>,
+    /// Raw failure output (stderr, host error bytes, trace snippet, etc.).
+    pub failure_payload: Vec<u8>,
+}
+
+impl CaseBundle {
+    /// Compares the stored fingerprint (if any) with `current` for replay safety.
+    pub fn replay_environment_report(
+        &self,
+        current: &EnvironmentFingerprint,
+    ) -> ReplayEnvironmentReport {
+        check_replay_environment(self.environment.as_ref(), current)
+    }
 }
 
 pub fn mutate_seed(seed: &CaseSeed) -> CaseSeed {
@@ -98,7 +124,7 @@ pub fn classify(seed: &CaseSeed) -> CrashSignature {
     let signature_hash = compute_signature_hash(category, &seed.payload);
 
     CrashSignature {
-        category,
+        category: category.to_string(),
         digest,
         signature_hash,
     }
@@ -110,6 +136,21 @@ pub fn to_bundle(seed: CaseSeed) -> CaseBundle {
     CaseBundle {
         seed: mutated,
         signature,
+        environment: None,
+        failure_payload: Vec::new(),
+    }
+}
+
+/// Like [`to_bundle`], but attaches [`EnvironmentFingerprint::capture`] for replay checks.
+pub fn to_bundle_with_environment(seed: CaseSeed) -> CaseBundle {
+    let environment = Some(EnvironmentFingerprint::capture());
+    let mutated = mutate_seed(&seed);
+    let signature = classify(&mutated);
+    CaseBundle {
+        seed: mutated,
+        signature,
+        environment,
+        failure_payload: Vec::new(),
     }
 }
 
@@ -146,6 +187,38 @@ mod tests {
         };
         let bundle = to_bundle(seed);
         assert!(!bundle.signature.category.is_empty());
+    }
+
+    #[test]
+    fn to_bundle_has_no_environment_by_default() {
+        let bundle = to_bundle(CaseSeed {
+            id: 1,
+            payload: vec![1],
+        });
+        assert!(bundle.environment.is_none());
+    }
+
+    #[test]
+    fn to_bundle_with_environment_captures_fingerprint() {
+        let bundle = to_bundle_with_environment(CaseSeed {
+            id: 1,
+            payload: vec![1],
+        });
+        let fp = bundle.environment.as_ref().expect("fingerprint");
+        assert_eq!(fp.os, std::env::consts::OS);
+        assert_eq!(fp.arch, std::env::consts::ARCH);
+    }
+
+    #[test]
+    fn replay_environment_report_clean_when_capture_matches_bundle() {
+        let bundle = to_bundle_with_environment(CaseSeed {
+            id: 1,
+            payload: vec![1, 2, 3],
+        });
+        let current = EnvironmentFingerprint::capture();
+        let report = bundle.replay_environment_report(&current);
+        assert!(!report.material_mismatch);
+        assert!(report.warnings.is_empty());
     }
 
     // ── signature_hash stability ──────────────────────────────────────────────
