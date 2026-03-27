@@ -28,18 +28,37 @@ To report a vulnerability, see our [Security Policy](.github/SECURITY.md). Do no
 
 ## Quick start
 
+If this is your first time setting up the repo locally, start with the
+[contributor setup checklist](CONTRIBUTING.md#local-setup-checklist).
+It walks through installing Git, Node.js, npm, Rust, and optional GitHub
+tooling before you run the project checks below.
+
 ### Prerequisites
 
+- Git
 - Node.js 22+
-- npm 9+
+- npm 10+ (the npm version bundled with Node.js 22 is fine)
 - Rust stable + Cargo
-- GitHub CLI (`gh`) authenticated for issue publishing
+- Optional: GitHub CLI (`gh`) authenticated for Wave maintenance scripts
 
-### Install and run frontend
+### Verify your toolchain
+
+```bash
+git --version
+node -v
+npm -v
+rustc -V
+cargo -V
+gh --version # optional
+```
+
+### Install web dependencies and run web checks
 
 ```bash
 cd apps/web
-npm install
+npm ci
+npm run lint
+npm run build
 npm run dev
 ```
 
@@ -47,7 +66,7 @@ npm run dev
 
 ```bash
 cd contracts/crashlab-core
-cargo test
+cargo test --all-targets
 ```
 
 ### Run checkpoints (resume without redoing work)

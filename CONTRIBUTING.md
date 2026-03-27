@@ -2,22 +2,109 @@
 
 Thanks for contributing. This project is maintainer-first and contributor-friendly: we optimize for clear issue scope, reproducible changes, and fast review cycles.
 
-## Development setup
+## Local setup checklist
 
-### Frontend
+These steps assume a brand-new contributor machine. After completing them,
+you should be able to run the web verification commands and the Rust test
+suite in under 20 minutes on a typical broadband connection.
+
+### 1. Install Git
+
+Make sure `git` is available in your shell:
+
+```bash
+git --version
+```
+
+If the command is missing, install Git from your operating system package
+manager or from git-scm.com before continuing.
+
+### 2. Install Node.js and npm
+
+The frontend in `apps/web` targets Node.js 22+ and npm 10+.
+
+Verify your versions:
+
+```bash
+node -v
+npm -v
+```
+
+If either command is missing, install Node.js 22 LTS. The bundled npm
+version that ships with Node.js 22 is supported.
+
+### 3. Install Rust and Cargo
+
+The core crate in `contracts/crashlab-core` uses the stable Rust toolchain.
+
+Verify your versions:
+
+```bash
+rustc -V
+cargo -V
+```
+
+If either command is missing, install Rust with `rustup` and keep the
+default stable toolchain selected.
+
+### 4. Optional: install GitHub CLI
+
+`gh` is not required to run the app or tests locally, but it is useful for
+Wave issue/PR workflows and the repository scripts under `scripts/`.
+
+```bash
+gh --version
+gh auth status
+```
+
+If you do not plan to use the GitHub automation scripts yet, you can skip
+this step.
+
+### 5. Install frontend dependencies
 
 ```bash
 cd apps/web
-npm install
+npm ci
+```
+
+Use `npm install` later only when you intentionally need to update
+dependencies or the lockfile.
+
+### 6. Run web verification
+
+The web app does not currently have a dedicated test runner. Use the same
+checks referenced by the maintainer playbook:
+
+```bash
+cd apps/web
+npm run lint
+npm run build
+```
+
+To start the local dashboard after the checks pass:
+
+```bash
+cd apps/web
 npm run dev
 ```
 
-### Core crate
+### 7. Run core tests
 
 ```bash
 cd contracts/crashlab-core
-cargo test
+cargo test --all-targets
 ```
+
+### 8. Expected first-run result
+
+On a clean machine, a successful setup looks like this:
+
+- `npm ci` completes without dependency errors
+- `npm run lint` and `npm run build` both pass in `apps/web`
+- `cargo test --all-targets` passes in `contracts/crashlab-core`
+
+If one of those steps fails, include the failing command and its output in
+your issue or PR so maintainers can reproduce it quickly.
 
 ## Branch and PR flow
 
