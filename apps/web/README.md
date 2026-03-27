@@ -1,4 +1,8 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a [Next.js](https://nextjs.org) dashboard for Soroban CrashLab.
+
+## Dashboard Notes
+
+- The home page includes a failure cluster view that groups failed runs by signature and context, then links each group to a representative sample run for triage.
 
 ## Getting Started
 

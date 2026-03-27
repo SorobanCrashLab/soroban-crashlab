@@ -34,6 +34,15 @@ pub use env_fingerprint::{
 pub mod boundary;
 pub use boundary::{BoundaryMutator, generate_boundary_vectors};
 
+pub mod enum_flip;
+pub use enum_flip::{EnumVariantFlipMutator, is_invalid_enum_tag_payload};
+
+pub mod decimal_precision;
+pub use decimal_precision::{
+    DecimalBoundaryCase, DecimalPrecisionMutator, decimal_boundary_cases,
+    generate_decimal_precision_vectors,
+};
+
 pub mod bundle_persist;
 pub use bundle_persist::{
     BundlePersistError, CASE_BUNDLE_SCHEMA_VERSION, CaseBundleDocument, SUPPORTED_BUNDLE_SCHEMAS,
@@ -69,7 +78,10 @@ pub mod retention;
 pub use retention::RetentionPolicy;
 
 pub mod scenario_export;
-pub use scenario_export::{FailureScenario, export_rust_regression_fixture, export_scenario_json};
+pub use scenario_export::{
+    FailureScenario, export_crash_report_markdown, export_rust_regression_fixture,
+    export_scenario_json,
+};
 
 pub mod simulation;
 pub use simulation::{
@@ -86,6 +98,11 @@ pub use crash_index::{CrashGroup, CrashGroupRecord, CrashIndex, CrashIndexSummar
 
 pub mod mutation_budget;
 pub use mutation_budget::{BudgetReport, MutationBudget};
+
+pub mod seed_novelty;
+pub use seed_novelty::{
+    DiscoveryBenchmark, NoveltyPrioritizer, SeedNoveltyCandidate, benchmark_novelty_discovery,
+};
 pub mod stale_detector;
 pub use stale_detector::{StaleDetectorConfig, StaleRunDetector, StaleStatus};
 
@@ -190,6 +207,8 @@ pub fn classify(seed: &CaseSeed) -> CrashSignature {
         "empty-input"
     } else if seed.payload.len() > 64 {
         "oversized-input"
+    } else if is_invalid_enum_tag_payload(&seed.payload) {
+        "invalid-enum-tag"
     } else {
         "runtime-failure"
     };
@@ -271,6 +290,16 @@ mod tests {
         };
         let sig = classify(&seed);
         assert_eq!(sig.category, "empty-input");
+    }
+
+    #[test]
+    fn classification_detects_invalid_enum_tag_distinct_from_runtime_failure() {
+        let seed = CaseSeed {
+            id: 11,
+            payload: vec![0xE0, 0xFF, 0xAA],
+        };
+        let sig = classify(&seed);
+        assert_eq!(sig.category, "invalid-enum-tag");
     }
 
     #[test]

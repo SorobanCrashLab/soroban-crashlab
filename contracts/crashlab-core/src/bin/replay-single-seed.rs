@@ -47,6 +47,7 @@ fn parse_bundle(path: &Path) -> Result<CaseBundle, String> {
         "empty-input" => "empty-input",
         "oversized-input" => "oversized-input",
         "runtime-failure" => "runtime-failure",
+        "invalid-enum-tag" => "invalid-enum-tag",
         other => return Err(format!("unsupported signature category '{other}'")),
     };
 

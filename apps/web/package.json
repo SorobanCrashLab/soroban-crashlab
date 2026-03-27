@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "npx tsc src/app/failureClusters.ts src/app/failureClusters.test.ts src/app/types.ts --module commonjs --target es2020 --outDir build/test-tmp --esModuleInterop && node build/test-tmp/failureClusters.test.js"
   },
   "dependencies": {
     "next": "16.1.6",

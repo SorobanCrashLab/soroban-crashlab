@@ -35,10 +35,10 @@ Add corpus seed import command|medium|area:fuzzer|type:feature|Import external s
 Add corpus seed export command|trivial|area:fuzzer|type:task|Export current corpus to portable seed archive for sharing.|Archive can be re-imported and preserves deterministic order.|implemented|
 Implement weighted mutator scheduler|high|area:fuzzer|type:feature|Schedule mutators by configurable weights to balance exploration and exploitation.|Run stats show mutator usage distribution matches configured weights.|implemented|
 Add bytestring entropy mutator|medium|area:fuzzer|type:feature|Generate high and low entropy byte patterns for payload stress cases.|Entropy profile appears in run metadata and tests cover edge ranges.||
-Add enum variant flip mutator|medium|area:fuzzer|type:feature|Mutate enum-like inputs by switching variants and invalid tags.|Runner records invalid tag failures distinctly from runtime faults.||
-Add decimal precision mutation strategy|medium|area:fuzzer|type:feature|Fuzz decimal scale and precision boundaries used in token math.|Boundary cases include rounding traps and overflow near limits.||
+Add enum variant flip mutator|medium|area:fuzzer|type:feature|Mutate enum-like inputs by switching variants and invalid tags.|Runner records invalid tag failures distinctly from runtime faults.|implemented|
+Add decimal precision mutation strategy|medium|area:fuzzer|type:feature|Fuzz decimal scale and precision boundaries used in token math.|Boundary cases include rounding traps and overflow near limits.|implemented|
 Add mutation budget limiter per run|trivial|area:fuzzer|type:task|Cap mutation attempts per run to avoid runaway jobs.|Limiter stops at configured budget and reports skipped attempts.||
-Implement seed prioritization by novelty|high|area:fuzzer|type:feature|Prioritize seeds that produce unseen crash signatures or state diffs.|Prioritizer improves unique signature discovery rate in benchmark run.||
+Implement seed prioritization by novelty|high|area:fuzzer|type:feature|Prioritize seeds that produce unseen crash signatures or state diffs.|Prioritizer improves unique signature discovery rate in benchmark run.|implemented|
 Add deterministic parallel worker partitioning|high|area:fuzzer|type:feature|Split seed execution across workers while preserving deterministic replay.|Replay output remains stable with one or many workers.||
 Add fuzz campaign preset profiles|trivial|area:fuzzer|type:task|Define campaign presets for smoke nightly and deep runs.|Preset selection changes runtime budget and mutation intensity predictably.||
 Implement run metadata schema versioning|medium|area:runtime|type:feature|Version run metadata format to support safe future migrations.|Older metadata can be read and upgraded without data loss.||
@@ -52,7 +52,7 @@ Add failure artifact compression|trivial|area:runtime|type:task|Compress stored 
 Add retention policy for run artifacts|medium|area:runtime|type:feature|Apply configurable retention windows for old run artifacts.|Policy can keep latest failures while pruning old non-critical data.||
 Implement run health summary endpoint|medium|area:runtime|type:feature|Provide health summary with throughput failures and queue depth metrics.|Endpoint returns machine-readable summary for dashboard polling.||
 Generate TypeScript reproducer snippets|medium|area:generator|type:feature|Export failing case as TypeScript reproducer helper for web tests.|Generated snippet executes with documented dependencies and expected assertion.||
-Add markdown crash report exporter|trivial|area:generator|type:task|Export crash details to markdown for issue attachments.|Report includes signature context and replay command.||
+Add markdown crash report exporter|trivial|area:generator|type:task|Export crash details to markdown for issue attachments.|Report includes signature context and replay command.|implemented|
 Implement fixture metadata manifest|medium|area:generator|type:feature|Store fixture metadata in manifest for indexing and compatibility checks.|Manifest validates fixture presence and schema version at load time.||
 Add fixture compatibility checker|medium|area:generator|type:feature|Check whether fixture set matches current engine schema and capabilities.|Checker reports actionable migration warnings.||
 Create automatic regression grouping|high|area:generator|type:feature|Group regression fixtures by domain risk area and expected failure mode.|Suite runner can execute selected groups independently.||

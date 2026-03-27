@@ -1,4 +1,5 @@
 use crate::CaseSeed;
+use crate::is_invalid_enum_tag_payload;
 use std::collections::HashMap;
 
 /// Stable failure categories for Soroban contract crashes.
@@ -11,6 +12,7 @@ use std::collections::HashMap;
 /// | `Budget`         | CPU or memory execution budget exceeded                     |
 /// | `State`          | Ledger entry absent, wrong type, or version conflict        |
 /// | `Xdr`            | XDR encoding / decoding error — malformed or out-of-range  |
+/// | `InvalidEnumTag` | Enum-like payload carried an unsupported discriminant tag   |
 /// | `EmptyInput`     | Seed payload was empty; no execution was attempted          |
 /// | `OversizedInput` | Seed payload exceeded the maximum allowable size            |
 /// | `Unknown`        | Raw failure did not match any known category                |
@@ -27,6 +29,8 @@ pub enum FailureClass {
     State,
     /// XDR encoding or decoding error: malformed or out-of-range value.
     Xdr,
+    /// Enum discriminant tag is outside supported variant set.
+    InvalidEnumTag,
     /// Seed payload was empty; no execution attempted.
     EmptyInput,
     /// Seed payload exceeded the maximum allowable size (> 64 bytes).
@@ -46,6 +50,7 @@ impl FailureClass {
             FailureClass::Budget => "budget",
             FailureClass::State => "state",
             FailureClass::Xdr => "xdr",
+            FailureClass::InvalidEnumTag => "invalid-enum-tag",
             FailureClass::EmptyInput => "empty-input",
             FailureClass::OversizedInput => "oversized-input",
             FailureClass::Unknown => "unknown",
@@ -53,11 +58,12 @@ impl FailureClass {
     }
 
     /// All variants in declaration order, useful for iteration and reporting.
-    pub const ALL: [FailureClass; 7] = [
+    pub const ALL: [FailureClass; 8] = [
         FailureClass::Auth,
         FailureClass::Budget,
         FailureClass::State,
         FailureClass::Xdr,
+        FailureClass::InvalidEnumTag,
         FailureClass::EmptyInput,
         FailureClass::OversizedInput,
         FailureClass::Unknown,
@@ -105,6 +111,9 @@ pub fn classify_failure(seed: &CaseSeed) -> FailureClass {
     }
     if seed.payload.len() > 64 {
         return FailureClass::OversizedInput;
+    }
+    if is_invalid_enum_tag_payload(&seed.payload) {
+        return FailureClass::InvalidEnumTag;
     }
     match seed.payload[0] {
         0x00..=0x1F => FailureClass::Xdr,
@@ -234,6 +243,7 @@ mod tests {
         assert_eq!(FailureClass::Budget.as_str(), "budget");
         assert_eq!(FailureClass::State.as_str(), "state");
         assert_eq!(FailureClass::Xdr.as_str(), "xdr");
+        assert_eq!(FailureClass::InvalidEnumTag.as_str(), "invalid-enum-tag");
         assert_eq!(FailureClass::EmptyInput.as_str(), "empty-input");
         assert_eq!(FailureClass::OversizedInput.as_str(), "oversized-input");
         assert_eq!(FailureClass::Unknown.as_str(), "unknown");
@@ -248,7 +258,16 @@ mod tests {
 
     #[test]
     fn all_contains_seven_variants() {
-        assert_eq!(FailureClass::ALL.len(), 7);
+        assert_eq!(FailureClass::ALL.len(), 8);
+    }
+
+    #[test]
+    fn invalid_enum_tag_is_classified_distinctly() {
+        let seed = CaseSeed {
+            id: 0,
+            payload: vec![0xE0, 0xFF],
+        };
+        assert_eq!(classify_failure(&seed), FailureClass::InvalidEnumTag);
     }
 
     // ── group_by_class ───────────────────────────────────────────────────────

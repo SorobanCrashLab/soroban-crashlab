@@ -70,6 +70,30 @@ pub fn export_scenario_json(
     serde_json::to_string_pretty(&scenario)
 }
 
+/// Exports a crash report in Markdown for issue attachments.
+///
+/// Includes signature context and a replay command section.
+pub fn export_crash_report_markdown(
+    bundle: &CaseBundle,
+    mode: impl Into<String>,
+    replay_command: impl Into<String>,
+) -> String {
+    let mode = mode.into();
+    let replay_command = replay_command.into();
+    let payload_hex = hex::encode(&bundle.seed.payload);
+
+    format!(
+        "# Crash Report\n\n## Signature Context\n- Category: `{}`\n- Digest: `{}`\n- Signature Hash: `{}`\n- Mode: `{}`\n\n## Seed\n- Seed ID: `{}`\n- Payload (hex): `{}`\n\n## Replay Command\n```bash\n{}\n```\n",
+        bundle.signature.category,
+        bundle.signature.digest,
+        bundle.signature.signature_hash,
+        mode,
+        bundle.seed.id,
+        payload_hex,
+        replay_command
+    )
+}
+
 fn is_valid_rust_ident(name: &str) -> bool {
     let mut chars = name.chars();
     let Some(first) = chars.next() else {
@@ -280,5 +304,25 @@ mod tests {
 
         let err = export_rust_regression_fixture(&bundle, "seed 8 bad name").unwrap_err();
         assert!(err.contains("test name"));
+    }
+
+    #[test]
+    fn markdown_export_contains_signature_context_and_replay_command() {
+        let bundle = to_bundle(CaseSeed {
+            id: 77,
+            payload: vec![0xAA, 0xBB],
+        });
+
+        let md = export_crash_report_markdown(
+            &bundle,
+            "invoker",
+            "cargo run --bin replay-single-seed ./bundle.json",
+        );
+
+        assert!(md.contains("Signature Context"));
+        assert!(md.contains(&bundle.signature.category));
+        assert!(md.contains(&bundle.signature.digest.to_string()));
+        assert!(md.contains(&bundle.signature.signature_hash.to_string()));
+        assert!(md.contains("cargo run --bin replay-single-seed"));
     }
 }

@@ -7,10 +7,11 @@ import RunHistoryTable from './RunHistoryTable';
 import RunHistoryTableSkeleton from './RunHistoryTableSkeleton';
 import Pagination from './Pagination';
 import CrashDetailDrawer from './CrashDetailDrawer';
-import { FuzzingRun, RunStatus, RunArea, RunSeverity } from './types';
+import { FuzzingRun, RunStatus } from './types';
 import ReportModal from './ReportModal';
 import { generateMarkdownReport } from './report-utils';
 import CreateRunHeatmapPage55 from './create-run-heatmap-page-55';
+import AlertingSettingsPage54 from './implement-alerting-settings-page-54';
 import { FuzzingRun, RunStatus } from './types';
 import CrossRunBoardWidgets from './implement-cross-run-board-widgets-component';
 import CrossRunBoardCustomWidgets from './create-cross-run-board-custom-widgets-63';
@@ -72,43 +73,6 @@ const toStableQueryString = (params: URLSearchParams): string => {
   return new URLSearchParams(sorted).toString();
 };
 
-const buildMockRuns = () =>
-  Array.from({ length: 25 }, (_, i) => {
-    const id = 1000 + i;
-    const status = (['completed', 'failed', 'running', 'cancelled'][i % 4]) as RunStatus;
-    const area = (['auth', 'state', 'budget', 'xdr'][i % 4]) as RunArea;
-    const severity = (['low', 'medium', 'high', 'critical'][i % 4]) as RunSeverity;
-
-    return {
-      id: `run-${id}`,
-      status,
-      area,
-      severity,
-      duration: 120_000 + i * 95_000,
-      seedCount: 10_000 + i * 1_250,
-      cpuInstructions: 450_000 + i * 28_500,
-      memoryBytes: 1_800_000 + i * 230_000,
-      minResourceFee: 600 + i * 170,
-      crashDetail:
-        status === 'failed'
-          ? {
-              failureCategory: i % 2 === 0 ? 'Panic' : 'InvariantViolation',
-              signature: `sig:${id}:contract::transfer:assert_balance_nonnegative`,
-              payload: JSON.stringify(
-                {
-                  contract: 'token',
-                  method: 'transfer',
-                  args: { from: 'GABCD...1234', to: 'GXYZ...7890', amount: 999999999 },
-                },
-                null,
-                2,
-              ),
-              replayAction: `cargo run --bin crash-replay -- --run-id run-${id}`,
-            }
-          : null,
-    };
-  }).reverse() as unknown as FuzzingRun[];
-
 function HomeContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -165,6 +129,10 @@ function HomeContent() {
       return true;
     });
   }, [runs, statusFilter, expensiveOnly]);
+  const stableQueryString = useMemo(
+    () => toStableQueryString(new URLSearchParams(searchParams.toString())),
+    [searchParams],
+  );
 
   const totalPages = Math.max(1, Math.ceil(filteredRuns.length / ITEMS_PER_PAGE));
   const clampedPage = Math.min(currentPage, totalPages);
@@ -337,16 +305,6 @@ function HomeContent() {
       <div className="w-full mb-12">
         <CrossRunBoardWidgets />
         <CrossRunBoardCustomWidgets runs={runs} />
-      </div>
-
-      {/* Run cluster visualization section */}
-      <div className="w-full mb-12">
-        <RunClusterVisualization runs={runs} />
-      </div>
-
-      {/* Run cluster overview section */}
-      <div className="w-full mb-12">
-        <RunClusterOverview runs={runs} />
       </div>
 
       <div className="text-center max-w-3xl mb-16">
@@ -573,6 +531,7 @@ function HomeContent() {
             </ul>
           )}
         </div>
+        <FailureClusterView runs={runs} pathname={pathname} queryString={stableQueryString} />
         <RunHistoryTable runs={paginatedRuns} onSelectRun={handleOpenRunDrawer} onViewReport={setReportRun} />
         {dataState === 'loading' && (
           <RunHistoryTableSkeleton rows={ITEMS_PER_PAGE} />
@@ -607,8 +566,12 @@ function HomeContent() {
         />
       </div>
 
-      <div className="mb-8 w-full">
+      <div className="mb-12 w-full">
         <CreateRunHeatmapPage55 />
+      </div>
+
+      <div className="mb-12 w-full">
+        <AlertingSettingsPage54 />
       </div>
 
       {showDetailView && (
