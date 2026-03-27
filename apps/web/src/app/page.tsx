@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import RunHistoryTable from './RunHistoryTable';
 import Pagination from './Pagination';
@@ -53,7 +53,7 @@ const isExpensiveRun = (run: FuzzingRun): boolean =>
   run.memoryBytes >= MEMORY_WARNING ||
   run.minResourceFee >= FEE_WARNING;
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -367,5 +367,13 @@ export default function Home() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-zinc-500">Loading dashboard…</div>}>
+      <HomeContent />
+    </Suspense>
   );
 }
