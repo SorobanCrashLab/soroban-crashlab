@@ -1,0 +1,61 @@
+title|complexity|area|type|summary|acceptance|status
+Integrate: Integration test harness for UI flows|medium|area:integration|type:feature|Add integration for Integration test harness for UI flows.|Integration test harness for UI flows works end-to-end.|
+Integrate: CI integration for run replay tests|medium|area:integration|type:feature|Add integration for CI integration for run replay tests.|CI integration for run replay tests works end-to-end.|
+Integrate: Webhook manager for run events|medium|area:integration|type:feature|Add integration for Webhook manager for run events.|Webhook manager for run events works end-to-end.|
+Integrate: Sentry integration for crash reporting|medium|area:integration|type:feature|Add integration for Sentry integration for crash reporting.|Sentry integration for crash reporting works end-to-end.|
+Integrate: Metrics export to Prometheus|medium|area:integration|type:feature|Add integration for Metrics export to Prometheus.|Metrics export to Prometheus works end-to-end.|
+Integrate: Storage backend integration for artifacts|medium|area:integration|type:feature|Add integration for Storage backend integration for artifacts.|Storage backend integration for artifacts works end-to-end.|
+Integrate: Run->issue link integration tests|medium|area:integration|type:feature|Add integration for Run->issue link integration tests.|Run->issue link integration tests works end-to-end.|
+Integrate: Replay end-to-end integration test|medium|area:integration|type:feature|Add integration for Replay end-to-end integration test.|Replay end-to-end integration test works end-to-end.|
+Integrate: Automated regression deploy integration|medium|area:integration|type:feature|Add integration for Automated regression deploy integration.|Automated regression deploy integration works end-to-end.|
+Integrate: Database migration integration tests|medium|area:integration|type:feature|Add integration for Database migration integration tests.|Database migration integration tests works end-to-end.|
+Integrate: External authentication integration|medium|area:integration|type:feature|Add integration for External authentication integration.|External authentication integration works end-to-end.|
+Integrate: GitHub PR link automation|medium|area:integration|type:feature|Add integration for GitHub PR link automation.|GitHub PR link automation works end-to-end.|
+Add Run comparison|high|area:web|type:task|Implement frontend Run comparison for improved UX.|Run comparison is visible and functional in the dashboard.|
+Add Run comparison builder|high|area:web|type:feature|Implement frontend Run comparison builder for improved UX.|Run comparison builder is visible and functional in the dashboard.|
+Implement Run detail modal component|medium|area:web|type:feature|Implement frontend Run detail modal for improved UX.|Run detail modal is visible and functional in the dashboard.|
+Add Artifact explorer|medium|area:web|type:task|Implement frontend Artifact explorer for improved UX.|Artifact explorer is visible and functional in the dashboard.|
+Implement Artifact preview modal component|medium|area:web|type:feature|Implement frontend Artifact preview modal for improved UX.|Artifact preview modal is visible and functional in the dashboard.|
+Add Report generator|medium|area:web|type:task|Implement frontend Report generator for improved UX.|Report generator is visible and functional in the dashboard.|
+Add Reporting templates manager|medium|area:web|type:task|Implement frontend Reporting templates manager for improved UX.|Reporting templates manager is visible and functional in the dashboard.|
+Add Run heatmap|high|area:web|type:task|Implement frontend Run heatmap for improved UX.|Run heatmap is visible and functional in the dashboard.|
+Add Run timeline|high|area:web|type:task|Implement frontend Run timeline for improved UX.|Run timeline is visible and functional in the dashboard.|
+Add Run status timeline|high|area:web|type:task|Implement frontend Run status timeline for improved UX.|Run status timeline is visible and functional in the dashboard.|
+Implement Log viewer component|medium|area:web|type:feature|Implement frontend Log viewer for improved UX.|Log viewer is visible and functional in the dashboard.|
+Add API error report|medium|area:web|type:task|Implement frontend API error report for improved UX.|API error report is visible and functional in the dashboard.|
+Add Run QA checklist|medium|area:web|type:task|Implement frontend Run QA checklist for improved UX.|Run QA checklist is visible and functional in the dashboard.|
+Create Advanced dashboard filters page|medium|area:web|type:feature|Implement frontend Advanced dashboard filters for improved UX.|Advanced dashboard filters is visible and functional in the dashboard.|
+Add Bulk actions for runs|medium|area:web|type:task|Implement frontend Bulk actions for runs for improved UX.|Bulk actions for runs is visible and functional in the dashboard.|
+Add Export run CSV|trivial|area:web|type:task|Implement frontend Export run CSV for improved UX.|Export run CSV is visible and functional in the dashboard.|
+Add Export run JSON|trivial|area:web|type:task|Implement frontend Export run JSON for improved UX.|Export run JSON is visible and functional in the dashboard.|
+Implement Crash detail drawer component|medium|area:web|type:feature|Implement frontend Crash detail drawer for improved UX.|Crash detail drawer is visible and functional in the dashboard.|
+Add Run replay UI|high|area:web|type:feature|Implement frontend Run replay UI for improved UX.|Run replay UI is visible and functional in the dashboard.|
+Add Replay from UI action|high|area:web|type:feature|Implement frontend Replay from UI action for improved UX.|Replay from UI action is visible and functional in the dashboard.|
+Implement Run history table component|medium|area:web|type:feature|Implement frontend Run history table for improved UX.|Run history table is visible and functional in the dashboard.|
+Implement Resource fee insight panel component|medium|area:web|type:feature|Implement frontend Resource fee insight panel for improved UX.|Resource fee insight panel is visible and functional in the dashboard.|
+Create Run issue link page page|medium|area:web|type:feature|Implement frontend Run issue link page for improved UX.|Run issue link page is visible and functional in the dashboard.|
+Create Sanity check pipeline page page|medium|area:web|type:feature|Implement frontend Sanity check pipeline page for improved UX.|Sanity check pipeline page is visible and functional in the dashboard.|
+Add Failure classification taxonomy|high|area:web|type:task|Implement frontend Failure classification taxonomy for improved UX.|Failure classification taxonomy is visible and functional in the dashboard.|
+Add Run filtering by severity|medium|area:web|type:task|Implement frontend Run filtering by severity for improved UX.|Run filtering by severity is visible and functional in the dashboard.|
+Add Keyboard navigation help|trivial|area:web|type:task|Implement frontend Keyboard navigation help for improved UX.|Keyboard navigation help is visible and functional in the dashboard.|
+Add Accessible keyboard nav blueprint|trivial|area:web|type:task|Implement frontend Accessible keyboard nav blueprint for improved UX.|Accessible keyboard nav blueprint is visible and functional in the dashboard.|
+Implement Onboarding checklist modal component|trivial|area:web|type:feature|Implement frontend Onboarding checklist modal for improved UX.|Onboarding checklist modal is visible and functional in the dashboard.|
+Add Theme tokens and contrast|trivial|area:web|type:task|Implement frontend Theme tokens and contrast for improved UX.|Theme tokens and contrast is visible and functional in the dashboard.|
+Add Dark mode support|trivial|area:web|type:task|Implement frontend Dark mode support for improved UX.|Dark mode support is visible and functional in the dashboard.|
+Add Responsive layout improvements|trivial|area:web|type:task|Implement frontend Responsive layout improvements for improved UX.|Responsive layout improvements is visible and functional in the dashboard.|
+Implement Virtualized run table component|trivial|area:web|type:feature|Implement frontend Virtualized run table for improved UX.|Virtualized run table is visible and functional in the dashboard.|
+Add Column customization|trivial|area:web|type:task|Implement frontend Column customization for improved UX.|Column customization is visible and functional in the dashboard.|
+Add Heatmap interactions|high|area:web|type:task|Implement frontend Heatmap interactions for improved UX.|Heatmap interactions is visible and functional in the dashboard.|
+Add Notification center UI|medium|area:web|type:feature|Implement frontend Notification center UI for improved UX.|Notification center UI is visible and functional in the dashboard.|
+Create Alerting settings page page|medium|area:web|type:feature|Implement frontend Alerting settings page for improved UX.|Alerting settings page is visible and functional in the dashboard.|
+Add Alert presets|medium|area:web|type:task|Implement frontend Alert presets for improved UX.|Alert presets is visible and functional in the dashboard.|
+Add Run annotations|medium|area:web|type:task|Implement frontend Run annotations for improved UX.|Run annotations is visible and functional in the dashboard.|
+Add Tagging and labels UI|trivial|area:web|type:feature|Implement frontend Tagging and labels UI for improved UX.|Tagging and labels UI is visible and functional in the dashboard.|
+Add Markdown preview for reports|trivial|area:web|type:task|Implement frontend Markdown preview for reports for improved UX.|Markdown preview for reports is visible and functional in the dashboard.|
+Add Issue triage board UI|medium|area:web|type:feature|Implement frontend Issue triage board UI for improved UX.|Issue triage board UI is visible and functional in the dashboard.|
+Implement Cross-run board widgets component|medium|area:web|type:feature|Implement frontend Cross-run board widgets for improved UX.|Cross-run board widgets is visible and functional in the dashboard.|
+Implement Widget layout editor component|medium|area:web|type:feature|Implement frontend Widget layout editor for improved UX.|Widget layout editor is visible and functional in the dashboard.|
+Add Run comparison charts|high|area:web|type:task|Implement frontend Run comparison charts for improved UX.|Run comparison charts is visible and functional in the dashboard.|
+Implement Timeline scrubber component component|high|area:web|type:feature|Implement frontend Timeline scrubber component for improved UX.|Timeline scrubber component is visible and functional in the dashboard.|
+Add Run cluster visualization|high|area:web|type:task|Implement frontend Run cluster visualization for improved UX.|Run cluster visualization is visible and functional in the dashboard.|
+Add Run cluster overview|high|area:web|type:task|Implement frontend Run cluster overview for improved UX.|Run cluster overview is visible and functional in the dashboard.|
