@@ -11,6 +11,7 @@ import { FuzzingRun, RunStatus, RunArea, RunSeverity } from './types';
 import ReportModal from './ReportModal';
 import { generateMarkdownReport } from './report-utils';
 import CreateRunHeatmapPage55 from './create-run-heatmap-page-55';
+import AlertingSettingsPage54 from './implement-alerting-settings-page-54';
 import { FuzzingRun, RunStatus } from './types';
 import CrossRunBoardWidgets from './implement-cross-run-board-widgets-component';
 import RunClusterVisualization from './add-run-cluster-visualization';
@@ -605,8 +606,12 @@ function HomeContent() {
         />
       </div>
 
-      <div className="mb-8 w-full">
+      <div className="mb-12 w-full">
         <CreateRunHeatmapPage55 />
+      </div>
+
+      <div className="mb-12 w-full">
+        <AlertingSettingsPage54 />
       </div>
 
       {showDetailView && (
