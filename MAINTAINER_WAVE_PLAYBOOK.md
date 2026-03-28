@@ -89,6 +89,16 @@ Review inside 24 hours to prevent unnecessary automated appeals. Review in this 
 4. Test coverage
 5. Clarity and maintainability
 
+## Release management
+
+Use [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) whenever you need to
+cut a tagged release. It defines:
+
+- how to choose the next version
+- how to update [`CHANGELOG.md`](CHANGELOG.md)
+- how to review backward compatibility before tagging
+- which validation commands to run before publishing release notes
+
 ## Unblocking contributor failures
 
 When a contributor is blocked on local setup, build, test, or replay issues,

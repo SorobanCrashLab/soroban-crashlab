@@ -22,6 +22,7 @@ To report a vulnerability, see our [Security Policy](.github/SECURITY.md). Do no
 - `docs/`: project documentation
   - [`ARCHITECTURE.md`](docs/ARCHITECTURE.md): system architecture and data flow
   - [`REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md): deterministic guarantees and troubleshooting
+  - [`RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md): maintainer checklist for tagging releases, updating the changelog, and reviewing backward compatibility
 - `.github/ISSUE_TEMPLATE`: structured issue intake for maintainers and contributors
 - `ops/wave3-issues.tsv`: curated backlog for Wave 3 with 32 non-overlapping issues
 - `scripts/create-wave3-issues.sh`: script to publish backlog issues to GitHub
@@ -182,6 +183,9 @@ chmod +x scripts/create-wave3-issues.sh
 3. Review PRs with reproducibility and safety as first checks.
 4. Mark issues resolved before wave cutoff when quality is acceptable.
 5. Leave post-resolution review feedback to strengthen contributor trust.
+
+For release tagging, changelog upkeep, and compatibility review, follow the
+[release process guide](docs/RELEASE_PROCESS.md).
 
 ## Security Hardening Assumptions
 ### Fuzz Input Handling

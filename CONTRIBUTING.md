@@ -247,6 +247,10 @@ Also paste the exact failing command and the first relevant error block.
 2. Keep PRs focused on one issue.
 3. Link the issue in the PR description using `Closes #<number>`.
 4. Include test evidence and reproduction notes for behavior changes.
+5. If your change alters a public API, persisted schema, CLI contract, or
+   documented maintainer workflow, call that out clearly in the PR so the next
+   release maintainer can update [`CHANGELOG.md`](CHANGELOG.md) and run the
+   compatibility review in [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 
 ## Quality bar
 
