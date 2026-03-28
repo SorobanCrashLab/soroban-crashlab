@@ -14,6 +14,7 @@ import CreateRunHeatmapPage55 from './create-run-heatmap-page-55';
 import AddRunComparisonCharts from './add-run-comparison-charts';
 import AddTaggingAndLabelsUi from './add-tagging-and-labels-ui';
 import AlertingSettingsPage54 from './implement-alerting-settings-page-54';
+import AlertingSettingsPage from './create-alerting-settings-page-page';
 import CrossRunBoardWidgets from './implement-cross-run-board-widgets-component';
 import CrossRunBoardCustomWidgets from './create-cross-run-board-custom-widgets-63';
 import RunClusterVisualization from './add-run-cluster-visualization';
@@ -646,6 +647,12 @@ function HomeContent() {
       {isMaintainer && (
         <div className="mb-12 w-full">
           <AlertingSettingsPage54 />
+        </div>
+      )}
+
+      {isMaintainer && (
+        <div className="mb-12 w-full">
+          <AlertingSettingsPage />
         </div>
       )}
 

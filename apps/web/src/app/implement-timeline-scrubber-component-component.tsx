@@ -14,7 +14,10 @@ export default function TimelineScrubber({ runs, onSelectRun }: TimelineScrubber
   // Reset index or clamp it if the runs list changes significantly
   useEffect(() => {
     if (index >= runs.length && runs.length > 0) {
-      setIndex(runs.length - 1);
+      const timer = setTimeout(() => {
+        setIndex(runs.length - 1);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [runs.length, index]);
 

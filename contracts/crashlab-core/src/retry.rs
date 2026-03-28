@@ -116,7 +116,10 @@ pub fn calculate_backoff(
     // Apply jitter (0.5 to 1.5 of the capped backoff)
     let jitter_factor = if let Some(p) = prng {
         // Use deterministic PRNG for stable tests
-        0.5 + p.next_f64()
+        // Convert u64 to f64 in range [0.0, 1.0)
+        let random_u64 = p.next_u64();
+        let normalized = (random_u64 as f64) / (u64::MAX as f64);
+        0.5 + normalized
     } else {
         // Fallback to simple pseudo-randomness if no PRNG provided
         #[cfg(not(test))]
@@ -127,7 +130,9 @@ pub fn calculate_backoff(
                 .unwrap_or(Duration::ZERO)
                 .as_nanos() as u64;
             let mut p = SeededPrng::new(seed);
-            0.5 + p.next_f64()
+            let random_u64 = p.next_u64();
+            let normalized = (random_u64 as f64) / (u64::MAX as f64);
+            0.5 + normalized
         }
         #[cfg(test)]
         1.0
@@ -175,8 +180,8 @@ mod tests {
             max_backoff: Duration::from_millis(500),
         };
 
-        let bDefault = calculate_backoff(&config, 10, None);
-        assert_eq!(bDefault, Duration::from_millis(500));
+        let b_default = calculate_backoff(&config, 10, None);
+        assert_eq!(b_default, Duration::from_millis(500));
     }
 
     #[test]
