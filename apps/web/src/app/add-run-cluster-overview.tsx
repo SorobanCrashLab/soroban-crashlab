@@ -7,6 +7,41 @@ interface RunClusterOverviewProps {
   runs: FuzzingRun[];
 }
 
+export interface ClusterStats {
+  area: RunArea;
+  total: number;
+  failed: number;
+  running: number;
+  completed: number;
+  avgCpu: number;
+  criticalIssues: number;
+  healthScore: number;
+}
+
+export function computeClusterStats(runs: FuzzingRun[]): ClusterStats[] {
+  const areas: RunArea[] = ['auth', 'state', 'budget', 'xdr'];
+
+  return areas.map((area) => {
+    const areaRuns = runs.filter((r) => r.area === area);
+    const total = areaRuns.length;
+    const failed = areaRuns.filter((r) => r.status === 'failed').length;
+    const running = areaRuns.filter((r) => r.status === 'running').length;
+    const completed = areaRuns.filter((r) => r.status === 'completed').length;
+
+    const avgCpu =
+      total > 0
+        ? Math.round(areaRuns.reduce((acc, r) => acc + r.cpuInstructions, 0) / total)
+        : 0;
+
+    const criticalIssues = areaRuns.filter((r) => r.severity === 'critical').length;
+
+    const healthScore =
+      total > 0 ? Math.round(((completed + running * 0.5) / total) * 100) : 100;
+
+    return { area, total, failed, running, completed, avgCpu, criticalIssues, healthScore };
+  });
+}
+
 const AREA_CONFIG: Record<RunArea, { label: string; icon: React.ReactNode; color: string; description: string }> = {
   auth: {
     label: 'Authentication',
@@ -79,42 +114,16 @@ const HEALTH_COLORS = {
   rose: 'text-rose-600 dark:text-rose-400',
 };
 
-const RunClusterOverview: React.FC<RunClusterOverviewProps> = ({ runs }) => {
-  const clusterStats = useMemo(() => {
-    const areas: RunArea[] = ['auth', 'state', 'budget', 'xdr'];
-    
-    return areas.map((area) => {
-      const areaRuns = runs.filter((r) => r.area === area);
-      const total = areaRuns.length;
-      const failed = areaRuns.filter((r) => r.status === 'failed').length;
-      const running = areaRuns.filter((r) => r.status === 'running').length;
-      const completed = areaRuns.filter((r) => r.status === 'completed').length;
-      
-      const avgCpu = total > 0 
-        ? Math.round(areaRuns.reduce((acc, r) => acc + r.cpuInstructions, 0) / total) 
-        : 0;
-      
-      const criticalIssues = areaRuns.filter((r) => r.severity === 'critical').length;
-      
-      const healthScore = total > 0 
-        ? Math.round(((completed + running * 0.5) / total) * 100) 
-        : 100;
+export function getHealthColor(score: number): string {
+  const colorKey = score > 80 ? 'emerald' : score > 50 ? 'amber' : 'rose';
+  return HEALTH_COLORS[colorKey];
+}
 
-      return {
-        area,
-        total,
-        failed,
-        running,
-        completed,
-        avgCpu,
-        criticalIssues,
-        healthScore,
-      };
-    });
-  }, [runs]);
+const RunClusterOverview: React.FC<RunClusterOverviewProps> = ({ runs }) => {
+  const clusterStats = useMemo(() => computeClusterStats(runs), [runs]);
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-6" aria-label="Cluster Health Overview">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Cluster Health Overview</h2>
@@ -133,8 +142,7 @@ const RunClusterOverview: React.FC<RunClusterOverviewProps> = ({ runs }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {clusterStats.map((stats) => {
           const config = AREA_CONFIG[stats.area];
-          const colorKey = stats.healthScore > 80 ? 'emerald' : stats.healthScore > 50 ? 'amber' : 'rose';
-          const healthColorClass = HEALTH_COLORS[colorKey];
+          const healthColorClass = getHealthColor(stats.healthScore);
           const styleConfig = COLOR_CLASSES[config.color];
           
           return (

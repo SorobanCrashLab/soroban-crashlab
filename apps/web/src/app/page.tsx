@@ -467,6 +467,11 @@ function HomeContent() {
         })}
       </div>
 
+      {dataState === 'loading' && (
+        <div className="w-full h-48 rounded-xl bg-zinc-100 dark:bg-zinc-800 animate-pulse mb-6" />
+      )}
+      {dataState === 'success' && <RunClusterOverview runs={runs} />}
+
       <div className="w-full mb-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Recent Fuzzing Runs</h2>
