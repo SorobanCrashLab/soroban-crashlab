@@ -18,7 +18,7 @@ To report a vulnerability, see our [Security Policy](.github/SECURITY.md). Do no
 ## Repository structure
 
 - `apps/web`: Next.js frontend dashboard for runs, failures, and replay output
-- `contracts/crashlab-core`: Rust crate for core fuzzing and reproducible case generation (`export_suite_json` / `run_regression_suite_from_json` for JSON regression packs)
+- `contracts/crashlab-core`: Rust crate for core fuzzing and reproducible case generation (`WorkerPartition` / `drive_run_partitioned` split seed indices across workers deterministically; see `docs/REPRODUCIBILITY.md`)
 - `docs/`: project documentation
   - [`ARCHITECTURE.md`](docs/ARCHITECTURE.md): system architecture and data flow
   - [`REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md): deterministic guarantees and troubleshooting
@@ -91,6 +91,8 @@ Input may be a bare JSON array of seeds or a full archive document; output is al
 ### Simulation timeout guardrails
 
 `run_simulation_with_timeout` wraps a host/contract simulation and returns `timeout_crash_signature` when wall time exceeds `SimulationTimeoutConfig::timeout_ms`. Surface the active limit in dashboards or logs with `RunMetadata::from_timeout_config`.
+
+Run metadata JSON is versioned (`schema` / `RUN_METADATA_SCHEMA_VERSION`). Persist with `save_run_metadata_json` and reload with `load_run_metadata_json` so documents without a `schema` field (older writes) are accepted and normalized to the current format without losing `simulation_timeout_ms`.
 
 ### Vec / map container stress mutator
 

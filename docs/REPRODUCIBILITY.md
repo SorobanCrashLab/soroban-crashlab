@@ -63,6 +63,12 @@ let mutator = scheduler.select_mutator(&mut rng);
 
 **Guarantee**: Given identical RNG state and weight configuration, mutator selection order is deterministic across runs.
 
+### Parallel worker partitioning
+
+When splitting a campaign across workers, use `WorkerPartition` and `drive_run_partitioned` from `crashlab-core`: global seed index `i` is assigned to worker `i % num_workers`. Each worker runs only its indices, but the runner still walks the full `0..total_seeds` order for cancellation alignment.
+
+**Guarantee**: Per-seed outputs (classification, signatures, mutation) depend only on the seed index and payload, not on worker count. Merging worker results sorted by global seed index matches a single-worker `drive_run` over the same schedule.
+
 ## Known Limitations
 
 ### Environment-Dependent Factors

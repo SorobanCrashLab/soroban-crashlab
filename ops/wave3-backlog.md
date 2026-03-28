@@ -24,7 +24,7 @@ This backlog is intentionally scoped for contributor onboarding and maintainer t
 
 - **Duplicate crash de-dup index** (`area:generator`): Added `crash_index` module with `CrashIndex`, `CrashGroup`, and `CrashIndexSummary`. Groups repeated failures by `signature_hash`, tracks hit count and newest sample per group. `CrashIndexSummary::to_cli_table()` renders grouped counts and newest seed for CLI/dashboard consumption.
 - **Deterministic suite export ordering** (`area:generator`, #61): Added `export_suite_json` to `scenario_export` module. Sorts `FailureScenario` entries by `(seed_id, failure_class)` before serialization so consecutive exports of the same bundle set are byte-identical regardless of input order.
-- **Regression suite loader** (`area:generator`, #16): Added `regression_suite` module with `load_regression_suite_json`, `run_regression_suite`, and `run_regression_suite_from_json`. Re-classifies each exported scenario and returns `RegressionSuiteSummary` with per-case pass/fail.
+- **Deterministic parallel worker partitioning** (`area:fuzzer`, #41): Added `worker_partition` module (`WorkerPartition`, `worker_for_seed`) and `drive_run_partitioned` in `run_control`. Modulo assignment `i % num_workers` preserves global seed order for cancellation; merged per-seed outputs match single-worker replay.
 
 ## Maintainer note
 

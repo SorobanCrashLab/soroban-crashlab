@@ -97,7 +97,9 @@ pub use regression_grouping::{
 
 pub mod simulation;
 pub use simulation::{
-    RunMetadata, SimulationTimeoutConfig, run_simulation_with_timeout, timeout_crash_signature,
+    RunMetadata, RunMetadataError, SimulationTimeoutConfig, load_run_metadata_json,
+    run_simulation_with_timeout, save_run_metadata_json, timeout_crash_signature,
+    RUN_METADATA_SCHEMA_VERSION, SUPPORTED_RUN_METADATA_SCHEMAS,
 };
 
 pub mod container_stress;
@@ -118,10 +120,13 @@ pub use seed_novelty::{
 pub mod stale_detector;
 pub use stale_detector::{StaleDetectorConfig, StaleRunDetector, StaleStatus};
 
+pub mod worker_partition;
+pub use worker_partition::{WorkerPartition, WorkerPartitionError, worker_for_seed};
+
 pub mod run_control;
 pub use run_control::{
     CancelSignal, RunId, RunSummary, RunTerminalState, cancel_marker_path, cancel_requested,
-    clear_cancel_request, default_state_dir, drive_run, request_cancel_run,
+    clear_cancel_request, default_state_dir, drive_run, drive_run_partitioned, request_cancel_run,
 };
 
 pub mod rpc_envelope;

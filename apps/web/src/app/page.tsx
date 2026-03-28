@@ -14,11 +14,13 @@ import CreateRunHeatmapPage55 from './create-run-heatmap-page-55';
 import AddRunComparisonCharts from './add-run-comparison-charts';
 import AddTaggingAndLabelsUi from './add-tagging-and-labels-ui';
 import AlertingSettingsPage54 from './implement-alerting-settings-page-54';
-
 import CrossRunBoardWidgets from './implement-cross-run-board-widgets-component';
 import CrossRunBoardCustomWidgets from './create-cross-run-board-custom-widgets-63';
 import RunClusterVisualization from './add-run-cluster-visualization';
 import RunClusterOverview from './add-run-cluster-overview';
+import FailureClusterView from './FailureClusterView';
+import MaintainerToggle from './MaintainerToggle';
+import { useMaintainerMode } from './useMaintainerMode';
 
 // Mock data for demonstration
 const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 25 }, (_, i) => ({
@@ -86,6 +88,7 @@ function HomeContent() {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [reportRun, setReportRun] = useState<FuzzingRun | null>(null);
   const cardsContainerRef = useRef<HTMLDivElement>(null);
+  const { isMaintainer, toggle: toggleMaintainerMode, mounted: maintainerMounted } = useMaintainerMode();
 
   const selectedRunId = searchParams.get('run');
   const statusFilter = STATUS_OPTIONS.includes((searchParams.get('status') ?? 'all') as 'all' | RunStatus)
@@ -301,11 +304,22 @@ function HomeContent() {
 
   return (
     <div className="flex flex-col items-center justify-center py-20 px-8 max-w-5xl mx-auto w-full">
-      {/* Cross-run board widgets section */}
-      <div className="w-full mb-12">
-        <CrossRunBoardWidgets />
-        <CrossRunBoardCustomWidgets runs={runs} />
+      {/* Role toggle */}
+      <div className="w-full flex justify-end mb-6">
+        <MaintainerToggle
+          isMaintainer={isMaintainer}
+          onToggle={toggleMaintainerMode}
+          mounted={maintainerMounted}
+        />
       </div>
+
+      {/* Cross-run board widgets section — maintainer only */}
+      {isMaintainer && (
+        <div className="w-full mb-12">
+          <CrossRunBoardWidgets />
+          <CrossRunBoardCustomWidgets runs={runs} />
+        </div>
+      )}
 
       <div className="text-center max-w-3xl mb-16">
         <h1 className="text-5xl font-bold tracking-tight mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -505,33 +519,37 @@ function HomeContent() {
           <p className="mb-3 text-sm text-red-700 dark:text-red-400">Could not copy link. Copy the URL from your browser address bar.</p>
         )}
 
-        <div className="mb-5 border border-amber-200 dark:border-amber-900/50 rounded-xl p-4 bg-amber-50/70 dark:bg-amber-950/20">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Resource Fee Insight</h3>
-            <span className="text-xs text-amber-800 dark:text-amber-300">
-              thresholds: cpu &ge; {CPU_WARNING.toLocaleString()}, mem &ge; {formatBytes(MEMORY_WARNING)}, fee &ge; {formatFee(FEE_WARNING)}
-            </span>
-          </div>
+        {isMaintainer && (
+          <div className="mb-5 border border-amber-200 dark:border-amber-900/50 rounded-xl p-4 bg-amber-50/70 dark:bg-amber-950/20">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Resource Fee Insight</h3>
+              <span className="text-xs text-amber-800 dark:text-amber-300">
+                thresholds: cpu &ge; {CPU_WARNING.toLocaleString()}, mem &ge; {formatBytes(MEMORY_WARNING)}, fee &ge; {formatFee(FEE_WARNING)}
+              </span>
+            </div>
 
-          {expensiveRuns.length === 0 ? (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">No expensive runs on this page.</p>
-          ) : (
-            <ul className="space-y-2">
-              {expensiveRuns.map((run) => (
-                <li key={run.id} className="text-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2 bg-white/60 dark:bg-zinc-900/40 rounded-lg px-3 py-2 border border-amber-100 dark:border-amber-900/40">
-                  <div className="font-mono text-zinc-800 dark:text-zinc-200">{run.id}</div>
-                  <div className="text-zinc-700 dark:text-zinc-300">
-                    cpu {run.cpuInstructions.toLocaleString()} &middot; mem {formatBytes(run.memoryBytes)} &middot; min fee {formatFee(run.minResourceFee)}
-                  </div>
-                  <Link href={`/runs/${run.id}`} className="text-amber-700 dark:text-amber-300 hover:underline underline-offset-4 font-medium">
-                    View run details
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        {/* <FailureClusterView runs={runs} pathname={pathname} queryString={stableQueryString} /> */}
+            {expensiveRuns.length === 0 ? (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">No expensive runs on this page.</p>
+            ) : (
+              <ul className="space-y-2">
+                {expensiveRuns.map((run) => (
+                  <li key={run.id} className="text-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2 bg-white/60 dark:bg-zinc-900/40 rounded-lg px-3 py-2 border border-amber-100 dark:border-amber-900/40">
+                    <div className="font-mono text-zinc-800 dark:text-zinc-200">{run.id}</div>
+                    <div className="text-zinc-700 dark:text-zinc-300">
+                      cpu {run.cpuInstructions.toLocaleString()} &middot; mem {formatBytes(run.memoryBytes)} &middot; min fee {formatFee(run.minResourceFee)}
+                    </div>
+                    <Link href={`/runs/${run.id}`} className="text-amber-700 dark:text-amber-300 hover:underline underline-offset-4 font-medium">
+                      View run details
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {isMaintainer && (
+          <FailureClusterView runs={runs} pathname={pathname} queryString={stableQueryString} />
+        )}
         <RunHistoryTable runs={paginatedRuns} onSelectRun={handleOpenRunDrawer} onViewReport={setReportRun} />
         {dataState === 'loading' && (
           <RunHistoryTableSkeleton rows={ITEMS_PER_PAGE} />
@@ -574,13 +592,17 @@ function HomeContent() {
         <AddTaggingAndLabelsUi runs={filteredRuns} />
       </div>
 
-      <div className="mb-12 w-full">
-        <CreateRunHeatmapPage55 />
-      </div>
+      {isMaintainer && (
+        <div className="mb-12 w-full">
+          <CreateRunHeatmapPage55 />
+        </div>
+      )}
 
-      <div className="mb-12 w-full">
-        <AlertingSettingsPage54 />
-      </div>
+      {isMaintainer && (
+        <div className="mb-12 w-full">
+          <AlertingSettingsPage54 />
+        </div>
+      )}
 
       {showDetailView && (
         <div
