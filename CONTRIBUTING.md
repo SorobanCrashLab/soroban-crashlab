@@ -60,6 +60,9 @@ gh auth status
 If you do not plan to use the GitHub automation scripts yet, you can skip
 this step.
 
+Maintainers use `scripts/check-sla.sh` and `scripts/backlog-freshness-review.sh`
+as described in [`MAINTAINER_WAVE_PLAYBOOK.md`](MAINTAINER_WAVE_PLAYBOOK.md).
+
 ### 5. Install frontend dependencies
 
 ```bash

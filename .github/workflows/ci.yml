@@ -30,3 +30,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cargo test --all-targets
+
+  ops-scripts-syntax:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n scripts/backlog-freshness-review.sh
