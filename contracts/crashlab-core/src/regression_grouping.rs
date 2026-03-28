@@ -259,7 +259,8 @@ mod tests {
         assert_eq!(ke.domain, FailureClass::EmptyInput);
         assert_eq!(ke.failure_mode, "empty-input");
 
-        let map = group_bundles_by_regression_group(&[b1, b2, b3, empty]);
+        let bundles = [b1, b2, b3, empty];
+        let map = group_bundles_by_regression_group(&bundles);
         assert_eq!(map.len(), 2);
         let auth_rt = RegressionGroupKey {
             domain: FailureClass::Auth,
