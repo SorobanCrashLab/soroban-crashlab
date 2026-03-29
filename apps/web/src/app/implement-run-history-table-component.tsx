@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import AddReplayFromUiAction from './add-replay-from-ui-action';
 import { FuzzingRun, RunStatus, RunSeverity } from './types';
 
 interface RunHistoryTableProps {
@@ -10,6 +11,8 @@ interface RunHistoryTableProps {
   onSelectRun: (runId: string) => void;
   /** Called when the report button is clicked for a run */
   onViewReport: (run: FuzzingRun) => void;
+  /** Called when a replay is initiated for a run */
+  onReplayRun?: (newRunData: { id: string; status: 'running' }) => void;
   /** List of visible columns */
   visibleColumns?: string[];
 }
@@ -71,10 +74,12 @@ export default function EnhancedRunHistoryTable({
   runs, 
   onSelectRun, 
   onViewReport, 
+  onReplayRun,
   visibleColumns = ['id', 'status', 'severity', 'duration', 'seedCount', 'cpu', 'actions'] 
 }: RunHistoryTableProps) {
   const [sortField, setSortField] = useState<keyof FuzzingRun>('id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const showOperations = visibleColumns.includes('actions') || visibleColumns.includes('report');
 
   const sortedRuns = useMemo(() => {
     return [...runs].sort((a: FuzzingRun, b: FuzzingRun) => {
@@ -147,7 +152,7 @@ export default function EnhancedRunHistoryTable({
                   Cycles
                 </th>
               )}
-              {visibleColumns.includes('actions') && (
+              {showOperations && (
                 <th className="px-6 py-5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-right pr-8">
                   Operations
                 </th>
@@ -158,8 +163,15 @@ export default function EnhancedRunHistoryTable({
             {sortedRuns.map((run) => (
               <tr
                 key={run.id}
+                tabIndex={0}
                 className="group hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all cursor-pointer"
                 onClick={() => onSelectRun(run.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectRun(run.id);
+                  }
+                }}
               >
                 {visibleColumns.includes('id') && (
                   <td className="px-6 py-5">
@@ -168,6 +180,11 @@ export default function EnhancedRunHistoryTable({
                         #{run.id.split('-').pop()}
                       </span>
                       <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-tight mt-0.5">{run.area} focus</span>
+                      {run.crashDetail && (
+                        <span className="mt-2 inline-flex w-fit items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+                          Crash detail ready
+                        </span>
+                      )}
                     </div>
                   </td>
                 )}
@@ -207,29 +224,37 @@ export default function EnhancedRunHistoryTable({
                     </span>
                   </td>
                 )}
-                {visibleColumns.includes('actions') && (
+                {showOperations && (
                   <td className="px-6 py-5 text-right pr-8">
-                    <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all transform translate-x-1 group-hover:translate-x-0">
-                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewReport(run);
-                        }}
-                        className="p-2 bg-white dark:bg-zinc-900 rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all border border-zinc-200 dark:border-zinc-800 shadow-sm"
-                        title="View Full Report"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </button>
+                    <div className="flex items-center justify-end gap-2 opacity-100 transition-all md:translate-x-1 md:opacity-0 md:group-hover:translate-x-0 md:group-hover:opacity-100">
+                      {onReplayRun && run.crashDetail && (
+                        <AddReplayFromUiAction runId={run.id} onReplayInitiated={onReplayRun} />
+                      )}
+                      {visibleColumns.includes('report') && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewReport(run);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[11px] font-semibold text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                          title="View markdown report"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Report
+                        </button>
+                      )}
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onSelectRun(run.id);
                         }}
-                        className="px-5 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-black/10 hover:shadow-blue-500/20 active:scale-95 transition-all"
+                        className="rounded-xl bg-zinc-900 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white shadow-xl shadow-black/10 transition-all hover:shadow-blue-500/20 active:scale-95 dark:bg-zinc-100 dark:text-zinc-900"
                       >
-                        Inspect
+                        {run.crashDetail ? 'Crash details' : 'Inspect'}
                       </button>
                     </div>
                   </td>

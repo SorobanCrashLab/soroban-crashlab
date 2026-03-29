@@ -6,8 +6,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import RunHistoryTable from './implement-run-history-table-component';
 import RunHistoryTableSkeleton from './RunHistoryTableSkeleton';
 import Pagination from './Pagination';
-import CrashDetailDrawer from './CrashDetailDrawer';
-import { FuzzingRun, RunStatus, RunArea, RunSeverity } from './types';
+import CrashDetailDrawer from './implement-crash-detail-drawer-component';
+import { FuzzingRun, RunStatus, RunSeverity } from './types';
 import ReportModal from './ReportModal';
 import { generateMarkdownReport } from './report-utils';
 import CreateRunHeatmapPage55 from './create-run-heatmap-page-55';
@@ -47,35 +47,9 @@ import RunSeverityFilter from './add-run-filtering-by-severity';
 import AddRunTimeline from './add-run-timeline';
 import OnboardingChecklistModal from './implement-onboarding-checklist-modal-component';
 import FailureClassificationTaxonomy from './add-failure-classification-taxonomy';
+import { buildMockRuns } from './mockRuns';
 
-// Mock data for demonstration
-const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 25 }, (_, i) => ({
-  id: `run-${1000 + i}`,
-  status: (['completed', 'failed', 'running', 'cancelled'][i % 4]) as RunStatus,
-  area: (['auth', 'state', 'budget', 'xdr'][i % 4]) as RunArea,
-  severity: (['low', 'medium', 'high', 'critical'][i % 4]) as RunSeverity,
-  duration: 120000 + (Math.random() * 3600000), // 2m to 1h
-  seedCount: Math.floor(10000 + Math.random() * 90000),
-  cpuInstructions: Math.floor(400000 + Math.random() * 900000),
-  memoryBytes: Math.floor(1_500_000 + Math.random() * 8_000_000),
-  minResourceFee: Math.floor(500 + Math.random() * 5000),
-  crashDetail: i % 4 === 1
-    ? {
-      failureCategory: i % 8 === 1 ? 'Panic' : 'InvariantViolation',
-      signature: `sig:${1000 + i}:contract::transfer:assert_balance_nonnegative`,
-      payload: JSON.stringify({
-        contract: 'token',
-        method: 'transfer',
-        args: {
-          from: 'GABCD...1234',
-          to: 'GXYZ...7890',
-          amount: 999999999,
-        },
-      }, null, 2),
-      replayAction: `cargo run --bin crash-replay -- --run-id run-${1000 + i}`,
-    }
-    : null,
-})).reverse();
+const MOCK_RUNS: FuzzingRun[] = buildMockRuns();
 
 const ITEMS_PER_PAGE = 10;
 const CPU_WARNING = 900_000;
@@ -118,7 +92,7 @@ function HomeContent() {
   const [reportRun, setReportRun] = useState<FuzzingRun | null>(null);
   const cardsContainerRef = useRef<HTMLDivElement>(null);
   const { isMaintainer, toggle: toggleMaintainerMode, mounted: maintainerMounted } = useMaintainerMode();
-  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(['id', 'status', 'duration', 'seedCount', 'report']);
+  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(['id', 'status', 'duration', 'seedCount', 'actions', 'report']);
 
   const selectedRunId = searchParams.get('run');
   const statusFilter = STATUS_OPTIONS.includes((searchParams.get('status') ?? 'all') as 'all' | RunStatus)
@@ -167,7 +141,7 @@ function HomeContent() {
       }
       return true;
     });
-  }, [runs, statusFilter, expensiveOnly]);
+  }, [runs, statusFilter, severityFilter, expensiveOnly]);
   const stableQueryString = useMemo(
     () => toStableQueryString(new URLSearchParams(searchParams.toString())),
     [searchParams],

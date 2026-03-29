@@ -77,6 +77,8 @@ const VirtualRow = ({
     onViewReport: (run: FuzzingRun) => void;
     visibleColumns: string[];
 }) => {
+    const showOperations = visibleColumns.includes('actions') || visibleColumns.includes('report');
+
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent<HTMLTableRowElement>) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -125,19 +127,33 @@ const VirtualRow = ({
                     {run.seedCount.toLocaleString()}
                 </td>
             )}
-            {visibleColumns.includes('report') && (
-                <td className="px-6 w-32 shrink-0 text-right">
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onViewReport(run);
-                        }}
-                        className="text-xs font-medium px-3 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                        aria-label={`View markdown report for ${run.id}`}
-                    >
-                        View Report
-                    </button>
+            {showOperations && (
+                <td className="px-6 w-52 shrink-0 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                        {visibleColumns.includes('report') && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onViewReport(run);
+                                }}
+                                className="rounded-lg bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-blue-100 hover:text-blue-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300"
+                                aria-label={`View markdown report for ${run.id}`}
+                            >
+                                Report
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectRun(run.id);
+                            }}
+                            className="rounded-lg bg-zinc-900 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                        >
+                            {run.crashDetail ? 'Crash details' : 'Inspect'}
+                        </button>
+                    </div>
                 </td>
             )}
         </tr>
@@ -164,7 +180,7 @@ export default function VirtualizedRunTable({
     viewportHeight = 480,
     onSelectRun,
     onViewReport,
-    visibleColumns = ['id', 'status', 'duration', 'seedCount', 'report'],
+    visibleColumns = ['id', 'status', 'duration', 'seedCount', 'actions', 'report'],
 }: VirtualizedRunTableProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [scrollTop, setScrollTop] = useState(0);
@@ -202,6 +218,7 @@ export default function VirtualizedRunTable({
     }
 
     const totalHeight = runs.length * ROW_HEIGHT;
+    const showOperations = visibleColumns.includes('actions') || visibleColumns.includes('report');
 
     /** Index of the first row that is at least partially visible. */
     const firstVisible = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
@@ -244,9 +261,9 @@ export default function VirtualizedRunTable({
                                     Seed Count
                                 </th>
                             )}
-                            {visibleColumns.includes('report') && (
-                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right">
-                                    Report
+                            {showOperations && (
+                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-52 shrink-0 text-right">
+                                    Actions
                                 </th>
                             )}
                         </tr>
