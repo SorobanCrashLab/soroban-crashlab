@@ -37,6 +37,7 @@ import AddRunStatusTimeline from './add-run-status-timeline';
 import AddExportRunJson from './add-export-run-json';
 import AddExportRunCsv from './add-export-run-csv';
 import IntegrateWebhookManagerForRunEvents from './integrate-webhook-manager-for-run-events';
+import AddAccessibleKeyboardNavBlueprint from './add-accessible-keyboard-nav-blueprint';
 import ArtifactExplorer from './add-artifact-explorer';
 import RunSeverityFilter from './add-run-filtering-by-severity';
 import AddRunTimeline from './add-run-timeline';
@@ -371,7 +372,9 @@ function HomeContent() {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-8 max-w-5xl mx-auto w-full">
+    <div className="min-h-screen w-full">
+      <AddAccessibleKeyboardNavBlueprint />
+      <div id="main-content" className="flex flex-col items-center justify-center py-20 px-8 max-w-5xl mx-auto w-full">
       {/* Role toggle */}
       <div className="w-full flex flex-wrap justify-end gap-3 mb-6">
         <button
@@ -906,6 +909,7 @@ function HomeContent() {
             Star the Repo
           </a>
         </div>
+      </div>
       </div>
     </div>
   );
