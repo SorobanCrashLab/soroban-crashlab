@@ -33,6 +33,10 @@ import ReportingTemplatesManager from './add-reporting-templates-manager';
 import AutomatedRegressionDeployIntegration from './integrate-automated-regression-deploy-integration';
 import ReportGenerator from './add-report-generator';
 import WidgetLayoutEditor from './implement-widget-layout-editor-component';
+import AddRunStatusTimeline from './add-run-status-timeline';
+import AddExportRunJson from './add-export-run-json';
+import AddExportRunCsv from './add-export-run-csv';
+import IntegrateWebhookManagerForRunEvents from './integrate-webhook-manager-for-run-events';
 
 // Mock data for demonstration
 const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 25 }, (_, i) => ({
@@ -480,7 +484,12 @@ function HomeContent() {
       </div>
 
       {dataState === 'success' && (
-        <TimelineScrubber runs={runs} onSelectRun={handleOpenRunDrawer} />
+        <>
+          <TimelineScrubber runs={runs} onSelectRun={handleOpenRunDrawer} />
+          <div className="mt-12 w-full">
+            <AddRunStatusTimeline runs={runs} />
+          </div>
+        </>
       )}
 
       {dataState === 'loading' && (
@@ -652,6 +661,11 @@ function HomeContent() {
         )}
       </div>
 
+      <div className="mb-12 w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+        <AddExportRunJson runs={filteredRuns} />
+        <AddExportRunCsv runs={filteredRuns} />
+      </div>
+
       <div className="mb-12 w-full">
         <AddRunComparisonCharts runs={filteredRuns} />
       </div>
@@ -785,6 +799,10 @@ function HomeContent() {
           onReplayComplete={handleReplayComplete}
         />
       )}
+
+      <div className="mt-12 mb-16 w-full">
+        <IntegrateWebhookManagerForRunEvents />
+      </div>
 
       <div className="mt-16 text-center border-t border-black/[.08] dark:border-white/[.145] pt-12 w-full">
         <h2 className="text-2xl font-bold mb-4">Stellar Wave 3 is Open!</h2>
