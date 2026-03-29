@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-export type ColumnId = 'id' | 'status' | 'duration' | 'seedCount' | 'report';
+export type ColumnId = 'id' | 'status' | 'duration' | 'seedCount' | 'report' | 'actions';
 
 interface ColumnCustomizationProps {
   visibleColumns: ColumnId[];
@@ -14,10 +14,14 @@ const ALL_COLUMNS: { id: ColumnId; label: string }[] = [
   { id: 'status', label: 'Status' },
   { id: 'duration', label: 'Duration' },
   { id: 'seedCount', label: 'Seed Count' },
+  { id: 'actions', label: 'Crash Drawer' },
   { id: 'report', label: 'Report Link' },
 ];
 
 const STORAGE_KEY = 'crashlab:column-settings:v1';
+
+const orderColumns = (columns: ColumnId[]): ColumnId[] =>
+  ALL_COLUMNS.filter((column) => columns.includes(column.id)).map((column) => column.id);
 
 export default function ColumnCustomization({ visibleColumns, onChange }: ColumnCustomizationProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -27,9 +31,19 @@ export default function ColumnCustomization({ visibleColumns, onChange }: Column
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as ColumnId[];
+        const parsed = JSON.parse(saved) as unknown;
         if (Array.isArray(parsed) && parsed.length > 0) {
-          onChange(parsed);
+          const validColumns = parsed.filter(
+            (column): column is ColumnId => typeof column === 'string' && ALL_COLUMNS.some((item) => item.id === column),
+          );
+          const migratedColumns = validColumns.includes('actions')
+            ? validColumns
+            : orderColumns([...validColumns, 'actions']);
+
+          if (migratedColumns.length > 0) {
+            onChange(migratedColumns);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(migratedColumns));
+          }
         }
       } catch (e) {
         console.error('Failed to parse column settings', e);
@@ -47,7 +61,7 @@ export default function ColumnCustomization({ visibleColumns, onChange }: Column
       }
     } else {
       // Keep order consistent with ALL_COLUMNS
-      next = ALL_COLUMNS.filter(c => visibleColumns.includes(c.id) || c.id === id).map(c => c.id);
+      next = orderColumns([...visibleColumns, id]);
     }
     
     onChange(next);
