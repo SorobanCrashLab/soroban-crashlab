@@ -39,6 +39,10 @@ import AddRunStatusTimeline from './add-run-status-timeline';
 import AddExportRunJson from './add-export-run-json';
 import AddExportRunCsv from './add-export-run-csv';
 import IntegrateWebhookManagerForRunEvents from './integrate-webhook-manager-for-run-events';
+import MetricsExportToPrometheus from './integrate-metrics-export-to-prometheus';
+import LogViewer from './implement-log-viewer-component';
+import AddAccessibleKeyboardNavBlueprint from './add-accessible-keyboard-nav-blueprint';
+import AddResponsiveLayoutImprovements from './add-responsive-layout-improvements';
 import AddKeyboardNavigationHelp from './add-keyboard-navigation-help';
 
 // Mock data for demonstration
@@ -381,6 +385,9 @@ function HomeContent() {
 
   return (
     <div className="min-h-screen w-full">
+      <AddAccessibleKeyboardNavBlueprint />
+      <AddResponsiveLayoutImprovements />
+      <div id="main-content" className="flex flex-col items-center justify-center py-20 px-8 max-w-5xl mx-auto w-full responsive-container">
       <AddKeyboardNavigationHelp />
       <div id="main-content" className="flex flex-col items-center justify-center py-20 px-8 max-w-5xl mx-auto w-full">
       {/* Role toggle */}
@@ -415,7 +422,7 @@ function HomeContent() {
       )}
 
       <div className="text-center max-w-3xl mb-16">
-        <h1 className="text-5xl font-bold tracking-tight mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hero-title">
           Bulletproof Your Soroban Smart Contracts
         </h1>
         <p className="text-xl leading-8 text-zinc-600 dark:text-zinc-400">
