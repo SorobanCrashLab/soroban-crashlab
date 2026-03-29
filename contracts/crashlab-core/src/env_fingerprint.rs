@@ -201,8 +201,7 @@ mod tests {
             id: 1,
             payload: vec![1],
         };
-        let recorded_fp =
-            EnvironmentFingerprint::new("linux", "x86_64", "unix", "0.1.0");
+        let recorded_fp = EnvironmentFingerprint::new("linux", "x86_64", "unix", "0.1.0");
         let bundle = CaseBundle {
             seed,
             signature: CrashSignature {
@@ -212,6 +211,7 @@ mod tests {
             },
             environment: Some(recorded_fp.clone()),
             failure_payload: Vec::new(),
+            rpc_envelope: None,
         };
 
         let current = EnvironmentFingerprint::new("windows", "x86_64", "windows", "0.1.0");
@@ -236,6 +236,7 @@ mod tests {
             },
             environment: None,
             failure_payload: Vec::new(),
+            rpc_envelope: None,
         };
         let current = EnvironmentFingerprint::new("linux", "x86_64", "unix", "0.1.0");
         let report = check_bundle_replay_environment(&bundle, &current);

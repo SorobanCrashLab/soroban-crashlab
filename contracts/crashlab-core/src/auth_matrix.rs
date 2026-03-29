@@ -1,3 +1,4 @@
+use crate::retry::{execute_with_retry, RetryConfig, SimulationError};
 use crate::{CaseSeed, CrashSignature};
 
 /// The three Soroban authorization modes under which a seed is exercised.
@@ -72,6 +73,14 @@ impl MatrixReport {
 /// matching Soroban auth setup; in tests a closure that branches on `mode` is
 /// sufficient.
 ///
+/// If the runner returns a transient error (e.g., RPC timeout), it is retried
+/// according to the default [`RetryConfig`].
+///
+/// # Errors
+///
+/// Returns [`SimulationError`] if a mode fails after all retry attempts or
+/// if a non-transient error is encountered.
+///
 /// # Example
 ///
 /// ```rust
@@ -81,30 +90,30 @@ impl MatrixReport {
 /// let seed = CaseSeed { id: 1, payload: vec![1, 2, 3] };
 ///
 /// // A runner that produces the same signature in every mode — no mismatches.
-/// let report = run_matrix(&seed, |s, _mode| classify(s));
+/// let report = run_matrix(&seed, |s, _mode| Ok(classify(s))).unwrap();
 ///
 /// assert!(report.is_consistent());
 /// assert_eq!(report.results.len(), 3);
 /// ```
-pub fn run_matrix<F>(seed: &CaseSeed, runner: F) -> MatrixReport
+pub fn run_matrix<F>(seed: &CaseSeed, mut runner: F) -> Result<MatrixReport, SimulationError>
 where
-    F: Fn(&CaseSeed, AuthMode) -> CrashSignature,
+    F: FnMut(&CaseSeed, AuthMode) -> Result<CrashSignature, SimulationError>,
 {
-    let results: Vec<ModeResult> = AuthMode::ALL
-        .iter()
-        .map(|&mode| ModeResult {
-            mode,
-            signature: runner(seed, mode),
-        })
-        .collect();
+    let config = RetryConfig::default();
+    let mut results = Vec::with_capacity(AuthMode::ALL.len());
+
+    for &mode in &AuthMode::ALL {
+        let signature = execute_with_retry(&config, None, || runner(seed, mode))?;
+        results.push(ModeResult { mode, signature });
+    }
 
     let mismatches = compute_mismatches(&results);
 
-    MatrixReport {
+    Ok(MatrixReport {
         seed: seed.clone(),
         results,
         mismatches,
-    }
+    })
 }
 
 fn compute_mismatches(results: &[ModeResult]) -> Vec<(AuthMode, AuthMode)> {
@@ -151,7 +160,7 @@ mod tests {
 
     #[test]
     fn consistent_runner_produces_no_mismatches() {
-        let report = run_matrix(&seed(1), |_, _| sig(0xABCD));
+        let report = run_matrix(&seed(1), |_, _| Ok(sig(0xABCD))).unwrap();
 
         assert_eq!(report.results.len(), 3);
         assert!(report.mismatches.is_empty());
@@ -160,7 +169,7 @@ mod tests {
 
     #[test]
     fn results_cover_all_three_modes() {
-        let report = run_matrix(&seed(2), |_, _| sig(0x1234));
+        let report = run_matrix(&seed(2), |_, _| Ok(sig(0x1234))).unwrap();
 
         let modes: Vec<AuthMode> = report.results.iter().map(|r| r.mode).collect();
         assert!(modes.contains(&AuthMode::Enforce));
@@ -173,11 +182,12 @@ mod tests {
         // Enforce↔Record and Enforce↔RecordAllowNonroot differ; Record↔RecordAllowNonroot agree.
         let report = run_matrix(&seed(3), |_, mode| {
             if mode == AuthMode::Enforce {
-                sig(0xDEAD)
+                Ok(sig(0xDEAD))
             } else {
-                sig(0xBEEF)
+                Ok(sig(0xBEEF))
             }
-        });
+        })
+        .unwrap();
 
         assert_eq!(report.mismatches.len(), 2);
         assert!(!report.is_consistent());
@@ -186,10 +196,11 @@ mod tests {
     #[test]
     fn all_modes_diverging_produces_three_mismatches() {
         let report = run_matrix(&seed(4), |_, mode| match mode {
-            AuthMode::Enforce => sig(0x01),
-            AuthMode::Record => sig(0x02),
-            AuthMode::RecordAllowNonroot => sig(0x03),
-        });
+            AuthMode::Enforce => Ok(sig(0x01)),
+            AuthMode::Record => Ok(sig(0x02)),
+            AuthMode::RecordAllowNonroot => Ok(sig(0x03)),
+        })
+        .unwrap();
 
         assert_eq!(report.mismatches.len(), 3);
         assert!(!report.is_consistent());
@@ -198,17 +209,18 @@ mod tests {
     #[test]
     fn seed_is_preserved_in_report() {
         let s = seed(99);
-        let report = run_matrix(&s, |_, _| sig(0));
+        let report = run_matrix(&s, |_, _| Ok(sig(0))).unwrap();
         assert_eq!(report.seed, s);
     }
 
     #[test]
     fn per_mode_signature_is_stored_correctly() {
         let report = run_matrix(&seed(5), |_, mode| match mode {
-            AuthMode::Enforce => sig(10),
-            AuthMode::Record => sig(20),
-            AuthMode::RecordAllowNonroot => sig(30),
-        });
+            AuthMode::Enforce => Ok(sig(10)),
+            AuthMode::Record => Ok(sig(20)),
+            AuthMode::RecordAllowNonroot => Ok(sig(30)),
+        })
+        .unwrap();
 
         for result in &report.results {
             let expected_digest = match result.mode {
@@ -225,11 +237,12 @@ mod tests {
         // Record differs; Enforce and RecordAllowNonroot agree.
         let report = run_matrix(&seed(6), |_, mode| {
             if mode == AuthMode::Record {
-                sig(0xFF)
+                Ok(sig(0xFF))
             } else {
-                sig(0x00)
+                Ok(sig(0x00))
             }
-        });
+        })
+        .unwrap();
 
         assert_eq!(report.mismatches.len(), 2);
         // Enforce and RecordAllowNonroot must NOT appear together as a mismatch.
@@ -240,18 +253,45 @@ mod tests {
         assert!(!has_enforce_vs_nonroot);
     }
 
+    #[test]
+    fn run_matrix_retries_on_transient_error() {
+        let mut calls_per_mode = std::collections::HashMap::new();
+
+        let report = run_matrix(&seed(7), |_, mode| {
+            let count = calls_per_mode.entry(mode).or_insert(0);
+            *count += 1;
+            if mode == AuthMode::Enforce && *count < 3 {
+                Err(SimulationError::Transient("rpc timeout".to_string()))
+            } else {
+                Ok(sig(0))
+            }
+        })
+        .unwrap();
+
+        assert!(report.is_consistent());
+        // Enforce should have been called 3 times (2 fails + 1 success)
+        assert_eq!(*calls_per_mode.get(&AuthMode::Enforce).unwrap(), 3);
+        // Others should have been called 1 time each
+        assert_eq!(*calls_per_mode.get(&AuthMode::Record).unwrap(), 1);
+        assert_eq!(
+            *calls_per_mode.get(&AuthMode::RecordAllowNonroot).unwrap(),
+            1
+        );
+    }
+
     // ── collect_mismatched ────────────────────────────────────────────────────
 
     #[test]
     fn collect_mismatched_excludes_consistent_reports() {
-        let consistent = run_matrix(&seed(10), |_, _| sig(0xAA));
+        let consistent = run_matrix(&seed(10), |_, _| Ok(sig(0xAA))).unwrap();
         let divergent = run_matrix(&seed(11), |_, mode| {
             if mode == AuthMode::Enforce {
-                sig(0xBB)
+                Ok(sig(0xBB))
             } else {
-                sig(0xCC)
+                Ok(sig(0xCC))
             }
-        });
+        })
+        .unwrap();
 
         let reports = vec![consistent, divergent];
         let flagged = collect_mismatched(&reports);
@@ -262,8 +302,8 @@ mod tests {
 
     #[test]
     fn collect_mismatched_returns_empty_when_all_consistent() {
-        let r1 = run_matrix(&seed(20), |_, _| sig(0x01));
-        let r2 = run_matrix(&seed(21), |_, _| sig(0x01));
+        let r1 = run_matrix(&seed(20), |_, _| Ok(sig(0x01))).unwrap();
+        let r2 = run_matrix(&seed(21), |_, _| Ok(sig(0x01))).unwrap();
         let reports = vec![r1, r2];
 
         assert!(collect_mismatched(&reports).is_empty());
@@ -273,18 +313,20 @@ mod tests {
     fn collect_mismatched_returns_all_when_all_divergent() {
         let r1 = run_matrix(&seed(30), |_, mode| {
             if mode == AuthMode::Enforce {
-                sig(1)
+                Ok(sig(1))
             } else {
-                sig(2)
+                Ok(sig(2))
             }
-        });
+        })
+        .unwrap();
         let r2 = run_matrix(&seed(31), |_, mode| {
             if mode == AuthMode::Enforce {
-                sig(3)
+                Ok(sig(3))
             } else {
-                sig(4)
+                Ok(sig(4))
             }
-        });
+        })
+        .unwrap();
         let reports = vec![r1, r2];
 
         assert_eq!(collect_mismatched(&reports).len(), 2);

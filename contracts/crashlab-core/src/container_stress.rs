@@ -4,8 +4,8 @@
 //! compact payload. Sizes are clamped to configured min/max bounds; generation is
 //! deterministic from `(seed, rng_state)` like other mutators.
 
-use crate::CaseSeed;
 use crate::scheduler::Mutator;
+use crate::CaseSeed;
 
 /// Bounds for encoded container dimensions (inclusive).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,12 +28,7 @@ impl Default for ContainerStressConfig {
 }
 
 impl ContainerStressConfig {
-    pub fn new(
-        vec_size_min: u64,
-        vec_size_max: u64,
-        map_size_min: u64,
-        map_size_max: u64,
-    ) -> Self {
+    pub fn new(vec_size_min: u64, vec_size_max: u64, map_size_min: u64, map_size_max: u64) -> Self {
         Self {
             vec_size_min,
             vec_size_max,
@@ -80,22 +75,10 @@ impl ContainerStressMutator {
 /// - `[1..9]` primary size (`u64` LE), meaning vec length or map entry count
 /// - `[9..17]` secondary (`u64` LE) — companion bound or sparse stride
 /// - `[17..32]` pattern fill derived from rng
-fn build_payload(
-    config: &ContainerStressConfig,
-    seed: &CaseSeed,
-    rng_state: &mut u64,
-) -> Vec<u8> {
+fn build_payload(config: &ContainerStressConfig, seed: &CaseSeed, rng_state: &mut u64) -> Vec<u8> {
     let use_map = (*rng_state ^ seed.id) & 1 == 1;
-    let vec_sz = config.pick_in_range(
-        rng_state,
-        config.vec_size_min,
-        config.vec_size_max,
-    );
-    let map_sz = config.pick_in_range(
-        rng_state,
-        config.map_size_min,
-        config.map_size_max,
-    );
+    let vec_sz = config.pick_in_range(rng_state, config.vec_size_min, config.vec_size_max);
+    let map_sz = config.pick_in_range(rng_state, config.map_size_min, config.map_size_max);
     let stride = config.pick_in_range(rng_state, 1, map_sz.max(1));
 
     let mut out = vec![0u8; 32];
@@ -108,8 +91,11 @@ fn build_payload(
     } else {
         out[0] = 0xD0;
         let primary = config.clamp(vec_sz, config.vec_size_min, config.vec_size_max);
-        let secondary =
-            config.clamp(vec_sz.wrapping_add(map_sz), config.vec_size_min, config.vec_size_max);
+        let secondary = config.clamp(
+            vec_sz.wrapping_add(map_sz),
+            config.vec_size_min,
+            config.vec_size_max,
+        );
         out[1..9].copy_from_slice(&primary.to_le_bytes());
         out[9..17].copy_from_slice(&secondary.to_le_bytes());
     }
@@ -150,8 +136,14 @@ pub fn generate_container_stress_grid(
 ) -> Vec<CaseSeed> {
     let mut out = Vec::new();
     let mut id = base_id;
-    let v_steps = config.vec_size_max.saturating_sub(config.vec_size_min).min(8);
-    let m_steps = config.map_size_max.saturating_sub(config.map_size_min).min(8);
+    let v_steps = config
+        .vec_size_max
+        .saturating_sub(config.vec_size_min)
+        .min(8);
+    let m_steps = config
+        .map_size_max
+        .saturating_sub(config.map_size_min)
+        .min(8);
 
     for vi in 0..=v_steps {
         for mi in 0..=m_steps {
@@ -177,7 +169,10 @@ mod tests {
 
     #[test]
     fn mutator_name() {
-        assert_eq!(ContainerStressMutator::default_mutator().name(), "container-stress");
+        assert_eq!(
+            ContainerStressMutator::default_mutator().name(),
+            "container-stress"
+        );
     }
 
     #[test]

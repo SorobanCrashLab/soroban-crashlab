@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FuzzingRun } from './types';
 import { simulateSeedReplay } from './replay';
+import { generateMarkdownReport } from './report-utils';
+import ReportModal from './ReportModal';
 
 export type ReplayUiStatus = 'idle' | 'running' | 'completed' | 'failed';
 
@@ -18,17 +20,10 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
     const [replayStatus, setReplayStatus] = useState<ReplayUiStatus>('idle');
     const [replayRunId, setReplayRunId] = useState<string | null>(null);
     const [replayError, setReplayError] = useState<string | null>(null);
-    const replayStatusRef = useRef(replayStatus);
-    replayStatusRef.current = replayStatus;
-
-    useEffect(() => {
-        setReplayStatus('idle');
-        setReplayRunId(null);
-        setReplayError(null);
-    }, [run.id]);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
     const handleReplay = useCallback(async () => {
-        if (!run.crashDetail || replayStatusRef.current === 'running') return;
+        if (!run.crashDetail || replayStatus === 'running') return;
         setReplayError(null);
         setReplayRunId(null);
         setReplayStatus('running');
@@ -39,15 +34,20 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
             onReplayComplete?.({
                 id: newRunId,
                 status: 'completed',
+                area: run.area,
+                severity: run.severity,
                 duration: 0,
                 seedCount: 1,
                 crashDetail: null,
+                cpuInstructions: 0,
+                memoryBytes: 0,
+                minResourceFee: 0,
             });
         } catch {
             setReplayStatus('failed');
             setReplayError('Replay could not be started. Try again.');
         }
-    }, [run.crashDetail, run.id, onReplayComplete]);
+    }, [onReplayComplete, replayStatus, run]);
 
     const canReplay = Boolean(run.crashDetail);
 
@@ -136,6 +136,19 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
                             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">Replay Action</p>
                             <p className="font-mono text-xs whitespace-pre-wrap break-words">{run.crashDetail.replayAction}</p>
                         </div>
+
+                        <div className="pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsReportModalOpen(true)}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg active:scale-[0.98]"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Generate Issue Report
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-sm text-zinc-600 dark:text-zinc-300">
@@ -159,6 +172,13 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
                     </button>
                 </div>
             </aside>
+
+            <ReportModal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                markdown={generateMarkdownReport(run)}
+                runId={run.id}
+            />
         </div>
     );
 }

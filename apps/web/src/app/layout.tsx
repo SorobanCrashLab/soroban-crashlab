@@ -1,6 +1,8 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import NotificationCenter from './add-notification-center-ui';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -27,10 +29,16 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-50 min-h-screen flex flex-col`}>
         <header className="border-b border-black/[.08] dark:border-white/[.145] p-6 flex items-center justify-between">
           <div className="font-semibold text-xl tracking-tight">Soroban CrashLab</div>
-          <nav className="flex gap-4 text-sm font-medium">
-            <a href="https://github.com/SorobanCrashLab/soroban-crashlab" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors" target="_blank" rel="noopener noreferrer">GitHub</a>
-            <a href="https://github.com/SorobanCrashLab/soroban-crashlab/issues" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors" target="_blank" rel="noopener noreferrer">Open Issues</a>
-          </nav>
+          <div className="flex items-center gap-4">
+            <nav className="flex gap-4 text-sm font-medium">
+              <a href="/add-accessible-keyboard-nav-blueprint-page-49" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Keyboard Nav</a>
+              <a href="/implement-alerting-settings-page-54" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Alerts</a>
+              <Link href="/#reporting-templates" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Templates</Link>
+              <a href="https://github.com/SorobanCrashLab/soroban-crashlab" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors" target="_blank" rel="noopener noreferrer">GitHub</a>
+              <a href="https://github.com/SorobanCrashLab/soroban-crashlab/issues" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors" target="_blank" rel="noopener noreferrer">Open Issues</a>
+            </nav>
+            <NotificationCenter />
+          </div>
         </header>
         <main className="flex-1 flex flex-col">
           {children}

@@ -50,11 +50,7 @@ impl From<serde_json::Error> for CorpusError {
 }
 
 fn sort_seeds_deterministic(seeds: &mut [CaseSeed]) {
-    seeds.sort_by(|a, b| {
-        a.id
-            .cmp(&b.id)
-            .then_with(|| a.payload.cmp(&b.payload))
-    });
+    seeds.sort_by(|a, b| a.id.cmp(&b.id).then_with(|| a.payload.cmp(&b.payload)));
 }
 
 /// Builds an archive from arbitrary seed order; output order is deterministic.
@@ -76,9 +72,7 @@ pub fn export_corpus_json(seeds: &[CaseSeed]) -> Result<Vec<u8>, serde_json::Err
 pub fn import_corpus_json(bytes: &[u8]) -> Result<Vec<CaseSeed>, CorpusError> {
     let arch: CorpusArchive = serde_json::from_slice(bytes)?;
     if arch.schema != CORPUS_ARCHIVE_SCHEMA_VERSION {
-        return Err(CorpusError::UnsupportedSchema {
-            found: arch.schema,
-        });
+        return Err(CorpusError::UnsupportedSchema { found: arch.schema });
     }
     Ok(arch.seeds)
 }

@@ -126,9 +126,18 @@ mod tests {
 
     #[test]
     fn parse_roundtrip() {
-        assert_eq!("smoke".parse::<CampaignPreset>().unwrap(), CampaignPreset::Smoke);
-        assert_eq!("NIGHTLY".parse::<CampaignPreset>().unwrap(), CampaignPreset::Nightly);
-        assert_eq!(" Deep ".parse::<CampaignPreset>().unwrap(), CampaignPreset::Deep);
+        assert_eq!(
+            "smoke".parse::<CampaignPreset>().unwrap(),
+            CampaignPreset::Smoke
+        );
+        assert_eq!(
+            "NIGHTLY".parse::<CampaignPreset>().unwrap(),
+            CampaignPreset::Nightly
+        );
+        assert_eq!(
+            " Deep ".parse::<CampaignPreset>().unwrap(),
+            CampaignPreset::Deep
+        );
         assert!("".parse::<CampaignPreset>().is_err());
     }
 

@@ -67,10 +67,7 @@ impl RunCheckpoint {
     }
 
     /// Seeds still to process, or an error if the checkpoint does not match `seeds`.
-    pub fn remaining<'a>(
-        &self,
-        seeds: &'a [CaseSeed],
-    ) -> Result<&'a [CaseSeed], CheckpointError> {
+    pub fn remaining<'a>(&self, seeds: &'a [CaseSeed]) -> Result<&'a [CaseSeed], CheckpointError> {
         if self.total_seeds != seeds.len() {
             return Err(CheckpointError::TotalMismatch {
                 recorded: self.total_seeds,

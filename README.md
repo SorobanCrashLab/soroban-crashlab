@@ -11,31 +11,57 @@ Most contract failures happen in edge cases that are not covered by manual tests
 - convert failures into deterministic regression tests
 - review risk and state-impact signals in a frontend dashboard
 
+## Security
+
+To report a vulnerability, see our [Security Policy](.github/SECURITY.md). Do not open a public issue for security concerns.
+
 ## Repository structure
 
 - `apps/web`: Next.js frontend dashboard for runs, failures, and replay output
-- `contracts/crashlab-core`: Rust crate for core fuzzing and reproducible case generation
+- `contracts/crashlab-core`: Rust crate for core fuzzing and reproducible case generation (`WorkerPartition` / `drive_run_partitioned` split seed indices across workers deterministically; see `docs/REPRODUCIBILITY.md`)
 - `docs/`: project documentation
   - [`ARCHITECTURE.md`](docs/ARCHITECTURE.md): system architecture and data flow
   - [`REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md): deterministic guarantees and troubleshooting
+  - [`RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md): maintainer checklist for tagging releases, updating the changelog, and reviewing backward compatibility
 - `.github/ISSUE_TEMPLATE`: structured issue intake for maintainers and contributors
 - `ops/wave3-issues.tsv`: curated backlog for Wave 3 with 32 non-overlapping issues
 - `scripts/create-wave3-issues.sh`: script to publish backlog issues to GitHub
 
 ## Quick start
 
+If this is your first time setting up the repo locally, start with the
+[contributor setup checklist](CONTRIBUTING.md#local-setup-checklist).
+It walks through installing Git, Node.js, npm, Rust, and optional GitHub
+tooling before you run the project checks below.
+If setup, build, test, or replay commands fail locally, jump to the
+[contributor debugging playbook](CONTRIBUTING.md#contributor-debugging-playbook).
+
 ### Prerequisites
 
+- Git
 - Node.js 22+
-- npm 9+
+- npm 10+ (the npm version bundled with Node.js 22 is fine)
 - Rust stable + Cargo
-- GitHub CLI (`gh`) authenticated for issue publishing
+- Optional: GitHub CLI (`gh`) authenticated for Wave maintenance scripts
 
-### Install and run frontend
+### Verify your toolchain
+
+```bash
+git --version
+node -v
+npm -v
+rustc -V
+cargo -V
+gh --version # optional
+```
+
+### Install web dependencies and run web checks
 
 ```bash
 cd apps/web
-npm install
+npm ci
+npm run lint
+npm run build
 npm run dev
 ```
 
@@ -43,12 +69,16 @@ npm run dev
 
 ```bash
 cd contracts/crashlab-core
-cargo test
+cargo test --all-targets
 ```
 
 ### Run checkpoints (resume without redoing work)
 
 Persist a [`RunCheckpoint`](contracts/crashlab-core/src/checkpoint.rs) (JSON) with `next_seed_index` and reload it after an interruption. Use `RunCheckpoint::remaining(&seeds)` to iterate only pending seeds, and `advance_one` / `advance_by` after each completed item so resumed runs skip finished work.
+
+### Artifact retention policy
+
+Apply configurable retention windows for old run artifacts with [`RetentionPolicy`](contracts/crashlab-core/src/retention.rs). Configure `max_failure_bundles` to keep the most recent failures (sorted by descending seed ID) and `max_checkpoints_per_campaign` to retain the most advanced checkpoints per campaign. Use `RetentionPolicy::retain_failure_bundles` and `RetentionPolicy::retain_checkpoints` to determine which artifacts to prune.
 
 ### Corpus export (portable seed archive)
 
@@ -64,6 +94,8 @@ Input may be a bare JSON array of seeds or a full archive document; output is al
 ### Simulation timeout guardrails
 
 `run_simulation_with_timeout` wraps a host/contract simulation and returns `timeout_crash_signature` when wall time exceeds `SimulationTimeoutConfig::timeout_ms`. Surface the active limit in dashboards or logs with `RunMetadata::from_timeout_config`.
+
+Run metadata JSON is versioned (`schema` / `RUN_METADATA_SCHEMA_VERSION`). Persist with `save_run_metadata_json` and reload with `load_run_metadata_json` so documents without a `schema` field (older writes) are accepted and normalized to the current format without losing `simulation_timeout_ms`.
 
 ### Vec / map container stress mutator
 
@@ -83,6 +115,30 @@ cargo run --bin replay-single-seed -- ./bundle.json
 ```
 
 The command exits `0` when replayed `class` and signature fields (`digest`, `signature_hash`) match the bundle's recorded signature; it exits non-zero with a mismatch report otherwise.
+
+### Transient RPC Retry Strategy
+
+`crashlab-core` implements a bounded retry strategy with exponential backoff and jitter for simulation and reproduction calls that fail due to transient network or RPC errors.
+
+#### Error Classification
+
+Simulation and reproduction calls (via `run_matrix`, `FlakyDetector::check`, or `filter_ci_pack`) must return a `Result<CrashSignature, SimulationError>`.
+
+*   **`SimulationError::Transient`**: Safe to retry (e.g., HTTP 429 Rate Limit, HTTP 503 Service Unavailable, connection timeouts).
+*   **`SimulationError::NonTransient`**: Immediate failure (e.g., HTTP 400 Bad Request, contract traps, logical invariants).
+
+#### Configuration
+
+The default retry configuration is:
+
+*   **Max Attempts**: 5 (initial call + 4 retries)
+*   **Initial Backoff**: 100ms
+*   **Max Backoff**: 10 seconds
+*   **Backoff Algorithm**: Exponential (`2^(attempt-1)`) with randomized jitter (0.5x to 1.5x of base backoff).
+
+#### Determinism in Tests
+
+The implementation integrates with `SeededPrng` to ensure jitter is deterministic and reproducible during tests when a seed is provided.
 
 Expected bundle JSON shape:
 
@@ -127,6 +183,9 @@ chmod +x scripts/create-wave3-issues.sh
 3. Review PRs with reproducibility and safety as first checks.
 4. Mark issues resolved before wave cutoff when quality is acceptable.
 5. Leave post-resolution review feedback to strengthen contributor trust.
+
+For release tagging, changelog upkeep, and compatibility review, follow the
+[release process guide](docs/RELEASE_PROCESS.md).
 
 ## Security Hardening Assumptions
 ### Fuzz Input Handling

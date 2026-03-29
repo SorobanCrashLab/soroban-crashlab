@@ -1,0 +1,20 @@
+name: Backlog freshness review
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run backlog freshness report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/backlog-freshness-review.sh --repo "${{ github.repository }}"

@@ -12,3 +12,9 @@ apps/web/.next/
 .env.*
 *.log
 
+.agents/
+.claude/
+.gemini/
+issue.md
+AGENTS.md
+skills-lock.json

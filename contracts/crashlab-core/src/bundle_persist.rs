@@ -3,16 +3,16 @@
 //! Failing cases are stored as portable UTF-8 JSON with a top-level **`schema`**
 //! field so future formats can be decoded explicitly (see issue #9).
 
-use crate::{CaseBundle, CaseSeed, CrashSignature, EnvironmentFingerprint};
+use crate::{CaseBundle, CaseSeed, CrashSignature, EnvironmentFingerprint, RpcEnvelopeCapture};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io::{Read, Write};
 
 /// Current on-disk schema version for [`save_case_bundle_json`] / [`load_case_bundle_json`].
-pub const CASE_BUNDLE_SCHEMA_VERSION: u32 = 1;
+pub const CASE_BUNDLE_SCHEMA_VERSION: u32 = 2;
 
 /// Schema versions this crate can load.
-pub const SUPPORTED_BUNDLE_SCHEMAS: &[u32] = &[CASE_BUNDLE_SCHEMA_VERSION];
+pub const SUPPORTED_BUNDLE_SCHEMAS: &[u32] = &[1, CASE_BUNDLE_SCHEMA_VERSION];
 
 /// Wire/document shape written to JSON. The `schema` field versions the layout.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,6 +26,9 @@ pub struct CaseBundleDocument {
     /// Raw failure output (stderr, host error bytes, trace snippet, etc.).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub failure_payload: Vec<u8>,
+    /// Captured RPC request/response envelopes for reproducibility auditing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rpc_envelope: Option<RpcEnvelopeCapture>,
 }
 
 /// Errors from loading or saving a bundle.
@@ -84,26 +87,30 @@ impl CaseBundleDocument {
             signature: bundle.signature.clone(),
             environment: bundle.environment.clone(),
             failure_payload: bundle.failure_payload.clone(),
+            rpc_envelope: bundle.rpc_envelope.clone(),
         }
     }
 
     /// Converts this document into a [`CaseBundle`] after validating `schema`.
     pub fn into_bundle(self) -> Result<CaseBundle, BundlePersistError> {
         if !SUPPORTED_BUNDLE_SCHEMAS.contains(&self.schema) {
-            return Err(BundlePersistError::UnsupportedSchema {
-                found: self.schema,
-            });
+            return Err(BundlePersistError::UnsupportedSchema { found: self.schema });
         }
         Ok(CaseBundle {
             seed: self.seed,
             signature: self.signature,
             environment: self.environment,
             failure_payload: self.failure_payload,
+            rpc_envelope: self.rpc_envelope,
         })
     }
 }
 
 /// Serializes `bundle` to pretty-printed JSON bytes (UTF-8) including `schema`.
+///
+/// This preserves the raw fixture contents. For public sharing, prefer
+/// [`crate::save_sanitized_case_bundle_json`] to scrub secret-like fragments from
+/// the seed and failure payloads before export.
 pub fn save_case_bundle_json(bundle: &CaseBundle) -> Result<Vec<u8>, BundlePersistError> {
     let doc = CaseBundleDocument::from_bundle(bundle);
     Ok(serde_json::to_vec_pretty(&doc)?)
@@ -135,7 +142,10 @@ pub fn read_case_bundle_json<R: Read>(reader: &mut R) -> Result<CaseBundle, Bund
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{to_bundle, to_bundle_with_environment, CrashSignature};
+    use crate::{
+        to_bundle, to_bundle_with_environment, to_bundle_with_rpc_envelope, CrashSignature,
+        RpcEnvelopeCapture, RpcRequestEnvelope, RpcResponseEnvelope,
+    };
 
     #[test]
     fn roundtrip_preserves_seed_signature_and_environment() {
@@ -149,6 +159,7 @@ mod tests {
         assert_eq!(loaded.signature, bundle.signature);
         assert_eq!(loaded.environment, bundle.environment);
         assert!(loaded.failure_payload.is_empty());
+        assert!(loaded.rpc_envelope.is_none());
     }
 
     #[test]
@@ -189,6 +200,7 @@ mod tests {
             },
             environment: None,
             failure_payload: vec![],
+            rpc_envelope: None,
         };
         let bytes = serde_json::to_vec(&doc).unwrap();
         let err = load_case_bundle_json(&bytes).unwrap_err();
@@ -209,6 +221,7 @@ mod tests {
         assert_eq!(v["schema"], CASE_BUNDLE_SCHEMA_VERSION);
         assert!(v.get("environment").is_none());
         assert!(v.get("failure_payload").is_none());
+        assert!(v.get("rpc_envelope").is_none());
     }
 
     #[test]
@@ -221,5 +234,70 @@ mod tests {
         write_case_bundle_json(&bundle, &mut buf).unwrap();
         let loaded = read_case_bundle_json(&mut buf.as_slice()).unwrap();
         assert_eq!(loaded, bundle);
+    }
+
+    #[test]
+    fn roundtrip_preserves_rpc_envelope() {
+        let request = RpcRequestEnvelope::new(
+            "simulateTransaction",
+            serde_json::json!({
+                "transaction": "test_tx",
+                "auth": "should_be_redacted"
+            }),
+        );
+        let response = RpcResponseEnvelope::success(serde_json::json!({
+            "results": [{"xdr": "AAAA"}]
+        }));
+        let envelope =
+            RpcEnvelopeCapture::new_with_timestamp(request, response, "2024-03-15T10:30:00Z");
+        let bundle = to_bundle_with_rpc_envelope(
+            crate::CaseSeed {
+                id: 42,
+                payload: vec![1, 2, 3],
+            },
+            envelope,
+        );
+
+        let bytes = save_case_bundle_json(&bundle).expect("serialize");
+        let loaded = load_case_bundle_json(&bytes).expect("deserialize");
+
+        assert!(loaded.rpc_envelope.is_some());
+        let loaded_envelope = loaded.rpc_envelope.unwrap();
+        assert_eq!(loaded_envelope.request.method, "simulateTransaction");
+        assert_eq!(loaded_envelope.request.params["auth"], "[REDACTED]");
+        assert_eq!(loaded_envelope.captured_at, "2024-03-15T10:30:00Z");
+    }
+
+    #[test]
+    fn backward_compatibility_with_schema_v1() {
+        // Simulate a schema v1 document (no rpc_envelope field)
+        let json = r#"{
+            "schema": 1,
+            "seed": {"id": 1, "payload": [1, 2, 3]},
+            "signature": {"category": "runtime-failure", "digest": 123, "signature_hash": 456}
+        }"#;
+        let loaded = load_case_bundle_json(json.as_bytes()).expect("should load schema v1");
+        assert_eq!(loaded.seed.id, 1);
+        assert!(loaded.rpc_envelope.is_none());
+    }
+
+    #[test]
+    fn json_contains_rpc_envelope_when_present() {
+        let request = RpcRequestEnvelope::new("test", serde_json::json!({}));
+        let response = RpcResponseEnvelope::success(serde_json::json!({}));
+        let envelope =
+            RpcEnvelopeCapture::new_with_timestamp(request, response, "2024-01-01T00:00:00Z");
+        let bundle = to_bundle_with_rpc_envelope(
+            crate::CaseSeed {
+                id: 1,
+                payload: vec![],
+            },
+            envelope,
+        );
+
+        let s = String::from_utf8(save_case_bundle_json(&bundle).unwrap()).unwrap();
+        assert!(s.contains("rpc_envelope"));
+        assert!(s.contains("captured_at"));
+        assert!(s.contains("2024-01-01T00:00:00Z"));
     }
 }

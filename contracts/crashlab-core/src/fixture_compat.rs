@@ -72,10 +72,7 @@ pub fn check_bundle_fixtures(docs: &[CaseBundleDocument], schema: &SeedSchema) -
             for e in errors {
                 warnings.push(CompatWarning {
                     fixture_index: i,
-                    message: format!(
-                        "bundle[{}] seed id={}: {}",
-                        i, doc.seed.id, e
-                    ),
+                    message: format!("bundle[{}] seed id={}: {}", i, doc.seed.id, e),
                 });
             }
         }
@@ -87,7 +84,7 @@ pub fn check_bundle_fixtures(docs: &[CaseBundleDocument], schema: &SeedSchema) -
 mod tests {
     use super::*;
     use crate::bundle_persist::CASE_BUNDLE_SCHEMA_VERSION;
-    use crate::{CrashSignature, to_bundle};
+    use crate::{to_bundle, CrashSignature};
 
     fn make_seed(id: u64, len: usize) -> CaseSeed {
         CaseSeed {
@@ -108,6 +105,7 @@ mod tests {
             signature: sig,
             environment: None,
             failure_payload: vec![],
+            rpc_envelope: None,
         }
     }
 

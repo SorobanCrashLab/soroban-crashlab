@@ -39,6 +39,29 @@ is:open is:issue label:wave3 label:blocked
 
 If the `blocked` label does not exist, create it with color `d93f0b` and description "Blocked on dependency or external factor".
 
+## Backlog freshness review (recurring)
+
+Purpose: retire stale work items and refine active scope so the Wave board stays curated and achievable.
+
+| Element | Definition |
+| --- | --- |
+| **Cadence** | Automated report weekly **Monday 09:00 UTC** (`.github/workflows/backlog-freshness.yml`). Maintainers complete human triage within **two business days** of each run (or the same day if the report is non-empty). |
+| **Owner** | **Triage maintainer** runs the checklist and applies labels or closures. **Wave lead** steps in if backlog drift spans more than one cycle without action. |
+| **Stale criteria** | See below; thresholds match `scripts/backlog-freshness-review.sh` (override via env vars documented in that script). |
+
+**Stale criteria (operational)**
+
+1. **Assigned `wave3` issues** — Has assignee and `updatedAt` before **00:00 UTC** on the calendar day **N days ago**, where **N = 3** (`ASSIGNED_STALE_DAYS`). Aligns with the triage “Stale” board query. Ping the contributor, then follow the Contributor SLA targets table if there is no response.
+2. **Unassigned `wave3` issues** — No assignee and last update older than **14 days** (`UNASSIGNED_STALE_DAYS`). Re-scope, split into smaller issues, close as not planned with a short note, or re-label so the backlog does not accumulate abandoned scope.
+3. **`wave3` + `stale` still open** — Last update older than **7 days** (`STALE_LABEL_QUIET_DAYS`) while the `stale` label remains. Un-assign and return the issue to the pool per the escalation path in Contributor SLA targets, unless a maintainer has posted a documented exception.
+4. **Duplicates / out of scope** — Maintainer discretion during the same review window; close with a pointer to the canonical issue when applicable.
+
+**Checklist each cycle**
+
+1. Open the latest **Backlog freshness review** workflow run log, or run locally: `bash scripts/backlog-freshness-review.sh` (requires `gh` auth).
+2. Cross-check with the saved queries under [Issue triage board queries](#issue-triage-board-queries).
+3. Apply label changes, assignments, closures, or follow-ups; keep changes scoped to Wave backlog hygiene.
+
 ## Pre-wave checklist
 
 1. Validate that each candidate issue has scope, acceptance criteria, and complexity.
@@ -65,6 +88,41 @@ Review inside 24 hours to prevent unnecessary automated appeals. Review in this 
 3. Deterministic reproducibility of behavior
 4. Test coverage
 5. Clarity and maintainability
+
+## Release management
+
+Use [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) whenever you need to
+cut a tagged release. It defines:
+
+- how to choose the next version
+- how to update [`CHANGELOG.md`](CHANGELOG.md)
+- how to review backward compatibility before tagging
+- which validation commands to run before publishing release notes
+
+## Unblocking contributor failures
+
+When a contributor is blocked on local setup, build, test, or replay issues,
+point them to the
+[`CONTRIBUTING.md` debugging playbook](CONTRIBUTING.md#contributor-debugging-playbook)
+before asking for a broad rewrite or a large debug dump.
+
+Ask them to paste:
+
+```bash
+git status --short
+node -v
+npm -v
+rustc -V
+cargo -V
+```
+
+Plus the exact failing command and the first relevant error block. This keeps
+triage focused on environment drift, dependency install problems, and replay
+environment mismatches instead of guesswork.
+
+## Security Policy
+
+The project's coordinated vulnerability disclosure process and response expectations are defined in [`.github/SECURITY.md`](.github/SECURITY.md). Maintainers are responsible for triaging incoming reports within the timelines specified there.
 
 ## Operational Security Assumptions
 

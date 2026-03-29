@@ -34,10 +34,14 @@ impl SeededPrng {
     /// zero-state even when `seed_id` is 0.
     pub fn new(seed_id: u64) -> Self {
         // Mix the seed so seed_id=0 still produces a valid non-zero state.
-        let state = seed_id
-            .wrapping_add(1)
-            .wrapping_mul(0x9E3779B97F4A7C15);
+        let state = seed_id.wrapping_add(1).wrapping_mul(0x9E3779B97F4A7C15);
         Self { state }
+    }
+
+    /// Returns a deterministic float in `[0, 1)` (53-bit precision) for jitter and sampling.
+    pub fn next_f64(&mut self) -> f64 {
+        const SCALE: f64 = 1.0 / (1u64 << 53) as f64;
+        (self.next_u64() >> 11) as f64 * SCALE
     }
 
     /// Advances the PRNG state and returns the next 64-bit value.

@@ -1,5 +1,6 @@
 use crashlab_core::{
-    CaseBundle, CaseSeed, CrashSignature, EnvironmentFingerprint, replay_seed_bundle,
+    CaseBundle, CaseSeed, CrashSignature, EnvironmentFingerprint, RpcEnvelopeCapture,
+    replay_seed_bundle,
 };
 use serde::Deserialize;
 use std::fs;
@@ -32,6 +33,7 @@ struct JsonBundle {
     signature: JsonSignature,
     environment: Option<JsonEnvironment>,
     failure_payload: Option<Vec<u8>>,
+    rpc_envelope: Option<RpcEnvelopeCapture>,
 }
 
 fn parse_bundle(path: &Path) -> Result<CaseBundle, String> {
@@ -45,6 +47,7 @@ fn parse_bundle(path: &Path) -> Result<CaseBundle, String> {
         "empty-input" => "empty-input",
         "oversized-input" => "oversized-input",
         "runtime-failure" => "runtime-failure",
+        "invalid-enum-tag" => "invalid-enum-tag",
         other => return Err(format!("unsupported signature category '{other}'")),
     };
 
@@ -62,6 +65,7 @@ fn parse_bundle(path: &Path) -> Result<CaseBundle, String> {
             EnvironmentFingerprint::new(env.os, env.arch, env.family, env.tool_version)
         }),
         failure_payload: parsed.failure_payload.unwrap_or_default(),
+        rpc_envelope: parsed.rpc_envelope,
     })
 }
 

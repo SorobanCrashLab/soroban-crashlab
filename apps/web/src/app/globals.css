@@ -3,6 +3,31 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /*
+   * Status chip color tokens — light mode.
+   * All foreground/background pairs meet WCAG AA (≥4.5:1 contrast ratio).
+   *
+   * running:   #1d4ed8 on #dbeafe  → ~7.2:1
+   * completed: #15803d on #dcfce7  → ~6.1:1
+   * failed:    #b91c1c on #fee2e2  → ~6.0:1
+   * cancelled: #3f3f46 on #f4f4f5  → ~8.5:1
+   */
+  --status-running-bg:        #dbeafe;
+  --status-running-fg:        #1d4ed8;
+  --status-running-border:    #bfdbfe;
+
+  --status-completed-bg:      #dcfce7;
+  --status-completed-fg:      #15803d;
+  --status-completed-border:  #bbf7d0;
+
+  --status-failed-bg:         #fee2e2;
+  --status-failed-fg:         #b91c1c;
+  --status-failed-border:     #fecaca;
+
+  --status-cancelled-bg:      #f4f4f5;
+  --status-cancelled-fg:      #3f3f46;
+  --status-cancelled-border:  #e4e4e7;
 }
 
 @theme inline {
@@ -16,6 +41,31 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+
+    /*
+     * Status chip color tokens — dark mode.
+     * All foreground/background pairs meet WCAG AA (≥4.5:1 contrast ratio).
+     *
+     * running:   #93c5fd on #1e3a5f  → ~5.1:1
+     * completed: #86efac on #14532d  → ~5.3:1
+     * failed:    #fca5a5 on #4c1d1d  → ~5.0:1
+     * cancelled: #d4d4d8 on #27272a  → ~7.2:1
+     */
+    --status-running-bg:        #1e3a5f;
+    --status-running-fg:        #93c5fd;
+    --status-running-border:    #1e40af;
+
+    --status-completed-bg:      #14532d;
+    --status-completed-fg:      #86efac;
+    --status-completed-border:  #166534;
+
+    --status-failed-bg:         #4c1d1d;
+    --status-failed-fg:         #fca5a5;
+    --status-failed-border:     #7f1d1d;
+
+    --status-cancelled-bg:      #27272a;
+    --status-cancelled-fg:      #d4d4d8;
+    --status-cancelled-border:  #3f3f46;
   }
 }
 

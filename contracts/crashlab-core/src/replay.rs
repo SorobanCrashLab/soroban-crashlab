@@ -1,4 +1,4 @@
-use crate::{CaseBundle, CrashSignature, classify, signatures_match};
+use crate::{classify, signatures_match, CaseBundle, CrashSignature};
 
 /// Replay outcome for a single persisted seed bundle.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,7 +23,7 @@ pub fn replay_seed_bundle(bundle: &CaseBundle) -> ReplayResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CaseSeed, to_bundle};
+    use crate::{to_bundle, CaseSeed};
 
     #[test]
     fn replay_matches_original_bundle_signature() {
