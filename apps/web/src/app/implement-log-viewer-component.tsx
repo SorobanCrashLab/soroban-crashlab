@@ -5,6 +5,8 @@
  *
  * Dashboard panel for tailing simulated fuzzer / RPC / scheduler logs with
  * level filters, search, pause, clear, auto-scroll, and copy.
+ *
+ * Tracking: https://github.com/SorobanCrashLab/soroban-crashlab/issues/267
  */
 
 import {

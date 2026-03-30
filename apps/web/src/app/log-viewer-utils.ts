@@ -1,3 +1,9 @@
+/**
+ * Pure helpers for the dashboard log viewer (SorobanCrashLab/soroban-crashlab#267).
+ *
+ * @see https://github.com/SorobanCrashLab/soroban-crashlab/issues/267
+ */
+
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
 export interface LogEntry {
