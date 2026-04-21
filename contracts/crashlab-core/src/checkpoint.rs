@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn json_roundtrip() {
         let s = seeds(4);
-        let mut cp = RunCheckpoint::new_run("wave3", &s);
+        let mut cp = RunCheckpoint::new_run("wave4", &s);
         cp.advance_by(2);
         let bytes = save_run_checkpoint_json(&cp).unwrap();
         let loaded = load_run_checkpoint_json(&bytes).unwrap();

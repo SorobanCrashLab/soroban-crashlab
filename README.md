@@ -24,8 +24,10 @@ To report a vulnerability, see our [Security Policy](.github/SECURITY.md). Do no
   - [`REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md): deterministic guarantees and troubleshooting
   - [`RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md): maintainer checklist for tagging releases, updating the changelog, and reviewing backward compatibility
 - `.github/ISSUE_TEMPLATE`: structured issue intake for maintainers and contributors
-- `ops/wave3-issues.tsv`: curated backlog for Wave 3 with 32 non-overlapping issues
-- `scripts/create-wave3-issues.sh`: script to publish backlog issues to GitHub
+- `ops/wave4-canonical.tsv`: canonical Wave 4 backlog source used for issue publishing
+- `ops/wave4-issues.tsv`: legacy backlog input (may contain historical merge artifacts)
+- `scripts/build-wave4-canonical.py`: dedupe builder for regenerating canonical backlog
+- `scripts/create-wave4-issues.sh`: script to publish backlog issues to GitHub
 
 ## Quick start
 
@@ -169,11 +171,17 @@ assert_eq!(roundtrip.seed, bundle.seed);
 
 See [`contracts/crashlab-core/src/bundle_persist.rs`](contracts/crashlab-core/src/bundle_persist.rs) for `read_case_bundle_json` / `write_case_bundle_json` and error types.
 
-### Publish curated Wave 3 issues
+### Publish curated Wave 4 issues
+
+Regenerate the canonical backlog before publishing if source TSVs changed:
 
 ```bash
-chmod +x scripts/create-wave3-issues.sh
-./scripts/create-wave3-issues.sh
+python3 scripts/build-wave4-canonical.py
+```
+
+```bash
+chmod +x scripts/create-wave4-issues.sh
+./scripts/create-wave4-issues.sh
 ```
 
 ## Maintainer workflow for Drips Wave
@@ -222,4 +230,4 @@ Documentation updated in:
 - README.md: Added Security Hardening Assumptions section
 - CONTRIBUTING.md: Added security guidance for contributors
 - MAINTAINER_WAVE_PLAYBOOK.md: Updated operational security assumptions
-- ops/wave3-issues.tsv: Marked #79 as implemented
+- ops/wave4-issues.tsv: Marked #79 as implemented

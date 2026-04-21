@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-ISSUE_FILE="$ROOT_DIR/ops/wave3-issues.tsv"
+ISSUE_FILE="$ROOT_DIR/ops/wave4-issues.tsv"
 REPO="SorobanCrashLab/soroban-crashlab"
 TARGET_COUNT="${1:-82}"
 
@@ -72,7 +72,7 @@ allowed_set = set(allowed_titles)
 query = """
 query($owner: String!, $name: String!, $cursor: String) {
   repository(owner: $owner, name: $name) {
-    issues(first: 100, after: $cursor, states: OPEN, labels: [\"wave3\"], orderBy: {field: CREATED_AT, direction: ASC}) {
+    issues(first: 100, after: $cursor, states: OPEN, labels: [\"wave4\"], orderBy: {field: CREATED_AT, direction: ASC}) {
       nodes {
         number
         title
@@ -130,7 +130,7 @@ for issue in to_close:
 count_query = """
 query($owner: String!, $name: String!) {
     repository(owner: $owner, name: $name) {
-        issues(states: OPEN, labels: [\"wave3\"]) {
+        issues(states: OPEN, labels: [\"wave4\"]) {
             totalCount
         }
     }

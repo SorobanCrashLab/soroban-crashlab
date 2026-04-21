@@ -108,7 +108,7 @@ upsert_label() {
 
 echo "Bootstrapping standard Wave labels for $REPO"
 
-upsert_label "wave3" "1f6feb" "Stellar Wave 3 issue backlog"
+upsert_label "wave4" "1f6feb" "Stellar Wave 4 issue backlog"
 upsert_label "Stellar Wave" "5319e7" "Wave participation tracking"
 upsert_label "complexity:trivial" "c2e0c6" "Wave trivial complexity"
 upsert_label "complexity:medium" "fbca04" "Wave medium complexity"

@@ -1,0 +1,46 @@
+Type: FEATURE
+
+Overview
+Implement frontend Timeline scrubber component for improved UX.
+
+Context
+- Area: area:web (web)
+- Complexity: High
+- This impacts dashboard usability and triage flow quality for maintainers and contributors.
+- Risk note: Inconsistent UX states can create triage confusion and reduce trust in run/crash signals.
+
+What to implement
+- [ ] Implement the UI behavior end-to-end, including explicit loading/error states, keyboard accessibility, and responsive layout behavior where relevant.
+- [ ] Ensure configuration/behavior can be verified without manual guesswork.
+- [ ] Keep scope aligned to this issue; move optional enhancements to follow-up tasks.
+- [ ] Dependency note: Coordinate with existing dashboard modules and shared type contracts before final UI wiring.
+
+Implementation Tasks
+- [ ] Add or update tests for the primary flow plus failure/edge behavior.
+- [ ] Include unit tests plus at least one integration/regression path for cross-module behavior.
+- [ ] Preserve existing behavior outside this issue scope.
+
+Acceptance Criteria
+- [ ] Timeline scrubber component is visible and functional in the dashboard.
+- [ ] Validation steps are included in the PR description and reproducible by a maintainer.
+- [ ] No regressions are introduced in adjacent Wave 4 flows.
+
+Definition of Done
+- [ ] Implementation is complete and merge-ready (no placeholder logic).
+- [ ] Tests are passing locally and in CI for impacted surfaces.
+- [ ] Reviewer can verify behavior without guesswork.
+- [ ] PR description includes Closes #<issue-number>.
+- [ ] Include a short design note in the PR (tradeoffs, alternatives considered, and rollback path).
+
+Suggested Validation
+- Primary: cd apps/web && npm run lint && npm run build
+- Secondary: run only affected module checks and include command output summary in PR.
+
+PR and Checkout (Suggested)
+- git checkout -b feat/wave4-implement-timeline-scrubber-component-component
+- git commit -m "feat: Implement Timeline scrubber component component"
+- git push origin feat/wave4-implement-timeline-scrubber-component-component
+
+Maintainer Notes
+- Keep this issue scoped; split follow-up work into linked issues when needed.
+- If blocked, document blockers clearly and link dependencies in the issue thread.

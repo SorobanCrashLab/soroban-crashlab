@@ -62,7 +62,7 @@ unassigned_cutoff=$(iso_start_n_days_ago "$UNASSIGNED_STALE_DAYS")
 stale_label_cutoff=$(iso_start_n_days_ago "$STALE_LABEL_QUIET_DAYS")
 
 echo "Backlog freshness — ${REPO}"
-echo "Thresholds: assigned+wave3 updated before ${assigned_cutoff} (${ASSIGNED_STALE_DAYS}d), unassigned+wave3 before ${unassigned_cutoff} (${UNASSIGNED_STALE_DAYS}d), wave3+stale before ${stale_label_cutoff} (${STALE_LABEL_QUIET_DAYS}d)."
+echo "Thresholds: assigned+wave4 updated before ${assigned_cutoff} (${ASSIGNED_STALE_DAYS}d), unassigned+wave4 before ${unassigned_cutoff} (${UNASSIGNED_STALE_DAYS}d), wave4+stale before ${stale_label_cutoff} (${STALE_LABEL_QUIET_DAYS}d)."
 echo ""
 
 print_block() {
@@ -83,7 +83,7 @@ assigned_json=$(
   gh issue list -R "$REPO" -s open -L 500 --assignee '*' \
     --json number,title,updatedAt,labels,assignees |
   jq --arg c "$assigned_cutoff" \
-    '[.[] | select(([.labels[]?.name] | index("wave3")) != null)
+    '[.[] | select(([.labels[]?.name] | index("wave4")) != null)
             | select((.assignees | length) > 0)
             | select(.updatedAt < $c)
             | {number, title, updatedAt}]'
@@ -93,7 +93,7 @@ unassigned_json=$(
   gh issue list -R "$REPO" -s open -L 500 \
     --json number,title,updatedAt,labels,assignees |
   jq --arg c "$unassigned_cutoff" \
-    '[.[] | select(([.labels[]?.name] | index("wave3")) != null)
+    '[.[] | select(([.labels[]?.name] | index("wave4")) != null)
             | select((.assignees | length) == 0)
             | select(.updatedAt < $c)
             | {number, title, updatedAt}]'
@@ -103,14 +103,14 @@ stale_label_json=$(
   gh issue list -R "$REPO" -s open -L 500 \
     --json number,title,updatedAt,labels |
   jq --arg c "$stale_label_cutoff" \
-    '[.[] | select(([.labels[]?.name] | index("wave3")) != null)
+    '[.[] | select(([.labels[]?.name] | index("wave4")) != null)
             | select(([.labels[]?.name] | index("stale")) != null)
             | select(.updatedAt < $c)
             | {number, title, updatedAt}]'
 )
 
-print_block "Assigned wave3 issues past activity threshold" "$assigned_json"
-print_block "Unassigned wave3 issues past activity threshold" "$unassigned_json"
-print_block "Open wave3 issues with stale label past quiet threshold" "$stale_label_json"
+print_block "Assigned wave4 issues past activity threshold" "$assigned_json"
+print_block "Unassigned wave4 issues past activity threshold" "$unassigned_json"
+print_block "Open wave4 issues with stale label past quiet threshold" "$stale_label_json"
 
 echo "See MAINTAINER_WAVE_PLAYBOOK.md (Backlog freshness review)."

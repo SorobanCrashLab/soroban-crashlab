@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Push missing Wave3 issues safely.
+"""Push missing Wave4 issues safely.
 
 Usage:
-    python3 scripts/push_wave3_missing.py --input ops/wave3-missing.tsv --repo SorobanCrashLab/soroban-crashlab [--yes]
+    python3 scripts/push_wave4_missing.py --input ops/wave4-missing.tsv --repo SorobanCrashLab/soroban-crashlab [--yes]
 
 Behavior:
  - Dry-run by default (no issues created). Use --yes to actually create.
  - Prefers GitHub REST when GITHUB_TOKEN is set; falls back to `gh` CLI.
  - Checks existing issues using `--check-state` (default: all) and skips any title that
      already exists in that issue set (prevents recreating closed/solved issues).
- - Writes a local record file at .ops/pushed_wave3_issues.json to avoid duplicates across runs.
+ - Writes a local record file at .ops/pushed_wave4_issues.json to avoid duplicates across runs.
 """
 import argparse
 import json
@@ -50,7 +50,7 @@ def parse_tsv(path: str) -> List[dict]:
 
 def gh_list_titles_cli(repo: str, state: str = "all") -> List[str]:
     try:
-        out = subprocess.check_output(["gh", "issue", "list", "-R", repo, "--label", "wave3", "--state", state, "--limit", "500", "--json", "title"], text=True)
+        out = subprocess.check_output(["gh", "issue", "list", "-R", repo, "--label", "wave4", "--state", state, "--limit", "500", "--json", "title"], text=True)
         arr = json.loads(out)
         return [a.get("title", "").strip() for a in arr if a.get("title")]
     except Exception:
@@ -79,7 +79,7 @@ def gh_list_titles_api(repo: str, token: str, state: str = "all") -> List[str]:
     titles = []
     page = 1
     while True:
-        url = f"https://api.github.com/repos/{repo}/issues?labels=wave3&state={state}&per_page=100&page={page}"
+        url = f"https://api.github.com/repos/{repo}/issues?labels=wave4&state={state}&per_page=100&page={page}"
         req = urllib.request.Request(url, headers={"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"})
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
@@ -147,7 +147,7 @@ def main():
     p.add_argument("--repo", required=True, help="owner/repo")
     p.add_argument("--yes", action="store_true", help="Actually create issues (default: dry-run)")
     p.add_argument("--check-state", choices=["open", "closed", "all"], default="all", help="Which issue states to check for duplicates (default: all)")
-    p.add_argument("--record", default="soroban-crashlab/.ops/pushed_wave3_issues.json", help="Local record path")
+    p.add_argument("--record", default="soroban-crashlab/.ops/pushed_wave4_issues.json", help="Local record path")
     args = p.parse_args()
 
     rows = parse_tsv(args.input)
@@ -178,7 +178,7 @@ def main():
             print('SKIP (record):', title, '->', record.get(n))
             continue
         body = build_body(r.get('parts', []))
-        labels = ['wave3']
+        labels = ['wave4']
         if len(r.get('parts', []))>1 and r['parts'][1]:
             labels.append(r['parts'][1])
         if len(r.get('parts', []))>2 and r['parts'][2]:

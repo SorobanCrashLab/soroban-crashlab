@@ -196,4 +196,4 @@ Write contributor local setup guide|trivial|area:docs|type:task|Provide step by 
 Write mutation strategy handbook|medium|area:docs|type:feature|Describe each mutator goal risk coverage and usage guidance.|Handbook links strategy choices to realistic contract failure classes.|
 Write release process documentation|medium|area:docs|type:feature|Document release tagging changelog and backward compatibility workflow.|Release process can be executed by a new maintainer without guesswork.|
 Write reproducibility guarantees documentation|medium|area:docs|type:feature|Document deterministic guarantees and known limits across environments.|Docs include examples and troubleshooting for mismatched replay outcomes.|
->>>>>>> 5a97b37 (chore(issues): dedupe wave3 issue backlog to single canonical issue per feature)
+>>>>>>> 5a97b37 (chore(issues): dedupe wave4 issue backlog to single canonical issue per feature)

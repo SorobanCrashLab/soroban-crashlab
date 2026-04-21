@@ -1,4 +1,4 @@
-# Wave 3 Batch Assignment Plan (Conflict-Aware)
+# Wave 4 Batch Assignment Plan (Conflict-Aware)
 
 This plan is designed to reduce contributor collisions and dependency stalls.
 

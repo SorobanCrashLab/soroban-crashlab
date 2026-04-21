@@ -1,14 +1,17 @@
-# Wave 3 Backlog (Curated, Non-Redundant)
+# Wave 4 Backlog (Planning Snapshot)
 
-This backlog is intentionally scoped for contributor onboarding and maintainer throughput. It is mirrored in `ops/wave3-issues.tsv` for automated issue creation.
+> Canonical publishing source: `ops/wave4-canonical.tsv` (generated via `scripts/build-wave4-canonical.py`).
+> This markdown file is planning context and may not match live canonical counts.
+
+This backlog is intentionally scoped for contributor onboarding and maintainer throughput. It is mirrored in `ops/wave4-issues.tsv` for automated issue creation.
 
 ## Current size
 
 - Total issues prepared: 91
 - Complexity distribution:
-	- Trivial: 30
-	- Medium: 48
-	- High: 13
+  - Trivial: 30
+  - Medium: 48
+  - High: 13
 
 ## Area breakdown
 
@@ -34,4 +37,3 @@ Recommended active window per wave:
 
 - 25 to 40 active issues
 - keep the remainder in reserve as queued, dependency-aware follow-up tasks
-
