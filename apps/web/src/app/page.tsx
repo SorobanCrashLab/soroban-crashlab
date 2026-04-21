@@ -840,18 +840,18 @@ function HomeContent() {
       </div>
 
       <div className="mt-16 text-center border-t border-black/[.08] dark:border-white/[.145] pt-12 w-full">
-        <h2 className="text-2xl font-bold mb-4">Stellar Wave 3 is Open!</h2>
+        <h2 className="text-2xl font-bold mb-4">Stellar Wave 4 is Open!</h2>
         <p className="text-zinc-600 dark:text-zinc-400 mb-8 max-w-2xl mx-auto">
           We are actively looking for contributors. Check out our open issues to build the future of Soroban dev tooling with us.
         </p>
         <div className="flex justify-center gap-4">
           <a
-            href="https://github.com/SorobanCrashLab/soroban-crashlab/issues?q=is%3Aissue+is%3Aopen+label%3Awave3"
+            href="https://github.com/SorobanCrashLab/soroban-crashlab/issues?q=is%3Aissue+is%3Aopen+label%3Awave4"
             className="flex items-center justify-center h-12 px-6 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Browse Wave 3 Issues
+            Browse Wave 4 Issues
           </a>
           <a
             href="https://github.com/SorobanCrashLab/soroban-crashlab"
@@ -880,3 +880,5 @@ export default function Home() {
     </Suspense>
   );
 }
+// eslint-disable-next-line react-hooks/rules-of-hooks
+const [showOnboardingChecklist, setShowOnboardingChecklist] = useState(false);

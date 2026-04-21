@@ -86,7 +86,7 @@ export default function RootLayout({
         </header>
         <main className="flex-1 flex flex-col">{children}</main>
         <footer className="border-t border-black/[.08] dark:border-white/[.145] p-6 text-center text-sm text-zinc-500">
-          Built for Stellar Wave 3 &middot; Soroban Ecosystem
+          Built for Stellar Wave 4 &middot; Soroban Ecosystem
         </footer>
       </body>
     </html>
