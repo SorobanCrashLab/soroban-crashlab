@@ -197,6 +197,19 @@ triggering event.
    must review immediately regardless of original assignment. Comment
    `reviewed-by: @<handle>` to mark ownership.
 
+### Blocked PR Escalation Path
+
+When a PR is marked with the `blocked` label, it enters a specialized escalation path to prevent stale backlog drift.
+
+| Milestone | Threshold | Action |
+| --- | --- | --- |
+| **Initial Block** | 0 h | Maintainer applies `blocked` label and comments with the specific dependency. |
+| **SLA Breach** | 24 h | `scripts/check-sla.sh` flags the PR. Maintainer posts status update. |
+| **Escalation** | 36 h | Wave lead review. If block persists without path to resolution, un-assign or move to backlog. |
+
+**Communication Template (24h breach)**
+> @maintainer: This PR has been blocked on dependencies for >24h. Please provide a status update or resolve the block to prevent stale backlog drift.
+
 ### Running the SLA check
 
 Use `scripts/check-sla.sh` to surface open items past their SLA window:

@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# scripts/triage-reminder.sh — Generate issue queue snapshots and identify high-priority triage actions.
+#
+# Usage:
+#   bash scripts/triage-reminder.sh [--repo OWNER/REPO]
+#
+# Environment:
+#   REPO                     Default SorobanCrashLab/soroban-crashlab
+#   WAVE_LABEL               Default wave3
+#   PYTHON_CMD               Path to python executable (optional)
+
+set -euo pipefail
+
+REPO="${REPO:-SorobanCrashLab/soroban-crashlab}"
+WAVE_LABEL="${WAVE_LABEL:-wave3}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo) REPO="$2"; shift 2 ;;
+    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+if ! command -v gh &>/dev/null; then
+  echo "Error: gh CLI is not installed." >&2
+  exit 2
+fi
+
+# Determine python command
+if [[ -z "${PYTHON_CMD:-}" ]]; then
+  if command -v python3 &>/dev/null; then
+    PYTHON_CMD="python3"
+  elif command -v python &>/dev/null; then
+    PYTHON_CMD="python"
+  else
+    echo "Error: python is not installed." >&2
+    exit 2
+  fi
+fi
+
+if [[ -n "${GITHUB_TOKEN:-}" || -n "${GH_TOKEN:-}" ]]; then
+  export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+else
+  if ! gh auth status &>/dev/null; then
+    echo "Error: gh is not authenticated. Run 'gh auth login' or set GH_TOKEN." >&2
+    exit 2
+  fi
+fi
+
+echo "### 🌊 Issue Queue Snapshot: ${REPO} (${WAVE_LABEL})"
+echo ""
+
+# Fetch all open issues with the wave label
+all_issues_json=$(gh issue list -R "$REPO" -s open -L 1000 --label "$WAVE_LABEL" --json number,title,labels,assignees,updatedAt)
+
+# Use Python for all processing to avoid jq dependency
+$PYTHON_CMD -c '
+import json, sys, os
+from datetime import datetime, timedelta
+
+try:
+    data = sys.stdin.read()
+    if not data.strip():
+        print("No issues found or empty output from gh.")
+        sys.exit(0)
+    issues = json.loads(data)
+except Exception as e:
+    print(f"Error parsing JSON from gh: {e}")
+    sys.exit(1)
+
+wave_label = os.environ.get("WAVE_LABEL", "wave3")
+
+# 1. Snapshot by Complexity
+complexities = {}
+no_complexity = 0
+for issue in issues:
+    found = False
+    for label in issue["labels"]:
+        if label["name"].startswith("complexity:"):
+            complexities[label["name"]] = complexities.get(label["name"], 0) + 1
+            found = True
+    if not found:
+        no_complexity += 1
+
+print("**Complexity Breakdown:**")
+for comp in sorted(complexities.keys()):
+    print(f" - {comp}: {complexities[comp]}")
+if no_complexity > 0:
+    print(f" - (missing complexity): {no_complexity}")
+print("")
+
+# 2. Snapshot by Area
+areas = {}
+no_area = 0
+for issue in issues:
+    found = False
+    for label in issue["labels"]:
+        if label["name"].startswith("area:"):
+            areas[label["name"]] = areas.get(label["name"], 0) + 1
+            found = True
+    if not found:
+        no_area += 1
+
+print("**Area Breakdown:**")
+for area in sorted(areas.keys()):
+    print(f" - {area}: {areas[area]}")
+if no_area > 0:
+    print(f" - (missing area): {no_area}")
+print("")
+
+# 3. Snapshot by Assignment
+total = len(issues)
+assigned = sum(1 for i in issues if len(i["assignees"]) > 0)
+unassigned = total - assigned
+print("**Assignment Status:**")
+print(f" - Total Open: {total}")
+print(f" - Assigned: {assigned}")
+print(f" - Unassigned: {unassigned}")
+print("")
+
+# 4. High-Priority Actions
+print("### 🚨 High-Priority Triage Actions")
+print("")
+
+# A. Missing Metadata
+needs_metadata = []
+for issue in issues:
+    has_comp = any(l["name"].startswith("complexity:") for l in issue["labels"])
+    has_area = any(l["name"].startswith("area:") for l in issue["labels"])
+    if not has_comp or not has_area:
+        needs_metadata.append(f" - #{issue['number']} {issue['title']} (missing metadata)")
+
+print("**Missing Metadata (Complexity/Area):**")
+if needs_metadata:
+    print("\n".join(needs_metadata))
+else:
+    print("None")
+print("")
+
+# B. Unassigned High Complexity
+unassigned_high = []
+for issue in issues:
+    is_unassigned = len(issue["assignees"]) == 0
+    is_high = any(l["name"] == "complexity:high" for l in issue["labels"])
+    if is_unassigned and is_high:
+        unassigned_high.append(f" - #{issue['number']} {issue['title']} (unassigned high complexity)")
+
+print("**Unassigned High Complexity:**")
+if unassigned_high:
+    print("\n".join(unassigned_high))
+else:
+    print("None")
+print("")
+
+# C. Stale Blocked
+cutoff = datetime.now() - timedelta(days=7)
+stale_blocked = []
+for issue in issues:
+    is_blocked = any(l["name"] == "blocked" for l in issue["labels"])
+    # updatedAt format: 2026-04-20T10:00:00Z
+    try:
+        updated_at = datetime.strptime(issue["updatedAt"][:19], "%Y-%m-%dT%H:%M:%S")
+        if is_blocked and updated_at < cutoff:
+            stale_blocked.append(f" - #{issue['number']} {issue['title']} (stale blocked since {issue['updatedAt'][:10]})")
+    except:
+        pass
+
+print("**Stale Blocked Issues (>7d):**")
+if stale_blocked:
+    print("\n".join(stale_blocked))
+else:
+    print("None")
+print("")
+' <<< "$all_issues_json"
+
+echo "---"
+echo "Generated by scripts/triage-reminder.sh"

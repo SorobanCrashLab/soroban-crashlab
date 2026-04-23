@@ -10,15 +10,17 @@
 #   bash scripts/check-sla.sh [--repo OWNER/REPO]
 #
 # Environment variables:
-#   REPO        Override the default repository (SorobanCrashLab/soroban-crashlab)
-#   PR_SLA_H    Hours before a PR without a review is flagged   (default: 24)
-#   ISSUE_SLA_H Hours before an assigned issue with no update is flagged (default: 48)
+#   REPO             Override the default repository (SorobanCrashLab/soroban-crashlab)
+#   PR_SLA_H         Hours before a PR without a review is flagged   (default: 24)
+#   ISSUE_SLA_H      Hours before an assigned issue with no update is flagged (default: 48)
+#   BLOCKED_PR_SLA_H Hours before a blocked PR with no update is flagged (default: 24)
 
 set -euo pipefail
 
 REPO="${REPO:-SorobanCrashLab/soroban-crashlab}"
 PR_SLA_H="${PR_SLA_H:-24}"
 ISSUE_SLA_H="${ISSUE_SLA_H:-48}"
+BLOCKED_PR_SLA_H="${BLOCKED_PR_SLA_H:-24}"
 
 # Parse optional --repo flag.
 while [[ $# -gt 0 ]]; do
@@ -112,6 +114,33 @@ done < <(gh issue list \
   --jq '.[] | [.number, .title, .updatedAt, (.assignees[0].login // "")] | @tsv')
 
 [[ "$issue_breach" -eq 0 ]] && echo "  All assigned issues are within the update SLA."
+
+# ── 3. Blocked PRs with no update older than BLOCKED_PR_SLA_H ─────────────────
+echo ""
+echo "==> Checking blocked PRs for update SLA breach (> ${BLOCKED_PR_SLA_H}h without update) ..."
+
+blocked_breach=0
+while IFS=$'\t' read -r number title updated_at; do
+  [[ -z "$number" ]] && continue
+
+  age_h=$(iso8601_age_h "$updated_at")
+
+  if [[ "$age_h" -ge "$BLOCKED_PR_SLA_H" ]]; then
+    printf "  [PR #%s] \"%s\" — blocked, last update %dh ago (SLA: %dh)\n" \
+      "$number" "$title" "$age_h" "$BLOCKED_PR_SLA_H"
+    printf "    Escalation Template:\n"
+    printf "    \"@maintainer: This PR has been blocked on dependencies for >%dh. Please provide a status update or resolve the block to prevent stale backlog drift.\"\n" "$BLOCKED_PR_SLA_H"
+    blocked_breach=1
+    breaches=1
+  fi
+done < <(gh pr list \
+  --repo "$REPO" \
+  --state open \
+  --label "blocked" \
+  --json number,title,updatedAt \
+  --jq '.[] | [.number, .title, .updatedAt] | @tsv')
+
+[[ "$blocked_breach" -eq 0 ]] && echo "  All blocked PRs are within the update SLA."
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
