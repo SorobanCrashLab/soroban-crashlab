@@ -58,6 +58,7 @@ import AddAFuzzyQueryBuilderPage51 from "./add-a-fuzzy-query-builder-page-51";
 import AddResponsiveLayoutImprovements from "./add-responsive-layout-improvements";
 import AddKeyboardNavigationHelp from "./add-keyboard-navigation-help";
 import AddRunAnnotations from "./add-run-annotations";
+import NotificationCenter from "./add-notification-center-ui";
 
 // Mock data for demonstration
 const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 25 }, (_, i) => ({
@@ -482,6 +483,7 @@ function HomeContent() {
         >
           {/* Role toggle */}
           <div className="w-full flex flex-wrap justify-end gap-3 mb-6">
+            <NotificationCenter />
             <button
               type="button"
               onClick={handleOpenOnboardingChecklist}
