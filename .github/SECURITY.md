@@ -38,6 +38,30 @@ A useful report includes:
 
 We follow a **coordinated disclosure** model. We ask reporters to keep details private until a fix is available or the 90-day window closes, whichever comes first. We will credit reporters in the advisory unless they prefer to remain anonymous.
 
+## Maintainer Conflicts of Interest
+
+Security trust depends on assignment, triage, review, merge, severity, and disclosure decisions being made by maintainers who can act independently.
+
+A maintainer has a conflict of interest when they are the reporter, author, assignee, PR author, employer, client, sponsor, close collaborator, direct financial beneficiary, direct competitor, or prior private implementer for the issue or PR under decision.
+
+### Required control path
+
+1. The conflicted maintainer discloses the conflict before taking an assignment, review, merge, severity, fix-readiness, bounty, point-award, or disclosure decision.
+2. For public issues or PRs, disclose with a short public comment and avoid sensitive details. For private vulnerability reports, disclose only in the GitHub private vulnerability report or maintainer channel.
+3. An unconflicted maintainer takes ownership before the decision continues.
+4. The conflicted maintainer may provide factual context when requested, but must not approve, merge, assign, close, set severity, decide disclosure timing, or award resolution credit for the conflicted item.
+
+### Timelines
+
+- Issue assignment and PR review conflicts use the Wave maintainer timelines: replacement owner within **24 hours**, escalation to any available unconflicted maintainer at **36 hours**.
+- Security report conflicts keep the disclosure timelines in this policy: acknowledgement within **48 hours**, initial triage and severity assessment within **5 business days**, and fix or mitigation plan within **14 days**.
+
+### Known risks and mitigation boundaries
+
+- A small maintainer pool can delay replacement ownership. Mitigation: the Wave lead or any available unconflicted maintainer may take over at the escalation timer.
+- Private vulnerability reports can reveal sensitive details while a conflict is being handled. Mitigation: recusal records for private reports stay in private channels until coordinated disclosure.
+- This policy does not automatically detect personal, employment, financial, or sponsor relationships. Mitigation: maintainers must self-disclose, contributors should flag known conflicts, and reviewers can request reassignment when independence is unclear.
+
 ## Scope
 
 This policy covers:

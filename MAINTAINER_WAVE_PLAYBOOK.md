@@ -79,6 +79,22 @@ Purpose: retire stale work items and refine active scope so the Wave board stays
 - Reject misaligned applications quickly using the Wave UI so contributors can reapply elsewhere.
 - If no progress update is posted in 24 hours, request a status check and un-assign if unresponsive.
 
+## Conflict-of-interest handling
+
+Use the [Security Policy conflict-of-interest control path](.github/SECURITY.md#maintainer-conflicts-of-interest) for issue assignment, PR review, merge, severity, disclosure, bounty, and point-award decisions.
+
+A maintainer is conflicted when they are the reporter, issue author, assignee, PR author, employer, client, sponsor, close collaborator, direct financial beneficiary, direct competitor, or prior private implementer for the work being decided.
+
+### Required path
+
+1. Disclose the conflict before acting. Use a public issue or PR comment for normal Wave work, and the private vulnerability report or maintainer channel for security-sensitive reports.
+2. Recuse from assignment, review approval, merge, severity, disclosure timing, closure, and resolution-credit decisions for the affected item.
+3. Reassign ownership to an unconflicted maintainer. For issue assignment and PR review, keep the existing Wave timers: replacement owner within **24 hours**, escalation at **36 hours**.
+4. For vulnerability reports, keep the `.github/SECURITY.md` disclosure timers: acknowledgement within **48 hours**, initial triage within **5 business days**, and fix or mitigation plan within **14 days**.
+5. If no unconflicted maintainer is available before the timer, the Wave lead posts the blocker, leaves the item unapproved, and opens a follow-up staffing/escalation issue instead of forcing a conflicted approval.
+
+Known boundary: this process relies on self-disclosure and contributor/reviewer escalation for relationships that automation cannot detect. The automated policy test verifies the documented control path, timelines, and handle-based self-assignment/self-review edge cases only.
+
 ## PR review policy
 
 Review inside 24 hours to prevent unnecessary automated appeals. Review in this order:
@@ -123,6 +139,8 @@ environment mismatches instead of guesswork.
 ## Security Policy
 
 The project's coordinated vulnerability disclosure process and response expectations are defined in [`.github/SECURITY.md`](.github/SECURITY.md). Maintainers are responsible for triaging incoming reports within the timelines specified there.
+
+Conflict-of-interest handling for security reports is defined in [`.github/SECURITY.md#maintainer-conflicts-of-interest`](.github/SECURITY.md#maintainer-conflicts-of-interest). A conflicted maintainer may route a private report to an unconflicted owner, but must not decide severity, fix readiness, disclosure timing, or public credit.
 
 ## Operational Security Assumptions
 
@@ -197,6 +215,19 @@ triggering event.
    must review immediately regardless of original assignment. Comment
    `reviewed-by: @<handle>` to mark ownership.
 
+### Blocked PR Escalation Path
+
+When a PR is marked with the `blocked` label, it enters a specialized escalation path to prevent stale backlog drift.
+
+| Milestone | Threshold | Action |
+| --- | --- | --- |
+| **Initial Block** | 0 h | Maintainer applies `blocked` label and comments with the specific dependency. |
+| **SLA Breach** | 24 h | `scripts/check-sla.sh` flags the PR. Maintainer posts status update. |
+| **Escalation** | 36 h | Wave lead review. If block persists without path to resolution, un-assign or move to backlog. |
+
+**Communication Template (24h breach)**
+> @maintainer: This PR has been blocked on dependencies for >24h. Please provide a status update or resolve the block to prevent stale backlog drift.
+
 ### Running the SLA check
 
 Use `scripts/check-sla.sh` to surface open items past their SLA window:
@@ -209,6 +240,17 @@ bash scripts/check-sla.sh
 The script lists open PRs with no review past 24 h and assigned issues
 with no update past 48 h. It exits non-zero when breaches are found so
 it can be wired into a CI schedule.
+
+### Running the conflict policy check
+
+Use the focused policy test when conflict handling, security-process docs, or Wave assignment/review language changes:
+
+```bash
+cd apps/web
+npm run test:policy
+```
+
+The test verifies primary allowed decisions, conflict recusal behavior, handle-normalization edge cases, policy cross-links, and the documented 24 h, 36 h, 48 h, 5 business day, and 14 day timers.
 
 ## Post-resolution feedback
 

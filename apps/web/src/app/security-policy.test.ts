@@ -10,11 +10,29 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 describe('Security Policy and Disclosure Path', () => {
-  const repoRoot = path.resolve(__dirname, '../../../../..');
+  const findRepoRoot = (start: string): string => {
+    let current = start;
+
+    while (current !== path.dirname(current)) {
+      if (
+        fs.existsSync(path.join(current, 'README.md')) &&
+        fs.existsSync(path.join(current, '.github', 'SECURITY.md'))
+      ) {
+        return current;
+      }
+
+      current = path.dirname(current);
+    }
+
+    throw new Error('Unable to locate repository root');
+  };
+
+  const repoRoot = findRepoRoot(process.cwd());
   const securityPolicyPath = path.join(repoRoot, '.github', 'SECURITY.md');
   const readmePath = path.join(repoRoot, 'README.md');
   const contributingPath = path.join(repoRoot, 'CONTRIBUTING.md');
   const maintainerPlaybookPath = path.join(repoRoot, 'MAINTAINER_WAVE_PLAYBOOK.md');
+  const prDescriptionPath = path.join(repoRoot, 'PR_DESCRIPTION.md');
 
   describe('SECURITY.md file existence and structure', () => {
     it('should have a SECURITY.md file in .github directory', () => {
@@ -74,6 +92,16 @@ describe('Security Policy and Disclosure Path', () => {
       expect(content).toMatch(/known gaps|accepted risks/i);
       expect(content).toContain('MAINTAINER_WAVE_PLAYBOOK.md');
     });
+
+    it('should define maintainer conflict-of-interest handling', () => {
+      const content = fs.readFileSync(securityPolicyPath, 'utf-8');
+
+      expect(content).toContain('## Maintainer Conflicts of Interest');
+      expect(content).toMatch(/unconflicted maintainer/i);
+      expect(content).toContain('48 hours');
+      expect(content).toContain('5 business days');
+      expect(content).toContain('14 days');
+    });
   });
 
   describe('README.md integration', () => {
@@ -89,6 +117,12 @@ describe('Security Policy and Disclosure Path', () => {
       const content = fs.readFileSync(readmePath, 'utf-8');
       
       expect(content.toLowerCase()).toMatch(/do not open.*public issue.*security/i);
+    });
+
+    it('should mention conflict-of-interest handling in README security guidance', () => {
+      const content = fs.readFileSync(readmePath, 'utf-8');
+
+      expect(content.toLowerCase()).toContain('conflict-of-interest');
     });
   });
 
@@ -111,6 +145,14 @@ describe('Security Policy and Disclosure Path', () => {
       
       expect(content).toContain('Security review checklist');
       expect(content).toMatch(/\[\s*\]/); // Checkbox format
+    });
+
+    it('should explain conflict disclosures without leaking private vulnerabilities', () => {
+      const content = fs.readFileSync(contributingPath, 'utf-8');
+
+      expect(content).toMatch(/conflict of interest/i);
+      expect(content).toMatch(/private vulnerability/i);
+      expect(content).toMatch(/unconflicted maintainer/i);
     });
   });
 
@@ -141,6 +183,14 @@ describe('Security Policy and Disclosure Path', () => {
       expect(content).toMatch(/reviewing.*security|security.*review/i);
       expect(content).toContain('fuzz input handling');
       expect(content).toContain('artifact storage');
+    });
+
+    it('should link to conflict-of-interest policy and verification command', () => {
+      const content = fs.readFileSync(maintainerPlaybookPath, 'utf-8');
+
+      expect(content).toContain('.github/SECURITY.md#maintainer-conflicts-of-interest');
+      expect(content).toContain('Conflict-of-interest handling');
+      expect(content).toContain('npm run test:policy');
     });
   });
 
@@ -181,11 +231,13 @@ describe('Security Policy and Disclosure Path', () => {
   });
 
   describe('Validation commands', () => {
-    it('should document validation commands in README', () => {
-      const content = fs.readFileSync(readmePath, 'utf-8');
+    it('should document validation commands in PR description', () => {
+      const content = fs.readFileSync(prDescriptionPath, 'utf-8');
       
       // Should reference the grep command for TODO/TBD checking
       expect(content).toMatch(/grep.*TODO.*TBD|rg.*TODO.*TBD/i);
+      expect(content).toContain('npm run test:policy');
+      expect(content).toContain('Closes #');
     });
   });
 

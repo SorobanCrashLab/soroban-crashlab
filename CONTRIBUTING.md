@@ -252,6 +252,14 @@ Also paste the exact failing command and the first relevant error block.
    release maintainer can update [`CHANGELOG.md`](CHANGELOG.md) and run the
    compatibility review in [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 
+## Conflict of interest disclosures
+
+If you know that an issue assignment, PR review, merge, security triage, or resolution-credit decision involves a maintainer with a personal, employment, sponsor, financial, close-collaboration, direct-competition, or prior private implementation conflict, flag it early.
+
+- For normal issues and PRs, leave a concise public comment asking for an unconflicted maintainer.
+- For private vulnerability reports, keep details in GitHub private vulnerability reporting or maintainer email. Do not move sensitive security details into a public issue or PR.
+- A conflicted maintainer may provide factual context when asked, but an unconflicted maintainer must own assignment, review approval, merge, severity, disclosure timing, and credit decisions.
+
 ## Quality bar
 
 - changes are readable and maintainable
