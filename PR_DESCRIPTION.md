@@ -1,7 +1,6 @@
 # feat: Add conflict-of-interest maintainer policy
 
-Closes #<issue-number>
-
+Closes #437 
 ## Summary
 
 Defines the conflict-of-interest control path for issue assignment, PR review, merge, security triage, disclosure, and resolution-credit decisions. The policy is documented in the security policy and maintainer playbook, with contributor guidance for raising known conflicts without leaking private vulnerability details.
