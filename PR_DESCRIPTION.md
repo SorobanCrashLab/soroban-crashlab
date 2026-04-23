@@ -1,65 +1,89 @@
-# chore: Add Heatmap interactions
+# feat: Add live run progress timeline
 
-Closes #498
+Closes #499
 
 ## Summary
 
-Implements end-to-end frontend heatmap interactions for the dashboard, adding explicit loading/error states, keyboard accessibility, and responsive layout behavior. Utility functions are exported for testability, and a comprehensive test suite (46 tests) covers unit, edge-case, and integration/regression paths.
+Implements a deterministic live run progress timeline for the dashboard that incrementally streams campaign milestone and failure discovery events from shared `FuzzingRun` data, with explicit loading/error states, pause/resume markers, and responsive/keyboard-accessible controls.
 
 ## What changed
 
-### `apps/web/src/app/add-heatmap-interactions.tsx`
+### `apps/web/src/app/campaign-milestone-timeline-55.tsx`
 
-- **Loading state**: Simulated async data fetch with skeleton grid (pulsing placeholder cells matching heatmap layout)
-- **Error state**: Error panel with retry button; `fetchAttempt` counter triggers re-fetch
-- **Success state**: Summary stats, metric tabs, filter bar, and interactive heatmap grid render only after data loads
-- **Exported utilities**: All pure functions (`getHeatClassName`, `getSeverityFilter`, `formatDelta`, `getAnnouncement`, `getCellId`, `normalizeCell`) and types/constants are now exported for testing
-- **Keyboard accessibility** (pre-existing, preserved): Arrow key navigation, Escape to unpin, focus management via `getCellId`
+- Replaced random simulated timeline generation with run-driven incremental updates.
+- Added explicit `dataState` handling (`loading`, `error`, `success`) with dedicated UI states.
+- Added retry wiring for timeline stream failures.
+- Added pause/resume marker insertion in the event feed.
+- Added `aria-live` event log semantics and `aria-pressed` control states for accessibility.
+- Preserved responsive layout behavior for controls and event summary row.
 
-### `apps/web/src/app/add-heatmap-interactions.test.ts` (new)
+### `apps/web/src/app/campaign-milestone-timeline-utils.ts` (new)
 
-- **Unit tests** (30): `getHeatClassName`, `getSeverityFilter`, `formatDelta`, `getAnnouncement`, `getCellId`, `normalizeCell`, plus constants integrity checks
-- **Integration tests** (16): Cross-module consistency between heat classes and severity filters, `normalizeCell` across all metric types, LEGEND_ITEMS color alignment, and data-state rendering logic validation
+- Added pure utility layer for deterministic, testable timeline behavior:
+  - `sortRunsForTimeline(runs)`
+  - `buildCampaignLifecycleEvent(campaignId, type)`
+  - `buildRunProgressEvent(run, knownSignatures)`
+  - `selectNextUnseenRun(runs, seenRunIds)`
+  - `prependCappedEvent(events, event, maxEventsDisplayed)`
+- Added shared `MilestoneEvent` / `MilestoneEventType` contracts for module coordination.
+
+### `apps/web/src/app/page.tsx`
+
+- Wired `CampaignMilestoneTimeline` to dashboard state contracts:
+  - `runs={runs}`
+  - `dataState={dataState}`
+  - `onRetry={() => setFetchAttempt((n) => n + 1)}`
+  - explicit timeline `errorMessage`
+
+### `apps/web/src/app/campaign-milestone-timeline-utils.test.ts` (new)
+
+- Added unit tests for:
+  - run sorting order
+  - failure event mapping and re-observed signature behavior
+  - unseen-run incremental selection
+  - capped prepend behavior
+- Added integration/regression path that validates replay placeholder runs map into timeline `run_update` events.
+
+### `apps/web/src/app/page.integration.test.ts`
+
+- Added cross-module regression coverage for issue #499:
+  - deterministic unseen-run progression
+  - replay placeholder (`replay-ui-utils`) → timeline event mapping
 
 ## Design note
 
-**Tradeoff**: Loading/error states use a simulated timer (600ms, 10% error rate) matching the existing `page.tsx` pattern. In production this would be a real API call, but the UX patterns (skeleton, error panel, retry) are production-ready and demonstrate the intended flow.
+**Tradeoff**: Timeline updates are generated from existing in-memory run data and emitted incrementally at a configurable interval instead of opening a backend stream in this issue.
 
-**Alternative considered**: Wrapping the entire component in Suspense — rejected because the heatmap is a self-contained section within the dashboard, and explicit `dataState` gives finer control over partial rendering (header always visible during loading).
+**Alternative considered**: Introduce websocket/SSE-backed timeline transport now. Deferred to follow-up to keep issue scope focused on UI behavior and shared type integration.
 
-**Rollback path**: Revert this single commit. The component is only rendered inside the maintainer-gated `CreateRunHeatmapPage55` wrapper, so removing the changes has zero impact on non-maintainer flows.
+**Rollback path**: Revert this commit to restore previous timeline rendering behavior and remove utility-based event generation.
 
 ## Validation
 
 ```bash
-cd apps/web && npm run lint && npm run build
+cd apps/web && npx jest src/app/campaign-milestone-timeline-utils.test.ts src/app/page.integration.test.ts --no-cache
 ```
 
-- `npm run lint` passes (exit code 0; all warnings/errors are pre-existing in `page.tsx`)
-- `npm run build` fails on pre-existing error in `add-accessible-keyboard-nav-blueprint-page-49.tsx:253` (not introduced by this PR)
+- ✅ 28/28 tests passing
 
 ```bash
-cd apps/web && npx jest src/app/add-heatmap-interactions.test.ts
+cd apps/web && npm run lint
 ```
 
-- **46 tests pass** (0 failures, 0 snapshots)
+- ⚠ Fails due to pre-existing unrelated baseline issues (e.g. `integrate-sentry-integration-for-crash-reporting.tsx` and pre-existing `page.tsx` memoization dependency warning)
 
 ```bash
-cd contracts/crashlab-core
-cargo test --all-targets
+cd apps/web && npm run build
 ```
 
-- [x] Frontend checks pass (`npm run lint`)
-- [x] Build failure is pre-existing, not introduced by this PR
-- [x] Tests cover primary flow plus failure/edge behavior (46 tests)
-- [x] Unit tests plus integration/regression paths included
-- [x] Existing behavior outside this issue scope is preserved
-- [x] No placeholder logic — implementation is merge-ready
-- [x] Keyboard accessibility verified (arrow keys, Escape, focus)
-- [x] Responsive layout behavior preserved (grid stacking, overflow scroll)
+- ⚠ Fails due to pre-existing unrelated baseline TypeScript error in `add-accessible-keyboard-nav-blueprint-page-49.tsx:253` (`handleReset` not defined)
 
-## Notes for Maintainers
+## Checklist
 
-- The pre-existing build error in `add-accessible-keyboard-nav-blueprint-page-49.tsx` (`Cannot find name 'handleReset'`) should be tracked separately
-- This PR only modifies `add-heatmap-interactions.tsx` and adds `add-heatmap-interactions.test.ts` — no other files touched
-- The heatmap is gated behind `isMaintainer` in `page.tsx`, limiting blast radius
+- [x] Timeline updates incrementally and supports pause/resume markers
+- [x] Explicit loading/error timeline states implemented with retry affordance
+- [x] Keyboard accessibility preserved for timeline controls and event feed focus
+- [x] Responsive behavior preserved for controls and event metadata layout
+- [x] Unit tests added for primary utility logic and edge behavior
+- [x] Integration/regression coverage added for cross-module replay-to-timeline flow
+- [x] Existing behavior outside issue scope preserved
