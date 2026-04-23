@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback, useEffect } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { FuzzingRun } from "./types";
 
 export type CrossRunBoardDataState = "loading" | "error" | "success";

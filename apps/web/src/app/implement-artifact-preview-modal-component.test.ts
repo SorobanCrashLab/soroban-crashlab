@@ -231,7 +231,6 @@ function testArtifactInterface(): void {
 // Test: Large artifact size formatting
 function testFormatSizeLarge(): void {
   const gigabyte = 1024 * 1024 * 1024;
-  const terabyte = gigabyte * 1024;
   
   // Test very large sizes (should still work with MB formatting)
   assert(formatSize(gigabyte) === "1024.0 MB", "1GB should format as 1024.0 MB");

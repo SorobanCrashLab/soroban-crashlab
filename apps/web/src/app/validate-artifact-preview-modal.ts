@@ -30,6 +30,11 @@ const sizeFormatted = formatSize(testArtifact.size);
 const dateFormatted = formatDate(testArtifact.updatedAt);
 const contentGenerated = generatePreviewContent(testArtifact);
 
+// Validate the results are reasonable
+console.log(`Size formatted: ${sizeFormatted}`);
+console.log(`Date formatted: ${dateFormatted}`);
+console.log(`Content generated: ${contentGenerated.length} characters`);
+
 // Component validation - ensure component can be instantiated
 const componentProps = {
   artifact: testArtifact,
