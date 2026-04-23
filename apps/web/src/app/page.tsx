@@ -523,7 +523,12 @@ function HomeContent() {
           {/* Cross-run board widgets section — maintainer only */}
           {isMaintainer && (
             <div className="w-full mb-12">
-              <CrossRunBoardWidgets />
+              <CrossRunBoardWidgets 
+                runs={runs}
+                dataState={dataState}
+                onRetry={() => setFetchAttempt(prev => prev + 1)}
+                errorMessage="Failed to load cross-run statistics. Please try again."
+              />
               <CrossRunBoardCustomWidgets runs={runs} />
             </div>
           )}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import ArtifactPreviewModal from './implement-artifact-preview-modal-component';
 
 interface Artifact {
   id: string;
@@ -30,6 +31,9 @@ const formatSize = (bytes: number) => {
 export default function ArtifactExplorer() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | Artifact['type']>('all');
+  const [previewArtifact, setPreviewArtifact] = useState<Artifact | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewDataState, setPreviewDataState] = useState<'loading' | 'error' | 'success'>('success');
 
   const filteredArtifacts = useMemo(() => {
     return MOCK_ARTIFACTS.filter(a => {
@@ -41,6 +45,35 @@ export default function ArtifactExplorer() {
     });
   }, [search, filter]);
 
+  const handlePreviewArtifact = (artifact: Artifact) => {
+    setPreviewArtifact(artifact);
+    setPreviewDataState('loading');
+    setIsPreviewOpen(true);
+    
+    // Simulate loading delay
+    setTimeout(() => {
+      // Simulate occasional errors for testing
+      if (Math.random() < 0.1) {
+        setPreviewDataState('error');
+      } else {
+        setPreviewDataState('success');
+      }
+    }, 800);
+  };
+
+  const handleClosePreview = () => {
+    setIsPreviewOpen(false);
+    setPreviewArtifact(null);
+    setPreviewDataState('success');
+  };
+
+  const handleRetryPreview = () => {
+    setPreviewDataState('loading');
+    setTimeout(() => {
+      setPreviewDataState('success');
+    }, 500);
+  };
+
   const typeStyles = {
     seed: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800',
     log: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',
@@ -50,14 +83,15 @@ export default function ArtifactExplorer() {
   };
 
   return (
-    <div className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xl transition-all hover:shadow-2xl">
-      <div className="p-6 border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/20">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Artifact Explorer</h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Manage and inspect fuzzing seeds, logs, and execution traces.</p>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 rounded-full text-xs font-semibold border border-blue-100 dark:border-blue-800">
+    <>
+      <div className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-xl transition-all hover:shadow-2xl">
+        <div className="p-6 border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/20">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Artifact Explorer</h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Manage and inspect fuzzing seeds, logs, and execution traces.</p>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 rounded-full text-xs font-semibold border border-blue-100 dark:border-blue-800">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
@@ -156,7 +190,12 @@ export default function ArtifactExplorer() {
                 </td>
                 <td className="px-6 py-5 text-right pr-8">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all shadow-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                    <button 
+                      onClick={() => handlePreviewArtifact(artifact)}
+                      className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-all shadow-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                      aria-label={`Preview artifact ${artifact.name}`}
+                      title="Preview artifact content"
+                    >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -191,5 +230,16 @@ export default function ArtifactExplorer() {
         </table>
       </div>
     </div>
+
+    {/* Artifact Preview Modal */}
+    <ArtifactPreviewModal
+      artifact={previewArtifact}
+      isOpen={isPreviewOpen}
+      onClose={handleClosePreview}
+      dataState={previewDataState}
+      onRetry={handleRetryPreview}
+      errorMessage="Failed to load artifact preview. The artifact may be corrupted or temporarily unavailable."
+    />
+  </>
   );
 }
