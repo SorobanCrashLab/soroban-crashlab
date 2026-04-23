@@ -31,12 +31,12 @@ const INITIAL_TESTS: UIFlowTest[] = [
   {
     id: 'flow-run-details',
     name: 'Run Detail Navigation',
-    description: 'Verifies that clicking a run opens the CrashDetailDrawer with correct data.',
+    description: 'Verifies that clicking a run opens the RunDetailModal with correct data.',
     steps: [
       'Locate run "run-1023" in the history table',
       'Trigger click event on the run row',
-      'Wait for CrashDetailDrawer to mount',
-      'Assert drawer contains "sig:1023:contract::transfer"',
+      'Wait for RunDetailModal to mount',
+      'Assert modal contains "sig:1023:contract::transfer"',
       'Close drawer via Escape key'
     ],
     status: 'idle',

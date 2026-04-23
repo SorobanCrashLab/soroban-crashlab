@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import RunHistoryTable from './implement-run-history-table-component';
 import RunHistoryTableSkeleton from './RunHistoryTableSkeleton';
 import Pagination from './Pagination';
-import CrashDetailDrawer from './CrashDetailDrawer';
+import RunDetailModal from './implement-run-detail-modal-component';
 import { FuzzingRun, RunStatus, RunArea, RunSeverity } from './types';
 import ReportModal from './ReportModal';
 import { generateMarkdownReport } from './report-utils';
@@ -826,8 +826,8 @@ function HomeContent() {
       />
 
       {selectedRun && (
-        <CrashDetailDrawer
-          key={selectedRun.id}
+        <RunDetailModal
+          isOpen={true}
           run={selectedRun}
           onClose={handleCloseRunDrawer}
           onReplayComplete={handleReplayComplete}
