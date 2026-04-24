@@ -1,101 +1,106 @@
 'use client';
 
 /**
- * Issue #XXX – Integrate: Storage backend integration for artifacts
+ * Issue #413 – Integrate: Storage backend integration for artifacts
  *
  * This integration page enables uploading, listing, and downloading
- * artifacts from a storage backend (mocked for now).
+ * artifacts from a storage backend with pluggable implementations.
+ *
+ * Features:
+ * - Multiple storage backend implementations (memory, IndexedDB)
+ * - Deterministic error handling and recovery
+ * - Observable operation logs for debugging
+ * - Quota tracking and statistics
+ * - End-to-end integration with run artifact persistence
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  StorageBackendManager,
+  MemoryStorageBackend,
+  IndexedDBStorageBackend,
+  globalStorageManager,
+  StorageError,
+  type Artifact,
+} from './storage-backend';
 
 // --- Types ---
 
-export type Artifact = {
-  id: string;
-  name: string;
-  createdAt: string;
-  sizeBytes?: number;
-  mimeType?: string;
-  url?: string;
-};
+export type { Artifact } from './storage-backend';
 
-// --- API Client Layer (Mocked) ---
+// --- API Client Layer (Storage Backend Integration) ---
 
 /**
- * Simulates uploading an artifact to the backend.
- * POST /api/artifacts
+ * Global storage manager instance
+ */
+let storageManager: StorageBackendManager;
+
+/**
+ * Initialize storage backend (called on component mount)
+ */
+function initializeStorageBackend(backendType: 'memory' | 'indexed-db' = 'memory'): StorageBackendManager {
+  if (!storageManager) {
+    const backend = backendType === 'indexed-db'
+      ? new IndexedDBStorageBackend()
+      : new MemoryStorageBackend();
+    
+    storageManager = new StorageBackendManager(backend);
+  }
+  return storageManager;
+}
+
+/**
+ * Upload artifact to configured storage backend
  */
 async function uploadArtifact(file: File): Promise<Artifact> {
-  // TODO: Replace with real fetch call when backend is available
-  console.log('Uploading file:', file.name);
+  if (!storageManager) {
+    initializeStorageBackend();
+  }
   
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // In a real implementation, the backend would return the metadata
-  const newArtifact: Artifact = {
-    id: `art-${Math.random().toString(36).substring(2, 9)}`,
-    name: file.name,
-    createdAt: new Date().toISOString(),
-    sizeBytes: file.size,
-    mimeType: file.type || 'application/octet-stream',
-    // In a real app, this would be a signed URL or direct storage link
-    url: URL.createObjectURL(file), 
-  };
-  
-  return newArtifact;
+  try {
+    return await storageManager.upload(file);
+  } catch (error) {
+    if (error instanceof StorageError) {
+      throw new Error(`Upload failed (${error.code}): ${error.message}`);
+    }
+    throw error;
+  }
 }
 
 /**
- * Simulates fetching the list of artifacts from the backend.
- * GET /api/artifacts
+ * Fetch artifacts from storage backend
  */
 async function fetchArtifacts(): Promise<Artifact[]> {
-  // TODO: Replace with real fetch call when backend is available
+  if (!storageManager) {
+    initializeStorageBackend();
+  }
   
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Mock data representing previously uploaded artifacts
-  return [
-    {
-      id: 'art-101',
-      name: 'run-942-crash-bundle.json',
-      createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-      sizeBytes: 15420,
-      mimeType: 'application/json',
-    },
-    {
-      id: 'art-102',
-      name: 'soroban-auth-trace-v1.bin',
-      createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-      sizeBytes: 892100,
-      mimeType: 'application/octet-stream',
+  try {
+    return await storageManager.list();
+  } catch (error) {
+    if (error instanceof StorageError) {
+      throw new Error(`List failed (${error.code}): ${error.message}`);
     }
-  ];
+    throw error;
+  }
 }
 
 /**
- * Simulates downloading artifact content from the backend.
- * GET /api/artifacts/:id
+ * Download artifact content from storage backend
  */
 async function downloadArtifactContent(id: string): Promise<Blob> {
-  // TODO: Replace with real fetch call when backend is available
-  console.log('Downloading artifact content for ID:', id);
+  if (!storageManager) {
+    initializeStorageBackend();
+  }
   
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 800));
-  
-  // Return a dummy JSON blob for demonstration
-  const dummyData = { 
-    id, 
-    source: 'Soroban CrashLab Storage Backend',
-    timestamp: new Date().toISOString(),
-    content: 'This is a mock artifact payload retrieved from the storage backend.' 
-  };
-  
-  return new Blob([JSON.stringify(dummyData, null, 2)], { type: 'application/json' });
+  try {
+    return await storageManager.download(id);
+  } catch (error) {
+    if (error instanceof StorageError) {
+      throw new Error(`Download failed (${error.code}): ${error.message}`);
+    }
+    throw error;
+  }
 }
 
 // --- Helper Functions ---
@@ -126,6 +131,7 @@ export default function ArtifactStorageIntegration() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [backendType, setBackendType] = useState<'memory' | 'indexed-db'>('memory');
 
   const loadArtifacts = useCallback(async () => {
     setIsLoading(true);
@@ -141,9 +147,11 @@ export default function ArtifactStorageIntegration() {
     }
   }, []);
 
+  // Initialize storage backend on mount
   useEffect(() => {
+    initializeStorageBackend(backendType);
     loadArtifacts();
-  }, [loadArtifacts]);
+  }, [backendType, loadArtifacts]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -180,10 +188,25 @@ export default function ArtifactStorageIntegration() {
   return (
     <div className="max-w-4xl mx-auto p-8 font-sans">
       <header className="mb-8 border-b border-gray-200 pb-4">
-        <h1 className="text-3xl font-bold text-gray-900">Artifact Storage Integration</h1>
-        <p className="text-gray-600 mt-2">
-          Connect your fuzzing runs to persistent storage for regression analysis and sharing.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Artifact Storage Integration</h1>
+            <p className="text-gray-600 mt-2">
+              Connect your fuzzing runs to persistent storage for regression analysis and sharing.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <label className="text-sm font-medium text-gray-700">Backend:</label>
+            <select
+              value={backendType}
+              onChange={(e) => setBackendType(e.target.value as 'memory' | 'indexed-db')}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="memory">Memory (Testing)</option>
+              <option value="indexed-db">IndexedDB (Browser)</option>
+            </select>
+          </div>
+        </div>
       </header>
 
       {error && (
