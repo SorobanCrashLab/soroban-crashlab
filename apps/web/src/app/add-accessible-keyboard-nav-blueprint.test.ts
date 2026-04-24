@@ -316,6 +316,7 @@ describe('Accessible Keyboard Navigation Blueprint', () => {
 
   describe('Loading and error states', () => {
     const blueprintContent = fs.readFileSync(blueprintPath, 'utf-8');
+    const pageContent = fs.readFileSync(blueprintPagePath, 'utf-8');
 
     it('should handle component mounting', () => {
       expect(blueprintContent).toContain('useEffect');
@@ -324,6 +325,19 @@ describe('Accessible Keyboard Navigation Blueprint', () => {
     it('should clean up event listeners', () => {
       expect(blueprintContent).toContain('removeEventListener');
       expect(blueprintContent).toMatch(/return \(\) =>/);
+    });
+
+    it('should implement isLoading state for form submission', () => {
+      expect(pageContent).toContain('isLoading');
+      expect(pageContent).toContain('setIsLoading(true)');
+      expect(pageContent).toContain('disabled={isLoading}');
+      expect(pageContent).toContain('animate-spin');
+    });
+
+    it('should handle success and error states', () => {
+      expect(pageContent).toContain('isSuccess');
+      expect(pageContent).toContain('error');
+      expect(pageContent).toContain('Status Indicators');
     });
   });
 

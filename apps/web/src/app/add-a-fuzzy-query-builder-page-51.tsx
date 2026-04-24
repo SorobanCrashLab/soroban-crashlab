@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FuzzingRun, RunStatus, RunArea, RunSeverity } from './types';
+import { FuzzingRun } from './types';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -71,8 +71,8 @@ function saveQueries(queries: SavedQuery[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(queries));
 }
 
-function getNestedValue(obj: any, path: string): any {
-  return path.split('.').reduce((current, key) => current?.[key], obj);
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  return path.split('.').reduce((current: unknown, key) => (current as Record<string, unknown>)?.[key], obj);
 }
 
 function applyFilter(run: FuzzingRun, filter: QueryFilter): boolean {
@@ -98,11 +98,6 @@ function applyFilter(run: FuzzingRun, filter: QueryFilter): boolean {
   }
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -125,6 +120,8 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
   const [queryName, setQueryName] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [selectedQueryId, setSelectedQueryId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Load saved queries on mount
   useEffect(() => {
@@ -140,6 +137,13 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
       mounted.current = true;
     }
   }, [savedQueries]);
+
+  /* ── Query execution ────────────────────────────────────────────── */
+
+  const filteredRuns = useMemo(() => {
+    if (filters.length === 0) return runs;
+    return runs.filter((run) => filters.every((filter) => applyFilter(run, filter)));
+  }, [runs, filters]);
 
   /* ── Filter management ──────────────────────────────────────────── */
 
@@ -177,20 +181,32 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
 
   /* ── Query persistence ──────────────────────────────────────────── */
 
-  const saveQuery = useCallback(() => {
+  const saveQuery = useCallback(async () => {
     if (!queryName.trim()) return;
 
-    const newQuery: SavedQuery = {
-      id: `query-${Date.now()}`,
-      name: queryName.trim(),
-      filters: [...filters],
-      createdAt: new Date().toISOString(),
-    };
+    setIsLoading(true);
+    setError(null);
 
-    setSavedQueries((prev) => [...prev, newQuery]);
-    setQueryName('');
-    setShowSaveDialog(false);
-    setSelectedQueryId(newQuery.id);
+    try {
+      // Simulate persistence delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const newQuery: SavedQuery = {
+        id: `query-${Date.now()}`,
+        name: queryName.trim(),
+        filters: [...filters],
+        createdAt: new Date().toISOString(),
+      };
+
+      setSavedQueries((prev) => [...prev, newQuery]);
+      setQueryName('');
+      setShowSaveDialog(false);
+      setSelectedQueryId(newQuery.id);
+    } catch {
+      setError('Failed to save query. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [queryName, filters]);
 
   const loadQuery = useCallback((query: SavedQuery) => {
@@ -334,7 +350,7 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
             {filters.length === 0 ? (
               <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
                 <p>No filters added yet.</p>
-                <p className="text-sm mt-1">Click "+ Add Filter" to start building your query.</p>
+                <p className="text-sm mt-1">Click &quot;+ Add Filter&quot; to start building your query.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -356,7 +372,7 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
                         const defaultOperator = OPERATOR_OPTIONS[fieldConfig.type]?.[0]?.value || 'equals';
                         updateFilter(filter.id, {
                           field: newField,
-                          operator: defaultOperator as any,
+                          operator: defaultOperator as unknown as QueryFilter['operator'],
                           value: '',
                           value2: undefined,
                         });
@@ -369,7 +385,7 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
                     </select>
                     <select
                       value={filter.operator}
-                      onChange={(e) => updateFilter(filter.id, { operator: e.target.value as any })}
+                      onChange={(e) => updateFilter(filter.id, { operator: e.target.value as unknown as QueryFilter['operator'] })}
                       className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm"
                     >
                       {OPERATOR_OPTIONS[getFieldConfig(filter.field).type]?.map((opt) => (
@@ -522,6 +538,11 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-700 p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Save Query</h3>
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 text-xs">
+                {error}
+              </div>
+            )}
             <input
               type="text"
               value={queryName}
@@ -529,6 +550,7 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
               placeholder="Query name"
               className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm mb-4"
               autoFocus
+              disabled={isLoading}
             />
             <div className="flex justify-end gap-2">
               <button
@@ -539,10 +561,17 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
               </button>
               <button
                 onClick={saveQuery}
-                disabled={!queryName.trim()}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!queryName.trim() || isLoading}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                Save
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  'Save'
+                )}
               </button>
             </div>
           </div>

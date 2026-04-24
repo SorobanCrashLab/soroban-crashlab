@@ -33,6 +33,9 @@ export default function AccessibleKeyboardNavPage() {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [focusedElement, setFocusedElement] = useState<string | null>(null);
   const [tabOrder, setTabOrder] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -50,16 +53,31 @@ export default function AccessibleKeyboardNavPage() {
     setFocusedElement(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
-    alert('Form submitted! Check console for data.');
+    setIsLoading(true);
+    setError(null);
+    setIsSuccess(false);
+
+    try {
+      // Simulate network request
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      console.log('Form submitted:', formData);
+      setIsSuccess(true);
+    } catch {
+      setError('Form submission failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleReset = () => {
     setFormData(initialFormData);
     setTabOrder([]);
     setFocusedElement(null);
+    setIsSuccess(false);
+    setError(null);
   };
 
   return (
@@ -74,6 +92,18 @@ export default function AccessibleKeyboardNavPage() {
             This page tests keyboard-first navigation. All controls should be accessible with Tab flow.
           </p>
         </div>
+
+        {/* Status Indicators */}
+        {(isSuccess || error) && (
+          <div className={`mb-8 p-4 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-4 ${
+            isSuccess ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200' : 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
+          }`}>
+            <div className={`w-2 h-2 rounded-full ${isSuccess ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <p className="text-sm font-medium">
+              {isSuccess ? 'Form submitted successfully!' : error}
+            </p>
+          </div>
+        )}
 
         {/* Tab Order Tracker */}
         <div className="mb-8 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -247,11 +277,19 @@ export default function AccessibleKeyboardNavPage() {
             <div className="flex flex-wrap gap-3">
               <button
                 type="submit"
+                disabled={isLoading}
                 onFocus={() => handleFocus('submit-button')}
                 onBlur={handleBlur}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Submit Form
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit Form'
+                )}
               </button>
 
               <button
