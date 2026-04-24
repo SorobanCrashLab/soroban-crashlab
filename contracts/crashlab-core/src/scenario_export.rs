@@ -70,6 +70,45 @@ pub fn export_scenario_json(
     serde_json::to_string_pretty(&scenario)
 }
 
+/// Exports a failing seed as a normalized JSON scenario for cross-tool reuse.
+///
+/// This is a focused variant of [`export_scenario_json`] that explicitly
+/// documents the "failing seed" contract: the exported JSON always includes
+/// the `seed_id`, hex-encoded `input_payload`, `mode`, and `failure_class`.
+/// The output is stable and deterministic for the same input, making it
+/// suitable for regression archives, replay harnesses, and external tools.
+///
+/// For sanitized public sharing (scrubbing secret-like fragments) use
+/// [`crate::export_sanitized_scenario_json`] instead.
+///
+/// # Errors
+///
+/// Returns a [`serde_json::Error`] if JSON serialization fails (in practice
+/// this does not happen for well-formed strings, but callers should handle it).
+///
+/// # Example
+///
+/// ```rust
+/// use crashlab_core::{to_bundle, CaseSeed};
+/// use crashlab_core::scenario_export::export_failing_seed_json;
+///
+/// let bundle = to_bundle(CaseSeed { id: 7, payload: vec![0x01, 0x02, 0x03] });
+/// let json = export_failing_seed_json(&bundle, "invoker").unwrap();
+///
+/// // The output round-trips through serde_json.
+/// let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+/// assert_eq!(parsed["seed_id"], 7);
+/// assert_eq!(parsed["mode"], "invoker");
+/// assert!(!parsed["input_payload"].as_str().unwrap().is_empty());
+/// assert!(!parsed["failure_class"].as_str().unwrap().is_empty());
+/// ```
+pub fn export_failing_seed_json(
+    bundle: &CaseBundle,
+    mode: impl Into<String>,
+) -> Result<String, serde_json::Error> {
+    export_scenario_json(bundle, mode)
+}
+
 /// Exports a collection of bundles as a deterministically ordered JSON suite.
 ///
 /// Scenarios are sorted by `(seed_id, failure_class)` before serialization so
@@ -419,5 +458,87 @@ mod tests {
         assert!(md.contains(&bundle.signature.digest.to_string()));
         assert!(md.contains(&bundle.signature.signature_hash.to_string()));
         assert!(md.contains("cargo run --bin replay-single-seed"));
+    }
+
+    // ── export_failing_seed_json ───────────────────────────────────────────────
+
+    #[test]
+    fn export_failing_seed_json_produces_valid_json() {
+        let bundle = to_bundle(CaseSeed {
+            id: 42,
+            payload: vec![0x10, 0x20, 0x30],
+        });
+
+        let json = export_failing_seed_json(&bundle, "invoker").unwrap();
+
+        let parsed: FailureScenario = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.seed_id, 42);
+        assert_eq!(parsed.mode, "invoker");
+        assert!(!parsed.input_payload.is_empty());
+        assert!(!parsed.failure_class.is_empty());
+    }
+
+    #[test]
+    fn export_failing_seed_json_matches_export_scenario_json() {
+        // The two functions must produce identical output for the same inputs
+        // so consumers can rely on either API without divergence.
+        let bundle = to_bundle(CaseSeed {
+            id: 99,
+            payload: vec![0xFF, 0x01],
+        });
+
+        let from_failing = export_failing_seed_json(&bundle, "contract").unwrap();
+        let from_generic = export_scenario_json(&bundle, "contract").unwrap();
+
+        assert_eq!(
+            from_failing, from_generic,
+            "export_failing_seed_json and export_scenario_json must produce identical output"
+        );
+    }
+
+    #[test]
+    fn export_failing_seed_json_contains_all_required_keys() {
+        let bundle = to_bundle(CaseSeed {
+            id: 5,
+            payload: vec![0xAB],
+        });
+
+        let json = export_failing_seed_json(&bundle, "none").unwrap();
+
+        assert!(json.contains("\"seed_id\""), "missing seed_id field");
+        assert!(json.contains("\"input_payload\""), "missing input_payload field");
+        assert!(json.contains("\"mode\""), "missing mode field");
+        assert!(json.contains("\"failure_class\""), "missing failure_class field");
+    }
+
+    #[test]
+    fn export_failing_seed_json_is_deterministic_for_same_seed() {
+        let bundle = to_bundle(CaseSeed {
+            id: 17,
+            payload: vec![0x01, 0x02],
+        });
+
+        let json1 = export_failing_seed_json(&bundle, "invoker").unwrap();
+        let json2 = export_failing_seed_json(&bundle, "invoker").unwrap();
+
+        assert_eq!(
+            json1, json2,
+            "repeated exports of the same bundle must produce identical JSON"
+        );
+    }
+
+    #[test]
+    fn export_failing_seed_json_empty_payload_is_accepted() {
+        let bundle = to_bundle(CaseSeed {
+            id: 0,
+            payload: vec![],
+        });
+
+        let json = export_failing_seed_json(&bundle, "none").unwrap();
+
+        let parsed: FailureScenario = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.seed_id, 0);
+        assert_eq!(parsed.input_payload, "");
+        assert_eq!(parsed.failure_class, "empty-input");
     }
 }
