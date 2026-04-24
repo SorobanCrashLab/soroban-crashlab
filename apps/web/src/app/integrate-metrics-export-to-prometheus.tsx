@@ -20,21 +20,12 @@ import {
  * the export of Soroban CrashLab metrics to a Prometheus instance.
  */
 
-// ---------------------------------------------------------------------------
-// Types & Mock Data
-// ---------------------------------------------------------------------------
-
-interface MetricPoint {
-  time: string;
-  value: number;
-}
-
-interface ExportConfig {
-  endpoint: string;
-  interval: number;
-  enabled: boolean;
-  labels: Record<string, string>;
-}
+import {
+  MetricPoint,
+  ExportConfig,
+  generateInitialData,
+  analyzeTrend
+} from './integrate-metrics-export-to-prometheus-utils';
 
 const DEFAULT_CONFIG: ExportConfig = {
   endpoint: 'https://prometheus.internal.crashlab.io/metrics',
@@ -45,14 +36,6 @@ const DEFAULT_CONFIG: ExportConfig = {
     service: 'soroban-fuzzer',
     region: 'us-east-1'
   }
-};
-
-// Generate some initial sparkline data
-const generateInitialData = (points: number): MetricPoint[] => {
-  return Array.from({ length: points }, (_, i) => ({
-    time: `${i}:00`,
-    value: Math.floor(Math.random() * 40) + 10
-  }));
 };
 
 // ---------------------------------------------------------------------------
@@ -133,7 +116,9 @@ export default function MetricsExportToPrometheus() {
     setTimeout(() => setTestResult(null), 3000);
   };
 
-  const currentLatency = latencyData[latencyData.length - 1].value.toFixed(1);
+  const currentLatency = latencyData[latencyData.length - 1].value;
+  const currentLatencyStr = currentLatency.toFixed(1);
+  const latencyTrend = analyzeTrend(latencyData);
 
   return (
     <section className="w-full space-y-8 p-1">
@@ -169,7 +154,7 @@ export default function MetricsExportToPrometheus() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard label="Active Exporters" value={1} trend="stable" />
         <MetricCard label="Metrics Scraped" value="1.2k" unit="per min" trend="up" />
-        <MetricCard label="Avg Latency" value={currentLatency} unit="ms" trend={parseFloat(currentLatency) > 80 ? 'down' : 'up'} />
+        <MetricCard label="Avg Latency" value={currentLatencyStr} unit="ms" trend={latencyTrend} />
         <MetricCard label="Export Uptime" value="99.98" unit="%" trend="stable" />
       </div>
 

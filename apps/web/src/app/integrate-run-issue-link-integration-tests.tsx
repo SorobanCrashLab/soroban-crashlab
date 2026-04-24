@@ -11,21 +11,13 @@ import type { RunIssueLink } from "./types";
  * the linking functionality works end-to-end.
  */
 
-interface IssueTracker {
-  id: string;
-  name: string;
-  type: "github" | "jira" | "linear";
-  baseUrl: string;
-  enabled: boolean;
-}
-
-interface IntegrationTest {
-  id: string;
-  name: string;
-  status: "pending" | "running" | "passed" | "failed";
-  duration?: number;
-  error?: string;
-}
+import {
+  IssueTracker,
+  IntegrationTest,
+  buildIssueLink,
+  summariseTests,
+  toggleTrackerEnabled
+} from './integrate-run-issue-link-integration-tests-utils';
 
 const MOCK_TRACKERS: IssueTracker[] = [
   {
@@ -82,11 +74,7 @@ export default function IntegrateRunIssueLinkIntegrationTests() {
   }, []);
 
   const handleToggleTracker = (id: string) => {
-    setTrackers((prev) =>
-      prev.map((tracker) =>
-        tracker.id === id ? { ...tracker, enabled: !tracker.enabled } : tracker,
-      ),
-    );
+    setTrackers((prev) => toggleTrackerEnabled(prev, id));
   };
 
   const handleLinkIssue = () => {
@@ -95,10 +83,7 @@ export default function IntegrateRunIssueLinkIntegrationTests() {
     const activeTracker = trackers.find((t) => t.enabled);
     if (!activeTracker) return;
 
-    const newLink: RunIssueLink = {
-      label: `${activeTracker.type.toUpperCase()}-${issueNumber}`,
-      href: `${activeTracker.baseUrl}/${issueNumber}`,
-    };
+    const newLink = buildIssueLink(activeTracker, issueNumber);
 
     setLinkedIssues((prev) => [...prev, newLink]);
     setIssueNumber("");
@@ -164,9 +149,10 @@ export default function IntegrateRunIssueLinkIntegrationTests() {
     }
   };
 
-  const testsPassed = tests.filter((t) => t.status === "passed").length;
-  const testsFailed = tests.filter((t) => t.status === "failed").length;
-  const testsTotal = tests.length;
+  const summary = summariseTests(tests);
+  const testsPassed = summary.passed;
+  const testsFailed = summary.failed;
+  const testsTotal = summary.total;
 
   return (
     <section className="w-full rounded-[2.5rem] border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-zinc-950">
