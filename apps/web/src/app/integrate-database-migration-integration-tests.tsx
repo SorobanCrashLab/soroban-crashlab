@@ -14,26 +14,12 @@
  */
 
 import React, { useState } from 'react';
-
-export type MigrationStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-
-export interface MigrationTestCase {
-  id: string;
-  name: string;
-  fromVersion: number;
-  toVersion: number;
-  status: MigrationStatus;
-  durationMs?: number;
-  errorMessage?: string;
-  affectedRecords?: number;
-}
-
-export interface MigrationSuite {
-  id: string;
-  label: string;
-  description: string;
-  cases: MigrationTestCase[];
-}
+import {
+  MigrationStatus,
+  MigrationSuite,
+  computeSuiteScore,
+  computeAggregateScore,
+} from './integrate-database-migration-integration-tests-utils';
 
 const MOCK_SUITES: MigrationSuite[] = [
   {
@@ -145,12 +131,7 @@ function statusBadge(status: MigrationStatus) {
   );
 }
 
-function suiteScore(suite: MigrationSuite): { passed: number; failed: number; total: number } {
-  const total = suite.cases.length;
-  const passed = suite.cases.filter((c) => c.status === 'passed').length;
-  const failed = suite.cases.filter((c) => c.status === 'failed').length;
-  return { passed, failed, total };
-}
+
 
 export default function DatabaseMigrationIntegrationTests() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
@@ -160,11 +141,11 @@ export default function DatabaseMigrationIntegrationTests() {
   const toggle = (id: string) =>
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const allCases = MOCK_SUITES.flatMap((s) => s.cases);
-  const totalPassed = allCases.filter((c) => c.status === 'passed').length;
-  const totalFailed = allCases.filter((c) => c.status === 'failed').length;
-  const totalRunning = allCases.filter((c) => c.status === 'running').length;
-  const totalCases = allCases.length;
+  const agg = computeAggregateScore(MOCK_SUITES);
+  const totalPassed = agg.passed;
+  const totalFailed = agg.failed;
+  const totalRunning = agg.running;
+  const totalCases = agg.total;
 
   return (
     <div className="w-full space-y-6">
@@ -210,7 +191,7 @@ export default function DatabaseMigrationIntegrationTests() {
       {/* Suites */}
       <div className="space-y-4">
         {MOCK_SUITES.map((suite) => {
-          const { passed, failed, total } = suiteScore(suite);
+          const { passed, failed, total } = computeSuiteScore(suite);
           const isOpen = !!expanded[suite.id];
 
           return (
