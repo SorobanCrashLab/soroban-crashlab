@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# helper to generate iso8601 timestamps
+get_ts() {
+  local offset="$1"
+  if date --version &>/dev/null 2>&1; then
+    date -u -d "$offset" +%Y-%m-%dT%H:%M:%SZ
+  else
+    # BSD/macOS date
+    date -u -v"$offset" +%Y-%m-%dT%H:%M:%SZ
+  fi
+}
+
+case "$*" in
+  "issue list"*"--assignee"*)
+    ts_fresh=$(get_ts "-1hour")
+    # check-sla expects: .number, .title, .updatedAt, .assignees[0].login
+    echo -e "10\tFresh Assigned Issue\t$ts_fresh\tuser1"
+    ;;
+  "pr list"*"--label blocked"*)
+    ts_stale=$(get_ts "-2days")
+    # check-sla expects: .number, .title, .updatedAt
+    echo -e "123\tStale Blocked PR\t$ts_stale"
+    ;;
+  "pr list"*)
+    ts_fresh=$(get_ts "-1hour")
+    # check-sla expects: .number, .title, .createdAt
+    echo -e "456\tFresh PR\t$ts_fresh"
+    ;;
+  "api"*"reviews"*)
+    # For PR #456, return a review count > 0 so it doesn't breach.
+    # For PR #123, we're checking its updated_at so reviews don't matter as much in section 3.
+    if [[ "$*" == *"/pulls/456/"* ]]; then
+      echo "1"
+    else
+      echo "0"
+    fi
+    ;;
+  "auth status"*)
+    exit 0
+    ;;
+  "issue list"*"--label wave3"*)
+    # Return a set of mock issues with various states
+    ts_stale=$(get_ts "-10days")
+    ts_fresh=$(get_ts "-1day")
+    
+    echo '['
+    echo '  {"number": 1, "title": "Missing Complexity", "labels": [{"name": "wave3"}, {"name": "area:fuzzer"}], "assignees": [], "updatedAt": "'$ts_fresh'"},'
+    echo '  {"number": 2, "title": "Missing Area", "labels": [{"name": "wave3"}, {"name": "complexity:medium"}], "assignees": [], "updatedAt": "'$ts_fresh'"},'
+    echo '  {"number": 3, "title": "Unassigned High", "labels": [{"name": "wave3"}, {"name": "complexity:high"}, {"name": "area:web"}], "assignees": [], "updatedAt": "'$ts_fresh'"},'
+    echo '  {"number": 4, "title": "Stale Blocked", "labels": [{"name": "wave3"}, {"name": "complexity:medium"}, {"name": "area:ops"}, {"name": "blocked"}], "assignees": [], "updatedAt": "'$ts_stale'"},'
+    echo '  {"number": 5, "title": "Healthy Assigned", "labels": [{"name": "wave3"}, {"name": "complexity:trivial"}, {"name": "area:docs"}], "assignees": [{"login": "user1"}], "updatedAt": "'$ts_fresh'"}'
+    echo ']'
+    ;;
+  *)
+    exit 1
+    ;;
+esac

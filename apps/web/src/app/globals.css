@@ -1,22 +1,134 @@
 @import "tailwindcss";
 
-:root {
+@custom-variant dark (&:where(.dark, .dark *));
+@theme {
   --background: #ffffff;
   --foreground: #171717;
+
+  --status-running-bg: #dbeafe;
+  --status-running-fg: #1d4ed8;
+  --header-border-color: rgba(0, 0, 0, 0.08);
+  --status-running-border: #bfdbfe;
+
+  --status-completed-bg: #dcfce7;
+  --status-completed-fg: #15803d;
+  --status-completed-border: #bbf7d0;
+
+  --status-failed-bg: #fee2e2;
+  --status-failed-fg: #b91c1c;
+  --status-failed-border: #fecaca;
+
+  --status-cancelled-bg: #f4f4f5;
+  --status-cancelled-fg: #3f3f46;
+  --status-cancelled-border: #e4e4e7;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
+@layer theme {
+  .dark {
     --background: #0a0a0a;
     --foreground: #ededed;
+
+    --status-running-bg: #1e3a5f;
+    --status-running-fg: #93c5fd;
+    --header-border-color: rgba(255, 255, 255, 0.145);
+    --status-running-border: #1e40af;
+
+    --status-completed-bg: #14532d;
+    --status-completed-fg: #86efac;
+    --status-completed-border: #166534;
+
+    --status-failed-bg: #4c1d1d;
+    --status-failed-fg: #fca5a5;
+    --status-failed-border: #7f1d1d;
+
+    --status-cancelled-bg: #27272a;
+    --status-cancelled-fg: #d4d4d8;
+    --status-cancelled-border: #3f3f46;
   }
+
+  @theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: #0a0a0a;
+      --foreground: #ededed;
+
+      --status-running-bg: #1e3a5f;
+      --status-running-fg: #93c5fd;
+      --status-running-border: #1e40af;
+
+      --status-completed-bg: #14532d;
+      --status-completed-fg: #86efac;
+      --status-completed-border: #166534;
+
+      --status-failed-bg: #4c1d1d;
+      --status-failed-fg: #fca5a5;
+      --status-failed-border: #7f1d1d;
+
+      --status-cancelled-bg: #27272a;
+      --status-cancelled-fg: #d4d4d8;
+      --status-cancelled-border: #3f3f46;
+    }
+  }
+}
+
+/* Pragmatic overrides: map common light utility classes to the
+   dark-mode CSS variables when `.dark` is present. This helps ensure
+   elements that were given explicit Tailwind light utilities (e.g.
+   `bg-white`, `bg-zinc-50`, `text-zinc-900`) will visually switch
+   when the `.dark` class is toggled. These selectors are intentionally
+   broad to cover many utility patterns; we can refine them later. */
+html.dark [class*="bg-white"],
+html.dark [class*="bg-zinc-50"],
+html.dark [class*="bg-zinc-100"],
+html.dark [class*="bg-zinc-200"] {
+  background-color: var(--background) !important;
+}
+
+html.dark [class*="text-zinc-900"],
+html.dark [class*="text-black"],
+html.dark [class*="text-gray-900"] {
+  color: var(--foreground) !important;
+}
+
+/* Ensure border colors that reference black-ish tokens don't stay too
+   visible in dark mode. This is conservative — adjust values if you
+   want different border contrast in dark theme. */
+html.dark [class*="border-black"],
+html.dark [class*="border-gray-200"],
+html.dark [class*="border-zinc-200"] {
+  --tw-border-opacity: 0.18;
+  border-color: rgba(255, 255, 255, var(--tw-border-opacity)) !important;
+}
+
+/* Explicit class selectors for very common utilities that may not be
+   caught by substring-match selectors in some browsers/contexts. */
+html.dark .bg-white {
+  background-color: var(--background) !important;
+}
+html.dark .bg-zinc-50 {
+  background-color: var(--background) !important;
+}
+html.dark .text-zinc-900 {
+  color: var(--foreground) !important;
+}
+html.dark .text-black {
+  color: var(--foreground) !important;
+}
+
+/* Header border specific override (covers the `border-black/[.08]` utility) */
+/* Header-specific override to ensure header background and border
+   match the dark theme when toggled. */
+html.dark header {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+  --tw-border-opacity: 0.145;
+  border-color: rgba(255, 255, 255, var(--tw-border-opacity)) !important;
 }
 
 body {

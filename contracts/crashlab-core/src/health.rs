@@ -1,13 +1,14 @@
 use std::time::Instant;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HealthStatus {
     Healthy,
     Degraded,
     Unhealthy,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthSummary {
     pub status: HealthStatus,
     pub throughput: ThroughputMetrics,
@@ -15,21 +16,21 @@ pub struct HealthSummary {
     pub queue: QueueMetrics,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThroughputMetrics {
     pub cases_per_second: f64,
     pub total_cases: u64,
     pub elapsed_secs: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FailureMetrics {
     pub total_failures: u64,
     pub unique_signatures: u64,
     pub failure_rate: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueueMetrics {
     pub pending: u64,
     pub in_progress: u64,
@@ -147,6 +148,10 @@ impl HealthMonitor {
             failures,
             queue,
         }
+    }
+
+    pub fn endpoint(&self) -> String {
+        serde_json::to_string(&self.summary()).unwrap_or_default()
     }
 
     fn compute_status(
@@ -329,5 +334,15 @@ mod tests {
 
         let summary = monitor.summary();
         assert_eq!(summary.status, HealthStatus::Unhealthy);
+    }
+
+    #[test]
+    fn endpoint_returns_json() {
+        let monitor = HealthMonitor::new(100);
+        let json = monitor.endpoint();
+        assert!(json.contains("\"status\":\"Healthy\""));
+        assert!(json.contains("\"throughput\""));
+        assert!(json.contains("\"failures\""));
+        assert!(json.contains("\"queue\""));
     }
 }

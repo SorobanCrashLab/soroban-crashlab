@@ -17,8 +17,8 @@
 //! All numeric values are encoded as **16-byte little-endian** byte arrays,
 //! matching the native Soroban host representation for 128-bit integers.
 
-use crate::CaseSeed;
 use crate::scheduler::Mutator;
+use crate::CaseSeed;
 
 /// Canonical boundary values for `i128`, ordered from most negative to most
 /// positive.  Each value targets a different overflow/underflow edge:
@@ -33,15 +33,7 @@ use crate::scheduler::Mutator;
 /// | `i128::MAX - 1`  | Neighbor just below signed maximum        |
 /// | `i128::MAX`      | Signed maximum — increment overflows      |
 pub fn boundary_values_i128() -> Vec<i128> {
-    vec![
-        i128::MIN,
-        i128::MIN + 1,
-        -1,
-        0,
-        1,
-        i128::MAX - 1,
-        i128::MAX,
-    ]
+    vec![i128::MIN, i128::MIN + 1, -1, 0, 1, i128::MAX - 1, i128::MAX]
 }
 
 /// Canonical boundary values for `u128`.

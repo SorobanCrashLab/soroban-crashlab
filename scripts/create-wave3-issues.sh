@@ -57,35 +57,7 @@ url_encode_title() {
   sed -e 's/%/%25/g' -e 's/ /%20/g' -e 's/"/%22/g' -e 's/#/%23/g' -e 's/&/%26/g' -e 's/?/%3F/g'
 }
 
-create_label() {
-  local name="$1"
-  local color="$2"
-  local desc="$3"
-
-  if [ "$have_gh" -eq 1 ]; then
-    gh label create "$name" --repo "$REPO" --color "$color" --description "$desc" 2>/dev/null || true
-    return
-  fi
-
-  local payload
-  payload=$(printf '{"name":"%s","color":"%s","description":"%s"}' "$name" "$color" "$desc")
-  api_call POST "/repos/$REPO/labels" "$payload" >/dev/null 2>&1 || true
-}
-
-create_label "wave3" "1f6feb" "Stellar Wave 3 issue backlog"
-create_label "complexity:trivial" "c2e0c6" "Wave trivial complexity"
-create_label "complexity:medium" "fbca04" "Wave medium complexity"
-create_label "complexity:high" "d93f0b" "Wave high complexity"
-create_label "area:fuzzer" "0052cc" "Fuzzer engine"
-create_label "area:runtime" "0e8a16" "Runtime and replay"
-create_label "area:generator" "5319e7" "Test generation and fixtures"
-create_label "area:web" "1d76db" "Frontend dashboard"
-create_label "area:docs" "0075ca" "Documentation"
-create_label "area:ops" "8250df" "Maintainer operations"
-create_label "area:security" "b60205" "Security policies"
-create_label "type:task" "d4c5f9" "Engineering task"
-create_label "type:feature" "a2eeef" "Feature work"
-create_label "blocked" "d93f0b" "Blocked on dependency or external factor"
+bash "$ROOT_DIR/scripts/bootstrap-wave3-labels.sh" --repo "$REPO"
 
 echo "Publishing curated issues from $ISSUE_FILE"
 

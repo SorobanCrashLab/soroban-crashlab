@@ -63,6 +63,18 @@ let mutator = scheduler.select_mutator(&mut rng);
 
 **Guarantee**: Given identical RNG state and weight configuration, mutator selection order is deterministic across runs.
 
+### Parallel worker partitioning
+
+When splitting a campaign across workers, use `WorkerPartition` and `drive_run_partitioned` from `crashlab-core`: global seed index `i` is assigned to worker `i % num_workers`. Each worker runs only its indices, but the runner still walks the full `0..total_seeds` order for cancellation alignment.
+
+**Guarantee**: Per-seed outputs (classification, signatures, mutation) depend only on the seed index and payload, not on worker count. Merging worker results sorted by global seed index matches a single-worker `drive_run` over the same schedule.
+
+### Checkpoint resume
+
+Persist `RunCheckpoint` as JSON and resume with `drive_run_from_checkpoint` (single worker) or `drive_run_partitioned_from_checkpoint` (per-worker resume). The checkpoint cursor always points at the next global seed index to inspect, and it advances only after the current seed index has been fully accounted for.
+
+**Guarantee**: Restarting from the same checkpoint replays the same remaining seed order without reprocessing seed indices already covered by that checkpoint.
+
 ## Known Limitations
 
 ### Environment-Dependent Factors
@@ -115,6 +127,12 @@ When running multiple seeds in parallel, the order of result collection is non-d
 
 **Recommendation**: Sort results by seed ID before comparison.
 
+### Concurrent checkpoint writers
+
+Checkpoint files are not locked. Two workers resuming from the same checkpoint file can overwrite each other's progress and reprocess work.
+
+**Recommendation**: Use one checkpoint file per worker partition and avoid sharing a single checkpoint path across concurrent runners.
+
 ## Stability Verification
 
 CrashLab provides built-in tools to verify reproducibility before exporting failures to CI.
@@ -158,6 +176,20 @@ let stable_pack = filter_ci_pack(&bundles, &detector, |seed| {
 // Only stable_pack seeds go into CI regression suite
 export_to_ci(stable_pack);
 ```
+
+### Grouped regression suites
+
+`crashlab_core::export_rust_regression_suite` places each fixture into a submodule named from **domain risk** (`FailureClass` from `classify_failure` on the bundle seed) and **expected failure mode** (`bundle.signature.category`). That lets you run slices of the suite independently:
+
+```bash
+# All regression tests under the generated root module
+cargo test my_contract_regression
+
+# Only the auth + runtime-failure bucket
+cargo test my_contract_regression::regression_auth_runtime_failure
+```
+
+Use `crashlab_core::group_bundles_by_regression_group` or `regression_group_module_ident` if you need the same grouping in tooling without emitting Rust source.
 
 ## Troubleshooting Mismatched Replays
 
@@ -309,7 +341,26 @@ for bundle in new_failures {
 }
 ```
 
-### 4. Use Reproducible CI Environment
+### 4. Sanitize Public Fixtures
+
+When a fixture needs to be attached to a public issue or shared outside the
+trusted team boundary, export it through the sanitization helpers instead of the
+raw JSON writers:
+
+```rust
+use crashlab_core::{
+    export_sanitized_scenario_json, save_sanitized_case_bundle_json,
+};
+
+let public_bundle_json = save_sanitized_case_bundle_json(&bundle)?;
+let public_scenario_json = export_sanitized_scenario_json(&bundle, "public")?;
+```
+
+These helpers preserve payload length and failure class while redacting
+secret-like fragments such as bearer tokens, cookies, and password-style key
+value pairs from exported fixture payloads.
+
+### 5. Use Reproducible CI Environment
 
 ```dockerfile
 FROM rust:1.75-slim

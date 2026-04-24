@@ -6,15 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "test": "npx tsc src/app/failureClusters.ts src/app/failureClusters.test.ts src/app/types.ts src/app/log-viewer-utils.ts src/app/log-viewer-utils.test.ts src/app/alerting-settings-utils.ts src/app/alerting-settings-utils.test.ts src/app/sanity-check-utils.ts src/app/sanity-check-utils.test.ts src/app/run-issue-utils.ts src/app/run-issue-utils.test.ts src/app/custom-widgets-utils.ts src/app/custom-widgets-utils.test.ts src/app/maintainer-conflict-policy.ts src/app/maintainer-conflict-policy.test.ts src/app/run-annotations-utils.ts src/app/run-annotations-utils.test.ts --module commonjs --target es2020 --outDir build/test-tmp --esModuleInterop && node build/test-tmp/failureClusters.test.js && node build/test-tmp/log-viewer-utils.test.js && node build/test-tmp/alerting-settings-utils.test.js && node build/test-tmp/sanity-check-utils.test.js && node build/test-tmp/run-issue-utils.test.js && node build/test-tmp/custom-widgets-utils.test.js && node build/test-tmp/maintainer-conflict-policy.test.js && node build/test-tmp/run-annotations-utils.test.js",
+    "test:policy": "npx tsc src/app/maintainer-conflict-policy.ts src/app/maintainer-conflict-policy.test.ts --module commonjs --target es2020 --outDir build/test-tmp --esModuleInterop && node build/test-tmp/maintainer-conflict-policy.test.js"
   },
   "dependencies": {
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.8.1",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -22,6 +28,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
   }
 }

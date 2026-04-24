@@ -1,0 +1,62 @@
+title|complexity|area|type|summary|acceptance|status
+Add RFC template for high-complexity work|trivial|area:ops|type:task|Provide RFC template required before starting selected high tasks.|Template includes motivation design risks and rollout plan.|
+Add accessible keyboard nav blueprint page [59]|medium|area:web|type:feature|Add page to enforce keyboard-first navigation tests. (Issue seed 59)|All controls accessible with tab flow.|
+Add authorization mode matrix runner|high|area:fuzzer|type:feature|Run each seed across enforce record and record_allow_nonroot modes.|Output stores per mode result and mismatch summary.|
+Add conflict-of-interest maintainer policy|medium|area:security|type:feature|Define conflict-of-interest handling for issue assignment and review decisions.|Policy is published and linked from maintainer playbook.|
+Add contributor SLA section with timers|medium|area:ops|type:feature|Set response and review timing commitments for wave sprint operations.|Playbook includes measurable SLA targets and escalation path.|
+Add corpus seed export command|trivial|area:fuzzer|type:task|Export current corpus to portable seed archive for sharing.|Archive can be re-imported and preserves deterministic order.|implemented
+Add corpus seed import command|medium|area:fuzzer|type:feature|Import external seed files into the local mutation corpus with validation.|Import rejects malformed files and reports accepted seed counts.|
+Add crash signature hashing|medium|area:generator|type:feature|Create stable signature hash from category stack and key fields.|Equivalent failures produce identical signature hash.|
+Add dependency update safety policy|medium|area:security|type:feature|Define policy for dependency updates including review and rollback requirements.|Policy requires changelog review and post-update validation checklist.|
+Add deterministic PRNG adapter|medium|area:fuzzer|type:feature|Provide deterministic pseudo random generation keyed by seed id.|Same seed always produces same mutation stream across runs.|
+Add duplicate crash de-dup index|medium|area:generator|type:feature|Group repeated failures by signature to reduce noise.|Dashboard and CLI report grouped counts and newest sample.|
+Add empty-state onboarding cards|trivial|area:web|type:task|Show actionable onboarding cards when no runs or crashes exist.|Cards guide first campaign setup and docs entry points.|
+Add environment fingerprinting to bundles|medium|area:runtime|type:feature|Record runtime environment details for replay consistency checks.|Replay warns when environment fingerprint differs materially.|implemented
+Add explicit loading and error states|trivial|area:web|type:task|Implement non-blocking loading and actionable error states across dashboard.|No blank screens when API request fails or is pending.|
+Add failure artifact compression|trivial|area:runtime|type:task|Compress stored artifacts to reduce disk footprint of long campaigns.|Compression reduces storage while preserving artifact integrity.|
+Add fixture compatibility checker|medium|area:generator|type:feature|Check whether fixture set matches current engine schema and capabilities.|Checker reports actionable migration warnings.|
+Add fixture sanitization pipeline|medium|area:generator|type:feature|Sanitize fixtures to remove unsafe payload fragments before sharing publicly.|Sanitized fixtures preserve repro value without leaking sensitive data.|
+Add fuzz campaign preset profiles|trivial|area:fuzzer|type:task|Define campaign presets for smoke nightly and deep runs.|Preset selection changes runtime budget and mutation intensity predictably.|
+Add keyboard navigation in dashboard|trivial|area:web|type:task|Enable keyboard shortcuts for table navigation and detail views.|Core flows are usable without mouse and documented in help panel.|
+Add label bootstrap automation|trivial|area:ops|type:task|Automate creation of standard labels used by backlog and triage.|Script is idempotent and safe for repeated execution.|
+Add maintainer response-time dashboard query|trivial|area:ops|type:task|Create query set to track first response and review turnaround metrics.|Queries are documented and reusable across wave cycles.|
+Add markdown rendering for issue-ready reports|trivial|area:web|type:task|Render issue report markdown preview before export or copy.|Preview matches exported markdown structure and formatting.|
+Add mutation budget limiter per run|trivial|area:fuzzer|type:task|Cap mutation attempts per run to avoid runaway jobs.|Limiter stops at configured budget and reports skipped attempts.|
+Add replay command for single seed|medium|area:runtime|type:feature|Create CLI command to replay one exact seed bundle end to end.|Replay returns same class and signature as original failure.|
+Add reproducer shrinking algorithm|high|area:generator|type:feature|Minimize failing inputs while preserving failure signature.|Shrunk case is smaller and still reproduces same signature.|
+Add retention policy for run artifacts|medium|area:runtime|type:feature|Apply configurable retention windows for old run artifacts.|Policy can keep latest failures while pruning old non-critical data.|
+Add run cancellation command|trivial|area:runtime|type:task|Allow maintainers to cancel active runs gracefully.|Cancelled runs end in terminal state with partial summary.|
+Add run filtering by area and severity|trivial|area:web|type:task|Enable filtering runs by component and severity tag.|Filters are reflected in URL query params.|
+Add run sanity check pipeline page [70]|medium|area:web|type:feature|Add page to hold pre-run sanity checks, validations and gating options.|Sanity checks can be run and status persists.|
+Add security policy and disclosure path|medium|area:security|type:feature|Define coordinated vulnerability disclosure process and response expectations.|Security policy file exists and linked from README.|
+Add shareable permalink for run report|medium|area:web|type:feature|Create stable URL for a specific run and applied filters.|Copy link action shares the same report view for other users.|
+Add simulation timeout guardrails|trivial|area:runtime|type:task|Stop long running simulation attempts and mark as timeout class.|Timeout threshold is configurable and surfaced in run metadata.|
+Add stale label auto-suggestion script|trivial|area:ops|type:task|Create script to suggest stale labels based on inactivity and blockers.|Script outputs proposed labels without mutating issues by default.|
+Add stale run detector|trivial|area:runtime|type:task|Detect and mark runs that stop producing progress for too long.|Detector marks stale status and surfaces recovery hint.|
+Add state change diff view|high|area:web|type:feature|Render readable before and after ledger entry changes from simulation output.|Diff highlights created updated deleted changes with type labels.|
+Add theme tokens for accessibility contrast|trivial|area:web|type:task|Define color tokens with accessible contrast for key statuses.|Status chips pass WCAG AA contrast checks.|
+Add vec and map size stress mutator|medium|area:fuzzer|type:feature|Exercise container growth and sparse key patterns for host function inputs.|Configurable min and max sizes with deterministic generation.|
+Add weekly triage cadence automation|medium|area:ops|type:feature|Automate recurring triage reminders and issue queue snapshots.|Automation posts summary with pending high-priority actions.|
+Build crash detail drawer UI|medium|area:web|type:feature|Show failure category signature payload and replay action in side drawer.|Drawer opens from history row and preserves browser state.|
+Build failure classification taxonomy|medium|area:runtime|type:feature|Map raw failures to stable categories like auth budget state and xdr.|Classification logic is documented and covered by tests.|
+Build replay from UI action|medium|area:web|type:feature|Trigger seed replay directly from crash detail panel.|Replay action shows status and links to resulting run.|
+Build resource fee insight panel|medium|area:web|type:feature|Display cpu mem and min resource fee with warning thresholds.|Panel flags expensive runs and links to related run details.|
+Build run history table UI|trivial|area:web|type:task|Implement dashboard table listing run id status duration and seed count.|Table supports basic pagination and links to run detail.|implemented
+Create architecture diagram documentation|trivial|area:docs|type:task|Document system architecture including data flow between fuzzer generator and web.|Diagram and text are included in repository docs.|
+Create cross-run board custom widgets [70]|medium|area:web|type:feature|Add configurable widget components for cross-run dashboards.|Widgets can be saved, reloaded, and reordered.|
+Create numeric boundary mutator for i128 and u128|medium|area:fuzzer|type:feature|Generate edge values near overflow and underflow ranges.|Mutator emits boundary vectors and test asserts include min max neighbors.|implemented
+Create threat model draft for artifact handling|high|area:security|type:feature|Build threat model for input ingestion artifact storage and report export.|Threat model lists abuse cases mitigations and open risks.|
+Define escalation policy for blocked PRs|medium|area:ops|type:feature|Set explicit escalation path when contributor PRs are blocked by dependencies.|Policy includes timing thresholds and communication template.|
+Document Security Hardening Assumptions|medium|area:security|type:task|Document the security hardening assumptions covering fuzz input handling and artifact storage.|Documentation exists in README.md, CONTRIBUTING.md, and MAINTAINER_WAVE_PLAYBOOK.md with clear trust boundaries and mitigation controls.|implemented
+Document issue triage board queries|medium|area:ops|type:feature|Add saved search conventions for pending review stale and blocked issues.|Maintainers can follow documented queries without manual guesswork.|
+Document wave issue complexity rubric|trivial|area:docs|type:task|Publish rubric for assigning trivial medium and high complexity accurately.|Rubric includes examples from current backlog areas.|
+Export failing seed as JSON scenario|trivial|area:generator|type:task|Allow exporting normalized JSON scenario for cross tool reuse.|Scenario includes seed id input payload mode and expected failure class.|
+Export failing seed as Rust regression fixture|high|area:generator|type:feature|Generate a Rust test snippet from a failing bundle for contract suites.|Output compiles in sample harness and fails before patch succeeds after patch.|
+Implement flaky reproducer detector|medium|area:generator|type:feature|Detect non-deterministic repro cases and flag them for quarantine.|Detector reports flake rate and excludes unstable fixtures from CI pack.|
+Implement run health summary endpoint|medium|area:runtime|type:feature|Provide health summary with throughput failures and queue depth metrics.|Endpoint returns machine-readable summary for dashboard polling.|
+Implement run resume from checkpoint|high|area:runtime|type:feature|Resume interrupted campaigns from persisted checkpoints.|Resumed run continues from last checkpoint without reprocessing completed seeds.|
+Implement secret scanning guidance for contributors|trivial|area:security|type:task|Document pre-commit secret scanning expectations and remediation steps.|Guide includes recommended tools and response process.|
+Implement seed schema validator|trivial|area:fuzzer|type:task|Validate incoming seed payloads against a strict schema before execution.|Reject malformed fields with clear errors and accept valid payloads.|
+Implement weighted mutator scheduler|high|area:fuzzer|type:feature|Schedule mutators by configurable weights to balance exploration and exploitation.|Run stats show mutator usage distribution matches configured weights.|implemented
+Persist failing case bundle format|medium|area:runtime|type:feature|Store seed input context env and failure payload in a portable bundle.|Bundle can be saved loaded and versioned with schema field.|
+Write reproducibility guarantees documentation|medium|area:docs|type:feature|Document deterministic guarantees and known limits across environments.|Docs include examples and troubleshooting for mismatched replay outcomes.|

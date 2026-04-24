@@ -1,0 +1,176 @@
+
+> web@0.1.0 lint
+> eslint .
+
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\add-a-fuzzy-query-builder-page-51.tsx
+    4:22  warning  'RunStatus' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+    4:33  warning  'RunArea' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+    4:42  warning  'RunSeverity' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   74:30  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-explicit-any
+   74:50  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-explicit-any
+  101:10  warning  'formatBytes' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  131:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\add-a-fuzzy-query-builder-page-51.tsx:131:5
+  129 |   // Load saved queries on mount
+  130 |   useEffect(() => {
+> 131 |     setSavedQueries(loadQueries());
+      |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  132 |   }, []);
+  133 |
+  134 |   // Persist whenever saved queries change (skip initial empty render)  react-hooks/set-state-in-effect
+  337:51  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react/no-unescaped-entities
+  337:64  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react/no-unescaped-entities
+  359:56  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-explicit-any
+  372:94  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-explicit-any
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\add-run-filtering-by-severity.tsx
+  25:53  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\add-run-timeline.tsx
+  36:20  warning  'maxTime' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\create-sanity-check-pipeline-page-page.tsx
+  156:24  warning  'setPipelineRuns' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\implement-alerting-settings-page-54.tsx
+   52:16  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+  105:14  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\implement-artifact-preview-modal-component.tsx
+  275:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\implement-artifact-preview-modal-component.tsx:275:5
+  273 |   // SSR mount guard
+  274 |   useEffect(() => {
+> 275 |     setMounted(true);
+      |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  276 |   }, []);
+  277 |
+  278 |   // Guard: null/undefined artifact  react-hooks/set-state-in-effect
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\implement-resource-fee-insight-panel-component.tsx
+  45:10  warning  'calculateGroupStats' is defined but never used  @typescript-eslint/no-unused-vars
+  60:10  warning  'calculateTrends' is defined but never used      @typescript-eslint/no-unused-vars
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\implement-run-workflow-board-page-58.tsx
+  104:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\implement-run-workflow-board-page-58.tsx:104:5
+  102 |   // Load saved workflow states on mount
+  103 |   useEffect(() => {
+> 104 |     setWorkflowStates(loadWorkflowStates());
+      |     ^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  105 |   }, []);
+  106 |
+  107 |   // Persist whenever workflow states change (skip initial empty render)  react-hooks/set-state-in-effect
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\integrate-integration-test-harness-for-ui-flows.tsx
+  16:27  warning  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\integrate-metrics-export-to-prometheus.tsx
+  3:38  warning  'useMemo' is defined but never used    @typescript-eslint/no-unused-vars
+  5:3   warning  'LineChart' is defined but never used  @typescript-eslint/no-unused-vars
+  6:3   warning  'Line' is defined but never used       @typescript-eslint/no-unused-vars
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\integrate-sentry-integration-for-crash-reporting.tsx
+  52:9  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\integrate-sentry-integration-for-crash-reporting.tsx:52:9
+  50 |       try {
+  51 |         const parsed = JSON.parse(savedConfig);
+> 52 |         setConfig(parsed);
+     |         ^^^^^^^^^ Avoid calling setState() directly within an effect
+  53 |       } catch {
+  54 |         // Ignore parse errors
+  55 |       }                                           react-hooks/set-state-in-effect
+  61:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\integrate-sentry-integration-for-crash-reporting.tsx:61:5
+  59 |   useEffect(() => {
+  60 |     // Simulate loading recent reports
+> 61 |     setRecentReports([
+     |     ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  62 |       {
+  63 |         id: "crash-001",
+  64 |         timestamp: new Date(Date.now() - 3600000).toISOString(),  react-hooks/set-state-in-effect
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\page.tsx
+   30:8   warning  'IssueTriageBoard' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  159:32  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `severityFilter`, but the source dependencies were [runs, statusFilter, expensiveOnly]. Inferred different dependency than source.
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\page.tsx:159:32
+  157 |   );
+  158 |
+> 159 |   const filteredRuns = useMemo(() => {
+      |                                ^^^^^^^
+> 160 |     return runs.filter((run) => {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 161 |       if (statusFilter !== 'all' && run.status !== statusFilter) {
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 171 |     });
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 172 |   }, [runs, statusFilter, expensiveOnly]);
+      | ^^^^ Could not preserve existing manual memoization
+  173 |   const stableQueryString = useMemo(
+  174 |     () => toStableQueryString(new URLSearchParams(searchParams.toString())),
+  175 |     [searchParams],  react-hooks/preserve-manual-memoization
+  159:32  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `severityFilter`, but the source dependencies were [runs, statusFilter, expensiveOnly]. Inferred different dependency than source.
+
+C:\Users\HP\Desktop\soroban-crashlab\apps\web\src\app\page.tsx:159:32
+  157 |   );
+  158 |
+> 159 |   const filteredRuns = useMemo(() => {
+      |                                ^^^^^^^
+> 160 |     return runs.filter((run) => {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 161 |       if (statusFilter !== 'all' && run.status !== statusFilter) {
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 171 |     });
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 172 |   }, [runs, statusFilter, expensiveOnly]);
+      | ^^^^ Could not preserve existing manual memoization
+  173 |   const stableQueryString = useMemo(
+  174 |     () => toStableQueryString(new URLSearchParams(searchParams.toString())),
+  175 |     [searchParams],  react-hooks/preserve-manual-memoization
+  172:6   warning  React Hook useMemo has a missing dependency: 'severityFilter'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/exhaustive-deps
+
+✖ 30 problems (14 errors, 16 warnings)
+

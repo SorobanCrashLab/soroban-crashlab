@@ -7,7 +7,7 @@ on:
 
 jobs:
   web:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: apps/web
@@ -20,13 +20,20 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm run test
       - run: npm run build
 
   core:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     defaults:
       run:
         working-directory: contracts/crashlab-core
     steps:
       - uses: actions/checkout@v4
       - run: cargo test --all-targets
+
+  ops-scripts-syntax:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n scripts/backlog-freshness-review.sh

@@ -39,6 +39,29 @@ is:open is:issue label:wave3 label:blocked
 
 If the `blocked` label does not exist, create it with color `d93f0b` and description "Blocked on dependency or external factor".
 
+## Backlog freshness review (recurring)
+
+Purpose: retire stale work items and refine active scope so the Wave board stays curated and achievable.
+
+| Element | Definition |
+| --- | --- |
+| **Cadence** | Automated report weekly **Monday 09:00 UTC** (`.github/workflows/backlog-freshness.yml`). Maintainers complete human triage within **two business days** of each run (or the same day if the report is non-empty). |
+| **Owner** | **Triage maintainer** runs the checklist and applies labels or closures. **Wave lead** steps in if backlog drift spans more than one cycle without action. |
+| **Stale criteria** | See below; thresholds match `scripts/backlog-freshness-review.sh` (override via env vars documented in that script). |
+
+**Stale criteria (operational)**
+
+1. **Assigned `wave3` issues** — Has assignee and `updatedAt` before **00:00 UTC** on the calendar day **N days ago**, where **N = 3** (`ASSIGNED_STALE_DAYS`). Aligns with the triage “Stale” board query. Ping the contributor, then follow the Contributor SLA targets table if there is no response.
+2. **Unassigned `wave3` issues** — No assignee and last update older than **14 days** (`UNASSIGNED_STALE_DAYS`). Re-scope, split into smaller issues, close as not planned with a short note, or re-label so the backlog does not accumulate abandoned scope.
+3. **`wave3` + `stale` still open** — Last update older than **7 days** (`STALE_LABEL_QUIET_DAYS`) while the `stale` label remains. Un-assign and return the issue to the pool per the escalation path in Contributor SLA targets, unless a maintainer has posted a documented exception.
+4. **Duplicates / out of scope** — Maintainer discretion during the same review window; close with a pointer to the canonical issue when applicable.
+
+**Checklist each cycle**
+
+1. Open the latest **Backlog freshness review** workflow run log, or run locally: `bash scripts/backlog-freshness-review.sh` (requires `gh` auth).
+2. Cross-check with the saved queries under [Issue triage board queries](#issue-triage-board-queries).
+3. Apply label changes, assignments, closures, or follow-ups; keep changes scoped to Wave backlog hygiene.
+
 ## Pre-wave checklist
 
 1. Validate that each candidate issue has scope, acceptance criteria, and complexity.
@@ -56,6 +79,22 @@ If the `blocked` label does not exist, create it with color `d93f0b` and descrip
 - Reject misaligned applications quickly using the Wave UI so contributors can reapply elsewhere.
 - If no progress update is posted in 24 hours, request a status check and un-assign if unresponsive.
 
+## Conflict-of-interest handling
+
+Use the [Security Policy conflict-of-interest control path](.github/SECURITY.md#maintainer-conflicts-of-interest) for issue assignment, PR review, merge, severity, disclosure, bounty, and point-award decisions.
+
+A maintainer is conflicted when they are the reporter, issue author, assignee, PR author, employer, client, sponsor, close collaborator, direct financial beneficiary, direct competitor, or prior private implementer for the work being decided.
+
+### Required path
+
+1. Disclose the conflict before acting. Use a public issue or PR comment for normal Wave work, and the private vulnerability report or maintainer channel for security-sensitive reports.
+2. Recuse from assignment, review approval, merge, severity, disclosure timing, closure, and resolution-credit decisions for the affected item.
+3. Reassign ownership to an unconflicted maintainer. For issue assignment and PR review, keep the existing Wave timers: replacement owner within **24 hours**, escalation at **36 hours**.
+4. For vulnerability reports, keep the `.github/SECURITY.md` disclosure timers: acknowledgement within **48 hours**, initial triage within **5 business days**, and fix or mitigation plan within **14 days**.
+5. If no unconflicted maintainer is available before the timer, the Wave lead posts the blocker, leaves the item unapproved, and opens a follow-up staffing/escalation issue instead of forcing a conflicted approval.
+
+Known boundary: this process relies on self-disclosure and contributor/reviewer escalation for relationships that automation cannot detect. The automated policy test verifies the documented control path, timelines, and handle-based self-assignment/self-review edge cases only.
+
 ## PR review policy
 
 Review inside 24 hours to prevent unnecessary automated appeals. Review in this order:
@@ -65,6 +104,56 @@ Review inside 24 hours to prevent unnecessary automated appeals. Review in this 
 3. Deterministic reproducibility of behavior
 4. Test coverage
 5. Clarity and maintainability
+
+## Secret scanning expectation for reviews
+
+Use the [Security Policy pre-commit secret scanning path](.github/SECURITY.md#pre-commit-secret-scanning-expectations) when a PR touches config files, environment examples, logs, fixtures, copied command output, or any material that could contain credentials.
+
+### Review requirements
+
+1. Confirm the contributor ran at least one recommended scanner (`gitleaks` or `trufflehog`) before opening or updating the PR.
+2. If a scanner finding was a false positive, confirm the PR or maintainer discussion names the scanner and file path without pasting the full matched value.
+3. If a real secret was found after push, move the response into a private channel immediately and require credential rotation or revocation before normal public review continues.
+4. Confirm the contributor removed any exposed value from the branch diff and local history before approving follow-up changes.
+
+Known boundary: this repository documents secret scanning expectations but does not yet ship an enforced pre-commit hook or CI secret scanner. Reviewer follow-through is still required.
+
+## Release management
+
+Use [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) whenever you need to
+cut a tagged release. It defines:
+
+- how to choose the next version
+- how to update [`CHANGELOG.md`](CHANGELOG.md)
+- how to review backward compatibility before tagging
+- which validation commands to run before publishing release notes
+
+## Unblocking contributor failures
+
+When a contributor is blocked on local setup, build, test, or replay issues,
+point them to the
+[`CONTRIBUTING.md` debugging playbook](CONTRIBUTING.md#contributor-debugging-playbook)
+before asking for a broad rewrite or a large debug dump.
+
+Ask them to paste:
+
+```bash
+git status --short
+node -v
+npm -v
+rustc -V
+cargo -V
+```
+
+Plus the exact failing command and the first relevant error block. This keeps
+triage focused on environment drift, dependency install problems, and replay
+environment mismatches instead of guesswork.
+
+## Security Policy
+
+The project's coordinated vulnerability disclosure process and response expectations are defined in [`.github/SECURITY.md`](.github/SECURITY.md). Maintainers are responsible for triaging incoming reports within the timelines specified there.
+
+Conflict-of-interest handling for security reports is defined in [`.github/SECURITY.md#maintainer-conflicts-of-interest`](.github/SECURITY.md#maintainer-conflicts-of-interest). A conflicted maintainer may route a private report to an unconflicted owner, but must not decide severity, fix readiness, disclosure timing, or public credit.
 
 ## Operational Security Assumptions
 
@@ -96,7 +185,7 @@ When reviewing changes to artifact storage:
 ### CI security checks
 - **Existing checks**:
   - Rust: `cargo test --all-targets` (compilation and unit tests)
-  - Web: `npm run lint` and `npm run build`
+  - Web: `npm run test`, `npm run lint`, and `npm run build`
 - **Missing checks** (gaps):
   - Dependency vulnerability scanning for Rust (`cargo audit`) and npm (`npm audit`).
   - Security-focused linter rules (e.g., `cargo clippy` with `--deny=unsafe_code` or similar).
@@ -139,6 +228,19 @@ triggering event.
    must review immediately regardless of original assignment. Comment
    `reviewed-by: @<handle>` to mark ownership.
 
+### Blocked PR Escalation Path
+
+When a PR is marked with the `blocked` label, it enters a specialized escalation path to prevent stale backlog drift.
+
+| Milestone | Threshold | Action |
+| --- | --- | --- |
+| **Initial Block** | 0 h | Maintainer applies `blocked` label and comments with the specific dependency. |
+| **SLA Breach** | 24 h | `scripts/check-sla.sh` flags the PR. Maintainer posts status update. |
+| **Escalation** | 36 h | Wave lead review. If block persists without path to resolution, un-assign or move to backlog. |
+
+**Communication Template (24h breach)**
+> @maintainer: This PR has been blocked on dependencies for >24h. Please provide a status update or resolve the block to prevent stale backlog drift.
+
 ### Running the SLA check
 
 Use `scripts/check-sla.sh` to surface open items past their SLA window:
@@ -151,6 +253,17 @@ bash scripts/check-sla.sh
 The script lists open PRs with no review past 24 h and assigned issues
 with no update past 48 h. It exits non-zero when breaches are found so
 it can be wired into a CI schedule.
+
+### Running the conflict policy check
+
+Use the focused policy test when conflict handling, security-process docs, or Wave assignment/review language changes:
+
+```bash
+cd apps/web
+npm run test:policy
+```
+
+The test verifies primary allowed decisions, conflict recusal behavior, handle-normalization edge cases, policy cross-links, and the documented 24 h, 36 h, 48 h, 5 business day, and 14 day timers.
 
 ## Post-resolution feedback
 
