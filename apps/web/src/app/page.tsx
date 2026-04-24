@@ -1022,7 +1022,11 @@ function HomeContent() {
           </div>
 
           <div className="mb-12 w-full">
-            <AddRunComparisonCharts runs={filteredRuns} />
+            <AddRunComparisonCharts
+              runs={filteredRuns}
+              dataState={dataState}
+              onRetry={() => setFetchAttempt((n) => n + 1)}
+            />
           </div>
 
           <div className="mb-12 w-full">

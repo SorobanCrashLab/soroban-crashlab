@@ -2,11 +2,19 @@
 
 import { useMemo, useState } from 'react';
 import type { FuzzingRun } from './types';
-
-type ComparisonMetric = 'duration' | 'cpuInstructions' | 'memoryBytes' | 'minResourceFee';
+import {
+  type ChartsDataState,
+  type ComparisonMetric,
+  buildChartRows,
+  getChartsStateMessage,
+  selectChartRuns,
+  summarizeChartRows,
+} from './add-run-comparison-charts-utils';
 
 type ComparisonProps = {
   runs: FuzzingRun[];
+  dataState: ChartsDataState;
+  onRetry: () => void;
 };
 
 const METRICS: Array<{
@@ -77,53 +85,28 @@ const getDeltaBadge = (delta: number): string => {
   return 'Regression';
 };
 
-export default function AddRunComparisonCharts({ runs }: ComparisonProps) {
-  const completedRuns = useMemo(() => runs.filter((run) => run.status !== 'cancelled').slice(0, 6), [runs]);
+export default function AddRunComparisonCharts({ runs, dataState, onRetry }: ComparisonProps) {
   const [metric, setMetric] = useState<ComparisonMetric>('duration');
   const [baselineRunId, setBaselineRunId] = useState<string>('');
   const [selectedRunId, setSelectedRunId] = useState<string>('');
 
-  const chartRuns = completedRuns.length > 0 ? completedRuns : runs.slice(0, 6);
+  const chartRuns = useMemo(() => selectChartRuns(runs), [runs]);
   const baselineRun = chartRuns.find((run) => run.id === baselineRunId) ?? chartRuns[chartRuns.length - 1] ?? null;
   const selectedRun = chartRuns.find((run) => run.id === selectedRunId) ?? chartRuns[0] ?? null;
   const metricConfig = METRICS.find((item) => item.key === metric) ?? METRICS[0];
+  const stateMessage = getChartsStateMessage(dataState, chartRuns.length);
 
   const comparisonData = useMemo(() => {
-    if (!baselineRun) {
-      return [];
-    }
-
-    const values = chartRuns.map((run) => run[metric]);
-    const maxValue = Math.max(...values, baselineRun[metric], 1);
-    const baselineValue = baselineRun[metric];
-
-    return chartRuns.map((run, index) => {
-      const value = run[metric];
-      const delta = baselineValue === 0 ? 0 : ((value - baselineValue) / baselineValue) * 100;
-
-      return {
-        ...run,
-        index,
-        value,
-        delta,
-        percentage: (value / maxValue) * 100,
-        baseline: run.id === baselineRun.id,
-        selected: selectedRun ? run.id === selectedRun.id : false,
-      };
-    });
+    if (!baselineRun) return [];
+    return buildChartRows(chartRuns, metric, baselineRun.id).map((row) => ({
+      ...row,
+      selected: selectedRun ? row.id === selectedRun.id : false,
+    }));
   }, [baselineRun, chartRuns, metric, selectedRun]);
 
   const selectedComparison = comparisonData.find((entry) => entry.id === selectedRun?.id) ?? comparisonData[0];
 
-  const summary = useMemo(() => {
-    const nonBaselineEntries = comparisonData.filter((entry) => !entry.baseline);
-    return {
-      tracked: comparisonData.length,
-      regressions: nonBaselineEntries.filter((entry) => entry.delta >= 10).length,
-      improvements: nonBaselineEntries.filter((entry) => entry.delta <= -10).length,
-      highest: comparisonData.reduce((best, current) => (current.value > best.value ? current : best), comparisonData[0]),
-    };
-  }, [comparisonData]);
+  const summary = useMemo(() => summarizeChartRows(comparisonData), [comparisonData]);
 
   return (
     <section className="w-full rounded-[2rem] border border-black/[.08] bg-white/95 p-6 shadow-sm dark:border-white/[.145] dark:bg-zinc-950/90 md:p-8">
@@ -154,15 +137,30 @@ export default function AddRunComparisonCharts({ runs }: ComparisonProps) {
             <div className="text-cyan-800 dark:text-cyan-300">Improvements ≤ -10%</div>
           </div>
           <div>
-            <div className="font-semibold text-cyan-950 dark:text-cyan-100">{summary.highest?.id ?? 'N/A'}</div>
+            <div className="font-semibold text-cyan-950 dark:text-cyan-100">{summary.highestId}</div>
             <div className="text-cyan-800 dark:text-cyan-300">Highest current metric</div>
           </div>
         </div>
       </div>
 
-      {chartRuns.length === 0 ? (
+      {dataState !== 'success' ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
-          Run comparison charts will appear once the dashboard has run data to compare.
+          <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{stateMessage.title}</p>
+          <p className="mt-2">{stateMessage.detail}</p>
+          {dataState === 'error' && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-4 rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-700"
+            >
+              Retry charts
+            </button>
+          )}
+        </div>
+      ) : chartRuns.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
+          <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{stateMessage.title}</p>
+          <p className="mt-2">{stateMessage.detail}</p>
         </div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
@@ -177,7 +175,18 @@ export default function AddRunComparisonCharts({ runs }: ComparisonProps) {
                       type="button"
                       role="tab"
                       aria-selected={isActive}
+                      aria-controls={`comparison-metric-${item.key}`}
                       onClick={() => setMetric(item.key)}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+                        event.preventDefault();
+                        const currentIndex = METRICS.findIndex((candidate) => candidate.key === item.key);
+                        const nextIndex =
+                          event.key === 'ArrowRight'
+                            ? (currentIndex + 1) % METRICS.length
+                            : (currentIndex - 1 + METRICS.length) % METRICS.length;
+                        setMetric(METRICS[nextIndex].key);
+                      }}
                       className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
                         isActive
                           ? 'border-cyan-500 bg-cyan-500 text-white shadow-sm'
@@ -223,7 +232,10 @@ export default function AddRunComparisonCharts({ runs }: ComparisonProps) {
               </div>
             </div>
 
-            <div className="mb-4 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <div
+              id={`comparison-metric-${metric}`}
+              className="mb-4 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+            >
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{metricConfig.label}</div>
