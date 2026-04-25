@@ -42,65 +42,7 @@ interface ResourceFeeStats {
   };
 }
 
-function calculateGroupStats(groupRuns: FuzzingRun[]) {
-  const fees = groupRuns.map(run => run.minResourceFee).filter(fee => fee > 0);
-  return {
-    averageFee: fees.length > 0 ? fees.reduce((sum, fee) => sum + fee, 0) / fees.length : 0,
-    totalRuns: groupRuns.length,
-    totalFees: fees.reduce((sum, fee) => sum + fee, 0)
-  };
-}
 
-function getWeekString(date: Date) {
-  const year = date.getFullYear();
-  const week = Math.ceil((date.getTime() - new Date(year, 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
-  return `${year}-W${week.toString().padStart(2, '0')}`;
-}
-
-function calculateTrends(filteredRuns: FuzzingRun[]) {
-  const dailyData = new Map<string, { fees: number[]; count: number }>();
-  const weeklyData = new Map<string, { fees: number[]; count: number }>();
-
-  filteredRuns.forEach(run => {
-    const date = new Date(run.startedAt || run.queuedAt || '');
-    const dateStr = date.toISOString().split('T')[0];
-    const weekStr = getWeekString(date);
-
-    if (!dailyData.has(dateStr)) {
-      dailyData.set(dateStr, { fees: [], count: 0 });
-    }
-    if (!weeklyData.has(weekStr)) {
-      weeklyData.set(weekStr, { fees: [], count: 0 });
-    }
-
-    if (run.minResourceFee > 0) {
-      dailyData.get(dateStr)!.fees.push(run.minResourceFee);
-      weeklyData.get(weekStr)!.fees.push(run.minResourceFee);
-    }
-    dailyData.get(dateStr)!.count++;
-    weeklyData.get(weekStr)!.count++;
-  });
-
-  const daily = Array.from(dailyData.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-30)
-    .map(([date, data]) => ({
-      date,
-      averageFee: data.fees.length > 0 ? data.fees.reduce((sum, fee) => sum + fee, 0) / data.fees.length : 0,
-      runCount: data.count
-    }));
-
-  const weekly = Array.from(weeklyData.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-12)
-    .map(([week, data]) => ({
-      week,
-      averageFee: data.fees.length > 0 ? data.fees.reduce((sum, fee) => sum + fee, 0) / data.fees.length : 0,
-      runCount: data.count
-    }));
-
-  return { daily, weekly };
-}
 
 const ResourceFeeInsightPanel: React.FC<ResourceFeeInsightPanelProps> = ({
   runs,

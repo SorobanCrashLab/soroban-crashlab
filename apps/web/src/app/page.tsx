@@ -367,7 +367,6 @@ function HomeContent() {
         setReportRun(run);
       } else if (dataState === "success") {
         // Clear param if run not found after data loaded
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setQueryState({ report: null });
       }
     }

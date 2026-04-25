@@ -23,7 +23,7 @@ const runAssertions = () => {
 
   const widgets: CustomWidget[] = [
     { id: 'w1', label: '1', metric: 'total-runs', color: 'blue' },
-    { id: 'w2', label: '2', metric: 'failed', color: 'red' as any },
+    { id: 'w2', label: '2', metric: 'failed', color: 'amber' },
     { id: 'w3', label: '3', metric: 'completed', color: 'green' },
   ];
 

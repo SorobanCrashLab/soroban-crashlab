@@ -49,6 +49,7 @@ export default function IntegrateSentryIntegrationForCrashReporting() {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setConfig(parsed);
       } catch {
         // Ignore parse errors
