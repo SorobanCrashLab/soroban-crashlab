@@ -3,7 +3,9 @@ import {
   buildPrometheusScrapeConfig,
   generateInitialData,
   analyzeTrend,
-  ExportConfig
+  runMetricsExportIntegrationFlow,
+  ExportConfig,
+  MetricsExportDependencies,
 } from './integrate-metrics-export-to-prometheus-utils';
 
 function assert(condition: boolean, message: string): void {
@@ -72,7 +74,70 @@ function testAnalyzeTrend(): void {
   console.log('✓ testAnalyzeTrend passed');
 }
 
-function runAllTests(): void {
+function makeDeps(overrides: Partial<MetricsExportDependencies> = {}): MetricsExportDependencies {
+  return {
+    async resolveConfig() {
+      return makeConfig();
+    },
+    async pushMetrics() {
+      return { accepted: true, pushedSeries: 14 };
+    },
+    async queryExporterHealth() {
+      return { healthy: true, statusCode: 200 };
+    },
+    ...overrides,
+  };
+}
+
+async function testRunMetricsExportIntegrationFlow_successPath(): Promise<void> {
+  const result = await runMetricsExportIntegrationFlow(makeDeps());
+  assert(result.success, 'integration flow should succeed');
+  assert(result.steps.length === 4, 'all deterministic boundary steps should be reported');
+  assert(result.steps.every((step) => step.status === 'passed'), 'all steps should pass');
+  assert(result.pushedSeries === 14, 'pushed series count should be surfaced');
+  console.log('✓ testRunMetricsExportIntegrationFlow_successPath passed');
+}
+
+async function testRunMetricsExportIntegrationFlow_configUnavailable(): Promise<void> {
+  const result = await runMetricsExportIntegrationFlow(
+    makeDeps({
+      async resolveConfig() {
+        return null;
+      },
+    }),
+  );
+  assert(!result.success, 'flow should fail when config cannot be resolved');
+  assert(result.steps.some((step) => step.id === 'config-resolve' && step.status === 'failed'), 'config resolve should fail');
+  console.log('✓ testRunMetricsExportIntegrationFlow_configUnavailable passed');
+}
+
+async function testRunMetricsExportIntegrationFlow_edgePushRejected(): Promise<void> {
+  const result = await runMetricsExportIntegrationFlow(
+    makeDeps({
+      async pushMetrics() {
+        return { accepted: false, pushedSeries: 0 };
+      },
+    }),
+  );
+  assert(!result.success, 'flow should fail when push is rejected');
+  assert(result.steps.some((step) => step.id === 'metrics-push' && step.status === 'failed'), 'metrics push step should fail');
+  console.log('✓ testRunMetricsExportIntegrationFlow_edgePushRejected passed');
+}
+
+async function testRunMetricsExportIntegrationFlow_healthFailure(): Promise<void> {
+  const result = await runMetricsExportIntegrationFlow(
+    makeDeps({
+      async queryExporterHealth() {
+        return { healthy: false, statusCode: 503 };
+      },
+    }),
+  );
+  assert(!result.success, 'flow should fail on downstream health failure');
+  assert(result.steps.some((step) => step.id === 'health-query' && step.status === 'failed'), 'health verification step should fail');
+  console.log('✓ testRunMetricsExportIntegrationFlow_healthFailure passed');
+}
+
+async function runAllTests(): Promise<void> {
   console.log('Running Metrics Export to Prometheus Utils Tests...\\n');
   try {
     testValidateExportConfig_valid();
@@ -82,6 +147,10 @@ function runAllTests(): void {
     testBuildPrometheusScrapeConfig();
     testGenerateInitialData();
     testAnalyzeTrend();
+    await testRunMetricsExportIntegrationFlow_successPath();
+    await testRunMetricsExportIntegrationFlow_configUnavailable();
+    await testRunMetricsExportIntegrationFlow_edgePushRejected();
+    await testRunMetricsExportIntegrationFlow_healthFailure();
     console.log('\\n✅ All Metrics Export to Prometheus utils tests passed!');
   } catch (error) {
     console.error('\\n❌ Test failed:', error);
@@ -90,5 +159,5 @@ function runAllTests(): void {
 }
 
 if (typeof require !== 'undefined' && require.main === module) {
-  runAllTests();
+  void runAllTests();
 }

@@ -3,9 +3,12 @@ import {
   buildIssueLink,
   summariseTests,
   toggleTrackerEnabled,
+  runIssueLinkIntegrationFlow,
   IssueTracker,
-  IntegrationTest
+  IntegrationTest,
+  RunIssueLinkDependencies,
 } from './integrate-run-issue-link-integration-tests-utils';
+import type { RunIssueLink } from './types';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
@@ -85,7 +88,84 @@ function testToggleTrackerEnabled(): void {
   console.log('✓ testToggleTrackerEnabled passed');
 }
 
-function runAllTests(): void {
+function makeDeps(overrides: Partial<RunIssueLinkDependencies> = {}): RunIssueLinkDependencies {
+  const runIssues: RunIssueLink[] = [];
+  return {
+    async getRunById(runId: string) {
+      return runId === 'run-1001' ? { id: runId, issues: runIssues } : null;
+    },
+    async getEnabledTrackerById(trackerId: string) {
+      if (trackerId !== 'gh-1') return null;
+      return makeTracker();
+    },
+    async createRunIssueLink(args) {
+      const link = buildIssueLink(args.tracker, args.issueNumber);
+      runIssues.push(link);
+      return link;
+    },
+    async verifyIssueLink() {
+      return { reachable: true, statusCode: 200 };
+    },
+    ...overrides,
+  };
+}
+
+async function testRunIssueLinkIntegrationFlow_successPath(): Promise<void> {
+  const result = await runIssueLinkIntegrationFlow(
+    { runId: 'run-1001', trackerId: 'gh-1', issueNumber: '411' },
+    makeDeps(),
+  );
+
+  assert(result.success, 'integration flow should succeed');
+  assert(result.link?.href === 'https://github.com/test/repo/issues/411', 'created href should match tracker URL');
+  assert(result.tests.length === 5, 'all deterministic steps should be reported');
+  assert(result.tests.every((step) => step.status === 'passed'), 'all steps should pass');
+  console.log('✓ testRunIssueLinkIntegrationFlow_successPath passed');
+}
+
+async function testRunIssueLinkIntegrationFlow_trackerUnavailable(): Promise<void> {
+  const result = await runIssueLinkIntegrationFlow(
+    { runId: 'run-1001', trackerId: 'missing', issueNumber: '411' },
+    makeDeps(),
+  );
+
+  assert(!result.success, 'flow should fail when tracker cannot be resolved');
+  assert(result.tests.some((step) => step.id === 'tracker-lookup' && step.status === 'failed'), 'tracker lookup should fail');
+  console.log('✓ testRunIssueLinkIntegrationFlow_trackerUnavailable passed');
+}
+
+async function testRunIssueLinkIntegrationFlow_edge_duplicateLink(): Promise<void> {
+  const existing = buildIssueLink(makeTracker(), '411');
+  const result = await runIssueLinkIntegrationFlow(
+    { runId: 'run-1001', trackerId: 'gh-1', issueNumber: '411' },
+    makeDeps({
+      async getRunById(runId: string) {
+        return runId === 'run-1001' ? { id: runId, issues: [existing] } : null;
+      },
+    }),
+  );
+
+  assert(!result.success, 'flow should fail on duplicate run->issue link');
+  assert(result.tests.some((step) => step.id === 'dedupe-check' && step.status === 'failed'), 'duplicate check should fail');
+  console.log('✓ testRunIssueLinkIntegrationFlow_edge_duplicateLink passed');
+}
+
+async function testRunIssueLinkIntegrationFlow_downstreamVerificationFailure(): Promise<void> {
+  const result = await runIssueLinkIntegrationFlow(
+    { runId: 'run-1001', trackerId: 'gh-1', issueNumber: '411' },
+    makeDeps({
+      async verifyIssueLink() {
+        return { reachable: false, statusCode: 503 };
+      },
+    }),
+  );
+
+  assert(!result.success, 'flow should fail when downstream endpoint is unreachable');
+  assert(result.tests.some((step) => step.id === 'link-verify' && step.status === 'failed'), 'verification step should fail');
+  console.log('✓ testRunIssueLinkIntegrationFlow_downstreamVerificationFailure passed');
+}
+
+async function runAllTests(): Promise<void> {
   console.log('Running Run Issue Link Integration Tests Utils Tests...\\n');
   try {
     testValidateTracker_valid();
@@ -95,6 +175,10 @@ function runAllTests(): void {
     testBuildIssueLink();
     testSummariseTests();
     testToggleTrackerEnabled();
+    await testRunIssueLinkIntegrationFlow_successPath();
+    await testRunIssueLinkIntegrationFlow_trackerUnavailable();
+    await testRunIssueLinkIntegrationFlow_edge_duplicateLink();
+    await testRunIssueLinkIntegrationFlow_downstreamVerificationFailure();
     console.log('\\n✅ All Run Issue Link Integration Tests utils tests passed!');
   } catch (error) {
     console.error('\\n❌ Test failed:', error);
@@ -103,5 +187,5 @@ function runAllTests(): void {
 }
 
 if (typeof require !== 'undefined' && require.main === module) {
-  runAllTests();
+  void runAllTests();
 }
