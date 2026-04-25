@@ -124,7 +124,7 @@ pub use regression_grouping::{
 
 pub mod simulation;
 pub use simulation::{
-    RUN_METADATA_SCHEMA_VERSION, RunMetadata, RunMetadataError, SUPPORTED_RUN_METADATA_SCHEMAS,
+    RunMetadataError,
     SimulationTimeoutConfig, load_run_metadata_json, run_simulation_with_timeout,
     save_run_metadata_json, timeout_crash_signature,
 };

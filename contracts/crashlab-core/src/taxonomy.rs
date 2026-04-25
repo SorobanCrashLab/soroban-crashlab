@@ -61,7 +61,7 @@ impl FailureClass {
     }
 
     /// All variants in declaration order, useful for iteration and reporting.
-    pub const ALL: [FailureClass; 8] = [
+    pub const ALL: [FailureClass; 9] = [
         FailureClass::Auth,
         FailureClass::Budget,
         FailureClass::State,
@@ -294,8 +294,8 @@ mod tests {
     }
 
     #[test]
-    fn all_contains_seven_variants() {
-        assert_eq!(FailureClass::ALL.len(), 8);
+    fn all_contains_nine_variants() {
+        assert_eq!(FailureClass::ALL.len(), 9);
     }
 
     #[test]
