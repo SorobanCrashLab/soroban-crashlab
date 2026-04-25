@@ -19,6 +19,7 @@ import ReportModal from "./ReportModal";
 import { generateMarkdownReport } from "./report-utils";
 import CreateRunHeatmapPage55 from "./create-run-heatmap-page-55";
 import AddRunComparisonCharts from "./add-run-comparison-charts";
+import AddRunComparisonBuilder from "./add-run-comparison-builder";
 import AddTaggingAndLabelsUi from "./add-tagging-and-labels-ui";
 import AlertingSettingsPage54 from "./implement-alerting-settings-page-54";
 import AlertingSettingsPage from "./create-alerting-settings-page-page";
@@ -1019,6 +1020,14 @@ function HomeContent() {
 
           <div className="mb-12 w-full">
             <AddDownloadableRunArtifactBundle runs={selectedRuns.length > 0 ? selectedRuns : filteredRuns} />
+          </div>
+
+          <div className="mb-12 w-full">
+            <AddRunComparisonBuilder
+              runs={filteredRuns}
+              dataState={dataState}
+              onRetry={() => setFetchAttempt((n) => n + 1)}
+            />
           </div>
 
           <div className="mb-12 w-full">
