@@ -57,10 +57,12 @@ import AddAFuzzyQueryBuilderPage51 from "./add-a-fuzzy-query-builder-page-51";
 import AddResponsiveLayoutImprovements from "./add-responsive-layout-improvements";
 import AddKeyboardNavigationHelp from "./add-keyboard-navigation-help";
 import AddRunAnnotations from "./add-run-annotations";
+import AddRunReplayUi from "./add-run-replay-ui";
 import NotificationCenter from "./add-notification-center-ui";
 import BulkActionsForRuns, { BulkAction } from "./add-bulk-actions-for-runs";
 import AddDownloadableRunArtifactBundle from "./add-downloadable-run-artifact-bundle";
 import CampaignConfigForm from "./CampaignConfigForm";
+import ContributorSLATargets from "./ContributorSLATargets";
 import { CampaignConfig } from "./types";
 
 // Mock data for demonstration
@@ -741,7 +743,11 @@ function HomeContent() {
             )}
           </div>
 
-          <div id="recent-runs" className="w-full mb-8 scroll-mt-8">
+    <div className="w-full mb-20 border-t border-zinc-100 dark:border-zinc-800 pt-20">
+      <ContributorSLATargets />
+    </div>
+
+    <div id="recent-runs" className="w-full mb-8 scroll-mt-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Recent Fuzzing Runs</h2>
               <div className="flex items-center gap-3">
@@ -1008,6 +1014,13 @@ function HomeContent() {
             {dataState === "success" && (
               <div className="mt-12 w-full">
                 <ReportGenerator availableRuns={runs} />
+              </div>
+            )}
+
+            {/* Run Replay Section */}
+            {dataState === "success" && (
+              <div className="mt-12 w-full">
+                <AddRunReplayUi runs={runs} />
               </div>
             )}
           </div>
