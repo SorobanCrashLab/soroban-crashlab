@@ -57,6 +57,7 @@ import AddAFuzzyQueryBuilderPage51 from "./add-a-fuzzy-query-builder-page-51";
 import AddResponsiveLayoutImprovements from "./add-responsive-layout-improvements";
 import AddKeyboardNavigationHelp from "./add-keyboard-navigation-help";
 import AddRunAnnotations from "./add-run-annotations";
+import AddRunReplayUi from "./add-run-replay-ui";
 import NotificationCenter from "./add-notification-center-ui";
 import BulkActionsForRuns, { BulkAction } from "./add-bulk-actions-for-runs";
 import AddDownloadableRunArtifactBundle from "./add-downloadable-run-artifact-bundle";
@@ -1009,6 +1010,13 @@ function HomeContent() {
             {dataState === "success" && (
               <div className="mt-12 w-full">
                 <ReportGenerator availableRuns={runs} />
+              </div>
+            )}
+
+            {/* Run Replay Section */}
+            {dataState === "success" && (
+              <div className="mt-12 w-full">
+                <AddRunReplayUi runs={runs} />
               </div>
             )}
           </div>
