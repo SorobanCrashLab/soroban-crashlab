@@ -44,25 +44,11 @@ const DEFAULT_CONFIG: ReplayConfig = {
   timeoutMs: 30000,
 };
 
-const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 5 }, (_, i) => ({
-  id: `run-${1000 + i}`,
-  status: "failed",
-  area: ["auth", "state", "budget", "xdr"][i % 4] as FuzzingRun["area"],
-  severity: ["high", "critical"][i % 2] as FuzzingRun["severity"],
-  duration: 120000 + Math.random() * 3600000,
-  seedCount: Math.floor(100 + Math.random() * 900),
-  cpuInstructions: Math.floor(400000 + Math.random() * 900000),
-  memoryBytes: Math.floor(1_500_000 + Math.random() * 8_000_000),
-  minResourceFee: Math.floor(500 + Math.random() * 5000),
-  crashDetail: {
-    failureCategory: "Panic",
-    signature: `sig:${1000 + i}:contract::transfer:assert_balance_nonnegative`,
-    payload: JSON.stringify({ contract: "token", method: "transfer" }),
-    replayAction: `cargo run --bin crash-replay -- --run-id run-${1000 + i}`,
-  },
-}));
+interface AddRunReplayUiProps {
+  runs: FuzzingRun[];
+}
 
-export default function AddRunReplayUi() {
+export default function AddRunReplayUi({ runs = [] }: AddRunReplayUiProps) {
   const [selectedRun, setSelectedRun] = useState<FuzzingRun | null>(null);
   const [config, setConfig] = useState<ReplayConfig>(DEFAULT_CONFIG);
   const [progress, setProgress] = useState<ReplayProgress>({
@@ -74,7 +60,7 @@ export default function AddRunReplayUi() {
   const [replayHistory, setReplayHistory] = useState<ReplayResult[]>([]);
 
   const handleSelectRun = (runId: string) => {
-    const run = MOCK_RUNS.find((r) => r.id === runId);
+    const run = runs.find((r) => r.id === runId);
     setSelectedRun(run ?? null);
     setResult(null);
     setProgress({ status: "idle", current: 0, total: 0 });
@@ -138,7 +124,7 @@ export default function AddRunReplayUi() {
         endTime: Date.now(),
       }));
     }
-  }, [selectedRun, config, progress.startTime]);
+  }, [selectedRun, config, progress.startTime, runs]);
 
   const handleStopReplay = () => {
     setProgress((prev) => ({
@@ -153,6 +139,8 @@ export default function AddRunReplayUi() {
 
   const isReplaying = progress.status === "running";
   const canStartReplay = selectedRun && !isReplaying;
+
+  const failedRuns = runs.filter(r => r.status === 'failed');
 
   return (
     <section className="w-full rounded-[2.5rem] border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-zinc-950">
@@ -186,8 +174,8 @@ export default function AddRunReplayUi() {
                 disabled={isReplaying}
                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 focus:ring-2 focus:ring-indigo-500 outline-none transition disabled:opacity-50"
               >
-                <option value="">Choose a run...</option>
-                {MOCK_RUNS.map((run) => (
+                <option value="">Choose a failed run...</option>
+                {failedRuns.map((run) => (
                   <option key={run.id} value={run.id}>
                     {run.id} - {run.area} ({run.seedCount} seeds)
                   </option>
