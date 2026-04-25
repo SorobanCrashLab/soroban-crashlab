@@ -101,12 +101,10 @@ export default function CrossRunBoardCustomWidgets({ runs = [] }: Props) {
     handleSave([...widgets, widget]);
     setAdding(false);
     setNewLabel("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newMetric, newLabel, newColor, widgets]);
 
   const removeWidget = useCallback((id: string) => {
     handleSave(widgets.filter((w) => w.id !== id));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widgets]);
 
   const handleDragStart = (idx: number) => {
