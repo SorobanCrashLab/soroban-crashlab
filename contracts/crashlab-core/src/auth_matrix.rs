@@ -1,4 +1,5 @@
 use crate::retry::{execute_with_retry, RetryConfig, SimulationError};
+use crate::taxonomy::{stable_failure_class_for_bundle, FailureClass};
 use crate::{CaseSeed, CrashSignature};
 
 /// The three Soroban authorization modes under which a seed is exercised.
@@ -61,6 +62,14 @@ impl MatrixReport {
     /// Returns `true` when every mode produced the same signature.
     pub fn is_consistent(&self) -> bool {
         self.mismatches.is_empty()
+    }
+
+    /// Returns the FailureClass for a given mode's result, using
+    /// stable_failure_class_for_bundle for legacy-safe classification.
+    pub fn failure_class_for_mode(&self, mode: AuthMode) -> Option<FailureClass> {
+        self.results.iter().find(|r| r.mode == mode).map(|r| {
+            stable_failure_class_for_bundle(&self.seed, &r.signature)
+        })
     }
 }
 
@@ -134,6 +143,36 @@ fn compute_mismatches(results: &[ModeResult]) -> Vec<(AuthMode, AuthMode)> {
 /// whose behavior is mode-sensitive and warrant further investigation.
 pub fn collect_mismatched(reports: &[MatrixReport]) -> Vec<&MatrixReport> {
     reports.iter().filter(|r| !r.is_consistent()).collect()
+}
+
+/// Runs a batch of seeds through the matrix and returns one MatrixReport per seed.
+pub fn run_matrix_for_seeds<F>(
+    seeds: &[CaseSeed],
+    mut runner: F,
+) -> Vec<Result<MatrixReport, SimulationError>>
+where
+    F: FnMut(&CaseSeed, AuthMode) -> Result<CrashSignature, SimulationError>,
+{
+    seeds.iter().map(|seed| run_matrix(seed, &mut runner)).collect()
+}
+
+/// A human-readable mismatch summary for a MatrixReport, including FailureClass
+/// per mode for triage.
+pub fn format_mismatch_summary(report: &MatrixReport) -> String {
+    let mut parts = Vec::new();
+    for &(mode_a, mode_b) in &report.mismatches {
+        let class_a = report
+            .failure_class_for_mode(mode_a)
+            .map_or("?".to_string(), |c| c.as_str().to_string());
+        let class_b = report
+            .failure_class_for_mode(mode_b)
+            .map_or("?".to_string(), |c| c.as_str().to_string());
+        parts.push(format!(
+            "{}[{}] \u{2260} {}[{}]",
+            mode_a, class_a, mode_b, class_b
+        ));
+    }
+    format!("seed {}: {}", report.seed.id, parts.join(", "))
 }
 
 #[cfg(test)]
@@ -342,5 +381,183 @@ mod tests {
             AuthMode::RecordAllowNonroot.to_string(),
             "record_allow_nonroot"
         );
+    }
+
+    // ── run_matrix_for_seeds ──────────────────────────────────────────────────
+
+    #[test]
+    fn run_matrix_for_seeds_handles_empty_slice() {
+        let reports = run_matrix_for_seeds(&[], |_, _| Ok(sig(0)));
+        assert!(reports.is_empty());
+    }
+
+    #[test]
+    fn run_matrix_for_seeds_propagates_nontransient_error() {
+        let seeds = vec![seed(1), seed(2)];
+        let mut call_count = 0;
+        let reports = run_matrix_for_seeds(&seeds, |_, _| {
+            call_count += 1;
+            if call_count == 1 {
+                Err(SimulationError::NonTransient("fail".to_string()))
+            } else {
+                Ok(sig(0))
+            }
+        });
+
+        assert_eq!(reports.len(), 2);
+        assert!(reports[0].is_err());
+        assert!(reports[1].is_ok());
+    }
+
+    // ── boundary and malformed inputs ─────────────────────────────────────────
+
+    #[test]
+    fn empty_seed_runs_through_all_modes() {
+        let empty = CaseSeed { id: 1, payload: vec![] };
+        let report = run_matrix(&empty, |s, _| {
+            Ok(CrashSignature {
+                category: crate::taxonomy::classify_failure(s).as_str().to_string(),
+                digest: 0,
+                signature_hash: 0,
+            })
+        }).unwrap();
+        assert!(report.is_consistent());
+        assert_eq!(report.failure_class_for_mode(AuthMode::Enforce), Some(FailureClass::EmptyInput));
+    }
+
+    #[test]
+    fn oversized_seed_runs_through_all_modes() {
+        let oversized = CaseSeed { id: 2, payload: vec![0xA0; 65] };
+        let report = run_matrix(&oversized, |s, _| {
+            Ok(CrashSignature {
+                category: crate::taxonomy::classify_failure(s).as_str().to_string(),
+                digest: 0,
+                signature_hash: 0,
+            })
+        }).unwrap();
+        assert!(report.is_consistent());
+        assert_eq!(report.failure_class_for_mode(AuthMode::Record), Some(FailureClass::OversizedInput));
+    }
+
+    #[test]
+    fn invalid_enum_tag_seed_consistent_across_modes() {
+        let invalid = CaseSeed { id: 3, payload: vec![0xE0, 0xFF] };
+        let report = run_matrix(&invalid, |s, _| {
+            Ok(CrashSignature {
+                category: crate::taxonomy::classify_failure(s).as_str().to_string(),
+                digest: 0,
+                signature_hash: 0,
+            })
+        }).unwrap();
+        assert!(report.is_consistent());
+        assert_eq!(report.failure_class_for_mode(AuthMode::Enforce), Some(FailureClass::InvalidEnumTag));
+    }
+
+    #[test]
+    fn non_root_context_seed_diverges_on_enforce() {
+        let s = seed(4); // Payload: [1, 2, 3] maps to Xdr
+        let report = run_matrix(&s, |_, mode| {
+            if mode == AuthMode::Enforce {
+                Ok(CrashSignature {
+                    category: "auth".to_string(),
+                    digest: 1,
+                    signature_hash: 1,
+                })
+            } else {
+                Ok(CrashSignature {
+                    category: "xdr".to_string(),
+                    digest: 2,
+                    signature_hash: 2,
+                })
+            }
+        }).unwrap();
+        assert!(!report.is_consistent());
+        assert_eq!(report.mismatches.len(), 2);
+    }
+
+    // ── determinism and mismatch formatting ───────────────────────────────────
+
+    #[test]
+    fn determinism_test_same_seed_and_runner_yield_identical_reports() {
+        let s = seed(100);
+        let mut runner = |s: &CaseSeed, mode: AuthMode| -> Result<CrashSignature, SimulationError> {
+            let digest = s.payload.len() as u64 + (mode as u64);
+            Ok(sig(digest))
+        };
+        let report1 = run_matrix(&s, &mut runner).unwrap();
+        let report2 = run_matrix(&s, &mut runner).unwrap();
+        
+        assert_eq!(report1.mismatches, report2.mismatches);
+        for (r1, r2) in report1.results.iter().zip(report2.results.iter()) {
+            assert_eq!(r1.mode, r2.mode);
+            assert_eq!(r1.signature, r2.signature);
+        }
+    }
+
+    #[test]
+    fn mismatch_summary_formats_correctly() {
+        let s = seed(5); // Payload: [1, 2, 3] -> Xdr
+        let report = run_matrix(&s, |_, mode| {
+            match mode {
+                AuthMode::Enforce => Ok(CrashSignature {
+                    category: "auth".to_string(),
+                    digest: 1,
+                    signature_hash: 1,
+                }),
+                AuthMode::Record => Ok(CrashSignature {
+                    category: "budget".to_string(),
+                    digest: 2,
+                    signature_hash: 2,
+                }),
+                AuthMode::RecordAllowNonroot => Ok(CrashSignature {
+                    category: "xdr".to_string(),
+                    digest: 3,
+                    signature_hash: 3,
+                }),
+            }
+        }).unwrap();
+
+        let summary = format_mismatch_summary(&report);
+        assert!(summary.contains("seed 5:"));
+        assert!(summary.contains("enforce[auth] \u{2260} record[budget]"));
+        assert!(summary.contains("enforce[auth] \u{2260} record_allow_nonroot[xdr]"));
+        assert!(summary.contains("record[budget] \u{2260} record_allow_nonroot[xdr]"));
+    }
+
+    // ── cross-module integration ──────────────────────────────────────────────
+
+    #[test]
+    fn integration_fuzzer_bundle_replay() {
+        use crate::bundle_persist::{CASE_BUNDLE_SCHEMA_VERSION, save_case_bundle_json, load_case_bundle_json};
+        use crate::replay::replay_seed_bundle;
+        use crate::CaseBundle;
+
+        let s = seed(6);
+        let reports = run_matrix_for_seeds(&[s.clone()], |s, _| {
+            Ok(CrashSignature {
+                category: crate::taxonomy::classify_failure(s).as_str().to_string(),
+                digest: 99,
+                signature_hash: 99,
+            })
+        });
+        
+        let report = reports.into_iter().next().unwrap().unwrap();
+        assert!(report.is_consistent());
+        
+        let bundle = CaseBundle {
+            schema: CASE_BUNDLE_SCHEMA_VERSION,
+            seed: report.seed,
+            signature: report.results[0].signature.clone(),
+            environment: None,
+            failure_payload: vec![],
+            rpc_envelope: None,
+        };
+
+        let bytes = save_case_bundle_json(&bundle).unwrap();
+        let loaded_bundle = load_case_bundle_json(&bytes).unwrap();
+        
+        let replay_result = replay_seed_bundle(&loaded_bundle);
+        assert!(replay_result.matches);
+        assert_eq!(replay_result.expected_class, FailureClass::Xdr); // Payload [1, 2, 3] begins with 1 -> Xdr
     }
 }
