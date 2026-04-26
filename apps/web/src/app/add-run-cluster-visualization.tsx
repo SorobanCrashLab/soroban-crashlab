@@ -1,8 +1,14 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { FuzzingRun, RunStatus, RunArea, RunSeverity } from "./types";
+import { buildFailureClusters as buildFailureSignatures, describeFailureCluster } from "./failureClusters";
+
+export type RunClusterVisualizationDataState = "loading" | "error" | "success";
 
 interface RunClusterVisualizationProps {
   runs?: FuzzingRun[];
+  dataState?: RunClusterVisualizationDataState;
+  onRetry?: () => void;
+  errorMessage?: string;
   onRunSelect?: (runId: string) => void;
   showTimeline?: boolean;
   showMetrics?: boolean;
@@ -11,7 +17,7 @@ interface RunClusterVisualizationProps {
 /**
  * Represents a cluster of runs grouped by a common attribute.
  */
-interface RunCluster {
+export interface RunCluster {
   id: string;
   label: string;
   runs: FuzzingRun[];
@@ -67,65 +73,78 @@ const SEVERITY_CONFIG: Record<RunSeverity, { color: string; icon: string }> = {
 
 const colorClasses: Record<
   string,
-  { bg: string; border: string; text: string }
+  { bg: string; border: string; text: string; gradient: string }
 > = {
   blue: {
-    bg: "bg-blue-100 dark:bg-blue-900/30",
-    border: "border-blue-300 dark:border-blue-700",
+    bg: "bg-blue-50 dark:bg-blue-900/20",
+    border: "border-blue-200 dark:border-blue-800",
     text: "text-blue-700 dark:text-blue-300",
+    gradient: "from-blue-500 to-blue-400",
   },
   green: {
-    bg: "bg-green-100 dark:bg-green-900/30",
-    border: "border-green-300 dark:border-green-700",
+    bg: "bg-green-50 dark:bg-green-900/20",
+    border: "border-green-200 dark:border-green-800",
     text: "text-green-700 dark:text-green-300",
+    gradient: "from-green-500 to-green-400",
   },
   red: {
-    bg: "bg-red-100 dark:bg-red-900/30",
-    border: "border-red-300 dark:border-red-700",
+    bg: "bg-red-50 dark:bg-red-900/20",
+    border: "border-red-200 dark:border-red-800",
     text: "text-red-700 dark:text-red-300",
+    gradient: "from-red-500 to-red-400",
   },
   gray: {
-    bg: "bg-zinc-100 dark:bg-zinc-800/50",
-    border: "border-zinc-300 dark:border-zinc-600",
-    text: "text-zinc-600 dark:text-zinc-300",
+    bg: "bg-zinc-100 dark:bg-zinc-800/40",
+    border: "border-zinc-200 dark:border-zinc-700",
+    text: "text-zinc-600 dark:text-zinc-400",
+    gradient: "from-zinc-500 to-zinc-400",
   },
   purple: {
-    bg: "bg-purple-100 dark:bg-purple-900/30",
-    border: "border-purple-300 dark:border-purple-700",
+    bg: "bg-purple-50 dark:bg-purple-900/20",
+    border: "border-purple-200 dark:border-purple-800",
     text: "text-purple-700 dark:text-purple-300",
+    gradient: "from-purple-500 to-purple-400",
   },
   amber: {
-    bg: "bg-amber-100 dark:bg-amber-900/30",
-    border: "border-amber-300 dark:border-amber-700",
+    bg: "bg-amber-50 dark:bg-amber-900/20",
+    border: "border-amber-200 dark:border-amber-800",
     text: "text-amber-700 dark:text-amber-300",
+    gradient: "from-amber-500 to-amber-400",
   },
   cyan: {
-    bg: "bg-cyan-100 dark:bg-cyan-900/30",
-    border: "border-cyan-300 dark:border-cyan-700",
+    bg: "bg-cyan-50 dark:bg-cyan-900/20",
+    border: "border-cyan-200 dark:border-cyan-800",
     text: "text-cyan-700 dark:text-cyan-300",
+    gradient: "from-cyan-500 to-cyan-400",
   },
   pink: {
-    bg: "bg-pink-100 dark:bg-pink-900/30",
-    border: "border-pink-300 dark:border-pink-700",
+    bg: "bg-pink-50 dark:bg-pink-900/20",
+    border: "border-pink-200 dark:border-pink-800",
     text: "text-pink-700 dark:text-pink-300",
+    gradient: "from-pink-500 to-pink-400",
   },
   yellow: {
-    bg: "bg-yellow-100 dark:bg-yellow-900/30",
-    border: "border-yellow-300 dark:border-yellow-700",
+    bg: "bg-yellow-50 dark:bg-yellow-900/20",
+    border: "border-yellow-200 dark:border-yellow-800",
     text: "text-yellow-700 dark:text-yellow-300",
+    gradient: "from-yellow-500 to-yellow-400",
   },
   orange: {
-    bg: "bg-orange-100 dark:bg-orange-900/30",
-    border: "border-orange-300 dark:border-orange-700",
+    bg: "bg-orange-50 dark:bg-orange-900/20",
+    border: "border-orange-200 dark:border-orange-800",
     text: "text-orange-700 dark:text-orange-300",
+    gradient: "from-orange-500 to-orange-400",
   },
 };
 
-type ClusterMode = "status" | "area" | "severity" | "performance";
+type ClusterMode = "status" | "area" | "severity" | "performance" | "failure";
 type ViewMode = "grid" | "bubbles" | "timeline" | "metrics";
 
 const RunClusterVisualization: React.FC<RunClusterVisualizationProps> = ({
   runs = [],
+  dataState = "success",
+  onRetry,
+  errorMessage,
   onRunSelect,
   showTimeline = true,
   showMetrics = true,
@@ -153,6 +172,9 @@ const RunClusterVisualization: React.FC<RunClusterVisualizationProps> = ({
         break;
       case "performance":
         clustersData = buildPerformanceClusters(runsData);
+        break;
+      case "failure":
+        clustersData = buildFailureSignatureClusters(runsData);
         break;
       default:
         clustersData = [];
@@ -223,6 +245,36 @@ const RunClusterVisualization: React.FC<RunClusterVisualizationProps> = ({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  if (dataState === "loading") {
+    return (
+      <section className="run-cluster-visualization" aria-busy="true">
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-8 w-48 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-32 bg-zinc-100 dark:bg-zinc-900 animate-pulse rounded-xl" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (dataState === "error") {
+    return (
+      <section className="run-cluster-visualization p-8 border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-950/20 rounded-2xl">
+        <h2 className="text-xl font-bold text-red-900 dark:text-red-100 mb-2">Cluster Visualization Error</h2>
+        <p className="text-red-700 dark:text-red-300 mb-4">{errorMessage || "Failed to load cluster data."}</p>
+        <button
+          onClick={onRetry}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold shadow-sm"
+        >
+          Retry Diagnostics
+        </button>
+      </section>
+    );
+  }
+
   if (clusters.length === 0) {
     return (
       <section
@@ -288,6 +340,12 @@ const RunClusterVisualization: React.FC<RunClusterVisualizationProps> = ({
               onClick={() => setClusterMode("performance")}
             >
               Performance
+            </ClusterModeButton>
+            <ClusterModeButton
+              active={clusterMode === "failure"}
+              onClick={() => setClusterMode("failure")}
+            >
+              Failures
             </ClusterModeButton>
           </div>
 
@@ -474,35 +532,59 @@ const ClusterCard: React.FC<{
 
   return (
     <div
-      className={`rounded-xl p-4 border transition-all cursor-pointer ${colors.bg} ${
+      className={`relative group rounded-2xl p-5 border transition-all duration-300 cursor-pointer overflow-hidden ${colors.bg} ${
         isSelected
-          ? `${colors.border} ring-2 ring-blue-500 dark:ring-blue-400`
-          : `${colors.border} hover:shadow-md hover:scale-105`
+          ? `${colors.border} ring-2 ring-blue-500 dark:ring-blue-400 shadow-lg scale-[1.02]`
+          : `${colors.border} hover:shadow-xl hover:-translate-y-1`
       }`}
       onClick={onClick}
     >
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-lg" aria-hidden="true">
-          {cluster.icon}
-        </span>
-        <span className={`text-sm font-medium ${colors.text}`}>
-          {cluster.label}
-        </span>
+      {/* Decorative background gradient */}
+      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${colors.gradient} opacity-5 -mr-10 -mt-10 rounded-full blur-2xl group-hover:opacity-10 transition-opacity`} />
+      
+      <div className="flex items-center justify-between mb-4">
+        <div className={`flex items-center gap-2.5 px-2.5 py-1 rounded-full bg-white/50 dark:bg-black/20 border ${colors.border}`}>
+          <span className="text-lg leading-none" aria-hidden="true">
+            {cluster.icon}
+          </span>
+          <span className={`text-xs font-bold uppercase tracking-wider ${colors.text}`}>
+            {cluster.label}
+          </span>
+        </div>
+        {isSelected && (
+          <div className="h-2 w-2 rounded-full bg-blue-500 animate-ping" />
+        )}
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-end justify-between">
-          <p className={`text-2xl font-bold ${colors.text}`}>
+      <div className="relative z-10 space-y-3">
+        <div className="flex items-baseline justify-between">
+          <p className={`text-3xl font-black ${colors.text}`}>
             {cluster.runs.length}
           </p>
-          <span className="text-xs opacity-70">{percentage}%</span>
+          <div className="flex flex-col items-end">
+             <span className="text-xs font-bold opacity-60">{percentage}%</span>
+             <span className="text-[10px] uppercase font-bold opacity-40">of total</span>
+          </div>
         </div>
 
-        {cluster.avgDuration && (
-          <div className="text-xs opacity-75">
-            <div>Avg: {Math.round(cluster.avgDuration / 1000 / 60)}m</div>
+        <div className="h-1.5 w-full bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
+          <div 
+            className={`h-full bg-gradient-to-r ${colors.gradient} transition-all duration-1000`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+
+        {cluster.avgDuration !== undefined && (
+          <div className="flex items-center justify-between text-[11px] font-bold opacity-70">
+            <div className="flex items-center gap-1">
+              <span>⏱️</span>
+              <span>{Math.round(cluster.avgDuration / 1000 / 60)}m avg</span>
+            </div>
             {cluster.failureRate !== undefined && (
-              <div>Failures: {cluster.failureRate.toFixed(1)}%</div>
+              <div className={`flex items-center gap-1 ${cluster.failureRate > 20 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                <span>⚠️</span>
+                <span>{cluster.failureRate.toFixed(1)}% fails</span>
+              </div>
             )}
           </div>
         )}
@@ -525,19 +607,26 @@ const ClusterBubble: React.FC<{
 
   return (
     <div
-      className={`flex flex-col items-center justify-center rounded-full border-2 transition-all cursor-pointer animate-pulse ${colors.bg} ${
+      className={`flex flex-col items-center justify-center rounded-full border-2 transition-all duration-500 cursor-pointer hover:shadow-2xl active:scale-95 ${colors.bg} ${
         isSelected
-          ? "ring-4 ring-blue-500 dark:ring-blue-400 scale-110"
+          ? "ring-4 ring-blue-500/50 dark:ring-blue-400/50 scale-110 shadow-2xl border-white dark:border-zinc-800"
           : `${colors.border} hover:scale-110`
       }`}
-      style={{ width: size, height: size, animationDuration: "2s", ...style }}
+      style={{ 
+        width: size, 
+        height: size, 
+        animation: "float 6s ease-in-out infinite",
+        animationDelay: style?.animationDelay || "0ms",
+        boxShadow: isSelected ? `0 0 20px ${cluster.color === 'gray' ? 'rgba(0,0,0,0.2)' : 'rgba(59,130,246,0.3)'}` : 'none',
+        ...style 
+      }}
       title={`${cluster.label}: ${cluster.runs.length} runs`}
       onClick={onClick}
     >
-      <span className={`text-sm font-bold ${colors.text}`}>
+      <span className={`text-lg font-black tracking-tighter ${colors.text}`}>
         {cluster.runs.length}
       </span>
-      <span className="text-xs opacity-75">{cluster.icon}</span>
+      <span className="text-[10px] font-bold opacity-60 uppercase">{cluster.icon}</span>
     </div>
   );
 };
@@ -545,7 +634,7 @@ const ClusterBubble: React.FC<{
 /**
  * Build clusters grouped by status.
  */
-function buildStatusClusters(runs: FuzzingRun[]): RunCluster[] {
+export function buildStatusClusters(runs: FuzzingRun[]): RunCluster[] {
   const statuses: RunStatus[] = ["running", "completed", "failed", "cancelled"];
 
   return statuses
@@ -588,7 +677,7 @@ function buildStatusClusters(runs: FuzzingRun[]): RunCluster[] {
 /**
  * Build clusters grouped by area.
  */
-function buildAreaClusters(runs: FuzzingRun[]): RunCluster[] {
+export function buildAreaClusters(runs: FuzzingRun[]): RunCluster[] {
   const areas: RunArea[] = ["auth", "state", "budget", "xdr"];
 
   return areas
@@ -631,7 +720,7 @@ function buildAreaClusters(runs: FuzzingRun[]): RunCluster[] {
 /**
  * Build clusters grouped by severity.
  */
-function buildSeverityClusters(runs: FuzzingRun[]): RunCluster[] {
+export function buildSeverityClusters(runs: FuzzingRun[]): RunCluster[] {
   const severities: RunSeverity[] = ["low", "medium", "high", "critical"];
 
   return severities
@@ -674,7 +763,7 @@ function buildSeverityClusters(runs: FuzzingRun[]): RunCluster[] {
 /**
  * Build clusters grouped by performance characteristics.
  */
-function buildPerformanceClusters(runs: FuzzingRun[]): RunCluster[] {
+export function buildPerformanceClusters(runs: FuzzingRun[]): RunCluster[] {
   if (runs.length === 0) return [];
 
   const avgDuration =
@@ -733,6 +822,38 @@ function buildPerformanceClusters(runs: FuzzingRun[]): RunCluster[] {
           cluster.runs.length) *
         100,
     }));
+}
+
+/**
+ * Build clusters grouped by failure signatures.
+ */
+/**
+ * Build clusters grouped by failure signatures.
+ */
+export function buildFailureSignatureClusters(runs: FuzzingRun[]): RunCluster[] {
+  const failureClusters = buildFailureSignatures(runs);
+
+  return failureClusters.map((fc) => ({
+    id: fc.id,
+    label: fc.failureCategory,
+    runs: runs.filter((r) => fc.relatedRunIds.includes(r.id)),
+    color: SEVERITY_CONFIG[fc.severity].color,
+    icon: SEVERITY_CONFIG[fc.severity].icon,
+    avgDuration: 0, // Could be computed if needed
+    avgCpuInstructions: 0,
+    avgMemoryBytes: 0,
+    failureRate: 100,
+  })).map(cluster => {
+    // Fill in metrics
+    if (cluster.runs.length === 0) return cluster;
+    
+    return {
+      ...cluster,
+      avgDuration: cluster.runs.reduce((sum, r) => sum + r.duration, 0) / cluster.runs.length,
+      avgCpuInstructions: cluster.runs.reduce((sum, r) => sum + r.cpuInstructions, 0) / cluster.runs.length,
+      avgMemoryBytes: cluster.runs.reduce((sum, r) => sum + r.memoryBytes, 0) / cluster.runs.length,
+    };
+  });
 }
 
 /**
@@ -1080,7 +1201,7 @@ const ClusterDetails: React.FC<{
 /**
  * Build mock cluster data when no runs are provided.
  */
-function buildMockClusters(seed = 123456): FuzzingRun[] {
+export function buildMockClusters(seed = 123456): FuzzingRun[] {
   // Deterministic PRNG (mulberry32) so server and client generate the
   // same mock data and avoid hydration mismatches.
   function mulberry32(a: number) {
@@ -1094,18 +1215,29 @@ function buildMockClusters(seed = 123456): FuzzingRun[] {
 
   const rng = mulberry32(seed);
 
-  return Array.from({ length: 25 }, (_, i) => ({
-    id: `run-${1000 + i}`,
-    status: ["running", "completed", "failed", "cancelled"][i % 4] as RunStatus,
-    area: ["auth", "state", "budget", "xdr"][i % 4] as RunArea,
-    severity: ["low", "medium", "high", "critical"][i % 4] as RunSeverity,
-    duration: Math.round(120000 + rng() * 3600000),
-    seedCount: Math.floor(10000 + rng() * 90000),
-    crashDetail: null,
-    cpuInstructions: Math.floor(400000 + rng() * 900000),
-    memoryBytes: Math.floor(1_500_000 + rng() * 8_000_000),
-    minResourceFee: Math.floor(500 + rng() * 5000),
-  }));
+  return Array.from({ length: 25 }, (_, i) => {
+    const status = ["running", "completed", "failed", "cancelled"][i % 4] as RunStatus;
+    const area = ["auth", "state", "budget", "xdr"][i % 4] as RunArea;
+    const severity = ["low", "medium", "high", "critical"][i % 4] as RunSeverity;
+    
+    return {
+      id: `run-${1000 + i}`,
+      status,
+      area,
+      severity,
+      duration: Math.round(120000 + rng() * 3600000),
+      seedCount: Math.floor(10000 + rng() * 90000),
+      crashDetail: status === "failed" ? {
+        failureCategory: area.charAt(0).toUpperCase() + area.slice(1),
+        signature: `sig:${1000 + i}:${area}::crash`,
+        payload: "{}",
+        replayAction: "cargo run",
+      } : null,
+      cpuInstructions: Math.floor(400000 + rng() * 900000),
+      memoryBytes: Math.floor(1_500_000 + rng() * 8_000_000),
+      minResourceFee: Math.floor(500 + rng() * 5000),
+    };
+  });
 }
 
 export default RunClusterVisualization;

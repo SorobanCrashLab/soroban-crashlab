@@ -1052,6 +1052,9 @@ function HomeContent() {
           <div className="mb-12 w-full">
             <RunClusterVisualization
               runs={filteredRuns}
+              dataState={dataState}
+              onRetry={() => setFetchAttempt((n) => n + 1)}
+              errorMessage="Cluster visualization diagnostics are temporarily unavailable."
               onRunSelect={handleOpenRunDrawer}
               showTimeline={true}
               showMetrics={true}
