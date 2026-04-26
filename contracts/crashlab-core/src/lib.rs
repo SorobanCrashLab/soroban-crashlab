@@ -6,7 +6,10 @@ pub mod retry;
 pub mod signature_hash;
 pub mod taxonomy;
 
-pub use auth_matrix::{AuthMode, MatrixReport, ModeResult, collect_mismatched, run_matrix};
+pub use auth_matrix::{
+    AuthMode, MatrixReport, ModeResult, collect_mismatched, format_mismatch_summary, run_matrix,
+    run_matrix_for_seeds,
+};
 pub use health::{
     FailureMetrics, HealthMonitor, HealthStatus, HealthSummary, QueueMetrics, ThroughputMetrics,
 };
