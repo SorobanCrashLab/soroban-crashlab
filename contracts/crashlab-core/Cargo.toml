@@ -18,3 +18,7 @@ path = "src/bin/export-corpus.rs"
 [[bin]]
 name = "import-corpus"
 path = "src/bin/import-corpus.rs"
+
+[[bin]]
+name = "check-fixtures"
+path = "src/bin/check-fixtures.rs"

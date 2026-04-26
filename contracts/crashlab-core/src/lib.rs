@@ -69,7 +69,10 @@ pub use artifact_storage::{
 };
 
 pub mod fixture_compat;
-pub use fixture_compat::{CompatReport, CompatWarning, check_bundle_fixtures, check_seed_fixtures};
+pub use fixture_compat::{
+    CompatReport, CompatWarning, check_bundle_fixtures, check_bundle_signature_hashes,
+    check_manifest_engine_schema, check_seed_fixtures, check_seed_sanitization,
+};
 
 pub mod fixture_manifest;
 pub use fixture_manifest::{
