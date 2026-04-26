@@ -95,9 +95,13 @@ pub use signature_comparison::{
 
 pub mod fixture_sanitize;
 pub use fixture_sanitize::{
-    export_sanitized_scenario_json, sanitize_bundle_document_for_sharing,
-    sanitize_bundle_for_sharing, sanitize_payload_fragments, sanitize_seed_for_sharing,
+    export_sanitized_scenario_json, export_sanitized_suite_json,
+    sanitize_and_validate_bundle, sanitize_bundle_document_for_sharing,
+    sanitize_bundle_for_sharing, sanitize_bundle_with_context, sanitize_payload_fragments,
+    sanitize_payload_with_context, sanitize_seed_for_sharing, sanitize_seed_with_context,
     sanitized_failure_scenario, save_sanitized_case_bundle_json,
+    RedactionStrategy, SanitizationContext, SanitizationError, SanitizationReport,
+    SanitizationRule,
 };
 
 pub mod checkpoint;
