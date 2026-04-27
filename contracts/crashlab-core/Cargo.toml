@@ -22,3 +22,11 @@ path = "src/bin/import-corpus.rs"
 [[bin]]
 name = "check-fixtures"
 path = "src/bin/check-fixtures.rs"
+
+[[bin]]
+name = "lint-fixtures"
+path = "src/bin/lint-fixtures.rs"
+
+[[bin]]
+name = "crash-index"
+path = "src/bin/crash-index.rs"

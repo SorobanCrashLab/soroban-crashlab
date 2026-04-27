@@ -230,4 +230,49 @@ mod tests {
         let b = generate_container_stress_grid(100, &cfg);
         assert_eq!(a, b);
     }
+
+    #[test]
+    fn fixed_vec_size_when_min_equals_max() {
+        // When min == max there is exactly one valid vec size.
+        let cfg = ContainerStressConfig::new(7, 7, 0, 10);
+        let m = ContainerStressMutator::new(cfg);
+        let seed = CaseSeed { id: 3, payload: vec![0u8; 8] };
+        for r in 0..40u64 {
+            let mut rng = r;
+            let out = m.mutate(&seed, &mut rng);
+            if out.payload[0] == 0xD0 {
+                let vec_sz = u64::from_le_bytes(out.payload[1..9].try_into().unwrap());
+                assert_eq!(vec_sz, 7, "vec size must be exactly 7 when min==max");
+            }
+        }
+    }
+
+    #[test]
+    fn fixed_map_size_when_min_equals_max() {
+        let cfg = ContainerStressConfig::new(0, 5, 13, 13);
+        let m = ContainerStressMutator::new(cfg);
+        let seed = CaseSeed { id: 8, payload: vec![0u8; 8] };
+        for r in 0..40u64 {
+            let mut rng = r.wrapping_mul(0xDEAD);
+            let out = m.mutate(&seed, &mut rng);
+            if out.payload[0] == 0xD1 {
+                let map_sz = u64::from_le_bytes(out.payload[1..9].try_into().unwrap());
+                assert_eq!(map_sz, 13, "map size must be exactly 13 when min==max");
+            }
+        }
+    }
+
+    #[test]
+    fn zero_max_clamps_to_zero() {
+        // Both vec and map max are 0; all sizes must be 0.
+        let cfg = ContainerStressConfig::new(0, 0, 0, 0);
+        let m = ContainerStressMutator::new(cfg);
+        let seed = CaseSeed { id: 1, payload: vec![0xAA; 4] };
+        for r in 0..20u64 {
+            let mut rng = r;
+            let out = m.mutate(&seed, &mut rng);
+            let primary = u64::from_le_bytes(out.payload[1..9].try_into().unwrap());
+            assert_eq!(primary, 0, "primary size must be 0 when max is 0");
+        }
+    }
 }
