@@ -5,6 +5,10 @@ pub mod reproducer;
 pub mod retry;
 pub mod signature_hash;
 pub mod taxonomy;
+pub mod regression_group;
+pub mod fixture;
+pub mod fixture_classifier;
+pub mod suite_runner;
 
 pub use auth_matrix::{
     AuthMode, MatrixReport, ModeResult, collect_mismatched, format_mismatch_summary, run_matrix,
@@ -23,6 +27,10 @@ pub use signature_hash::{SignatureHasher, hash_category_payload};
 pub use taxonomy::{
     FailureClass, classify_failure, group_by_class, stable_failure_class_for_bundle,
 };
+pub use regression_group::RegressionGroup;
+pub use fixture::RegressionFixture;
+pub use fixture_classifier::{classify_fixture, classify_and_wrap_fixture};
+pub use suite_runner::{GroupSummary, GroupStats, SuiteRunnerConfig};
 
 pub mod seed_validator;
 pub use seed_validator::{SeedSchema, SeedValidationError, Validate};

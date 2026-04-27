@@ -191,7 +191,7 @@ mod tests {
         CrashSignature {
             category: "runtime-failure".to_string(),
             digest,
-            signature_hash: 0,
+            signature_hash: digest.wrapping_mul(31),
         }
     }
 

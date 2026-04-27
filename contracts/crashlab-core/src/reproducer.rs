@@ -285,18 +285,16 @@ mod tests {
         let detector = FlakyDetector::new(4, 0.6);
         let counter = Cell::new(0u32);
 
-        let report = detector
-            .check(&bundle, |_| {
-                let n = counter.get();
-                counter.set(n + 1);
-                // Even calls reproduce correctly; odd calls diverge → 2/4 stable.
-                if n % 2 == 0 {
-                    Ok(bundle.signature.clone())
-                } else {
-                    Ok(divergent_sig())
-                }
-            })
-            .unwrap();
+        let report = detector.check(&bundle, |_| {
+            let n = counter.get();
+            counter.set(n + 1);
+            // Even calls reproduce correctly; odd calls diverge → 2/4 stable.
+            if n % 2 == 0 {
+                Ok(bundle.signature.clone())
+            } else {
+                Ok(divergent_sig())
+            }
+        }).unwrap();
 
         assert_eq!(report.stable_count, 2);
         assert!((report.flake_rate - 0.5).abs() < f64::EPSILON);
