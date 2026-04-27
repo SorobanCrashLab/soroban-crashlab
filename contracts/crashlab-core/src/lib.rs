@@ -124,6 +124,11 @@ pub use corpus::{
     export_corpus_json, import_corpus_json,
 };
 
+pub mod corpus_import;
+pub use corpus_import::{
+    CorpusImportError, CorpusImportResult, import_seeds, import_seeds_with_schema,
+};
+
 pub mod retention;
 pub use retention::{RetentionPolicy, RetentionRecord};
 

@@ -79,12 +79,33 @@ fn validate_seeds(seeds: &[CaseSeed]) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    // =====================================================================
+    // Parse Tests: Archive Documents and Raw Seed Arrays
+    // =====================================================================
+
     #[test]
     fn parse_accepts_archive_document() {
         let raw = r#"{"schema":1,"seeds":[{"id":1,"payload":[1,2,3]}]}"#;
         let seeds = parse_seeds(raw.as_bytes()).expect("archive should parse");
         assert_eq!(seeds.len(), 1);
         assert_eq!(seeds[0].id, 1);
+        assert_eq!(seeds[0].payload, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn parse_accepts_raw_seed_array() {
+        let raw = r#"[{"id":1,"payload":[1,2,3]},{"id":2,"payload":[4,5,6]}]"#;
+        let seeds = parse_seeds(raw.as_bytes()).expect("seed array should parse");
+        assert_eq!(seeds.len(), 2);
+        assert_eq!(seeds[0].id, 1);
+        assert_eq!(seeds[1].id, 2);
+    }
+
+    #[test]
+    fn parse_accepts_archive_with_multiple_seeds() {
+        let raw = r#"{"schema":1,"seeds":[{"id":10,"payload":[1]},{"id":20,"payload":[2,3]},{"id":30,"payload":[4,5,6]}]}"#;
+        let seeds = parse_seeds(raw.as_bytes()).expect("archive should parse");
+        assert_eq!(seeds.len(), 3);
     }
 
     #[test]
@@ -92,6 +113,57 @@ mod tests {
         let err = parse_seeds(br#"{"schema":1,"seeds":[{"id":"bad"}]}"#)
             .expect_err("malformed input must fail");
         assert!(err.contains("malformed seed input"));
+    }
+
+    #[test]
+    fn parse_rejects_invalid_json() {
+        let err = parse_seeds(br#"this is not json"#)
+            .expect_err("invalid JSON must fail");
+        assert!(err.contains("malformed seed input"));
+    }
+
+    #[test]
+    fn parse_rejects_empty_input() {
+        let err = parse_seeds(br#""#).expect_err("empty input must fail");
+        assert!(err.contains("empty input"));
+    }
+
+    #[test]
+    fn parse_rejects_missing_id_field() {
+        let raw = r#"[{"payload":[1,2,3]}]"#;
+        let err = parse_seeds(raw.as_bytes())
+            .expect_err("missing id field must fail");
+        assert!(err.contains("malformed seed input"));
+    }
+
+    #[test]
+    fn parse_rejects_missing_payload_field() {
+        let raw = r#"[{"id":1}]"#;
+        let err = parse_seeds(raw.as_bytes())
+            .expect_err("missing payload field must fail");
+        assert!(err.contains("malformed seed input"));
+    }
+
+    // =====================================================================
+    // Validation Tests: Boundary Conditions and Edge Cases
+    // =====================================================================
+
+    #[test]
+    fn validation_accepts_seed_at_minimum_bounds() {
+        let seeds = vec![CaseSeed {
+            id: 0,           // min_id
+            payload: vec![1], // min_payload_len = 1
+        }];
+        assert!(validate_seeds(&seeds).is_ok());
+    }
+
+    #[test]
+    fn validation_accepts_seed_at_maximum_bounds() {
+        let seeds = vec![CaseSeed {
+            id: u64::MAX,                     // max_id
+            payload: vec![0u8; 64],           // max_payload_len = 64
+        }];
+        assert!(validate_seeds(&seeds).is_ok());
     }
 
     #[test]
@@ -107,7 +179,19 @@ mod tests {
     }
 
     #[test]
-    fn validation_accepts_valid_seed_set_and_reports_count() {
+    fn validation_rejects_seed_with_payload_exceeding_max() {
+        let seeds = vec![CaseSeed {
+            id: 1,
+            payload: vec![0u8; 65], // exceeds max_payload_len = 64
+        }];
+
+        let err = validate_seeds(&seeds).expect_err("payload too long should fail");
+        assert!(err.contains("invalid seed at index 0"));
+        assert!(err.contains("payload too long"));
+    }
+
+    #[test]
+    fn validation_accepts_multiple_valid_seeds() {
         let seeds = vec![
             CaseSeed {
                 id: 1,
@@ -117,8 +201,80 @@ mod tests {
                 id: 2,
                 payload: vec![1, 2, 3],
             },
+            CaseSeed {
+                id: 100,
+                payload: vec![0u8; 64],
+            },
         ];
 
+        assert!(validate_seeds(&seeds).is_ok());
+    }
+
+    #[test]
+    fn validation_accepts_seeds_with_duplicate_ids() {
+        // Duplicate IDs are allowed (they may be intended for corpus merging)
+        let seeds = vec![
+            CaseSeed {
+                id: 1,
+                payload: vec![1, 2],
+            },
+            CaseSeed {
+                id: 1,
+                payload: vec![3, 4],
+            },
+        ];
+
+        assert!(validate_seeds(&seeds).is_ok());
+    }
+
+    #[test]
+    fn validation_rejects_on_first_invalid_seed() {
+        let seeds = vec![
+            CaseSeed {
+                id: 1,
+                payload: vec![1],
+            },
+            CaseSeed {
+                id: 2,
+                payload: vec![], // This one is invalid
+            },
+            CaseSeed {
+                id: 3,
+                payload: vec![1],
+            },
+        ];
+
+        let err = validate_seeds(&seeds).expect_err("validation should fail");
+        assert!(err.contains("invalid seed at index 1"));
+    }
+
+    #[test]
+    fn validation_reports_seed_id_in_error() {
+        let seeds = vec![CaseSeed {
+            id: 99,
+            payload: vec![],
+        }];
+
+        let err = validate_seeds(&seeds).expect_err("validation should fail");
+        assert!(err.contains("id=99"));
+    }
+
+    // =====================================================================
+    // Integration Tests
+    // =====================================================================
+
+    #[test]
+    fn roundtrip_archive_document_parse_and_validate() {
+        let raw = r#"{"schema":1,"seeds":[{"id":42,"payload":[1,2,3,4,5]}]}"#;
+        let seeds = parse_seeds(raw.as_bytes()).expect("parse should succeed");
+        assert!(validate_seeds(&seeds).is_ok());
+        assert_eq!(seeds[0].id, 42);
+    }
+
+    #[test]
+    fn roundtrip_raw_array_parse_and_validate() {
+        let raw = r#"[{"id":1,"payload":[1]},{"id":2,"payload":[2,3]}]"#;
+        let seeds = parse_seeds(raw.as_bytes()).expect("parse should succeed");
         assert!(validate_seeds(&seeds).is_ok());
         assert_eq!(seeds.len(), 2);
     }
