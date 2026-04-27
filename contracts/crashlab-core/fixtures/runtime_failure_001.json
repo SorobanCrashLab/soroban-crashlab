@@ -1,0 +1,6 @@
+{
+  "seed_id": 42,
+  "input_payload": "010203",
+  "mode": "invoker",
+  "failure_class": "runtime-failure"
+}

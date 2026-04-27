@@ -8,6 +8,12 @@ import {
   validateResult,
   RegressionDeployScenario,
   RegressionDeployIntegrationResult,
+  parseRegressionOutput,
+  validateRegressionConfig,
+  formatRegressionSummary,
+  shouldBlockDeployment,
+  CIRegressionConfig,
+  RegressionSuiteResult,
 } from './integrate-automated-regression-deploy-integration-utils';
 
 function assert(condition: boolean, message: string): void {
@@ -157,11 +163,201 @@ function testValidateResult_negativeDuration(): void {
   console.log('✓ testValidateResult_negativeDuration passed');
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// CI Regression Integration Tests (Issue #404)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── parseRegressionOutput ─────────────────────────────────────────────────────
+
+function testParseRegressionOutput_allPassed(): void {
+  const output = `::group::Regression Suite Results
+Total: 3
+Passed: 3
+Failed: 0
+::endgroup::
+
+✅ All regression tests passed!`;
+
+  const result = parseRegressionOutput(output);
+  assert(result.total === 3, 'total should be 3');
+  assert(result.passed === 3, 'passed should be 3');
+  assert(result.failed === 0, 'failed should be 0');
+  assert(result.allPassed, 'allPassed should be true');
+  assert(result.failures.length === 0, 'failures should be empty');
+  console.log('✓ testParseRegressionOutput_allPassed passed');
+}
+
+function testParseRegressionOutput_withFailures(): void {
+  const output = `::group::Regression Suite Results
+Total: 5
+Passed: 3
+Failed: 2
+::endgroup::
+
+Failed test cases:
+::error::Seed 99 (invoker): expected wrong-class, got runtime-failure
+::error::Seed 42 (contract): expected auth, got budget`;
+
+  const result = parseRegressionOutput(output);
+  assert(result.total === 5, 'total should be 5');
+  assert(result.passed === 3, 'passed should be 3');
+  assert(result.failed === 2, 'failed should be 2');
+  assert(!result.allPassed, 'allPassed should be false');
+  assert(result.failures.length === 2, 'should have 2 failures');
+  assert(result.failures[0].seedId === 99, 'first failure seed should be 99');
+  assert(result.failures[0].expected === 'wrong-class', 'first failure expected should be wrong-class');
+  assert(result.failures[0].actual === 'runtime-failure', 'first failure actual should be runtime-failure');
+  assert(result.failures[1].seedId === 42, 'second failure seed should be 42');
+  console.log('✓ testParseRegressionOutput_withFailures passed');
+}
+
+function testParseRegressionOutput_withError(): void {
+  const output = `::group::Regression Suite Results
+Total: 1
+Passed: 0
+Failed: 1
+::endgroup::
+
+Failed test cases:
+::error::Seed 123 (none): invalid input_payload hex: invalid character`;
+
+  const result = parseRegressionOutput(output);
+  assert(result.total === 1, 'total should be 1');
+  assert(result.failed === 1, 'failed should be 1');
+  assert(result.failures.length === 1, 'should have 1 failure');
+  assert(result.failures[0].seedId === 123, 'failure seed should be 123');
+  assert(result.failures[0].error !== undefined, 'failure should have error message');
+  console.log('✓ testParseRegressionOutput_withError passed');
+}
+
+function testParseRegressionOutput_emptyOutput(): void {
+  const result = parseRegressionOutput('');
+  assert(result.total === 0, 'total should be 0');
+  assert(result.passed === 0, 'passed should be 0');
+  assert(result.failed === 0, 'failed should be 0');
+  assert(!result.allPassed, 'allPassed should be false when total is 0');
+  console.log('✓ testParseRegressionOutput_emptyOutput passed');
+}
+
+// ── validateRegressionConfig ──────────────────────────────────────────────────
+
+function testValidateRegressionConfig_valid(): void {
+  const config: CIRegressionConfig = {
+    fixturePath: 'fixtures/',
+    gitRef: 'main',
+    environment: 'staging',
+  };
+  const result = validateRegressionConfig(config);
+  assert(result.isValid, 'valid config should pass');
+  assert(result.errors.length === 0, 'valid config should have no errors');
+  console.log('✓ testValidateRegressionConfig_valid passed');
+}
+
+function testValidateRegressionConfig_missingFixturePath(): void {
+  const config: CIRegressionConfig = {
+    fixturePath: '',
+    gitRef: 'main',
+    environment: 'staging',
+  };
+  const result = validateRegressionConfig(config);
+  assert(!result.isValid, 'missing fixturePath should be invalid');
+  assert(result.errors.includes('fixturePath is required'), 'should flag missing fixturePath');
+  console.log('✓ testValidateRegressionConfig_missingFixturePath passed');
+}
+
+function testValidateRegressionConfig_missingGitRef(): void {
+  const config: CIRegressionConfig = {
+    fixturePath: 'fixtures/',
+    gitRef: '',
+    environment: 'staging',
+  };
+  const result = validateRegressionConfig(config);
+  assert(!result.isValid, 'missing gitRef should be invalid');
+  assert(result.errors.includes('gitRef is required'), 'should flag missing gitRef');
+  console.log('✓ testValidateRegressionConfig_missingGitRef passed');
+}
+
+function testValidateRegressionConfig_invalidTimeout(): void {
+  const config: CIRegressionConfig = {
+    fixturePath: 'fixtures/',
+    gitRef: 'main',
+    environment: 'staging',
+    timeoutSeconds: -1,
+  };
+  const result = validateRegressionConfig(config);
+  assert(!result.isValid, 'negative timeout should be invalid');
+  assert(result.errors.some(e => e.includes('timeoutSeconds')), 'should flag invalid timeout');
+  console.log('✓ testValidateRegressionConfig_invalidTimeout passed');
+}
+
+// ── formatRegressionSummary ───────────────────────────────────────────────────
+
+function testFormatRegressionSummary_allPassed(): void {
+  const result: RegressionSuiteResult = {
+    total: 10,
+    passed: 10,
+    failed: 0,
+    failures: [],
+    allPassed: true,
+  };
+  const summary = formatRegressionSummary(result);
+  assert(summary.includes('✅'), 'summary should include success emoji');
+  assert(summary.includes('10'), 'summary should include total count');
+  assert(summary.includes('passed'), 'summary should mention passed');
+  console.log('✓ testFormatRegressionSummary_allPassed passed');
+}
+
+function testFormatRegressionSummary_withFailures(): void {
+  const result: RegressionSuiteResult = {
+    total: 5,
+    passed: 3,
+    failed: 2,
+    failures: [
+      { seedId: 99, mode: 'invoker', expected: 'auth', actual: 'budget' },
+      { seedId: 42, mode: 'contract', expected: 'state', error: 'invalid hex' },
+    ],
+    allPassed: false,
+  };
+  const summary = formatRegressionSummary(result);
+  assert(summary.includes('❌'), 'summary should include failure emoji');
+  assert(summary.includes('2 of 5'), 'summary should include failure ratio');
+  assert(summary.includes('Seed 99'), 'summary should include first failure');
+  assert(summary.includes('Seed 42'), 'summary should include second failure');
+  console.log('✓ testFormatRegressionSummary_withFailures passed');
+}
+
+// ── shouldBlockDeployment ─────────────────────────────────────────────────────
+
+function testShouldBlockDeployment_allPassed(): void {
+  const result: RegressionSuiteResult = {
+    total: 10,
+    passed: 10,
+    failed: 0,
+    failures: [],
+    allPassed: true,
+  };
+  assert(!shouldBlockDeployment(result), 'should not block when all passed');
+  console.log('✓ testShouldBlockDeployment_allPassed passed');
+}
+
+function testShouldBlockDeployment_withFailures(): void {
+  const result: RegressionSuiteResult = {
+    total: 10,
+    passed: 9,
+    failed: 1,
+    failures: [{ seedId: 99, mode: 'invoker', expected: 'auth', actual: 'budget' }],
+    allPassed: false,
+  };
+  assert(shouldBlockDeployment(result), 'should block when any test fails');
+  console.log('✓ testShouldBlockDeployment_withFailures passed');
+}
+
 // ── Runner ────────────────────────────────────────────────────────────────────
 
 function runAllTests(): void {
   console.log('Running Automated Regression Deploy Integration Utils Tests...\n');
   try {
+    // Original tests
     testIsBusyStage();
     testIsTerminalStage();
     testStageStepIndex();
@@ -173,6 +369,21 @@ function runAllTests(): void {
     testValidateResult_passedExceedsScheduled();
     testValidateResult_missingDeploymentId();
     testValidateResult_negativeDuration();
+
+    // CI Regression Integration tests (Issue #404)
+    testParseRegressionOutput_allPassed();
+    testParseRegressionOutput_withFailures();
+    testParseRegressionOutput_withError();
+    testParseRegressionOutput_emptyOutput();
+    testValidateRegressionConfig_valid();
+    testValidateRegressionConfig_missingFixturePath();
+    testValidateRegressionConfig_missingGitRef();
+    testValidateRegressionConfig_invalidTimeout();
+    testFormatRegressionSummary_allPassed();
+    testFormatRegressionSummary_withFailures();
+    testShouldBlockDeployment_allPassed();
+    testShouldBlockDeployment_withFailures();
+
     console.log('\n✅ All Automated Regression Deploy Integration utils tests passed!');
   } catch (error) {
     console.error('\n❌ Test failed:', error);

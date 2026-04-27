@@ -114,3 +114,197 @@ export function validateResult(result: RegressionDeployIntegrationResult): Resul
   if (!result.deployedArtifactDigest) errors.push('deployedArtifactDigest is required');
   return { isValid: errors.length === 0, errors };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CI Regression Integration (Issue #404)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Configuration for the CI regression job.
+ */
+export interface CIRegressionConfig {
+  /** Path to the fixtures directory or file */
+  fixturePath: string;
+  /** Git reference (branch or commit SHA) */
+  gitRef: string;
+  /** Deployment environment (e.g., 'staging', 'production') */
+  environment: string;
+  /** Optional: comma-separated list of regression groups to run */
+  groups?: string;
+  /** Optional: timeout in seconds (default: 300) */
+  timeoutSeconds?: number;
+}
+
+/**
+ * Parsed result from the regression suite CLI output.
+ */
+export interface RegressionSuiteResult {
+  /** Total number of test cases */
+  total: number;
+  /** Number of passing tests */
+  passed: number;
+  /** Number of failing tests */
+  failed: number;
+  /** Individual test case failures */
+  failures: RegressionFailure[];
+  /** Whether all tests passed */
+  allPassed: boolean;
+}
+
+/**
+ * Details of a single regression test failure.
+ */
+export interface RegressionFailure {
+  /** Seed ID that failed */
+  seedId: number;
+  /** Execution mode */
+  mode: string;
+  /** Expected failure class */
+  expected: string;
+  /** Actual failure class (if available) */
+  actual?: string;
+  /** Error message (if available) */
+  error?: string;
+}
+
+/**
+ * Parses the structured output from the crashlab regression-suite CLI.
+ *
+ * Expected format:
+ * ```
+ * ::group::Regression Suite Results
+ * Total: 312
+ * Passed: 310
+ * Failed: 2
+ * ::endgroup::
+ * ```
+ *
+ * @param output - The stdout from the CLI command
+ * @returns Parsed regression suite result
+ */
+export function parseRegressionOutput(output: string): RegressionSuiteResult {
+  const lines = output.split('\n');
+  let total = 0;
+  let passed = 0;
+  let failed = 0;
+  const failures: RegressionFailure[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Parse summary lines
+    if (trimmed.startsWith('Total:')) {
+      total = parseInt(trimmed.substring(6).trim(), 10) || 0;
+    } else if (trimmed.startsWith('Passed:')) {
+      passed = parseInt(trimmed.substring(7).trim(), 10) || 0;
+    } else if (trimmed.startsWith('Failed:')) {
+      failed = parseInt(trimmed.substring(7).trim(), 10) || 0;
+    }
+
+    // Parse error lines: ::error::Seed 99 (invoker): expected wrong-class, got runtime-failure
+    if (trimmed.startsWith('::error::Seed ')) {
+      const match = trimmed.match(/::error::Seed (\d+) \(([^)]+)\): (.+)/);
+      if (match) {
+        const seedId = parseInt(match[1], 10);
+        const mode = match[2];
+        const message = match[3];
+
+        // Try to parse expected/actual from message
+        const expectedActualMatch = message.match(/expected ([^,]+), got (.+)/);
+        if (expectedActualMatch) {
+          failures.push({
+            seedId,
+            mode,
+            expected: expectedActualMatch[1],
+            actual: expectedActualMatch[2],
+          });
+        } else {
+          failures.push({
+            seedId,
+            mode,
+            expected: '',
+            error: message,
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    total,
+    passed,
+    failed,
+    failures,
+    allPassed: failed === 0 && total > 0,
+  };
+}
+
+/**
+ * Validates a CI regression configuration.
+ *
+ * @param config - The configuration to validate
+ * @returns Validation result with any errors
+ */
+export function validateRegressionConfig(config: CIRegressionConfig): ResultValidation {
+  const errors: string[] = [];
+
+  if (!config.fixturePath) {
+    errors.push('fixturePath is required');
+  }
+
+  if (!config.gitRef) {
+    errors.push('gitRef is required');
+  }
+
+  if (!config.environment) {
+    errors.push('environment is required');
+  }
+
+  if (config.timeoutSeconds !== undefined && config.timeoutSeconds <= 0) {
+    errors.push('timeoutSeconds must be positive');
+  }
+
+  return { isValid: errors.length === 0, errors };
+}
+
+/**
+ * Formats a regression suite result as a human-readable summary.
+ *
+ * @param result - The regression suite result to format
+ * @returns Formatted summary string
+ */
+export function formatRegressionSummary(result: RegressionSuiteResult): string {
+  if (result.allPassed) {
+    return `✅ All ${result.total} regression tests passed`;
+  }
+
+  const lines: string[] = [
+    `❌ ${result.failed} of ${result.total} regression tests failed`,
+    '',
+    'Failed tests:',
+  ];
+
+  for (const failure of result.failures) {
+    if (failure.actual) {
+      lines.push(
+        `  - Seed ${failure.seedId} (${failure.mode}): expected ${failure.expected}, got ${failure.actual}`
+      );
+    } else if (failure.error) {
+      lines.push(`  - Seed ${failure.seedId} (${failure.mode}): ${failure.error}`);
+    } else {
+      lines.push(`  - Seed ${failure.seedId} (${failure.mode}): test failed`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Determines if a regression result should block deployment.
+ *
+ * @param result - The regression suite result
+ * @returns true if deployment should be blocked (any failures)
+ */
+export function shouldBlockDeployment(result: RegressionSuiteResult): boolean {
+  return !result.allPassed;
+}

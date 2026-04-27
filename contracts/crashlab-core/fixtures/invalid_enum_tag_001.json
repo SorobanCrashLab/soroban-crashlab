@@ -1,0 +1,6 @@
+{
+  "seed_id": 11,
+  "input_payload": "e0ffaa",
+  "mode": "invoker",
+  "failure_class": "invalid-enum-tag"
+}

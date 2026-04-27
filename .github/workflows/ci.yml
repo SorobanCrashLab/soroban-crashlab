@@ -37,3 +37,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash -n scripts/backlog-freshness-review.sh
+
+  regression:
+    needs: [core, web]
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: contracts/crashlab-core
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo run --bin crashlab -- regression-suite fixtures/
