@@ -1,0 +1,10 @@
+[package]
+name = "regression-harness"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crashlab-core = { path = "../.." }
+
+[lib]
+path = "src/lib.rs"

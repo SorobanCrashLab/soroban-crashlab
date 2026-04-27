@@ -119,8 +119,9 @@ pub use retention::{RetentionPolicy, RetentionRecord};
 
 pub mod scenario_export;
 pub use scenario_export::{
-    FailureScenario, export_crash_report_markdown, export_failing_seed_json,
+    FailureScenario, derive_test_name, export_crash_report_markdown, export_failing_seed_json,
     export_rust_regression_fixture, export_scenario_json, export_suite_json,
+    write_rust_regression_snippet,
 };
 
 pub mod regression_suite;
