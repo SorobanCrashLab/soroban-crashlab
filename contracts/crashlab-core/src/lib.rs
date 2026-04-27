@@ -13,7 +13,7 @@ pub use auth_matrix::{
 pub use health::{
     FailureMetrics, HealthMonitor, HealthStatus, HealthSummary, QueueMetrics, ThroughputMetrics,
 };
-pub use prng::SeededPrng;
+pub use prng::{PrngMutator, SeededPrng};
 pub use reproducer::{
     FlakyDetector, ReproReport, filter_ci_pack, shrink_bundle_payload,
     shrink_seed_preserving_signature,
