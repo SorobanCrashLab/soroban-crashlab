@@ -734,7 +734,17 @@ function HomeContent() {
           {dataState === "success" && (
             <>
               <TimelineScrubber runs={runs} onSelectRun={handleOpenRunDrawer} />
-              <AddRunTimeline runs={runs} onSelectRun={handleOpenRunDrawer} />
+            </>
+          )}
+          <AddRunTimeline 
+            runs={runs} 
+            onSelectRun={handleOpenRunDrawer} 
+            dataState={dataState}
+            onRetry={() => setFetchAttempt((n) => n + 1)}
+            errorMessage="Run timeline data is temporarily unavailable."
+          />
+          {dataState === "success" && (
+            <>
               <div className="mt-12 w-full">
                 <AddRunStatusTimeline runs={runs} />
               </div>
