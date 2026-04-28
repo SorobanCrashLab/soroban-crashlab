@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import type { LedgerStateChange } from '../../types';
 import { buildMockRuns } from '../../mockRuns';
 import RunIssueLinkPage53 from '../../add-run-issue-link-page-53';
-import RunStatusTimeline from '../../create-run-status-timeline-component-52';
+import RunStatusTimeline from '../../RunStatusTimeline';
 import DownloadArtifactsButton from './DownloadArtifactsButton';
 
 interface RunDetailPageProps {

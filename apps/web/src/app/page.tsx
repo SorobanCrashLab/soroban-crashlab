@@ -41,7 +41,7 @@ import AutomatedRegressionDeployIntegration from "./integrate-automated-regressi
 import IntegrationTestHarnessForUIFlows from "./integrate-integration-test-harness-for-ui-flows";
 import ReportGenerator from "./add-report-generator";
 import WidgetLayoutEditor from "./implement-widget-layout-editor-component";
-import AddRunStatusTimeline from "./add-run-status-timeline";
+import AddRunStatusTimeline from "./RunActivityTimeline";
 import AddExportRunJson from "./add-export-run-json";
 import AddExportRunCsv from "./add-export-run-csv";
 import IntegrateWebhookManagerForRunEvents from "./integrate-webhook-manager-for-run-events";
