@@ -6,8 +6,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // In-memory storage for demonstration purposes
 // In production, this would connect to the Rust backend or cloud storage
@@ -77,7 +75,7 @@ export async function POST(request: NextRequest) {
  * GET /api/artifacts
  * Lists all stored artifacts
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const artifacts = Array.from(artifactStore.values()).map(art => ({
       id: art.id,

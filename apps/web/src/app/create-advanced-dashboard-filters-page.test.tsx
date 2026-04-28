@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AdvancedDashboardFilters, { DashboardFilters } from './create-advanced-dashboard-filters-page';
-import { RunStatus, RunArea, RunSeverity } from './types';
 
 const defaultFilters: DashboardFilters = {
   status: [],

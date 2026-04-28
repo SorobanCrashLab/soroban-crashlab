@@ -124,7 +124,7 @@ export default function AddRunReplayUi({ runs = [] }: AddRunReplayUiProps) {
         endTime: Date.now(),
       }));
     }
-  }, [selectedRun, config, progress.startTime, runs]);
+  }, [selectedRun, config, progress.startTime]);
 
   const handleStopReplay = () => {
     setProgress((prev) => ({
