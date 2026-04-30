@@ -118,21 +118,18 @@ fn validate_seeds_list(
     seeds: &[CaseSeed],
     schema: &SeedSchema,
 ) -> CorpusImportResult<()> {
-    for (idx, seed) in seeds.iter().enumerate() {
-        if let Err(errors) = seed.validate(schema) {
-            let details = errors
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-                .join("; ");
-            return Err(CorpusImportError::InvalidSeed {
-                index: idx,
-                seed_id: seed.id,
-                details,
-            });
+    crate::seed_validator::validate_seeds(seeds, schema).map_err(|(idx, id, errors)| {
+        let details = errors
+            .into_iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("; ");
+        CorpusImportError::InvalidSeed {
+            index: idx,
+            seed_id: id,
+            details,
         }
-    }
-    Ok(())
+    })
 }
 
 #[cfg(test)]

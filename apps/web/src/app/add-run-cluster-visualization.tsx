@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { FuzzingRun, RunStatus, RunArea, RunSeverity } from "./types";
-import { buildFailureClusters as buildFailureSignatures, describeFailureCluster } from "./failureClusters";
+import { buildFailureClusters as buildFailureSignatures } from "./failureClusters";
 
 export type RunClusterVisualizationDataState = "loading" | "error" | "success";
 

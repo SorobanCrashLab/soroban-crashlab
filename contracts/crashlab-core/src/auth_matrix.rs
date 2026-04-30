@@ -528,24 +528,22 @@ mod tests {
 
     #[test]
     fn integration_fuzzer_bundle_replay() {
-        use crate::bundle_persist::{CASE_BUNDLE_SCHEMA_VERSION, save_case_bundle_json, load_case_bundle_json};
+        use crate::bundle_persist::{save_case_bundle_json, load_case_bundle_json};
         use crate::replay::replay_seed_bundle;
         use crate::CaseBundle;
+        use crate::classify;
 
         let s = seed(6);
         let reports = run_matrix_for_seeds(&[s.clone()], |s, _| {
-            Ok(CrashSignature {
-                category: crate::taxonomy::classify_failure(s).as_str().to_string(),
-                digest: 99,
-                signature_hash: 99,
-            })
+            // Use the actual classify() function to get realistic signature values
+            Ok(classify(s))
         });
         
         let report = reports.into_iter().next().unwrap().unwrap();
         assert!(report.is_consistent());
         
         let bundle = CaseBundle {
-            seed: report.seed,
+            seed: report.seed.clone(),
             signature: report.results[0].signature.clone(),
             environment: None,
             failure_payload: vec![],
@@ -556,7 +554,9 @@ mod tests {
         let loaded_bundle = load_case_bundle_json(&bytes).unwrap();
         
         let replay_result = replay_seed_bundle(&loaded_bundle);
-        assert!(replay_result.matches);
+        assert!(replay_result.matches, 
+            "Replay mismatch: expected={:?}, actual={:?}", 
+            replay_result.expected, replay_result.actual);
         assert_eq!(replay_result.expected_class, FailureClass::Xdr); // Payload [1, 2, 3] begins with 1 -> Xdr
     }
 }

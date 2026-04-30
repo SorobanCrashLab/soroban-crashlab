@@ -361,7 +361,7 @@ function parseRule(rawRule: unknown): AlertRule | null {
     cooldown,
     tags,
     createdAt,
-    lastTriggered,
+    lastTriggered: lastTriggered as string | undefined,
   };
 }
 
@@ -401,7 +401,7 @@ function parseChannel(rawChannel: unknown): NotificationChannel | null {
     enabled,
     config: Object.fromEntries(
       entries.map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
-    ),
+    ) as Record<string, string | number | boolean | string[]>,
   };
 }
 

@@ -178,7 +178,7 @@ pub fn check_bundle_signature_hashes(docs: &[CaseBundleDocument]) -> CompatRepor
 mod tests {
     use super::*;
     use crate::bundle_persist::CASE_BUNDLE_SCHEMA_VERSION;
-    use crate::fixture_manifest::{FixtureManifest, FixtureMetadata};
+    use crate::fixture_manifest::FixtureManifest;
     use crate::{to_bundle, CrashSignature};
 
     fn make_seed(id: u64, len: usize) -> CaseSeed {

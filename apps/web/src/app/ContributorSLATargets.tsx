@@ -59,11 +59,10 @@ const MOCK_ACTIVE_ITEMS: ActiveSLAItem[] = [
 ];
 
 export default function ContributorSLATargets() {
-  const [activeItems, setActiveItems] = useState<ActiveSLAItem[]>([]);
+  const [activeItems] = useState<ActiveSLAItem[]>(MOCK_ACTIVE_ITEMS);
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
-    setActiveItems(MOCK_ACTIVE_ITEMS);
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);

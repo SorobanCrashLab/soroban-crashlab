@@ -74,7 +74,7 @@ const QA_CHECKLIST_ITEMS: QACheckItem[] = [
 
 const STORAGE_KEY = 'crashlab:run-qa-checklist:v1';
 
-export default function AddRunQAChecklist({ runs: _runs = [] }: AddRunQAChecklistProps) {
+export default function AddRunQAChecklist({ }: AddRunQAChecklistProps) {
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [selectedCategory, setSelectedCategory] = useState<'all' | QACheckItem['category']>('all');
   const [isExpanded, setIsExpanded] = useState(true);

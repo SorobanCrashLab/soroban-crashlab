@@ -19,6 +19,8 @@ import ReportModal from "./ReportModal";
 import { generateMarkdownReport } from "./report-utils";
 import CreateRunHeatmapPage55 from "./create-run-heatmap-page-55";
 import AddRunComparisonCharts from "./add-run-comparison-charts";
+import AddStateChangeDiffView from "./add-state-change-diff-view";
+import AddRunHeatmap from "./add-run-heatmap";
 import AddTaggingAndLabelsUi from "./add-tagging-and-labels-ui";
 import AlertingSettingsPage54 from "./implement-alerting-settings-page-54";
 import AlertingSettingsPage from "./create-alerting-settings-page-page";
@@ -32,7 +34,7 @@ import MaintainerToggle from "./MaintainerToggle";
 import { useMaintainerMode } from "./useMaintainerMode";
 import AlertPresets from "./AlertPresets";
 import CreateReportingTemplatesPage60 from "./create-reporting-templates-page-60";
-import TimelineScrubber from "./implement-timeline-scrubber-component-component";
+import TimelineScrubber from "./TimelineScrubber";
 import ColumnCustomization, { ColumnId } from "./add-column-customization";
 import CampaignMilestoneTimeline from "./campaign-milestone-timeline-55";
 import VirtualizedRunTable from "./implement-virtualized-run-table-component";
@@ -64,7 +66,7 @@ import AddDownloadableRunArtifactBundle from "./add-downloadable-run-artifact-bu
 import CampaignConfigForm from "./CampaignConfigForm";
 import ContributorSLATargets from "./ContributorSLATargets";
 import { CampaignConfig } from "./types";
-import ResourceFeeInsightPanel from "./implement-resource-fee-insight-panel-component";
+import { ResourceFeeInsightPanel } from "./implement-resource-fee-insight-panel-component";
 import AdvancedDashboardFilters, { DashboardFilters } from "./create-advanced-dashboard-filters-page";
 
 // Mock data for demonstration
@@ -732,7 +734,17 @@ function HomeContent() {
           {dataState === "success" && (
             <>
               <TimelineScrubber runs={runs} onSelectRun={handleOpenRunDrawer} />
-              <AddRunTimeline runs={runs} onSelectRun={handleOpenRunDrawer} />
+            </>
+          )}
+          <AddRunTimeline 
+            runs={runs} 
+            onSelectRun={handleOpenRunDrawer} 
+            dataState={dataState}
+            onRetry={() => setFetchAttempt((n) => n + 1)}
+            errorMessage="Run timeline data is temporarily unavailable."
+          />
+          {dataState === "success" && (
+            <>
               <div className="mt-12 w-full">
                 <AddRunStatusTimeline runs={runs} />
               </div>
@@ -1094,6 +1106,31 @@ function HomeContent() {
               onRunSelect={handleOpenRunDrawer}
               showTimeline={true}
               showMetrics={true}
+            />
+          </div>
+
+          <div className="mb-12 w-full">
+            <AddRunHeatmap
+              runs={filteredRuns}
+              metric="duration"
+              title="Run Performance Heatmap - Duration"
+            />
+          </div>
+
+          <div className="mb-12 w-full">
+            <AddRunHeatmap
+              runs={filteredRuns}
+              metric="cpu"
+              title="CPU Instruction Usage Heatmap"
+            />
+          </div>
+
+          <div className="mb-12 w-full">
+            <AddStateChangeDiffView
+              changes={[]} 
+              title="Ledger State Changes"
+              isLoading={dataState === 'loading'}
+              error={dataState === 'error' ? 'Failed to load state changes' : null}
             />
           </div>
 

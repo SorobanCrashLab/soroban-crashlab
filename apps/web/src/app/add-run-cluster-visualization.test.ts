@@ -7,7 +7,7 @@ import {
   buildMockClusters,
   buildFailureSignatureClusters,
 } from "./add-run-cluster-visualization";
-import { FuzzingRun, RunStatus, RunArea, RunSeverity } from "./types";
+import { FuzzingRun } from "./types";
 
 // Helper to build a minimal FuzzingRun
 function makeRun(overrides: Partial<FuzzingRun>): FuzzingRun {
