@@ -1,20 +1,16 @@
-/**
- * API Route for Individual Artifact Operations
- *
- * GET /api/artifacts/[id] - Download an artifact
- * DELETE /api/artifacts/[id] - Delete an artifact
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { artifactStore } from '@/lib/artifact-store';
+import {
+  getArtifactById,
+  deleteArtifactById,
+} from '@/lib/artifact-fs-adapter';
 
 /**
  * GET /api/artifacts/[id]
- * Downloads an artifact by ID
+ * Downloads an artifact from CRASHLAB_ARTIFACT_DIR by ID
  */
 export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -22,52 +18,45 @@ export async function GET(
     if (!id) {
       return NextResponse.json(
         { error: 'Artifact ID is required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Validate ID format (path traversal prevention)
-    if (id.includes('..') || id.includes('/') || id.includes('\\')) {
-      return NextResponse.json(
-        { error: 'Invalid artifact ID' },
-        { status: 400 }
-      );
-    }
+    const result = await getArtifactById(id);
 
-    const artifact = artifactStore.get(id);
-
-    if (!artifact) {
+    if (!result) {
       return NextResponse.json(
         { error: 'Artifact not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
-    // Return the artifact as a download
-    return new NextResponse(artifact.buffer as unknown as BodyInit, {
+    const { metadata, buffer } = result;
+
+    return new NextResponse(buffer as unknown as BodyInit, {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${artifact.name}"`,
-        'Content-Length': artifact.sizeBytes.toString(),
+        'Content-Disposition': `attachment; filename="${metadata.name}"`,
+        'Content-Length': metadata.sizeBytes.toString(),
       },
     });
   } catch (error) {
     console.error('Failed to download artifact:', error);
     return NextResponse.json(
       { error: 'Failed to download artifact' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 /**
  * DELETE /api/artifacts/[id]
- * Deletes an artifact by ID
+ * Deletes an artifact from CRASHLAB_ARTIFACT_DIR by ID
  */
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -75,28 +64,18 @@ export async function DELETE(
     if (!id) {
       return NextResponse.json(
         { error: 'Artifact ID is required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Validate ID format (path traversal prevention)
-    if (id.includes('..') || id.includes('/') || id.includes('\\')) {
-      return NextResponse.json(
-        { error: 'Invalid artifact ID' },
-        { status: 400 }
-      );
-    }
+    const deleted = await deleteArtifactById(id);
 
-    const existed = artifactStore.has(id);
-
-    if (!existed) {
+    if (!deleted) {
       return NextResponse.json(
         { error: 'Artifact not found' },
-        { status: 404 }
+        { status: 404 },
       );
     }
-
-    artifactStore.delete(id);
 
     return NextResponse.json({
       success: true,
@@ -106,7 +85,7 @@ export async function DELETE(
     console.error('Failed to delete artifact:', error);
     return NextResponse.json(
       { error: 'Failed to delete artifact' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
