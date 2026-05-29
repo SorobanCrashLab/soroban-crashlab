@@ -39,9 +39,18 @@ jobs:
         working-directory: contracts/soroban-example
     steps:
       - uses: actions/checkout@v4
-      - run: rustup target add wasm32-unknown-unknown
-      - run: cargo test --all-targets
-      - run: cargo build --target wasm32-unknown-unknown --release
+      - name: Install Rust stable with wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/soroban-example
+      - name: Run tests
+        run: cargo test --all-targets
+      - name: Build WASM artifact
+        run: cargo build --target wasm32-unknown-unknown --release
 
   ops-scripts-syntax:
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -51,7 +60,7 @@ jobs:
       - run: bash -n scripts/contracts/build-soroban-example.sh
 
   regression:
-    needs: [core, web]
+    needs: [core, web, soroban-example]
     runs-on: blacksmith-4vcpu-ubuntu-2404
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     defaults:
