@@ -1,5 +1,6 @@
 "use client";
 
+import Script from "next/script";
 import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "crashlab:dark-mode";
@@ -14,29 +15,28 @@ export function useDarkMode(): {
 
   // Initialize on client; read saved preference or OS preference and apply
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      setMounted(true);
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved !== null) {
-          const next = saved === "true";
-          setIsDark(next);
-          document.documentElement.classList.toggle("dark", next);
-          // some setups toggle dark on body instead of html
-          document.body?.classList?.toggle?.("dark", next);
-        } else if (window.matchMedia) {
-          const prefers = window.matchMedia(
-            "(prefers-color-scheme: dark)",
-          ).matches;
-          setIsDark(prefers);
-          document.documentElement.classList.toggle("dark", prefers);
-          document.body?.classList?.toggle?.("dark", prefers);
-        }
-      } catch {
-        // ignore localStorage errors
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved !== null) {
+        const next = saved === "true";
+        setIsDark(next);
+        document.documentElement.classList.toggle("dark", next);
+        document.body?.classList?.toggle?.("dark", next);
+        document.documentElement.style.colorScheme = next ? "dark" : "light";
+      } else if (window.matchMedia) {
+        const prefers = window.matchMedia(
+          "(prefers-color-scheme: dark)",
+        ).matches;
+        setIsDark(prefers);
+        document.documentElement.classList.toggle("dark", prefers);
+        document.body?.classList?.toggle?.("dark", prefers);
+        document.documentElement.style.colorScheme = prefers ? "dark" : "light";
       }
-    }, 0);
-    return () => window.clearTimeout(t);
+    } catch {
+      // ignore localStorage errors
+    } finally {
+      setMounted(true);
+    }
   }, []);
 
   // Persist and apply whenever it changes
@@ -118,38 +118,62 @@ export function useDarkMode(): {
   return { isDark, toggle, mounted };
 }
 
+const INITIAL_THEME_SCRIPT = `
+  (function () {
+    try {
+      var saved = localStorage.getItem(${JSON.stringify(STORAGE_KEY)});
+      var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var isDark = saved === 'true' || (saved !== 'false' && prefersDark);
+      var root = document.documentElement;
+      root.classList.toggle('dark', isDark);
+      root.style.colorScheme = isDark ? 'dark' : 'light';
+      if (document.body) {
+        document.body.classList.toggle('dark', isDark);
+      }
+    } catch (error) {
+      // Ignore storage and matchMedia failures during early boot.
+    }
+  })();
+`;
+
 export default function DarkModeToggle() {
   const { isDark, toggle, mounted } = useDarkMode();
-  if (!mounted) return null;
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
-      <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-        Theme
-      </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={isDark}
-        onClick={toggle}
-        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 ${
-          isDark ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-600"
-        }`}
-        aria-label="Toggle dark mode"
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-            isDark ? "translate-x-6" : "translate-x-1"
-          }`}
-        />
-      </button>
-      <span className="text-sm font-medium">
-        {isDark ? (
-          <span className="text-blue-400">Dark</span>
-        ) : (
-          <span className="text-zinc-500 dark:text-zinc-400">Light</span>
-        )}
-      </span>
-    </div>
+    <>
+      <Script id="crashlab-dark-mode-init" strategy="beforeInteractive">
+        {INITIAL_THEME_SCRIPT}
+      </Script>
+      {mounted ? (
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm">
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+            Theme
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isDark}
+            onClick={toggle}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 ${
+              isDark ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-600"
+            }`}
+            aria-label="Toggle dark mode"
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                isDark ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+          <span className="text-sm font-medium">
+            {isDark ? (
+              <span className="text-blue-400">Dark</span>
+            ) : (
+              <span className="text-zinc-500 dark:text-zinc-400">Light</span>
+            )}
+          </span>
+        </div>
+      ) : null}
+    </>
   );
 }
