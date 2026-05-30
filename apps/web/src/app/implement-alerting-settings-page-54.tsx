@@ -3,32 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AlertConfig, toggleAlert, updateAlertThreshold, validateAlerts } from './alerting-settings-utils';
 
-const DEFAULT_ALERTS: AlertConfig[] = [
-  {
-    id: 'crash-rate-spike',
-    name: 'Crash Rate Spike',
-    description: 'Alert when the crash rate increases by a certain percentage over a short period.',
-    enabled: true,
-    threshold: 15,
-    unit: '%',
-  },
-  {
-    id: 'resource-exhaustion',
-    name: 'Resource Exhaustion',
-    description: 'Alert when a run consistently hits resource limits (CPU or Memory).',
-    enabled: false,
-    threshold: 90,
-    unit: '%',
-  },
-  {
-    id: 'consecutive-failures',
-    name: 'Consecutive Failures',
-    description: 'Alert when multiple consecutive fuzzing runs fail.',
-    enabled: true,
-    threshold: 5,
-    unit: 'runs',
-  },
-];
+const ALERTING_API_URL = '/api/settings/alerting';
 
 export default function AlertingSettingsPage54() {
   const [alerts, setAlerts] = useState<AlertConfig[]>([]);
@@ -38,15 +13,27 @@ export default function AlertingSettingsPage54() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Mock API fetch
   useEffect(() => {
     let isMounted = true;
     const fetchSettings = async () => {
       try {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
+        const response = await fetch(ALERTING_API_URL);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch alerting settings: ${response.status}`);
+        }
+        const data = await response.json();
         if (isMounted) {
-          setAlerts(DEFAULT_ALERTS);
+          const mapped: AlertConfig[] = Array.isArray(data.alertRules)
+            ? data.alertRules.map((rule: { id: string; name: string; description: string; enabled: boolean; threshold: number; unit: string }) => ({
+                id: rule.id,
+                name: rule.name,
+                description: rule.description,
+                enabled: rule.enabled,
+                threshold: rule.threshold,
+                unit: rule.unit,
+              }))
+            : [];
+          setAlerts(mapped);
           setIsLoading(false);
         }
       } catch {
@@ -84,36 +71,59 @@ export default function AlertingSettingsPage54() {
       setValidationError(vErr);
       return;
     }
-    
+
     setIsSaving(true);
     setSaveSuccess(false);
     setError(null);
-    
+
     try {
-      // Simulate API call
-      await new Promise((resolve, reject) => {
-        setTimeout(() => {
-          // 5% chance of mock failure
-          if (Math.random() < 0.05) reject(new Error('Network error'));
-          else resolve(null);
-        }, 1000);
+      const response = await fetch(ALERTING_API_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alerts }),
       });
-      
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error ?? `Save failed with status ${response.status}`);
+      }
+
       setSaveSuccess(true);
-      // Hide success message after 3 seconds
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch {
-      setError('Failed to save settings. Please try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save settings. Please try again.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleReset = () => {
-    setAlerts(DEFAULT_ALERTS);
+  const handleReset = async () => {
     setValidationError(null);
     setError(null);
     setSaveSuccess(false);
+    setIsLoading(true);
+    try {
+      const response = await fetch(ALERTING_API_URL);
+      if (!response.ok) {
+        throw new Error(`Failed to reload alerting settings: ${response.status}`);
+      }
+      const data = await response.json();
+      const mapped: AlertConfig[] = Array.isArray(data.alertRules)
+        ? data.alertRules.map((rule: { id: string; name: string; description: string; enabled: boolean; threshold: number; unit: string }) => ({
+            id: rule.id,
+            name: rule.name,
+            description: rule.description,
+            enabled: rule.enabled,
+            threshold: rule.threshold,
+            unit: rule.unit,
+          }))
+        : [];
+      setAlerts(mapped);
+    } catch {
+      setError('Failed to reload alerting settings.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isLoading) {
@@ -156,7 +166,7 @@ export default function AlertingSettingsPage54() {
           Configure threshold alerts for crash rate spikes and other critical events.
         </p>
       </div>
-      
+
       {error && (
         <div className="mx-8 mt-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-lg text-red-700 dark:text-red-400 text-sm font-medium flex items-center gap-2" role="alert">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -182,15 +192,15 @@ export default function AlertingSettingsPage54() {
               <div className="flex items-center gap-3 mb-2">
                 <h3 className="font-semibold text-lg text-zinc-900 dark:text-zinc-50">{alert.name}</h3>
                 <span className={`px-2.5 py-0.5 text-xs rounded-full font-semibold uppercase tracking-wider ${
-                  alert.enabled 
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' 
+                  alert.enabled
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
                     : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500'
                 }`}>
                   {alert.enabled ? 'Active' : 'Inactive'}
                 </span>
               </div>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">{alert.description}</p>
-              
+
               <div className={`transition-all duration-300 overflow-hidden ${alert.enabled ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0'}`}>
                 <div className="flex items-center gap-4 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-700">
                   <label htmlFor={`threshold-${alert.id}`} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
@@ -211,7 +221,7 @@ export default function AlertingSettingsPage54() {
                 </div>
               </div>
             </div>
-            
+
             <button
               onClick={() => handleToggle(alert.id)}
               className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 mt-1 ${
@@ -229,7 +239,7 @@ export default function AlertingSettingsPage54() {
           </div>
         ))}
       </div>
-      
+
       <div className="px-8 py-6 bg-zinc-50/50 dark:bg-zinc-900/30 border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center gap-4">
         <div>
           {saveSuccess && (
@@ -242,14 +252,14 @@ export default function AlertingSettingsPage54() {
           )}
         </div>
         <div className="flex gap-4">
-          <button 
+          <button
             onClick={handleReset}
             disabled={isSaving}
             className="px-6 py-2.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium transition disabled:opacity-50"
           >
             Reset to Default
           </button>
-          <button 
+          <button
             onClick={handleSave}
             disabled={isSaving || !!validationError}
             className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 dark:disabled:bg-blue-800 text-white rounded-xl font-bold shadow-lg shadow-blue-200 dark:shadow-none transition transform active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
