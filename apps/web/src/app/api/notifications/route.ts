@@ -15,6 +15,42 @@ interface NotificationFeedResponse {
   optional: true;
 }
 
+function isFalsyToggle(value: string | null): boolean {
+  if (!value) {
+    return false;
+  }
+
+  return ["0", "false", "off", "no"].includes(value.toLowerCase());
+}
+
+function sanitizeNotificationFeedItem(
+  item: Partial<NotificationFeedItem>,
+): NotificationFeedItem | null {
+  if (
+    typeof item.id !== 'string' ||
+    typeof item.title !== 'string' ||
+    typeof item.message !== 'string' ||
+    typeof item.createdAt !== 'string' ||
+    typeof item.read !== 'boolean'
+  ) {
+    return null;
+  }
+
+  const allowedSeverity = new Set(['info', 'success', 'warning', 'error']);
+  const severity = allowedSeverity.has(item.severity ?? '')
+    ? (item.severity as NotificationFeedItem['severity'])
+    : 'info';
+
+  return {
+    id: item.id,
+    title: item.title,
+    message: item.message,
+    createdAt: item.createdAt,
+    read: item.read,
+    severity,
+  };
+}
+
 function buildEmptyFeed(): NotificationFeedResponse {
   return {
     notifications: [],
@@ -41,21 +77,33 @@ async function fetchNotificationsFeed(request: NextRequest, feedUrl: string): Pr
   }
 
   const payload = (await response.json()) as Partial<NotificationFeedResponse> & {
-    notifications?: NotificationFeedItem[];
+    notifications?: Partial<NotificationFeedItem>[];
   };
 
   if (!Array.isArray(payload.notifications)) {
     return buildEmptyFeed();
   }
 
+  const notifications = payload.notifications
+    .map((item) => sanitizeNotificationFeedItem(item))
+    .filter((item): item is NotificationFeedItem => item !== null);
+
   return {
-    notifications: payload.notifications,
-    total: typeof payload.total === 'number' ? payload.total : payload.notifications.length,
+    notifications,
+    total: typeof payload.total === 'number' ? payload.total : notifications.length,
     optional: true,
   };
 }
 
 export async function GET(request: NextRequest) {
+  if (isFalsyToggle(request.nextUrl.searchParams.get('enabled'))) {
+    return NextResponse.json(buildEmptyFeed());
+  }
+
+  if (isFalsyToggle(process.env.NOTIFICATIONS_FEED_ENABLED ?? null)) {
+    return NextResponse.json(buildEmptyFeed());
+  }
+
   const feedUrl = process.env.NOTIFICATIONS_FEED_URL ?? process.env.NOTIFICATIONS_API_URL;
 
   if (!feedUrl) {

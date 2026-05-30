@@ -17,7 +17,7 @@ import CrossRunBoardWidgets from "../implement-cross-run-board-widgets-component
 import CrossRunBoardCustomWidgets from "../create-cross-run-board-custom-widgets-63";
 import AlertPresets from "../AlertPresets";
 import WidgetLayoutEditor from "../implement-widget-layout-editor-component";
-import ResourceFeeInsightPanel from "../implement-resource-fee-insight-panel-component";
+import { ResourceFeeInsightPanel } from "../implement-resource-fee-insight-panel-component";
 
 export default function MaintainerPage() {
   const { isMaintainer, mounted } = useMaintainerMode();
