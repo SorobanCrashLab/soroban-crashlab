@@ -165,21 +165,9 @@ test.describe('Artifact Upload/Download E2E', () => {
       await uploadArtifactViaUI(page, testFilePath);
       await waitForArtifactInList(page, testFileName);
 
-      // Start listening for download
-      const downloadPromise = context.waitForEvent('download');
-
-      // Find and click download button for the artifact
       const artifactRow = page.locator(`text="${testFileName}"`).first();
       await expect(artifactRow).toBeVisible();
 
-      // Click download button (usually near the artifact name)
-      const downloadButton = page
-        .locator(`text="${testFileName}"`)
-        .locator('..')
-        .locator('button', { has: page.locator('svg') })
-        .nth(0);
-
-      // Try to click if button exists
       const buttons = await page
         .locator(`text="${testFileName}"`)
         .locator('..')
@@ -187,10 +175,10 @@ test.describe('Artifact Upload/Download E2E', () => {
         .all();
 
       if (buttons.length > 0) {
-        // Click the first button (likely download)
-        await buttons[0].click({ timeout: 5000 }).catch(() => {
-          // Download button might not exist in all cases
-        });
+        const downloadPromise = context.waitForEvent('download');
+        await buttons[0].click({ timeout: 5000 });
+        const download = await downloadPromise;
+        expect(download.suggestedFilename()).toBe(testFileName);
       }
     } finally {
       cleanupTestFile(testFilePath);
