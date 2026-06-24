@@ -115,7 +115,7 @@ test.describe('Artifact Upload/Download E2E', () => {
     await page.waitForLoadState('networkidle');
 
     // Check if artifact list section exists
-    const listSection = page.locator('text=Artifacts');
+    const listSection = page.locator('text=Stored Artifacts');
     await expect(listSection).toBeVisible();
   });
 

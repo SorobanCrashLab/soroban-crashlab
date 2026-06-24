@@ -87,3 +87,17 @@ export async function deleteArtifactById(id: string): Promise<boolean> {
     return false;
   }
 }
+
+export async function saveArtifact(name: string, buffer: Buffer): Promise<ArtifactMetadata> {
+  const dir = await getArtifactDirOrCreate();
+  const safeName = sanitizeId(name);
+  const filePath = path.join(dir, safeName);
+  await fs.writeFile(filePath, buffer);
+  const stat = await fs.stat(filePath);
+  return {
+    id: safeName,
+    name: safeName,
+    createdAt: stat.birthtime.toISOString(),
+    sizeBytes: stat.size,
+  };
+}
