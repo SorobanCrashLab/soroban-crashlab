@@ -47,7 +47,7 @@ function cleanupTestFile(filePath: string): void {
  * Helper to navigate to artifact storage integration page
  */
 async function navigateToArtifactPage(page: Page): Promise<void> {
-  await page.goto('/integrate-storage-backend-integration-for-artifacts');
+  await page.goto('/integrations/artifacts');
   // Wait for the page to fully load
   await page.waitForLoadState('networkidle');
 }
