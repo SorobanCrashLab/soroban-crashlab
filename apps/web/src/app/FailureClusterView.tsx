@@ -24,8 +24,22 @@ const buildRepresentativeHref = (pathname: string, queryString: string, runId: s
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 };
 
+function parseContractCall(run: FuzzingRun): { contract: string; method: string } | null {
+  if (!run.crashDetail?.payload) return null;
+  try {
+    const parsed = JSON.parse(run.crashDetail.payload) as { contract?: string; method?: string };
+    if (parsed.contract && parsed.method) {
+      return { contract: parsed.contract, method: parsed.method };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export default function FailureClusterView({ runs, pathname, queryString }: FailureClusterViewProps) {
   const clusters = buildFailureClusters(runs);
+  const runById = new Map(runs.map((run) => [run.id, run]));
 
   return (
     <section className="mb-8 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
@@ -47,7 +61,11 @@ export default function FailureClusterView({ runs, pathname, queryString }: Fail
         </div>
       ) : (
         <div className="space-y-4">
-          {clusters.map((cluster) => (
+          {clusters.map((cluster) => {
+            const representative = runById.get(cluster.representativeRunId);
+            const contractCall = representative ? parseContractCall(representative) : null;
+
+            return (
             <article
               key={cluster.id}
               className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-900/40"
@@ -68,10 +86,15 @@ export default function FailureClusterView({ runs, pathname, queryString }: Fail
                     {cluster.signature}
                   </p>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">{describeFailureCluster(cluster)}</p>
+                  {contractCall && (
+                    <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
+                      Contract call: {contractCall.contract}::{contractCall.method}
+                    </p>
+                  )}
                 </div>
 
                 <Link
-                  href={buildRepresentativeHref(pathname, queryString, cluster.representativeRunId)}
+                  href={`/runs/${cluster.representativeRunId}`}
                   className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
                 >
                   Open sample {cluster.representativeRunId}
@@ -82,7 +105,8 @@ export default function FailureClusterView({ runs, pathname, queryString }: Fail
                 Representative sample: {cluster.representativeRunId}. Related runs: {cluster.relatedRunIds.join(', ')}.
               </p>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

@@ -4,6 +4,8 @@ import { buildFailureClusters as buildFailureSignatures } from "./failureCluster
 
 export type RunClusterVisualizationDataState = "loading" | "error" | "success";
 
+type ClusterMode = "status" | "area" | "severity" | "performance" | "failure";
+
 interface RunClusterVisualizationProps {
   runs?: FuzzingRun[];
   dataState?: RunClusterVisualizationDataState;
@@ -12,11 +14,9 @@ interface RunClusterVisualizationProps {
   onRunSelect?: (runId: string) => void;
   showTimeline?: boolean;
   showMetrics?: boolean;
+  initialClusterMode?: ClusterMode;
 }
 
-/**
- * Represents a cluster of runs grouped by a common attribute.
- */
 export interface RunCluster {
   id: string;
   label: string;
@@ -137,7 +137,6 @@ const colorClasses: Record<
   },
 };
 
-type ClusterMode = "status" | "area" | "severity" | "performance" | "failure";
 type ViewMode = "grid" | "bubbles" | "timeline" | "metrics";
 
 const RunClusterVisualization: React.FC<RunClusterVisualizationProps> = ({
@@ -148,8 +147,9 @@ const RunClusterVisualization: React.FC<RunClusterVisualizationProps> = ({
   onRunSelect,
   showTimeline = true,
   showMetrics = true,
+  initialClusterMode = "status",
 }) => {
-  const [clusterMode, setClusterMode] = useState<ClusterMode>("status");
+  const [clusterMode, setClusterMode] = useState<ClusterMode>(initialClusterMode);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"count" | "duration" | "failure-rate">(
