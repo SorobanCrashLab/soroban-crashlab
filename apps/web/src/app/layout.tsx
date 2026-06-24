@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import NotificationCenter from "./add-notification-center-ui";
 import DarkModeToggle from "./add-dark-mode-support";
+import MobileNavDrawer from "./MobileNavDrawer";
 
 // Using system fonts to avoid external Google Fonts fetch during build
 
@@ -40,7 +41,8 @@ export default function RootLayout({
           <div className="font-semibold text-xl tracking-tight">
             Soroban CrashLab
           </div>
-          <div className="flex items-center gap-4">
+          <MobileNavDrawer />
+          <div className="hidden md:flex items-center gap-4">
             <nav className="flex gap-4 text-sm font-medium">
               <Link
                 href="/logs"
