@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { noStore } from 'next/cache';
 import type { FuzzingRun, LedgerStateChange } from '../../types';
 import RunTimeline from './RunTimeline';
 
@@ -17,7 +16,6 @@ interface RunDetailPageProps {
 const formatDate = (value?: string): string => value ? new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) : 'Pending';
 
 async function fetchRun(id: string): Promise<RunDetail | null> {
-    noStore();
     const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
     const res = await fetch(`${base}/api/runs/${encodeURIComponent(id)}`, { cache: 'no-store' });
     if (res.status === 404) return null;

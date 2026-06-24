@@ -12,14 +12,15 @@ import {
 } from '../app/settings/api/api-config-utils';
 
 export default function ApiConfigForm() {
-  const [config, setConfig] = useState<ApiConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<ApiConfig>(() =>
+    typeof window === 'undefined' ? DEFAULT_CONFIG : loadFromStorage(),
+  );
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [saved, setSaved] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setConfig(loadFromStorage());
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
   }, []);
 
   const handleChange = useCallback(

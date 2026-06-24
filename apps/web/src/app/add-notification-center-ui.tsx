@@ -87,7 +87,9 @@ export default function NotificationCenter({ className = '' }: NotificationCente
   }, []);
 
   useEffect(() => {
-    fetchNotifications();
+    queueMicrotask(() => {
+      void fetchNotifications();
+    });
     intervalRef.current = setInterval(fetchNotifications, POLL_INTERVAL_MS);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);

@@ -11,10 +11,12 @@ export default function SettingsPage() {
   const [isMockData, setIsMockData] = useState<boolean>(true);
 
   useEffect(() => {
-    const config = loadFromStorage();
-    const activeUrl = config.backendUrl || process.env.NEXT_PUBLIC_API_URL || '';
-    setApiUrl(activeUrl || 'Not configured (using mock data)');
-    setIsMockData(!activeUrl);
+    queueMicrotask(() => {
+      const config = loadFromStorage();
+      const activeUrl = config.backendUrl || process.env.NEXT_PUBLIC_API_URL || '';
+      setApiUrl(activeUrl || 'Not configured (using mock data)');
+      setIsMockData(!activeUrl);
+    });
   }, []);
   return (
     <div className="container-full page-padding fade-in">
@@ -31,7 +33,7 @@ export default function SettingsPage() {
             </svg>
             <div>
               <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Storage quota exceeded</p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">Your browser's local storage is full. Settings may not persist between sessions. Please clear some data or free up storage space.</p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">Your browser&apos;s local storage is full. Settings may not persist between sessions. Please clear some data or free up storage space.</p>
             </div>
           </div>
         </div>

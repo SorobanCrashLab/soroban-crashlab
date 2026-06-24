@@ -37,7 +37,7 @@ export default function NavBar() {
   }, []);
 
   useEffect(() => {
-    setDrawerOpen(false);
+    queueMicrotask(() => setDrawerOpen(false));
   }, [pathname]);
 
   useEffect(() => {
