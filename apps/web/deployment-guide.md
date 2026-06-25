@@ -147,7 +147,7 @@ soroban contract id --wasm target/wasm32-unknown-unknown/release/soroban_example
 
 ---
 
-## Part 4: Environment Configuration Reference
+## Part 4: Environment Configuration
 
 Create a file called `.env.local` in `apps/web/` with your settings:
 
@@ -164,16 +164,9 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 ```
 
-### Feature flags explained
-
-- `NEXT_PUBLIC_API_URL`: When this is empty, the frontend uses mock data
-  so you can develop without a running backend. When you deploy the Rust
-  backend, set this to its URL and the frontend will proxy API calls to it.
-- `NEXT_PUBLIC_ENABLE_MOCK_DATA`: When set to true, the API routes fall
-  back to mock data even when the backend is unreachable. Set to false for
-  production to ensure data integrity.
-- `NEXT_PUBLIC_APP_URL`: Used for server side URL generation in permalinks
-  and API calls. Vercel sets this automatically for you.
+For the full list of browser-exposed and server-only settings, see the
+[`docs/ENVIRONMENT_VARIABLES.md`](../../docs/ENVIRONMENT_VARIABLES.md)
+reference.
 
 ---
 
