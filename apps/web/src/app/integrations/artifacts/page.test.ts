@@ -22,8 +22,8 @@ const runAssertions = (): void => {
   const content = fs.readFileSync(componentPath, 'utf-8');
 
   assert.ok(
-    content.includes("import ArtifactStorageIntegration from '../../integrate-storage-backend-integration-for-artifacts'"),
-    'Page should import the ArtifactStorageIntegration wrapper component',
+    content.includes("dynamic(() => import('../../integrate-storage-backend-integration-for-artifacts')"),
+    'Page should lazy-load the ArtifactStorageIntegration wrapper component via next/dynamic',
   );
   assert.ok(
     content.includes('export default function ArtifactStorageIntegrationPage()'),

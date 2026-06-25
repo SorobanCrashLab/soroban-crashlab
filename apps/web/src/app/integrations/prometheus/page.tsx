@@ -1,8 +1,12 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
+import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-import MetricsExportToPrometheus from '../../integrate-metrics-export-to-prometheus';
+const MetricsExportToPrometheus = dynamic(() => import('../../integrate-metrics-export-to-prometheus'), {
+  loading: () => <IntegrationPageSkeleton />,
+});
 
 export default function PrometheusPage() {
   return (

@@ -1,7 +1,12 @@
 'use client';
 
 import React from 'react';
-import CIIntegrationForRunReplayTests from '../../integrate-ci-integration-for-run-replay-tests';
+import dynamic from 'next/dynamic';
+import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
+
+const CIIntegrationForRunReplayTests = dynamic(() => import('../../integrate-ci-integration-for-run-replay-tests'), {
+  loading: () => <IntegrationPageSkeleton />,
+});
 
 export default function CIReplayIntegrationPage() {
   return (

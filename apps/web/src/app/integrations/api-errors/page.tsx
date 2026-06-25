@@ -1,6 +1,11 @@
 'use client';
 
-import ApiErrorReportPage from '../../api-error-report-page';
+import dynamic from 'next/dynamic';
+import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
+
+const ApiErrorReportPage = dynamic(() => import('../../api-error-report-page'), {
+  loading: () => <IntegrationPageSkeleton />,
+});
 
 export default function ApiErrorsIntegrationPage() {
   return <ApiErrorReportPage />;

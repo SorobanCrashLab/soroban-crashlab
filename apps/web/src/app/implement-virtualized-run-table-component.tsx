@@ -141,6 +141,19 @@ const VirtualRow = ({
                     <StatusBadge status={run.status} />
                 </td>
             )}
+            {visibleColumns.includes('area') && (
+                <td className="px-6 w-28 shrink-0 text-sm text-zinc-600 dark:text-zinc-400 truncate">
+                    {run.area}
+                </td>
+            )}
+            {visibleColumns.includes('severity') && (
+                <td
+                    className="px-6 w-28 shrink-0 text-sm truncate"
+                    style={{ color: run.severity === 'critical' ? '#C37D16' : run.severity === 'high' ? '#CC1016' : undefined }}
+                >
+                    {run.severity}
+                </td>
+            )}
             {visibleColumns.includes('duration') && (
                 <td className="px-6 w-28 shrink-0 text-sm text-zinc-600 dark:text-zinc-400 text-right tabular-nums">
                     {formatDuration(run.duration)}
@@ -283,6 +296,16 @@ export default function VirtualizedRunTable({
                             {visibleColumns.includes('status') && (
                                 <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-36 shrink-0">
                                     Status
+                                </th>
+                            )}
+                            {visibleColumns.includes('area') && (
+                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0">
+                                    Area
+                                </th>
+                            )}
+                            {visibleColumns.includes('severity') && (
+                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0">
+                                    Severity
                                 </th>
                             )}
                             {visibleColumns.includes('duration') && (

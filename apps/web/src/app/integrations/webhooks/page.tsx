@@ -1,8 +1,12 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
+import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-import IntegrateWebhookManagerForRunEvents from '../../integrate-webhook-manager-for-run-events';
+const IntegrateWebhookManagerForRunEvents = dynamic(() => import('../../integrate-webhook-manager-for-run-events'), {
+  loading: () => <IntegrationPageSkeleton />,
+});
 
 export default function WebhooksPage() {
   return (

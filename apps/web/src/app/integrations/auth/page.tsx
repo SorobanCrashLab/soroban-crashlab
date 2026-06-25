@@ -1,8 +1,12 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
+import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-import ExternalAuthenticationIntegration from '../../integrate-external-authentication-integration';
+const ExternalAuthenticationIntegration = dynamic(() => import('../../integrate-external-authentication-integration'), {
+  loading: () => <IntegrationPageSkeleton />,
+});
 
 export default function ExternalAuthenticationIntegrationPage() {
   return (

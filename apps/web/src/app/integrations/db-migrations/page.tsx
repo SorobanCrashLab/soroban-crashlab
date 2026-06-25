@@ -1,7 +1,12 @@
 'use client';
 
 import React from 'react';
-import DatabaseMigrationIntegrationTests from '../../integrate-database-migration-integration-tests';
+import dynamic from 'next/dynamic';
+import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
+
+const DatabaseMigrationIntegrationTests = dynamic(() => import('../../integrate-database-migration-integration-tests'), {
+  loading: () => <IntegrationPageSkeleton />,
+});
 
 export default function DbMigrationsIntegrationPage() {
   return (

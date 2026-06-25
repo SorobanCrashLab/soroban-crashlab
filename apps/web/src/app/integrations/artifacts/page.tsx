@@ -1,7 +1,12 @@
 'use client';
 
 import React from 'react';
-import ArtifactStorageIntegration from '../../integrate-storage-backend-integration-for-artifacts';
+import dynamic from 'next/dynamic';
+import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
+
+const ArtifactStorageIntegration = dynamic(() => import('../../integrate-storage-backend-integration-for-artifacts'), {
+  loading: () => <IntegrationPageSkeleton />,
+});
 
 export default function ArtifactStorageIntegrationPage() {
   return <ArtifactStorageIntegration />;

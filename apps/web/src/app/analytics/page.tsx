@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FuzzingRun } from '../types';
+import { dedupedFetchJson } from '../../lib/request-dedup';
 
 export default function AnalyticsPage() {
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
@@ -10,8 +11,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/runs')
-      .then((res) => res.json())
+    dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs')
       .then((data) => {
         if (!cancelled) {
           setRuns(data.runs ?? []);
@@ -49,6 +49,7 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
         {[
           { href: '/analytics/clusters', title: 'Failure Clusters', desc: 'View grouped failure signatures and crash patterns', icon: '◈' },
+          { href: '/analytics/comparison', title: 'Run Comparison', desc: 'Compare two runs side by side to inspect metrics and metadata differences', icon: '⇄' },
           { href: '/analytics/heatmap', title: 'Performance Heatmap', desc: 'Visualize run duration, CPU and memory usage patterns', icon: '⊟' },
           { href: '/analytics/flaky', title: 'Flaky Test Detection', desc: 'Identify non-deterministic crashes and unstable tests', icon: '⊕' },
           { href: '/trends', title: 'Crash Trends', desc: 'Time series crash trend visualization and analysis', icon: '⊞' },

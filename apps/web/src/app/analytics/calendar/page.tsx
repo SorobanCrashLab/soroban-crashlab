@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FuzzingRun } from '../../types';
+import { dedupedFetchJson } from '../../../lib/request-dedup';
 
 type DayData = {
   date: string;
@@ -182,8 +183,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/runs')
-      .then((res) => res.json())
+    dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs')
       .then((data) => {
         if (!cancelled) {
           const apiRuns: FuzzingRun[] = data.runs ?? [];

@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FuzzingRun, RunIssueLink } from "../types";
+import { dedupedFetchJson } from "../../lib/request-dedup";
 import {
   TRIAGE_COLUMNS,
   getColumnRuns,
@@ -24,10 +25,8 @@ import {
 // ---------------------------------------------------------------------------
 
 async function fetchRuns(): Promise<FuzzingRun[]> {
-  const res = await fetch('/api/runs');
-  if (!res.ok) throw new Error('Failed to fetch runs');
-  const data = await res.json();
-  return data.runs as FuzzingRun[];
+  const data = await dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs');
+  return data.runs ?? [];
 }
 
 async function fetchIssuesForRuns(

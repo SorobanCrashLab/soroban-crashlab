@@ -1,4 +1,9 @@
-import IntegrationTestHarnessForUIFlows from '../../integrate-integration-test-harness-for-ui-flows';
+import dynamic from 'next/dynamic';
+import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
+
+const IntegrationTestHarnessForUIFlows = dynamic(() => import('../../integrate-integration-test-harness-for-ui-flows'), {
+  loading: () => <IntegrationPageSkeleton />,
+});
 
 export const metadata = {
   title: 'UI Flow Test Harness | SorobanCrashLab',

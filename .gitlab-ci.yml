@@ -1,0 +1,15 @@
+stages:
+  - trigger
+
+trigger_downstream:
+  stage: trigger
+  script:
+    - echo "Triggering downstream pipeline"
+  trigger:
+    project: $DOWNSTREAM_PROJECT
+    branch: $CI_COMMIT_BRANCH
+    strategy: depend
+
+# Optional variables (set in CI/CD settings)
+# DOWNSTREAM_PROJECT: "group/subproject"
+# Ensure a CI_JOB_TOKEN with appropriate permissions is available.
