@@ -1,6 +1,13 @@
 import * as assert from 'node:assert/strict';
 import { RunIssueLink } from './types';
-import { validateIssueUrl, getIssueTypeFromUrl, addIssueLink, removeIssueLink } from './run-issue-utils';
+import {
+  validateIssueUrl,
+  getIssueTypeFromUrl,
+  getIssueHostname,
+  getIssueFaviconUrl,
+  addIssueLink,
+  removeIssueLink,
+} from './run-issue-utils';
 
 const runAssertions = () => {
   // Test validateIssueUrl
@@ -15,6 +22,15 @@ const runAssertions = () => {
   assert.equal(getIssueTypeFromUrl('https://mycompany.jira.com/issue'), 'Jira Ticket');
   assert.equal(getIssueTypeFromUrl('https://linear.app/issue'), 'Linear Issue');
   assert.equal(getIssueTypeFromUrl('https://bugtracker.com/123'), 'External Issue');
+
+  // Test hostname/favicon helpers
+  assert.equal(getIssueHostname('https://github.com/stellar/soroban-cli/issues/1'), 'github.com');
+  assert.equal(getIssueHostname('not-a-url'), null);
+  assert.equal(
+    getIssueFaviconUrl('https://github.com/stellar/soroban-cli/issues/1'),
+    'https://www.google.com/s2/favicons?domain=github.com&sz=32',
+  );
+  assert.equal(getIssueFaviconUrl('not-a-url'), null);
 
   // Test addIssueLink
   const initialLinks: RunIssueLink[] = [{ label: 'Bug 1', href: 'https://github.com/stellar/1' }];

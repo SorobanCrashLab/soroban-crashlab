@@ -166,10 +166,6 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
     setFilters([]);
     setSelectedQueryId(null);
   }, []);
-
-  /* ── Query execution ────────────────────────────────────────────── */
-
-
   /* ── Query persistence ──────────────────────────────────────────── */
 
   const saveQuery = useCallback(async () => {
@@ -399,7 +395,10 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
             )}
 
             {filters.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+              <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 space-y-2">
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Filtered by field: {filters.map(f => getFieldConfig(f.field).label).join(', ')}
+                </div>
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-zinc-600 dark:text-zinc-400">
                     <span className="font-medium">{filteredRuns.length}</span> of {runs.length} runs match

@@ -45,6 +45,7 @@ export default function SettingsPage() {
           { href: '/settings/reporting', title: 'Reporting', desc: 'Report generation templates and export preferences', icon: '⊞' },
           { href: '/settings/accessibility', title: 'Accessibility', desc: 'Keyboard navigation, screen reader and contrast settings', icon: '◈' },
           { href: '/settings/api', title: 'API Configuration', desc: 'Backend URL, rate limits and connection settings', icon: '⚙' },
+          { href: '/settings/notifications', title: 'Notifications', desc: 'Configure notification types, delivery and quiet hours', icon: '◉' },
         ].map((item) => (
           <Link key={item.href} href={item.href} className="card card-padding card-interactive flex items-start gap-3 sm:gap-4 text-decoration-none">
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center text-base sm:text-lg flex-shrink-0" style={{ background: '#E7F0F9', color: '#0A66C2' }}>

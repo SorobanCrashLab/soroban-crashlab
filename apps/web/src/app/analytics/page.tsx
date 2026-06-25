@@ -52,6 +52,7 @@ export default function AnalyticsPage() {
           { href: '/analytics/heatmap', title: 'Performance Heatmap', desc: 'Visualize run duration, CPU and memory usage patterns', icon: '⊟' },
           { href: '/analytics/flaky', title: 'Flaky Test Detection', desc: 'Identify non-deterministic crashes and unstable tests', icon: '⊕' },
           { href: '/trends', title: 'Crash Trends', desc: 'Time series crash trend visualization and analysis', icon: '⊞' },
+          { href: '/analytics/calendar', title: 'Run Heatmap Calendar', desc: 'Visualize run activity by date with GitHub-style contribution calendar', icon: '⊡' },
         ].map((item) => (
           <Link key={item.href} href={item.href} className="card card-padding card-interactive flex items-start gap-3 sm:gap-4 text-decoration-none">
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center text-base sm:text-lg flex-shrink-0" style={{ background: '#E7F0F9', color: '#0A66C2' }}>

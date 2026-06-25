@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildMockRuns } from '@/app/mockRuns';
+import { addTag, normalizeTag, removeTag } from '@/app/run-tags-utils';
 
 // In-memory store keyed by run ID (persists for the lifetime of the process)
 const tagStore = new Map<string, string[]>();
 
-function normTag(tag: string): string {
-  return tag.trim().toLowerCase().replace(/\s+/g, '-');
-}
-
 function getTags(id: string): string[] {
   if (!tagStore.has(id)) {
-    tagStore.set(id, []);
+    const run = buildMockRuns().find((r) => r.id === id);
+    const initial = run?.tags ?? [];
+    tagStore.set(id, [...initial]);
   }
   return tagStore.get(id)!;
 }
@@ -57,17 +56,14 @@ export async function POST(
     return NextResponse.json({ error: 'tag is required and must be a non-empty string' }, { status: 400 });
   }
 
-  const tag = normTag(raw);
-  if (tag.length > 64) {
-    return NextResponse.json({ error: 'Tag exceeds 64 character limit' }, { status: 400 });
+  const current = getTags(id);
+  const result = addTag(current, raw);
+  if (!result.success) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  const tags = getTags(id);
-  if (!tags.includes(tag)) {
-    tags.push(tag);
-    tags.sort();
-  }
-  return NextResponse.json({ runId: id, tags }, { status: 201 });
+  tagStore.set(id, result.tags);
+  return NextResponse.json({ runId: id, tags: result.tags }, { status: 201 });
 }
 
 /**
@@ -96,13 +92,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'tag is required' }, { status: 400 });
   }
 
-  const tag = normTag(raw);
-  const tags = getTags(id);
-  const idx = tags.indexOf(tag);
-  if (idx === -1) {
+  const normalized = normalizeTag(raw);
+  const current = getTags(id);
+  if (!current.includes(normalized)) {
     return NextResponse.json({ error: 'Tag not found' }, { status: 404 });
   }
 
-  tags.splice(idx, 1);
-  return NextResponse.json({ runId: id, tags });
+  const next = removeTag(current, normalized);
+  tagStore.set(id, next);
+  return NextResponse.json({ runId: id, tags: next });
 }

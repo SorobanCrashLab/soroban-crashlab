@@ -235,6 +235,12 @@ export function buildMockRuns(): FuzzingRun[] {
       associatedIssues: status === 'failed' ? (issueCatalog[signature] ?? []) : [],
       annotations:
         index % 5 === 0 ? ['Verified by maintainer', 'Related to contract state exhaustion'] : [],
+      tags:
+        index % 7 === 0
+          ? ['needs-repro', 'partner-followup']
+          : index % 4 === 0
+            ? ['ship-blocker']
+            : [],
     };
   }).reverse();
 }

@@ -219,7 +219,8 @@ const AdvancedDashboardFilters: React.FC<AdvancedDashboardFiltersProps> = ({
                 : 'border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100'
             } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             aria-describedby="search-runs-description"
-          />\n          <span id="search-runs-description" className="sr-only">
+          />
+          <span id="search-runs-description" className="sr-only">
             Enter keywords to filter runs by ID, signature, or other attributes
           </span>
         </div>
@@ -313,7 +314,8 @@ const AdvancedDashboardFilters: React.FC<AdvancedDashboardFiltersProps> = ({
                     onChange={(e) => handleDateRangeChange('start', e.target.value)}
                     disabled={isLoading}
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100 disabled:opacity-50"
-                  />\n                  <span className="text-gray-500 dark:text-zinc-500" aria-hidden="true">to</span>
+                    />
+                  <span className="text-gray-500 dark:text-zinc-500" aria-hidden="true">to</span>
                   <input
                     id="date-end"
                     type="date"
@@ -364,7 +366,8 @@ const AdvancedDashboardFilters: React.FC<AdvancedDashboardFiltersProps> = ({
                     disabled={isLoading}
                     min="0"
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100 disabled:opacity-50"
-                  />\n                  <span className="text-gray-500 dark:text-zinc-500" aria-hidden="true">-</span>
+                    />
+                  <span className="text-gray-500 dark:text-zinc-500" aria-hidden="true">-</span>
                   <input
                     id="duration-max"
                     type="number"
@@ -395,7 +398,8 @@ const AdvancedDashboardFilters: React.FC<AdvancedDashboardFiltersProps> = ({
                     disabled={isLoading}
                     min="0"
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-zinc-900 text-gray-900 dark:text-zinc-100 disabled:opacity-50"
-                  />\n                  <span className="text-gray-500 dark:text-zinc-500" aria-hidden="true">-</span>
+                    />
+                  <span className="text-gray-500 dark:text-zinc-500" aria-hidden="true">-</span>
                   <input
                     id="fee-max"
                     type="number"

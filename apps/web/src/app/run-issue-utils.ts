@@ -17,6 +17,20 @@ export function getIssueTypeFromUrl(url: string): string {
   return 'External Issue';
 }
 
+export function getIssueHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+export function getIssueFaviconUrl(url: string): string | null {
+  const hostname = getIssueHostname(url);
+  if (!hostname) return null;
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32`;
+}
+
 export function addIssueLink(links: RunIssueLink[], newLink: RunIssueLink): { success: boolean; links: RunIssueLink[]; error?: string } {
   if (!validateIssueUrl(newLink.href)) {
     return { success: false, links, error: 'Invalid URL format' };

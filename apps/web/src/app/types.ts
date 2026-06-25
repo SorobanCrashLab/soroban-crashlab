@@ -69,6 +69,8 @@ export interface FuzzingRun {
     associatedIssues?: RunIssueLink[];
     /** Custom annotations and notes for the run */
     annotations?: string[];
+    /** User-defined tags for triage and filtering */
+    tags?: string[];
 }
 
 /**

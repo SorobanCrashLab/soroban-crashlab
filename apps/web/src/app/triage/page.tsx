@@ -9,7 +9,7 @@
  * live issue data fetched from the /api/runs/[id]/issues endpoint.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FuzzingRun, RunIssueLink } from "../types";
 import {
   TRIAGE_COLUMNS,
@@ -59,6 +59,7 @@ async function loadTriageData(): Promise<FuzzingRun[]> {
 // Helpers
 // ---------------------------------------------------------------------------
 type PageDataState = "loading" | "success" | "error";
+type TriageFilter = "all" | TriageColumnDef["id"];
 
 const SEVERITY_DOT: Record<string, string> = {
   low: "bg-zinc-400",
@@ -271,6 +272,8 @@ function TriageColumn({
 export default function TriageBoardPage() {
   const [dataState, setDataState] = useState<PageDataState>("loading");
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
+  const [activeFilter, setActiveFilter] = useState<TriageFilter>("all");
+  const filterButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -301,6 +304,36 @@ export default function TriageBoardPage() {
   };
 
   const totalIssues = getIssueCounts(runs);
+  const visibleColumns =
+    activeFilter === "all"
+      ? TRIAGE_COLUMNS
+      : TRIAGE_COLUMNS.filter((column) => column.id === activeFilter);
+
+  const handleFilterKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    const buttons = filterButtonRefs.current.filter(
+      (button): button is HTMLButtonElement => button !== null,
+    );
+    if (buttons.length === 0) return;
+
+    let nextIndex = index;
+    if (event.key === "ArrowRight") {
+      nextIndex = (index + 1) % buttons.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + buttons.length) % buttons.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = buttons.length - 1;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    buttons[nextIndex]?.focus();
+  };
 
   return (
     <div className="container-full page-padding fade-in">
@@ -329,15 +362,48 @@ export default function TriageBoardPage() {
       {dataState === "error" && <ErrorState onRetry={handleRetry} />}
 
       {dataState === "success" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {TRIAGE_COLUMNS.map((col) => (
+        <>
+          <div
+            role="group"
+            aria-label="Filter triage columns"
+            className="mb-4 flex flex-wrap items-center gap-2"
+          >
+            {(["all", ...TRIAGE_COLUMNS.map((column) => column.id)] as TriageFilter[]).map((filter, index) => {
+              const isActive = activeFilter === filter;
+              const label = filter === "all" ? "All" : TRIAGE_COLUMNS.find((column) => column.id === filter)?.title ?? filter;
+
+              return (
+                <button
+                  key={filter}
+                  ref={(element) => {
+                    filterButtonRefs.current[index] = element;
+                  }}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => setActiveFilter(filter)}
+                  onKeyDown={(event) => handleFilterKeyDown(event, index)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#0A66C2] focus:ring-offset-2 dark:focus:ring-offset-zinc-950 ${
+                    isActive
+                      ? "border-[#0A66C2] bg-[#0A66C2] text-white"
+                      : "border-zinc-300 bg-white text-zinc-700 hover:border-[#0A66C2] hover:text-[#0A66C2] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {visibleColumns.map((col) => (
             <TriageColumn
               key={col.id}
               col={col}
               runs={getColumnRuns(runs, col)}
             />
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

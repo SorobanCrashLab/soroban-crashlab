@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
+import { loadPreferences, filterByPreferences, isInQuietHours } from './notification-preferences-utils';
+import type { NotificationType, NotificationPriority } from './notification-preferences-utils';
 
-export type NotificationType = 'info' | 'success' | 'warning' | 'error';
-export type NotificationPriority = 'low' | 'medium' | 'high' | 'critical';
+export type { NotificationType, NotificationPriority };
 
 export interface Notification {
   id: string;
@@ -60,6 +62,8 @@ export default function NotificationCenter({ className = '' }: NotificationCente
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const prefs = loadPreferences();
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -149,10 +153,13 @@ export default function NotificationCenter({ className = '' }: NotificationCente
     }
   }, [isOpen]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const effectiveNotifications = notifications.filter((n) =>
+    filterByPreferences(n, prefs),
+  );
+  const unreadCount = effectiveNotifications.filter(n => !n.read).length;
   const filteredNotifications = filter === 'unread' 
-    ? notifications.filter(n => !n.read)
-    : notifications;
+    ? effectiveNotifications.filter(n => !n.read)
+    : effectiveNotifications;
 
   const markAsRead = (id: string) => {
     setNotifications((prev: Notification[]) => 
@@ -395,6 +402,21 @@ export default function NotificationCenter({ className = '' }: NotificationCente
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-3 border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 rounded-b-xl">
+            <Link
+              href="/settings/notifications"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-center gap-2 w-full py-2 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Notification Preferences
+            </Link>
           </div>
         </div>
       )}

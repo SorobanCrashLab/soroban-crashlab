@@ -1,7 +1,21 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { FuzzingRun } from './types';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 import {
   type ChartsDataState,
   type ComparisonMetric,
@@ -16,6 +30,16 @@ type ComparisonProps = {
   dataState: ChartsDataState;
   onRetry: () => void;
 };
+
+type ChartType = 'bar' | 'line' | 'scatter';
+
+const CHART_TYPES: { key: ChartType; label: string; description: string }[] = [
+  { key: 'bar', label: 'Bar', description: 'Compare metric values across runs with grouped bars.' },
+  { key: 'line', label: 'Line', description: 'Trend metric values across runs to spot patterns.' },
+  { key: 'scatter', label: 'Scatter', description: 'View distribution of metric values across all runs.' },
+];
+
+const CHART_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 const METRICS: Array<{
   key: ComparisonMetric;
@@ -89,6 +113,7 @@ export default function AddRunComparisonCharts({ runs, dataState, onRetry }: Com
   const [metric, setMetric] = useState<ComparisonMetric>('duration');
   const [baselineRunId, setBaselineRunId] = useState<string>('');
   const [selectedRunId, setSelectedRunId] = useState<string>('');
+  const [chartType, setChartType] = useState<ChartType>('bar');
 
   const chartRuns = useMemo(() => selectChartRuns(runs), [runs]);
   const baselineRun = chartRuns.find((run) => run.id === baselineRunId) ?? chartRuns[chartRuns.length - 1] ?? null;
@@ -107,6 +132,18 @@ export default function AddRunComparisonCharts({ runs, dataState, onRetry }: Com
   const selectedComparison = comparisonData.find((entry) => entry.id === selectedRun?.id) ?? comparisonData[0];
 
   const summary = useMemo(() => summarizeChartRows(comparisonData), [comparisonData]);
+
+  const chartData = useMemo(() => {
+    return comparisonData.map((row) => ({
+      id: row.id,
+      value: row.value,
+      delta: row.delta,
+      percentage: row.percentage,
+      area: row.area,
+      status: row.status,
+      baseline: row.baseline,
+    }));
+  }, [comparisonData]);
 
   return (
     <section className="w-full rounded-[2rem] border border-black/[.08] bg-white/95 p-6 shadow-sm dark:border-white/[.145] dark:bg-zinc-950/90 md:p-8">
@@ -246,6 +283,95 @@ export default function AddRunComparisonCharts({ runs, dataState, onRetry }: Com
                 </div>
               </div>
             </div>
+
+            <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Chart type selector">
+              {CHART_TYPES.map((type) => {
+                const isActive = type.key === chartType;
+                return (
+                  <button
+                    key={type.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setChartType(type.key)}
+                    className={`rounded-full border px-4 py-1.5 text-xs font-medium transition ${
+                      isActive
+                        ? 'border-cyan-500 bg-cyan-500 text-white shadow-sm'
+                        : 'border-zinc-300 bg-white text-zinc-700 hover:border-cyan-300 hover:text-cyan-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-cyan-800 dark:hover:text-cyan-300'
+                    }`}
+                  >
+                    {type.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {chartType === 'bar' && chartData.length > 0 && (
+              <div className="mb-6 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-800" />
+                    <XAxis dataKey="id" tick={{ fontSize: 11 }} angle={-20} textAnchor="end" height={50} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'var(--tooltip-bg, white)',
+                        border: '1px solid var(--tooltip-border, #e5e7eb)',
+                        borderRadius: '0.375rem',
+                        padding: '0.75rem',
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="value" fill="#3b82f6" name={metricConfig.label} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {chartType === 'line' && chartData.length > 0 && (
+              <div className="mb-6 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-800" />
+                    <XAxis dataKey="id" tick={{ fontSize: 11 }} angle={-20} textAnchor="end" height={50} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'var(--tooltip-bg, white)',
+                        border: '1px solid var(--tooltip-border, #e5e7eb)',
+                        borderRadius: '0.375rem',
+                        padding: '0.75rem',
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="value" stroke="#3b82f6" name={metricConfig.label} dot={{ r: 4 }} strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {chartType === 'scatter' && chartData.length > 0 && (
+              <div className="mb-6 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                <ResponsiveContainer width="100%" height={300}>
+                  <ScatterChart margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-zinc-200 dark:stroke-zinc-800" />
+                    <XAxis dataKey="delta" tick={{ fontSize: 12 }} name="Delta %" />
+                    <YAxis dataKey="value" tick={{ fontSize: 12 }} name={metricConfig.label} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'var(--tooltip-bg, white)',
+                        border: '1px solid var(--tooltip-border, #e5e7eb)',
+                        borderRadius: '0.375rem',
+                        padding: '0.75rem',
+                      }}
+                      cursor={{ strokeDasharray: '3 3' }}
+                    />
+                    <Legend />
+                    <Scatter data={chartData} fill="#3b82f6" name={metricConfig.label} />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             <div className="space-y-3">
               {comparisonData.map((entry) => (

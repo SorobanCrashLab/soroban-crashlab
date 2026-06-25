@@ -5,8 +5,8 @@ import {
   getChartsStateMessage,
   selectChartRuns,
   summarizeChartRows,
-} from "./add-run-comparison-charts-utils.ts";
-import { buildMockRuns } from "./mockRuns.ts";
+} from "./add-run-comparison-charts-utils";
+import { buildMockRuns } from "./mockRuns";
 
 function runAssertions(): void {
   assert.equal(computeDeltaPercent(100, 120), 20);
