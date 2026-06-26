@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test.describe('Integrations Hub navigation', () => {
   test('should load integrations hub and navigate to an integration page', async ({ page }) => {
