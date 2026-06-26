@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 
-export async function POST(request: NextRequest) {
-    const body = await request.json() as Record<string, unknown>;
+export const POST = withRouteErrorHandling('POST /api/campaigns', async (request: NextRequest) => {
+    const parsedBody = await readJsonBody(request);
+    if ('error' in parsedBody) return parsedBody.error;
 
     const campaign = {
         id: `campaign-${Date.now()}`,
         status: 'queued',
         createdAt: new Date().toISOString(),
-        ...body,
+        ...(parsedBody.body as Record<string, unknown>),
     };
 
     return NextResponse.json({ campaign }, { status: 201 });
-}
+});

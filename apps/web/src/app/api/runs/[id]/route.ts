@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildMockRuns } from '@/app/mockRuns';
 import type { FuzzingRun } from '@/app/types';
-import { logger } from '@/lib/logger';
+import { withRouteErrorHandling } from '@/lib/route-handler';
 
 /**
  * Resolves a single run by ID from the in-process mock store.
@@ -21,11 +21,9 @@ export function findRunById(id: string): FuzzingRun | undefined {
  * Env vars:
  *   RUNS_API_URL  – base URL of the Rust fuzzer API (e.g. http://localhost:8080)
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withRouteErrorHandling(
+  'GET /api/runs/[id]',
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { id } = await params;
 
     if (!id) {
@@ -54,8 +52,5 @@ export async function GET(
       return NextResponse.json({ error: 'Run not found' }, { status: 404 });
     }
     return NextResponse.json(run, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } });
-  } catch (error) {
-    logger.error('GET /api/runs/[id] failed', { error });
-    return NextResponse.json({ error: 'Failed to fetch run' }, { status: 500 });
-  }
-}
+  },
+);

@@ -2,17 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import type { Artifact } from "./types";
 
-// Artifact interface - mirrors the shape in add-artifact-explorer.tsx
-export interface Artifact {
-  id: string;
-  name: string;
-  type: "seed" | "log" | "trace" | "coverage" | "bundle";
-  size: number; // bytes
-  updatedAt: string; // ISO 8601
-  runId?: string;
-  content_hash?: string;
-}
+export type { Artifact };
 
 export type ArtifactPreviewDataState = "loading" | "error" | "success";
 

@@ -1,100 +1,49 @@
-"use client";
-
-import Link from "next/link";
+import type { Metadata } from "next";
 import "./globals.css";
-import NotificationCenter from "./add-notification-center-ui";
-import DarkModeToggle from "./add-dark-mode-support";
-import OnboardingWizard from "./components/OnboardingWizard";
-import { useOnboardingWizard } from "./hooks/useOnboardingWizard";
+import { ThemeProvider } from "../components/ThemeProvider";
+import NavBar from "../components/NavBar";
+import AddKeyboardShortcutCheatsheetModal from "./add-keyboard-shortcut-cheatsheet-modal";
+
+export const metadata: Metadata = {
+  title: "Soroban CrashLab | Smart Contract Fuzzing Platform",
+  description:
+    "Intelligent mutation testing and runtime behavior tracing for Soroban smart contracts on the Stellar network.",
+  openGraph: {
+    title: "Soroban CrashLab",
+    description: "Advanced fuzzing framework for Soroban smart contracts",
+    type: "website",
+  },
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { showWizard, markComplete } = useOnboardingWizard();
-
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <title>Soroban CrashLab | Smart Contract Fuzzing</title>
-        <meta
-          name="description"
-          content="Intelligent mutation testing and runtime behavior tracing for Soroban smart contracts."
-        />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            try {
+              var t = localStorage.getItem('crashlab:theme');
+              var d = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
+              document.documentElement.classList.toggle('dark', d);
+            } catch(e) {}
+          `
+        }} />
       </head>
-      <body className={`antialiased min-h-screen flex flex-col`}
-        style={{ background: "var(--background)", color: "var(--foreground)" }}
-      >
-        <header
-          className="border-b p-6 flex items-center justify-between"
-          style={{
-            borderColor: "var(--header-border-color)",
-            background: "var(--background)",
-            color: "var(--foreground)",
-          }}
-        >
-          <div className="font-semibold text-xl tracking-tight">
-            Soroban CrashLab
-          </div>
-          <div className="flex items-center gap-4">
-            <nav className="flex gap-4 text-sm font-medium">
-              <Link
-                href="/logs"
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                Logs
-              </Link>
-              <Link
-                href="/triage"
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                Triage
-              </Link>
-              <Link
-                href="/settings/accessibility"
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                Keyboard Nav
-              </Link>
-              <Link
-                href="/settings/alerting"
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                Alerts
-              </Link>
-              <Link
-                href="/#reporting-templates"
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                Templates
-              </Link>
-              <a
-                href="https://github.com/SorobanCrashLab/soroban-crashlab"
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                GitHub
-              </a>
-              <a
-                href="https://github.com/SorobanCrashLab/soroban-crashlab/issues"
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open Issues
-              </a>
-            </nav>
-            <NotificationCenter />
-            <DarkModeToggle />
-          </div>
-        </header>
-        <main className="flex-1 flex flex-col">{children}</main>
-        <footer className="border-t border-black/8 dark:border-white/15 p-6 text-center text-sm text-zinc-500">
-          Built for Stellar &middot; Soroban Ecosystem
-        </footer>
-        <OnboardingWizard isOpen={showWizard} onClose={markComplete} />
+      <body className="antialiased min-h-screen">
+        <ThemeProvider>
+          <NavBar />
+          <AddKeyboardShortcutCheatsheetModal />
+          <main style={{ background: 'var(--bg)', paddingTop: '52px', minHeight: '100vh', transition: 'background 0.3s ease' }}>
+            {children}
+          </main>
+        </ThemeProvider>
       </body>
     </html>
   );

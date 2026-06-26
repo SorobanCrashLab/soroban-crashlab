@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FuzzingRun } from '../types';
-import { dedupedFetchJson } from '../../lib/request-dedup';
+import { fetchRuns } from '../../lib/api-client';
 import VirtualizedRunTable from '../implement-virtualized-run-table-component';
 
 const RUN_TABLE_COLUMNS = ['id', 'status', 'area', 'severity', 'duration', 'seedCount'];
@@ -23,7 +23,7 @@ export default function RunsPage() {
     const load = async () => {
       setDataState('loading');
       try {
-        const data = await dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs');
+        const data = await fetchRuns();
         if (!cancelled) {
           const sorted = (data.runs ?? []).slice().sort((a: FuzzingRun, b: FuzzingRun) => {
             const ta = a.queuedAt ?? a.startedAt ?? '';

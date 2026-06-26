@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { loadPreferences, filterByPreferences, isInQuietHours } from './notification-preferences-utils';
 import type { NotificationType, NotificationPriority } from './notification-preferences-utils';
+import { api, type NotificationFeedItem } from '../lib/api-client';
 
 export type { NotificationType, NotificationPriority };
 
@@ -27,16 +28,7 @@ interface NotificationCenterProps {
 
 const POLL_INTERVAL_MS = 30000;
 
-type FeedItem = {
-  id: string;
-  title: string;
-  message: string;
-  severity: 'info' | 'success' | 'warning' | 'error';
-  createdAt: string;
-  read: boolean;
-};
-
-function mapFeedItemToNotification(item: FeedItem): Notification {
+function mapFeedItemToNotification(item: NotificationFeedItem): Notification {
   const priorityMap: Record<string, NotificationPriority> = {
     error: 'critical',
     warning: 'high',
@@ -67,10 +59,8 @@ export default function NotificationCenter({ className = '' }: NotificationCente
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await fetch('/api/notifications');
-      if (!res.ok) return;
-      const data = await res.json();
-      const feed: FeedItem[] = data.notifications ?? [];
+      const data = await api.notifications.list();
+      const feed: NotificationFeedItem[] = data.notifications ?? [];
       const mapped = feed.map(mapFeedItemToNotification);
       setNotifications((prev) => {
         const prevIds = new Set(prev.map((n) => n.id));

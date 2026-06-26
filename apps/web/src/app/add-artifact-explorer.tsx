@@ -3,16 +3,10 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import ArtifactPreviewModal from './implement-artifact-preview-modal-component';
 import { useDebounce } from '../lib/useDebounce';
+import { api } from '../lib/api-client';
+import type { Artifact } from './types';
 
-export interface Artifact {
-  id: string;
-  name: string;
-  type: 'seed' | 'log' | 'trace' | 'coverage' | 'bundle';
-  size: number;
-  updatedAt: string;
-  runId?: string;
-  content_hash?: string;
-}
+export type { Artifact };
 
 const MOCK_ARTIFACTS: Artifact[] = [
   { id: 'art-001', name: 'seed_2026_03_29_001.bin', type: 'seed', size: 1024 * 45, updatedAt: '2026-03-29T10:00:00Z', runId: 'run-1000', content_hash: 'a1b2c3d4' },
@@ -80,14 +74,7 @@ export default function ArtifactExplorer() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/artifacts', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to list artifacts');
-      }
-      const data = await response.json();
+      const data = await api.artifacts.list();
       const mapped = (data.artifacts || []).map(mapMetadataToArtifact);
       setArtifacts(mapped);
     } catch (err) {
@@ -145,13 +132,7 @@ export default function ArtifactExplorer() {
   const handleDownload = async (artifact: Artifact) => {
     setDownloadingId(artifact.id);
     try {
-      const response = await fetch(`/api/artifacts/${encodeURIComponent(artifact.id)}`, {
-        method: 'GET',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to download artifact content');
-      }
-      const blob = await response.blob();
+      const blob = await api.artifacts.download(artifact.id);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

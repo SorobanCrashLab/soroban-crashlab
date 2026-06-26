@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { api } from '../lib/api-client';
 
 // --- Types ---
 
@@ -55,17 +56,7 @@ async function uploadArtifact(file: File): Promise<Artifact> {
  * GET /api/artifacts
  */
 async function fetchArtifacts(): Promise<Artifact[]> {
-  const response = await fetch('/api/artifacts', {
-    method: 'GET',
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to list artifacts');
-  }
-
-  const data = await response.json();
+  const data = await api.artifacts.list();
   return data.artifacts || [];
 }
 
@@ -74,16 +65,7 @@ async function fetchArtifacts(): Promise<Artifact[]> {
  * GET /api/artifacts/:id
  */
 async function downloadArtifactContent(id: string): Promise<Blob> {
-  const response = await fetch(`/api/artifacts/${id}`, {
-    method: 'GET',
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to download artifact');
-  }
-
-  return await response.blob();
+  return api.artifacts.download(id);
 }
 
 

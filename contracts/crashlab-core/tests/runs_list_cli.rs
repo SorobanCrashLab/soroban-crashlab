@@ -2,14 +2,19 @@ use crashlab_core::{RunId, request_cancel_run};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn unique_tmp() -> PathBuf {
     let n = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("time")
         .as_nanos();
-    std::env::temp_dir().join(format!("crashlab-runs-list-{n}"))
+    let seq = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
+    std::env::temp_dir().join(format!("crashlab-runs-list-{pid}-{n}-{seq}"))
 }
 
 #[test]

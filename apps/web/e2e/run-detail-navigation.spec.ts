@@ -94,7 +94,7 @@ test.describe('Run detail navigation', () => {
 
     await expect(page.getByRole('heading', { name: 'Run Details' })).toBeVisible();
     await expect(page.getByText('ID: run-1002')).toBeVisible();
-    await expect(page.getByRole('link', { name: '← Back to Runs' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Back to Dashboard' })).toBeVisible();
   });
 
   test('navigates back from run detail to runs list', async ({ page }) => {
@@ -102,9 +102,9 @@ test.describe('Run detail navigation', () => {
 
     await expect(page.getByRole('heading', { name: 'Run Details' })).toBeVisible();
     await expect(page.getByText('ID: run-1001')).toBeVisible();
-    await expect(page.locator('.badge-failed')).toBeVisible();
+    await expect(page.getByText('Issues found')).toBeVisible();
 
-    await page.getByRole('link', { name: '← Back to Runs' }).click();
+    await page.locator('a.top-nav-link[href="/runs"]').click();
 
     await expect(page).toHaveURL(/\/runs$/);
     await expect(page.getByRole('heading', { name: 'Fuzzing Runs' })).toBeVisible();
@@ -113,7 +113,7 @@ test.describe('Run detail navigation', () => {
   test('links to dashboard from run detail page', async ({ page }) => {
     await openRunFromList(page, 'run-1001');
 
-    await page.locator('a.btn-outline', { hasText: 'Dashboard' }).click();
+    await page.getByRole('link', { name: 'Back to Dashboard' }).click();
 
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();

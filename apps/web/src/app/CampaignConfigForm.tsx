@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CampaignConfig, CampaignSeedSource, CampaignAuthMode } from './types';
+import { api } from '../lib/api-client';
 
 interface CampaignConfigFormProps {
     onSubmit: (config: CampaignConfig) => void;
@@ -23,12 +24,7 @@ export default function CampaignConfigForm({ onSubmit, onCancel }: CampaignConfi
         setSubmitting(true);
         setError(null);
         try {
-            const res = await fetch('/api/campaigns', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config),
-            });
-            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            await api.campaigns.create(config);
             onSubmit(config);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to launch campaign');

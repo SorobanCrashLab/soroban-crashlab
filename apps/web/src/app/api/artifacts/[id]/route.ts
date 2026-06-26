@@ -3,33 +3,25 @@ import {
   getArtifactById,
   deleteArtifactById,
 } from '@/lib/artifact-fs-adapter';
-import { logger } from '@/lib/logger';
+import { jsonError, withRouteErrorHandling } from '@/lib/route-handler';
 
 /**
  * GET /api/artifacts/[id]
  * Downloads an artifact from CRASHLAB_ARTIFACT_DIR by ID
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const GET = withRouteErrorHandling(
+  'GET /api/artifacts/[id]',
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { id } = await params;
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Artifact ID is required' },
-        { status: 400 },
-      );
+      return jsonError('Artifact ID is required', 400);
     }
 
     const result = await getArtifactById(id);
 
     if (!result) {
-      return NextResponse.json(
-        { error: 'Artifact not found' },
-        { status: 404 },
-      );
+      return jsonError('Artifact not found', 404);
     }
 
     const { metadata, buffer } = result;
@@ -42,51 +34,33 @@ export async function GET(
         'Content-Length': metadata.sizeBytes.toString(),
       },
     });
-  } catch (error) {
-    logger.error('GET /api/artifacts/[id] failed', { error });
-    return NextResponse.json(
-      { error: 'Failed to download artifact' },
-      { status: 500 },
-    );
-  }
-}
+  },
+  'Failed to download artifact',
+);
 
 /**
  * DELETE /api/artifacts/[id]
  * Deletes an artifact from CRASHLAB_ARTIFACT_DIR by ID
  */
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const DELETE = withRouteErrorHandling(
+  'DELETE /api/artifacts/[id]',
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { id } = await params;
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Artifact ID is required' },
-        { status: 400 },
-      );
+      return jsonError('Artifact ID is required', 400);
     }
 
     const deleted = await deleteArtifactById(id);
 
     if (!deleted) {
-      return NextResponse.json(
-        { error: 'Artifact not found' },
-        { status: 404 },
-      );
+      return jsonError('Artifact not found', 404);
     }
 
     return NextResponse.json({
       success: true,
       message: 'Artifact deleted successfully',
     });
-  } catch (error) {
-    logger.error('DELETE /api/artifacts/[id] failed', { error });
-    return NextResponse.json(
-      { error: 'Failed to delete artifact' },
-      { status: 500 },
-    );
-  }
-}
+  },
+  'Failed to delete artifact',
+);

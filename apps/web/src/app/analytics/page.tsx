@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FuzzingRun } from '../types';
-import { dedupedFetchJson } from '../../lib/request-dedup';
+import { fetchRuns } from '../../lib/api-client';
 
 export default function AnalyticsPage() {
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
@@ -11,7 +11,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs')
+    fetchRuns()
       .then((data) => {
         if (!cancelled) {
           setRuns(data.runs ?? []);

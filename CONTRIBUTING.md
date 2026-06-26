@@ -241,197 +241,45 @@ cargo -V
 
 Also paste the exact failing command and the first relevant error block.
 
-## Branch and PR flow
+## Branch naming
 
-1. Create a branch from `main` named `feat/<short-name>` or `fix/<short-name>`.
-2. Keep PRs focused on one issue.
-3. Link the issue in the PR description using `Closes #<number>`.
-4. Include test evidence and reproduction notes for behavior changes.
-5. If your change alters a public API, persisted schema, CLI contract, or
-   documented maintainer workflow, call that out clearly in the PR so the next
-   release maintainer can update [`CHANGELOG.md`](CHANGELOG.md) and run the
-   compatibility review in [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
-
-   ## Branch and Pull Request Workflow
-
-Follow this workflow when contributing to Soroban CrashLab.
-
-### 1. Fork the repository
-
-Create your own fork of the repository using the GitHub Fork button.
-
-### 2. Clone your fork
+Create branches from `main` using the convention `issue/<number>-<kebab-case-description>`.
 
 ```bash
-git clone https://github.com/<your-username>/soroban-crashlab.git
-cd soroban-crashlab
+git checkout -b issue/137-contributing-md
 ```
 
-### 3. Configure the upstream remote
+## Pull Request process
 
-```bash
-git remote add upstream https://github.com/SorobanCrashLab/soroban-crashlab.git
-git remote -v
-```
+1. **One issue per PR.** Keep scope limited to the files listed in the issue to avoid merge conflicts.
+2. **PR title format.** Use [Conventional Commits](https://www.conventionalcommits.org/):
+   ```
+   type(area): short summary (ROADMAP-NNN)
+   ```
+   Examples:
+   ```
+   docs(root): add CONTRIBUTING.md with PR policy (ROADMAP-137)
+   feat(web): add run cancellation button (ROADMAP-142)
+   fix(core): handle timeout edge case in replay (ROADMAP-138)
+   ```
+3. **Link the issue.** Include `Closes #<issue_number>` in the PR body.
+4. **Test evidence.** Include output from relevant verification commands and reproduction notes for behavior changes.
+5. **API / schema / CLI changes.** If your change alters a public API, persisted schema, CLI contract, or documented maintainer workflow, call that out clearly in the PR so the next release maintainer can update [`CHANGELOG.md`](CHANGELOG.md) and run the compatibility review in [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 
-You should see both `origin` (your fork) and `upstream` (the main repository).
+## Lockfile policy
 
-### 4. Sync your local main branch
+Do not commit changes to `pnpm-lock.yaml` or `package-lock.json`. If your
+change requires a dependency update, open a separate PR that only touches the
+lockfile.
 
-Before starting work on an issue, update your local copy:
+## package.json changes
 
-```bash
-git checkout main
-git fetch upstream
-git merge upstream/main
-git push origin main
-```
+If your PR modifies `package.json`, add a **Maintainer approval** section in the
+PR body describing why the change is needed. Examples of valid reasons:
 
-### 5. Create a branch
-
-Create a focused branch for a single issue.
-
-Examples:
-
-```bash
-git checkout -b feat/add-dashboard-filter
-git checkout -b fix/login-timeout
-git checkout -b docs/contribution-guidelines-pr-workflow
-```
-
-Recommended naming conventions:
-
-```text
-feat/<short-description>
-fix/<short-description>
-docs/<short-description>
-chore/<short-description>
-```
-
-### 6. Implement your changes
-
-Keep changes focused on the assigned issue.
-
-Avoid unrelated refactors or formatting-only modifications unless they are required for the task.
-
-### 7. Run verification checks
-
-For frontend changes:
-
-```bash
-cd apps/web
-npm run test
-npm run lint
-npm run build
-```
-
-For Rust changes:
-
-```bash
-cd contracts/crashlab-core
-cargo test --all-targets
-```
-
-### 8. Review your changes
-
-Check the files that were modified:
-
-```bash
-git status
-git diff
-```
-
-Ensure:
-
-* Only relevant files are modified
-* No debug code remains
-* Documentation is updated when needed
-
-### 9. Commit your work
-
-Create a clear commit message:
-
-```bash
-git add .
-git commit -m "docs: add contribution workflow guide"
-```
-
-Examples:
-
-```text
-feat: add artifact filtering
-fix: handle replay timeout edge case
-docs: expand contribution workflow guide
-```
-
-### 10. Push your branch
-
-```bash
-git push origin <branch-name>
-```
-
-Example:
-
-```bash
-git push origin docs/contribution-guidelines-pr-workflow
-```
-
-### 11. Open a Pull Request
-
-Open a pull request from your branch into the upstream repository's `main` branch.
-
-Your pull request should include:
-
-* Summary of changes
-* Testing evidence
-* Screenshots when applicable
-* Related issue reference
-
-Example:
-
-```md
-## Summary
-
-Added contribution guidelines and documented the pull request workflow.
-
-## Testing
-
-- npm run test
-- npm run lint
-- npm run build
-
-Closes #895
-```
-
-### 12. Respond to review feedback
-
-Review comments are a normal part of the process.
-
-Address feedback by making additional commits and pushing them to the same branch:
-
-```bash
-git add .
-git commit -m "Address review feedback"
-git push origin <branch-name>
-```
-
-### 13. Merge
-
-After approval and successful checks, a maintainer will merge the pull request.
-
-### Contribution Guidelines
-
-When contributing:
-
-* Keep pull requests focused on a single issue.
-* Link issues using `Closes #<issue-number>`.
-* Include test evidence for behavior changes.
-* Update documentation when user-facing behavior changes.
-* Clearly describe any API, schema, CLI, or workflow changes.
-* Keep commit messages concise and descriptive.
-* Be respectful during code review discussions.
-* Respond to reviewer feedback promptly whenever possible.
-
+- Adding a new dependency required by the feature
+- Updating a dependency to fix a security vulnerability
+- Changing a script for the build or dev workflow
 
 ## Conflict of interest disclosures
 

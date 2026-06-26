@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import type { FuzzingRun } from '../../types';
 import ImplementRunWorkflowBoardPage58 from '../../implement-run-workflow-board-page-58';
-import { dedupedFetchJson } from '../../../lib/request-dedup';
+import { fetchRuns as fetchRunsFromApi } from '../../../lib/api-client';
 
 async function fetchRuns(): Promise<FuzzingRun[]> {
-  const data = await dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs');
+  const data = await fetchRunsFromApi();
   return data.runs ?? [];
 }
 

@@ -13,6 +13,7 @@ import { useMaintainerMode } from "../useMaintainerMode";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FuzzingRun } from "../types";
+import { fetchRuns as fetchRunsFromApi } from "../../lib/api-client";
 import CrossRunBoardWidgets from "../implement-cross-run-board-widgets-component";
 import CrossRunBoardCustomWidgets from "../create-cross-run-board-custom-widgets-63";
 import AlertPresets from "../AlertPresets";
@@ -40,12 +41,10 @@ export default function MaintainerPage() {
     let cancelled = false;
     const ctrl = new AbortController();
 
-    const fetchRuns = async () => {
+    const loadRuns = async () => {
       setDataState("loading");
       try {
-        const res = await fetch("/api/runs", { signal: ctrl.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const data = await fetchRunsFromApi(ctrl.signal);
         if (!cancelled) {
           setRuns(data.runs || []);
           setDataState("success");
@@ -56,7 +55,7 @@ export default function MaintainerPage() {
     };
 
     const timer = window.setTimeout(() => {
-      void fetchRuns();
+      void loadRuns();
     }, 0);
 
     return () => {

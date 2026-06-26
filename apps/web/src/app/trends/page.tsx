@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { FuzzingRun, RunArea, RunSeverity } from '../types';
 import { FilterBar } from './FilterBar';
 import { CrashTrendChart } from './CrashTrendChart';
-import { dedupedFetchJson } from '../../lib/request-dedup';
+import { fetchRuns } from '../../lib/api-client';
 import {
   transformRunsToCrashEvents,
   bucketByDay,
@@ -25,7 +25,7 @@ export default function CrashTrendPage() {
 
   useEffect(() => {
     let cancelled = false;
-    dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs')
+    fetchRuns()
       .then((data) => { if (!cancelled) setRuns(data.runs ?? []); })
       .catch(() => {});
     return () => { cancelled = true; };

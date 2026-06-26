@@ -6,6 +6,7 @@ import {
   validateAlertingSettingsSnapshot,
   type AlertingSettingsSnapshot,
 } from '@/app/alerting-settings-page-utils';
+import { jsonError, withRouteErrorHandling } from '@/lib/route-handler';
 
 // In-memory store (persists for the lifetime of the process)
 let store: AlertingSettingsSnapshot | null = null;
@@ -29,25 +30,22 @@ export async function GET() {
  * PUT /api/settings/alerting
  * Replaces the alerting settings snapshot. Body: AlertingSettingsSnapshot JSON.
  */
-export async function PUT(request: NextRequest) {
+export const PUT = withRouteErrorHandling('PUT /api/settings/alerting', async (request: NextRequest) => {
   let body: string;
   try {
     body = await request.text();
   } catch {
-    return NextResponse.json({ error: 'Failed to read request body' }, { status: 400 });
+    return jsonError('Failed to read request body', 400);
   }
 
   const result = readAlertingSettingsSnapshot(body);
   if (result.status === 'error' || !result.snapshot) {
-    return NextResponse.json(
-      { error: result.error ?? 'Invalid alerting settings payload' },
-      { status: 422 },
-    );
+    return jsonError(result.error ?? 'Invalid alerting settings payload', 422);
   }
 
   const validationError = validateAlertingSettingsSnapshot(result.snapshot);
   if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 422 });
+    return jsonError(validationError, 422);
   }
 
   store = {
@@ -56,4 +54,4 @@ export async function PUT(request: NextRequest) {
   };
 
   return NextResponse.json(store);
-}
+});
