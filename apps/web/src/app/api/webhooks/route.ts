@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebhookConfig, RunEventType } from '@/app/webhook-manager';
-import { errorResponse, createdResponse, successResponse, status } from '@/lib/api-response-utils';
+import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 
 const VALID_PROTOCOLS = new Set(['http:', 'https:']);
 

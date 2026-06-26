@@ -55,6 +55,17 @@ jobs:
       - name: Build WASM artifact
         run: cargo build --target wasm32-unknown-unknown --release
 
+  secrets-scan:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Secret scanning with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   ops-scripts-syntax:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
