@@ -165,7 +165,7 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=true
 ```
 
 For the full list of browser-exposed and server-only settings, see the
-[`docs/ENVIRONMENT_VARIABLES.md`](../../docs/ENVIRONMENT_VARIABLES.md)
+[`docs/ENV.md`](../../docs/ENV.md)
 reference.
 
 ---

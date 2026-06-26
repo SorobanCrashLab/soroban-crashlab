@@ -180,7 +180,7 @@ You will need real XLM for mainnet deployment fees.
 ### Environment Variables
 
 For the complete reference, including server-only API route settings, see
-[`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md).
+[`docs/ENV.md`](docs/ENV.md).
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
