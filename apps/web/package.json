@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@sentry/nextjs": "^10.62.0",
+
     "jszip": "^3.10.1",
     "next": "16.1.6",
     "react": "19.2.3",
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",

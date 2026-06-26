@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { proxy } from './proxy';
+import { proxy } from './rate-limit';
 
 describe('API Rate Limit Middleware', () => {
   beforeEach(() => {

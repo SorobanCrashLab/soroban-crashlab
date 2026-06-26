@@ -1,0 +1,13 @@
+title = "Soroban CrashLab Gitleaks config"
+
+[allowlist]
+description = "Allowlisted files and patterns for the repo"
+paths = [
+  ".env.example",
+  "apps/web/.env.example",
+  "contracts/crashlab-core/fixtures/",
+  "contracts/soroban-example/test_snapshots/",
+  "test_output.txt",
+  "pnpm-lock.yaml",
+  "package-lock.json",
+]
