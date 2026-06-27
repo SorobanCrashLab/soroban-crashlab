@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FuzzingRun, RunStatus } from './types';
+import { formatDuration } from './utils/format';
 
 /** Height of a single data row in pixels — must match the rendered row height. */
 const ROW_HEIGHT = 57;
@@ -28,37 +29,9 @@ interface VirtualizedRunTableProps {
     onToggleAllRunsSelection?: (runIds: string[]) => void;
 }
 
-/**
- * Formats milliseconds into a human-readable duration string (e.g., "5m 23s").
- * Mirrors the helper in RunHistoryTable to stay consistent.
- */
-const formatDuration = (ms: number): string => {
-    if (ms < 1000) return `${ms}ms`;
-    const seconds = Math.floor((ms / 1000) % 60);
-    const minutes = Math.floor((ms / (1000 * 60)) % 60);
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-
-    const parts: string[] = [];
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
-
-    return parts.join(' ');
-};
-
-/**
- * Renders a color-coded status badge driven by CSS custom properties
- * (--status-*) defined in globals.css — identical to the one used in
- * RunHistoryTable so the two tables look identical row-for-row.
- */
 const StatusBadge = ({ status }: { status: RunStatus }) => (
     <span
-        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
-        style={{
-            backgroundColor: `var(--status-${status}-bg)`,
-            color: `var(--status-${status}-fg)`,
-            borderColor: `var(--status-${status}-border)`,
-        }}
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border status-badge status-badge-${status}`}
     >
         {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>

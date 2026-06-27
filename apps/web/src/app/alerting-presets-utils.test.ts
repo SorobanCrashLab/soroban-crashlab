@@ -7,8 +7,6 @@ import {
   buildPresetsFromExisting,
   getPresetChannels,
   countPresetsByCategory,
-  type AlertPreset,
-  type PresetStatus,
 } from './alerting-presets-utils';
 import type { AlertRule } from './alerting-settings-page-utils';
 

@@ -13,6 +13,7 @@ import { useMaintainerMode } from "../useMaintainerMode";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FuzzingRun } from "../types";
+import { fetchRuns as fetchRunsFromApi } from "../../lib/api-client";
 import CrossRunBoardWidgets from "../implement-cross-run-board-widgets-component";
 import CrossRunBoardCustomWidgets from "../create-cross-run-board-custom-widgets-63";
 import AlertPresets from "../AlertPresets";
@@ -40,12 +41,10 @@ export default function MaintainerPage() {
     let cancelled = false;
     const ctrl = new AbortController();
 
-    const fetchRuns = async () => {
+    const loadRuns = async () => {
       setDataState("loading");
       try {
-        const res = await fetch("/api/runs", { signal: ctrl.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const data = await fetchRunsFromApi(ctrl.signal);
         if (!cancelled) {
           setRuns(data.runs || []);
           setDataState("success");
@@ -56,7 +55,7 @@ export default function MaintainerPage() {
     };
 
     const timer = window.setTimeout(() => {
-      void fetchRuns();
+      void loadRuns();
     }, 0);
 
     return () => {
@@ -121,7 +120,7 @@ export default function MaintainerPage() {
 
         {/* Loading State */}
         {dataState === "loading" && (
-          <div className="w-full space-y-6">
+          <div role="status" aria-live="polite" className="w-full space-y-6">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
@@ -133,7 +132,7 @@ export default function MaintainerPage() {
 
         {/* Error State */}
         {dataState === "error" && (
-          <div className="w-full border border-red-200 dark:border-red-900/50 rounded-2xl p-8 bg-red-50/60 dark:bg-red-950/20 text-center">
+          <div role="alert" className="w-full border border-red-200 dark:border-red-900/50 rounded-2xl p-8 bg-red-50/60 dark:bg-red-950/20 text-center">
             <div className="h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center mx-auto mb-4">
               <svg
                 className="h-6 w-6 text-red-600 dark:text-red-400"

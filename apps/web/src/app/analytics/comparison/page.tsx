@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import AddRunComparisonSideBySideView from '../../add-run-comparison-side-by-side-view';
 import type { FuzzingRun } from '../../types';
+import { fetchRuns } from '../../../lib/api-client';
 
 export default function ComparisonPage() {
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
@@ -17,9 +18,7 @@ export default function ComparisonPage() {
     const load = async () => {
       setDataState('loading');
       try {
-        const res = await fetch('/api/runs', { signal: ctrl.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const data = await fetchRuns(ctrl.signal);
         if (!cancelled) {
           setRuns(data.runs ?? []);
           setDataState('success');

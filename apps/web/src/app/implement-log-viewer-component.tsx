@@ -23,51 +23,7 @@ import {
   type LogLevel,
   type LogLevelFilter,
 } from './log-viewer-utils';
-
-const SEED_ENTRIES: LogEntry[] = [
-  {
-    id: 'seed-1',
-    timestamp: Date.now() - 120_000,
-    level: 'info',
-    source: 'fuzz-worker',
-    message: 'Campaign drive_run started (partition 0/4)',
-  },
-  {
-    id: 'seed-2',
-    timestamp: Date.now() - 90_000,
-    level: 'debug',
-    source: 'fuzz-worker',
-    message: 'Mutation stream seeded from case id 0x7a3f',
-  },
-  {
-    id: 'seed-3',
-    timestamp: Date.now() - 60_000,
-    level: 'warn',
-    source: 'rpc',
-    message: 'RPC latency p95 820ms (threshold 750ms)',
-  },
-  {
-    id: 'seed-4',
-    timestamp: Date.now() - 45_000,
-    level: 'info',
-    source: 'scheduler',
-    message: 'Checkpoint advanced: next_seed_index=18432',
-  },
-  {
-    id: 'seed-5',
-    timestamp: Date.now() - 30_000,
-    level: 'error',
-    source: 'fuzz-worker',
-    message: 'InvariantViolation: balance_nonnegative (signature recorded)',
-  },
-  {
-    id: 'seed-6',
-    timestamp: Date.now() - 10_000,
-    level: 'info',
-    source: 'rpc',
-    message: 'Replay envelope submitted for run-1012',
-  },
-];
+import { SEED_LOG_ENTRIES } from '../fixtures/logs';
 
 const LEVEL_OPTIONS: { value: LogLevelFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -118,7 +74,7 @@ function formatTime(ts: number): string {
 }
 
 export default function LogViewer() {
-  const [entries, setEntries] = useState<LogEntry[]>(() => [...SEED_ENTRIES]);
+  const [entries, setEntries] = useState<LogEntry[]>(() => [...SEED_LOG_ENTRIES]);
   const [paused, setPaused] = useState(false);
   const [levelFilter, setLevelFilter] = useState<LogLevelFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -157,7 +113,7 @@ export default function LogViewer() {
 
   const handleClear = useCallback(() => {
     streamSeq = 0;
-    setEntries([...SEED_ENTRIES]);
+    setEntries([...SEED_LOG_ENTRIES]);
   }, []);
 
   const handleCopy = useCallback(async () => {

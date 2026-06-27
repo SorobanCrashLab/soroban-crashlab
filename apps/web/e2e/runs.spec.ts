@@ -1,6 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-
-const baseUrl = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:3000';
+import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
 
 const mockRuns = [
   {
@@ -76,32 +75,33 @@ test.describe('Runs list', () => {
         new URL(response.url()).pathname === '/api/runs' && response.status() === 200,
     );
 
-    await page.goto(`${baseUrl}/runs`);
+    await page.goto('/runs');
     await runsResponse;
 
     await expect(page.getByRole('heading', { name: 'Fuzzing Runs' })).toBeVisible();
-    await expect(page.getByText(`${mockRuns.length} Runs`)).toBeVisible();
+    await expect(page.getByText(`${mockRuns.length} Total Runs`)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Replay History' })).toBeVisible();
 
-    const table = page.getByRole('table');
-    await expect(table.getByRole('columnheader', { name: /^id$/i })).toBeVisible();
-    await expect(table.getByRole('columnheader', { name: /status/i })).toBeVisible();
-    await expect(table.getByRole('columnheader', { name: /severity/i })).toBeVisible();
+    const tableContainer = page.getByRole('region', { name: 'Virtualized fuzzing run table' });
+    await expect(tableContainer.locator('th').filter({ hasText: /Run ID|Run Identifier/i })).toBeVisible();
+    await expect(tableContainer.locator('th').filter({ hasText: /status/i })).toBeVisible();
+    await expect(tableContainer.locator('th').filter({ hasText: /severity/i })).toBeVisible();
 
-    const rows = table.locator('tbody tr');
+    const rows = tableContainer.locator('tbody tr');
     await expect(rows).toHaveCount(mockRuns.length);
 
-    await expect(rows.nth(0)).toContainText('run-1001');
-    await expect(rows.nth(0)).toContainText('completed');
-    await expect(rows.nth(0)).toContainText('high');
+    await expect(rows.nth(0)).toContainText('run-1003');
+    await expect(rows.nth(0)).toContainText('Running');
+    await expect(rows.nth(0)).toContainText('medium');
 
     await expect(rows.nth(1)).toContainText('run-1002');
-    await expect(rows.nth(1)).toContainText('failed');
+    await expect(rows.nth(1)).toContainText('Failed');
     await expect(rows.nth(1)).toContainText('critical');
     await expect(rows.nth(1)).toContainText('18,200');
 
-    await expect(rows.nth(2)).toContainText('run-1003');
-    await expect(rows.nth(2)).toContainText('running');
-    await expect(rows.nth(2)).toContainText('medium');
+    await expect(rows.nth(2)).toContainText('run-1001');
+    await expect(rows.nth(2)).toContainText('Completed');
+    await expect(rows.nth(2)).toContainText('high');
   });
 
   test('shows an error state when the runs API fails and recovers after retry', async ({ page }) => {
@@ -126,7 +126,7 @@ test.describe('Runs list', () => {
       });
     });
 
-    await page.goto(`${baseUrl}/runs`);
+    await page.goto('/runs');
 
     await expect(page.getByText('Failed to load fuzzing runs')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
@@ -140,6 +140,8 @@ test.describe('Runs list', () => {
     await retryResponse;
 
     await expect(page.getByRole('heading', { name: 'Fuzzing Runs' })).toBeVisible();
-    await expect(page.locator('tbody tr')).toHaveCount(mockRuns.length);
+    await expect(
+      page.getByRole('region', { name: 'Virtualized fuzzing run table' }).locator('tbody tr'),
+    ).toHaveCount(mockRuns.length);
   });
 });

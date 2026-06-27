@@ -130,3 +130,21 @@ export interface CampaignConfig {
     parallelism: number;
     timeoutSeconds: number;
 }
+
+export type ArtifactType = 'seed' | 'log' | 'trace' | 'coverage' | 'bundle';
+
+/**
+ * A stored fuzzing artifact as displayed in the artifact explorer and
+ * preview modal.
+ */
+export interface Artifact {
+    id: string;
+    name: string;
+    type: ArtifactType;
+    /** Size in bytes */
+    size: number;
+    /** ISO 8601 timestamp */
+    updatedAt: string;
+    runId?: string;
+    content_hash?: string;
+}

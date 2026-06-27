@@ -1,0 +1,10 @@
+**/.git
+**/.next
+**/node_modules
+**/build
+**/target
+**/.tmp-test
+**/*.md
+!apps/web/README.md
+.env*
+.DS_Store

@@ -153,7 +153,7 @@ export default function DashboardShell({
                 }`}
                 title={isSidebarCollapsed ? item.name : undefined}
               >
-                <span className={`shrink-0 ${isActive ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300"}`}>
+                <span className={`shrink-0 ${isActive ? "text-blue-600 dark:text-blue-400" : "text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300"}`}>
                   {item.icon}
                 </span>
                 {!isSidebarCollapsed && <span className="truncate">{item.name}</span>}
@@ -173,7 +173,7 @@ export default function DashboardShell({
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors group"
               title={isSidebarCollapsed ? item.name : undefined}
             >
-              <span className="shrink-0 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300">
+              <span className="shrink-0 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300">
                 {item.icon}
               </span>
               {!isSidebarCollapsed && <span className="truncate">{item.name}</span>}
@@ -198,7 +198,7 @@ export default function DashboardShell({
           <button
             type="button"
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="w-full flex items-center justify-center p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-all border border-zinc-200/40 dark:border-zinc-800/40"
+            className="w-full flex items-center justify-center p-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-all border border-zinc-200/40 dark:border-zinc-800/40"
             aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <svg
@@ -206,6 +206,7 @@ export default function DashboardShell({
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
@@ -227,13 +228,13 @@ export default function DashboardShell({
               className="md:hidden p-2 rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
               aria-label="Toggle mobile menu"
             >
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
               </svg>
             </button>
 
             {/* Breadcrumbs */}
-            <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+            <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
               <span>CrashLab</span>
               <svg className="h-3 w-3 text-zinc-300 dark:text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -245,7 +246,7 @@ export default function DashboardShell({
           {/* Header Action Elements */}
           <div className="flex items-center gap-4">
             {/* Search Shortcut */}
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs text-zinc-400">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xs text-zinc-500 dark:text-zinc-400">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -264,7 +265,7 @@ export default function DashboardShell({
                     : "bg-zinc-100 text-zinc-600 border-zinc-200/50 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700/50"
                 }`}
               >
-                <span className={`h-1.5 w-1.5 rounded-full ${isMaintainer ? "bg-amber-500 animate-pulse" : "bg-zinc-400"}`} />
+                <span className={`h-1.5 w-1.5 rounded-full ${isMaintainer ? "bg-amber-500 animate-pulse" : "bg-zinc-500 dark:bg-zinc-400"}`} />
                 <span>{isMaintainer ? "Maintainer" : "User"} Mode</span>
               </button>
             </div>
@@ -295,9 +296,10 @@ export default function DashboardShell({
                 <button
                   type="button"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
+                  className="p-2 rounded-xl text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
+                  aria-label="Close mobile menu"
                 >
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -370,7 +372,7 @@ export default function DashboardShell({
             {/* Dashboard Layout Footer */}
             <footer className="border-t border-zinc-200/50 dark:border-zinc-800/50 pt-8 mt-12 text-center text-xs text-zinc-500 leading-normal">
               <p>Soroban CrashLab &middot; Stellar &amp; Soroban smart contract invariant mutation framework</p>
-              <p className="mt-1 text-zinc-400 dark:text-zinc-600">Continuous fuzzing node &middot; Version 0.1.0 (Stellar Wave 3 Release)</p>
+              <p className="mt-1 text-zinc-500 dark:text-zinc-400">Continuous fuzzing node &middot; Version 0.1.0 (Stellar Wave 3 Release)</p>
             </footer>
 
           </div>

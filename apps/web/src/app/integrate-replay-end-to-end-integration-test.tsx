@@ -194,6 +194,22 @@ export default function ReplayEndToEndIntegrationTest() {
   const failed = testCases.filter((t) => t.status === 'failed').length;
   const running = testCases.filter((t) => t.status === 'running').length;
 
+  if (testCases.length === 0) {
+    return (
+      <div className="w-full space-y-6">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-full text-zinc-300 mb-4">
+            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">No replay test cases configured</h3>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 max-w-sm">Add test cases to validate that persisted crash seeds replay deterministically and produce matching signatures.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full space-y-6">
       {/* Header */}

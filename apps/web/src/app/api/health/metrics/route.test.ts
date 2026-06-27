@@ -26,8 +26,8 @@ async function testCreateAdapterWithRealConfig(): Promise<void> {
 
 async function testAdapterHealthQueryWithMockFetch(): Promise<void> {
   const mockFetch = async (
-    input: RequestInfo | URL,
-    init?: RequestInit,
+    _input: RequestInfo | URL,
+    _init?: RequestInit,
   ): Promise<Response> => {
     return new Response(JSON.stringify({ status: "healthy" }), {
       status: 200,
@@ -51,8 +51,8 @@ async function testAdapterHealthQueryWithMockFetch(): Promise<void> {
 
 async function testAdapterHealthQueryWithUnhealthyEndpoint(): Promise<void> {
   const mockFetch = async (
-    input: RequestInfo | URL,
-    init?: RequestInit,
+    _input: RequestInfo | URL,
+    _init?: RequestInit,
   ): Promise<Response> => {
     return new Response(JSON.stringify({ status: "unhealthy" }), {
       status: 503,
@@ -104,8 +104,8 @@ async function testAdapterWithCustomHeaders(): Promise<void> {
   const capturedHeaders: Record<string, string> = {};
 
   const mockFetch = async (
-    input: RequestInfo | URL,
-    init?: RequestInit,
+    _input: RequestInfo | URL,
+    _init?: RequestInit,
   ): Promise<Response> => {
     if (init?.headers) {
       const headers = init.headers as Record<string, string>;

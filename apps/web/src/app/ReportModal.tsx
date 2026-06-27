@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import MarkdownPreview from './MarkdownPreview';
+import { triggerBrowserDownload } from './utils/browser-download';
 
 interface ReportModalProps {
     isOpen: boolean;
@@ -34,15 +35,10 @@ export default function ReportModal({ isOpen, onClose, markdown, runId }: Report
     };
 
     const handleDownload = () => {
-        const blob = new Blob([markdown], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `crashlab-report-${runId}.md`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        triggerBrowserDownload(
+            new Blob([markdown], { type: 'text/markdown' }),
+            `crashlab-report-${runId}.md`,
+        );
     };
 
     if (!isOpen) return null;

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FuzzingRun } from '../../types';
-import { dedupedFetchJson } from '../../../lib/request-dedup';
+import { fetchRuns } from '../../../lib/api-client';
 
 type DayData = {
   date: string;
@@ -183,7 +183,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     let cancelled = false;
-    dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs')
+    fetchRuns()
       .then((data) => {
         if (!cancelled) {
           const apiRuns: FuzzingRun[] = data.runs ?? [];
@@ -254,7 +254,7 @@ export default function CalendarPage() {
         </div>
 
         {dataState === 'loading' && (
-          <div className="card card-padding flex items-center justify-center py-16">
+          <div role="status" aria-live="polite" className="card card-padding flex items-center justify-center py-16">
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#0A66C2', borderTopColor: 'transparent' }} />
               <span className="text-meta">Loading run data...</span>

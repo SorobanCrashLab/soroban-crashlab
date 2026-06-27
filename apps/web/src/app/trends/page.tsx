@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { FuzzingRun, RunArea, RunSeverity } from '../types';
 import { FilterBar } from './FilterBar';
 import { CrashTrendChart } from './CrashTrendChart';
-import { dedupedFetchJson } from '../../lib/request-dedup';
+import { fetchRuns } from '../../lib/api-client';
 import {
   transformRunsToCrashEvents,
   bucketByDay,
@@ -22,14 +22,18 @@ import {
  */
 export default function CrashTrendPage() {
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
+  const [dataState, setDataState] = useState<'loading' | 'success' | 'error'>('loading');
 
   useEffect(() => {
     let cancelled = false;
-    dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs')
-      .then((data) => { if (!cancelled) setRuns(data.runs ?? []); })
-      .catch(() => {});
+    fetchRuns()
+      .then((data) => { if (!cancelled) { setRuns(data.runs ?? []); setDataState('success'); } })
+      .catch(() => { if (!cancelled) setDataState('error'); });
     return () => { cancelled = true; };
   }, []);
+
+  const isLoading = dataState === 'loading';
+  const hasError = dataState === 'error';
 
   // Filter state
   const [selectedAreas, setSelectedAreas] = useState<RunArea[]>([]);

@@ -2,6 +2,21 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Global focus-visible indicator for all interactive elements.
+ * Provides a consistent 2px blue ring so keyboard users always
+ * know which element is focused.  Uses :focus-visible so the
+ * ring only appears on keyboard navigation, not on clicks.
+ */
+:where(a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid #0A66C2;
+  outline-offset: 2px;
+}
+
+.dark :where(a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline-color: #5AA7F0;
+}
+
 @theme {
   --color-primary: #0A66C2;
   --color-primary-hover: #004182;
@@ -13,7 +28,7 @@
   --color-text-secondary: #666666;
   --color-border: #E0DFDC;
   --color-success: #057642;
-  --color-warning: #C37D16;
+  --color-warning: #946210;
   --color-error: #CC1016;
 }
 
@@ -45,7 +60,7 @@
   --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 2px 4px rgba(0, 0, 0, 0.3);
   --card-shadow-hover: 0 0 0 1px rgba(0, 255, 65, 0.08), 0 4px 12px rgba(0, 0, 0, 0.4);
   --input-bg: #0a0a0a;
-  --input-border: #2a2a2a;
+  --input-border: #606060;
   --skeleton-from: #1a1a1a;
   --skeleton-to: #111111;
   --chip-bg: #1a1a1a;
@@ -187,6 +202,12 @@ body {
   background: #004182;
 }
 
+.btn-primary:focus-visible {
+  outline: 2px solid #004182;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(10, 102, 194, 0.2);
+}
+
 .btn-primary:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -214,6 +235,12 @@ body {
   background: rgba(10, 102, 194, 0.05);
 }
 
+.btn-outline:focus-visible {
+  outline: 2px solid #0A66C2;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(10, 102, 194, 0.2);
+}
+
 .btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -234,6 +261,12 @@ body {
 
 .btn-ghost:hover {
   background: rgba(10, 102, 194, 0.05);
+}
+
+.btn-ghost:focus-visible {
+  outline: 2px solid #0A66C2;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(10, 102, 194, 0.2);
 }
 
 .input-field {
@@ -302,7 +335,15 @@ body {
 
 .badge-critical {
   background: rgba(195, 125, 22, 0.1);
-  color: #C37D16;
+  color: #946210;
+}
+
+.dark .badge-completed {
+  color: #229B6B;
+}
+
+.dark .badge-failed {
+  color: #EF4444;
 }
 
 .link {
@@ -823,5 +864,81 @@ nav, header, .nav-bar {
 @media (min-width: 1024px) {
   .page-padding {
     padding: 24px 48px;
+  }
+}
+
+@layer utilities {
+  .bg-theme {
+    background: var(--background);
+  }
+
+  .text-theme {
+    color: var(--foreground);
+  }
+
+  .border-header {
+    border-color: var(--header-border-color);
+  }
+
+  .status-badge {
+    background-color: var(--status-badge-bg);
+    color: var(--status-badge-fg);
+    border-color: var(--status-badge-border);
+  }
+
+  .status-badge-running {
+    --status-badge-bg: var(--status-running-bg);
+    --status-badge-fg: var(--status-running-fg);
+    --status-badge-border: var(--status-running-border);
+  }
+
+  .status-badge-completed {
+    --status-badge-bg: var(--status-completed-bg);
+    --status-badge-fg: var(--status-completed-fg);
+    --status-badge-border: var(--status-completed-border);
+  }
+
+  .status-badge-failed {
+    --status-badge-bg: var(--status-failed-bg);
+    --status-badge-fg: var(--status-failed-fg);
+    --status-badge-border: var(--status-failed-border);
+  }
+
+  .status-badge-cancelled {
+    --status-badge-bg: var(--status-cancelled-bg);
+    --status-badge-fg: var(--status-cancelled-fg);
+    --status-badge-border: var(--status-cancelled-border);
+  }
+
+  .text-token-primary {
+    color: var(--color-text);
+  }
+
+  .text-token-muted {
+    color: var(--color-muted);
+  }
+
+  .text-token-accent {
+    color: var(--color-accent);
+  }
+
+  .bg-token-bg {
+    background: var(--color-bg);
+  }
+
+  .bg-token-surface {
+    background: var(--color-surface);
+  }
+
+  .bg-token-elevated {
+    background: var(--color-elevated);
+  }
+
+  .border-token {
+    border-color: var(--color-border);
+  }
+
+  .text-token-border {
+    color: var(--color-border);
   }
 }

@@ -10,11 +10,11 @@
 
 const inFlightRequests = new Map<string, Promise<unknown>>();
 
-export function dedupedFetchJson<T>(url: string): Promise<T> {
+export function dedupedFetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const existing = inFlightRequests.get(url);
   if (existing) return existing as Promise<T>;
 
-  const request = fetch(url)
+  const request = fetch(url, { signal })
     .then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json() as Promise<T>;

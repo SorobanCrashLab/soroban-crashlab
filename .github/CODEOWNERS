@@ -1,0 +1,31 @@
+# Soroban CrashLab code ownership
+#
+# Keep this file path-based and reviewable. Add narrower owners above broader
+# catch-all rules if the project introduces dedicated teams.
+
+# Default owner for all repository changes.
+* @TheShnider
+
+# Repository policy, automation, and security-sensitive GitHub configuration.
+/.github/ @TheShnider
+/.github/workflows/ @TheShnider
+
+# Project documentation and maintainer operations.
+/README.md @TheShnider
+/CONTRIBUTING.md @TheShnider
+/CHANGELOG.md @TheShnider
+/docs/ @TheShnider
+/ops/ @TheShnider
+/MAINTAINER_WAVE_PLAYBOOK.md @TheShnider
+
+# Web dashboard, UI routes, and frontend tooling.
+/apps/web/ @TheShnider
+/apps/package-lock.json @TheShnider
+/package-lock.json @TheShnider
+
+# Rust fuzzing engine and Soroban example contract.
+/contracts/crashlab-core/ @TheShnider
+/contracts/soroban-example/ @TheShnider
+
+# Repository automation scripts and generated roadmap tooling.
+/scripts/ @TheShnider

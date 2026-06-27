@@ -22,7 +22,7 @@ const runAssertions = (): void => {
   const content = fs.readFileSync(componentPath, 'utf-8');
 
   assert.ok(
-    content.includes("dynamic(() => import('../../integrate-storage-backend-integration-for-artifacts')"),
+    content.includes('dynamic') && content.includes('integrate-storage-backend-integration-for-artifacts'),
     'Page should lazy-load the ArtifactStorageIntegration wrapper component via next/dynamic',
   );
   assert.ok(

@@ -16,22 +16,7 @@ interface RunHistoryTableProps {
     visibleColumns?: string[];
 }
 
-/**
- * Formats milliseconds into a human-readable duration string (e.g., "5m 23s").
- */
-const formatDuration = (ms: number): string => {
-    if (ms < 1000) return `${ms}ms`;
-    const seconds = Math.floor((ms / 1000) % 60);
-    const minutes = Math.floor((ms / (1000 * 60)) % 60);
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-
-    const parts = [];
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
-
-    return parts.join(' ');
-};
+import { formatDuration } from './utils/format';
 
 /**
  * Renders a color-coded status badge for a run.
@@ -41,12 +26,7 @@ const formatDuration = (ms: number): string => {
 const StatusBadge = ({ status }: { status: RunStatus }) => {
     return (
         <span
-            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
-            style={{
-                backgroundColor: `var(--status-${status}-bg)`,
-                color: `var(--status-${status}-fg)`,
-                borderColor: `var(--status-${status}-border)`,
-            }}
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border status-badge status-badge-${status}`}
         >
             {status.charAt(0).toUpperCase() + status.slice(1)}
         </span>

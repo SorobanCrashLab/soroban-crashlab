@@ -2,6 +2,11 @@
 
 import React, { useState, useMemo } from "react";
 import { FuzzingRun, RunStatus, RunSeverity } from "./types";
+import {
+  getSortIndicator,
+  getNextSortState,
+  type SortState,
+} from "./run-history-sort-utils";
 
 interface RunHistoryTableProps {
   /** Array of fuzzing runs to display */
@@ -110,26 +115,43 @@ export default function EnhancedRunHistoryTable({
   onToggleRunSelection,
   onToggleAllRunsSelection,
 }: RunHistoryTableProps) {
-  const [sortField, setSortField] = useState<keyof FuzzingRun>("id");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  // Single source of truth for the active sort column + direction. Keeping
+  // field and order together lets the sort-indicator helpers (#838) derive the
+  // correct arrow/aria-sort for every header from one value.
+  const [sort, setSort] = useState<SortState<keyof FuzzingRun & string>>({
+    field: "id",
+    order: "desc",
+  });
 
   const sortedRuns = useMemo(() => {
     return [...runs].sort((a: FuzzingRun, b: FuzzingRun) => {
-      const valA = a[sortField] ?? "";
-      const valB = b[sortField] ?? "";
-      if (valA < valB) return sortOrder === "asc" ? -1 : 1;
-      if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+      const valA = a[sort.field] ?? "";
+      const valB = b[sort.field] ?? "";
+      if (valA < valB) return sort.order === "asc" ? -1 : 1;
+      if (valA > valB) return sort.order === "asc" ? 1 : -1;
       return 0;
     });
-  }, [runs, sortField, sortOrder]);
+  }, [runs, sort]);
 
-  const toggleSort = (field: keyof FuzzingRun) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("desc");
-    }
+  const toggleSort = (field: keyof FuzzingRun & string) => {
+    setSort((current) => getNextSortState(current, field));
+  };
+
+  /**
+   * Render the sort glyph for a column: a bold up/down arrow when the column is
+   * active, and a dimmed neutral ↕ on inactive sortable columns so it's always
+   * clear which column drives the current order (#838).
+   */
+  const renderSortGlyph = (field: keyof FuzzingRun & string) => {
+    const indicator = getSortIndicator(field, sort);
+    return (
+      <span
+        aria-hidden="true"
+        className={indicator.active ? "text-blue-600 dark:text-blue-400" : "text-zinc-300 dark:text-zinc-600"}
+      >
+        {indicator.symbol}
+      </span>
+    );
   };
 
   if (runs.length === 0) {
@@ -191,10 +213,10 @@ export default function EnhancedRunHistoryTable({
               {visibleColumns.includes("id") && (
                 <th
                   className="px-6 py-5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest cursor-pointer hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                  aria-sort={getSortIndicator("id", sort).ariaSort}
                   onClick={() => toggleSort("id")}
                 >
-                  Run Identifier{" "}
-                  {sortField === "id" && (sortOrder === "asc" ? "↑" : "↓")}
+                  Run Identifier {renderSortGlyph("id")}
                 </th>
               )}
               {visibleColumns.includes("status") && (
@@ -210,21 +232,19 @@ export default function EnhancedRunHistoryTable({
               {visibleColumns.includes("duration") && (
                 <th
                   className="px-6 py-5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-right cursor-pointer hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                  aria-sort={getSortIndicator("duration", sort).ariaSort}
                   onClick={() => toggleSort("duration")}
                 >
-                  Timeline{" "}
-                  {sortField === "duration" &&
-                    (sortOrder === "asc" ? "↑" : "↓")}
+                  Timeline {renderSortGlyph("duration")}
                 </th>
               )}
               {visibleColumns.includes("seedCount") && (
                 <th
                   className="px-6 py-5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-right cursor-pointer hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                  aria-sort={getSortIndicator("seedCount", sort).ariaSort}
                   onClick={() => toggleSort("seedCount")}
                 >
-                  Vectors{" "}
-                  {sortField === "seedCount" &&
-                    (sortOrder === "asc" ? "↑" : "↓")}
+                  Vectors {renderSortGlyph("seedCount")}
                 </th>
               )}
               {visibleColumns.includes("cpu") && (

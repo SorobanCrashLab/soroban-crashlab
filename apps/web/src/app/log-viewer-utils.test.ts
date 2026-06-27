@@ -3,7 +3,6 @@ import {
   compareLogEntriesByTime,
   filterLogEntries,
   type LogEntry,
-  type LogLevel,
 } from './log-viewer-utils';
 
 // ---------------------------------------------------------------------------

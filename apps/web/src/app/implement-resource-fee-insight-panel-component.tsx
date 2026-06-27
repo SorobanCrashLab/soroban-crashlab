@@ -133,7 +133,7 @@ export function ResourceFeeInsightPanel({
 
   if (dataState === "error") {
     return (
-      <section className="w-full rounded-2xl border border-red-200 bg-red-50/60 p-6 shadow-sm dark:border-red-900/50 dark:bg-red-950/20">
+      <section role="alert" className="w-full rounded-2xl border border-red-200 bg-red-50/60 p-6 shadow-sm dark:border-red-900/50 dark:bg-red-950/20">
         <h2 className="text-xl font-bold text-red-900 dark:text-red-100">
           Resource Fee Insight
         </h2>

@@ -2,17 +2,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import type { Artifact } from "./types";
+import { formatSize } from "./utils/format";
+import { triggerBrowserDownload } from "./utils/browser-download";
 
-// Artifact interface - mirrors the shape in add-artifact-explorer.tsx
-export interface Artifact {
-  id: string;
-  name: string;
-  type: "seed" | "log" | "trace" | "coverage" | "bundle";
-  size: number; // bytes
-  updatedAt: string; // ISO 8601
-  runId?: string;
-  content_hash?: string;
-}
+export { formatSize } from "./utils/format";
+export type { Artifact };
 
 export type ArtifactPreviewDataState = "loading" | "error" | "success";
 
@@ -26,15 +21,6 @@ export interface ArtifactPreviewModalProps {
   className?: string;
 }
 
-/**
- * formatSize — converts a byte count to a human-readable string.
- * Examples: 512 → "512 B", 2048 → "2.0 KB", 1572864 → "1.5 MB"
- */
-export function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /**
  * formatDate — formats an ISO 8601 timestamp using Intl.DateTimeFormat.
@@ -137,7 +123,7 @@ export function generatePreviewContent(artifact: Artifact): string {
  * Loading skeleton component for artifact preview
  */
 const ArtifactPreviewSkeleton: React.FC = () => (
-  <div className="animate-pulse">
+  <div role="status" aria-label="Loading artifact preview" className="animate-pulse">
     <div className="mb-4 pr-8">
       <div className="h-6 w-48 bg-zinc-300 dark:bg-zinc-700 rounded mb-2"></div>
       <div className="flex gap-2 mb-3">
@@ -164,7 +150,7 @@ const ArtifactPreviewError: React.FC<{ onRetry?: () => void; errorMessage?: stri
   onRetry,
   errorMessage = "Failed to load artifact preview",
 }) => (
-  <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+  <div role="alert" className="flex flex-col items-center justify-center py-12 px-6 text-center">
     <div className="w-16 h-16 mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
       <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -291,15 +277,7 @@ const ArtifactPreviewModal: React.FC<ArtifactPreviewModalProps> = ({
     if (!artifact) return;
 
     const content = generatePreviewContent(artifact);
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${artifact.name}-preview.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    triggerBrowserDownload(new Blob([content], { type: "text/plain" }), `${artifact.name}-preview.txt`);
   }, [artifact]);
 
   // Scroll lock when modal is open

@@ -262,7 +262,7 @@ const RunClusterVisualization: React.FC<RunClusterVisualizationProps> = ({
 
   if (dataState === "error") {
     return (
-      <section className="run-cluster-visualization p-8 border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-950/20 rounded-2xl">
+      <section role="alert" className="run-cluster-visualization p-8 border border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-950/20 rounded-2xl">
         <h2 className="text-xl font-bold text-red-900 dark:text-red-100 mb-2">Cluster Visualization Error</h2>
         <p className="text-red-700 dark:text-red-300 mb-4">{errorMessage || "Failed to load cluster data."}</p>
         <button
@@ -288,7 +288,7 @@ const RunClusterVisualization: React.FC<RunClusterVisualizationProps> = ({
           <p className="text-zinc-500 dark:text-zinc-400 font-medium">
             No cluster data available.
           </p>
-          <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-1">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
             Start a new campaign to see cluster visualization.
           </p>
         </div>
@@ -1096,12 +1096,14 @@ const ClusterDetails: React.FC<{
         <button
           onClick={onClose}
           className="p-2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+          aria-label="Close cluster detail"
         >
           <svg
             className="w-5 h-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"

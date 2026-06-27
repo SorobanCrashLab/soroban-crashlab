@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { buildMockRuns } from '../../../../mockRuns';
 import type { FuzzingRun } from '../../../../types';
 import { logger } from '@/lib/logger';
+import { successResponse, errorResponse, status } from '@/lib/api-response-utils';
 
 export const runtime = 'nodejs';
 
@@ -291,7 +292,7 @@ export async function POST(
   const { id } = await params;
 
   if (!id) {
-    return NextResponse.json({ error: 'Run ID is required' }, { status: 400 });
+    return errorResponse('Run ID is required', status.badRequest);
   }
 
   try {
@@ -299,13 +300,13 @@ export async function POST(
     const newRunId = buildReplayRunId(id);
 
     if (!run) {
-      return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+      return errorResponse('Run not found', status.notFound);
     }
 
     if (!run.crashDetail) {
-      return NextResponse.json(
-        { error: 'Run does not include replayable crash details' },
-        { status: 422 },
+      return errorResponse(
+        'Run does not include replayable crash details',
+        status.unprocessableEntity
       );
     }
 
@@ -317,25 +318,8 @@ export async function POST(
       const cli = await executeReplayCli(bundlePath);
 
       if (cli.exitCode !== 0) {
-        return NextResponse.json(
-          {
-            ok: false,
-            runId: run.id,
-            newRunId,
-            bundleJson,
-            command: cli.command,
-            args: cli.args,
-            stdout: cli.stdout,
-            stderr: cli.stderr,
-            exitCode: cli.exitCode,
-          },
-          { status: replayFailureStatus(cli.stderr) },
-        );
-      }
-
-      return NextResponse.json(
-        {
-          ok: true,
+        const responseData = {
+          ok: false,
           runId: run.id,
           newRunId,
           bundleJson,
@@ -344,20 +328,27 @@ export async function POST(
           stdout: cli.stdout,
           stderr: cli.stderr,
           exitCode: cli.exitCode,
-        },
-        { status: 200 },
-      );
+        };
+        return successResponse(responseData, { status: replayFailureStatus(cli.stderr) });
+      }
+
+      const responseData = {
+        ok: true,
+        runId: run.id,
+        newRunId,
+        bundleJson,
+        command: cli.command,
+        args: cli.args,
+        stdout: cli.stdout,
+        stderr: cli.stderr,
+        exitCode: cli.exitCode,
+      };
+      return successResponse(responseData);
     } finally {
       await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
     }
   } catch (error) {
     logger.error('POST /api/runs/[id]/replay failed', { error });
-    return NextResponse.json(
-      {
-        ok: false,
-        error: 'Failed to start replay',
-      },
-      { status: 500 },
-    );
+    return errorResponse('Failed to start replay', status.internalError);
   }
 }

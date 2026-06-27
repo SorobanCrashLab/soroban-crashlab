@@ -1,8 +1,5 @@
-/**
- * Loading fallback shown while a heavy integration page component is being
- * lazy-loaded via next/dynamic. Shared across all /integrations/* routes so
- * each one doesn't redefine its own skeleton markup.
- */
+import React from 'react';
+
 export default function IntegrationPageSkeleton() {
   return (
     <div role="status" aria-label="Loading integration" className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8 animate-pulse">

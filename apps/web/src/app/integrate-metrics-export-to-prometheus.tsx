@@ -129,7 +129,7 @@ export default function MetricsExportToPrometheus() {
               body: JSON.stringify({ timestamp: Date.now(), labels: cfg.labels })
             });
             return { accepted: res.ok, pushedSeries: res.ok ? 1 : 0 };
-          } catch (e) {
+          } catch {
             return { accepted: false, pushedSeries: 0 };
           }
         },
@@ -138,7 +138,7 @@ export default function MetricsExportToPrometheus() {
             // Try a lightweight GET to the endpoint to infer reachability
             const res = await fetch(endpoint, { method: 'GET' });
             return { healthy: res.ok, statusCode: res.status };
-          } catch (e) {
+          } catch {
             return { healthy: false, statusCode: 0 };
           }
         }
@@ -146,7 +146,7 @@ export default function MetricsExportToPrometheus() {
 
       const result = await runMetricsExportIntegrationFlow(deps);
       setTestResult(result.success ? 'success' : 'error');
-    } catch (e) {
+    } catch {
       setTestResult('error');
     } finally {
       setIsTesting(false);

@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { downloadArtifacts } from '../../utils/artifact-download';
-import { collectRunArtifacts } from '../../utils/artifact-collection';
+import { generateRunArtifactZip } from '../../utils/artifact-zip';
 import type { FuzzingRun, LedgerStateChange } from '../../types';
 
 interface DownloadArtifactsButtonProps {
@@ -21,8 +20,23 @@ export default function DownloadArtifactsButton({
   const handleDownload = async () => {
     setState('loading');
     try {
-      const artifacts = collectRunArtifacts(run, ledgerChanges);
-      downloadArtifacts(artifacts, run.id);
+      const zipBlob = await generateRunArtifactZip(run, ledgerChanges);
+      
+      // Trigger browser download
+      const url = URL.createObjectURL(zipBlob);
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `run-${run.id}-artifacts-${timestamp}.zip`;
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      
       setState('idle');
     } catch {
       setState('error');

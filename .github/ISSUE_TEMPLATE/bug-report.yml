@@ -2,28 +2,83 @@ name: Bug report
 description: Report a reproducible defect.
 labels: [bug]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please search existing issues to avoid duplicates.
+
   - type: textarea
     id: problem
     attributes:
       label: Problem
-      description: What is broken?
+      description: What is broken? Provide a clear and concise description.
     validations:
       required: true
+
   - type: textarea
     id: steps
     attributes:
       label: Reproduction steps
-      description: Include exact command or UI path.
+      description: |
+        Include the exact command, UI path, or minimal code snippet needed to reproduce.
+      placeholder: |
+        1. Run `...`
+        2. Navigate to `...`
+        3. Observe error
     validations:
       required: true
+
   - type: textarea
     id: expected
     attributes:
       label: Expected behavior
+      description: What should happen instead?
     validations:
       required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happens? Include error messages verbatim.
+    validations:
+      required: true
+
   - type: textarea
     id: evidence
     attributes:
       label: Evidence
-      description: Logs, screenshots, traces, or seed values.
+      description: Logs, screenshots, traces, or seed values. Attach files or paste inline.
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Relevant versions and runtime details.
+      placeholder: |
+        - OS: (e.g. Ubuntu 22.04, macOS 14, Windows 11)
+        - Node / Rust / SDK version:
+        - Browser (if applicable):
+        - Deployment target (testnet / mainnet / local):
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How much does this impact normal usage?
+      options:
+        - critical – data loss or security issue
+        - high – core functionality broken
+        - medium – degraded but workaround exists
+        - low – cosmetic or edge case
+    validations:
+      required: true
+
+  - type: input
+    id: area
+    attributes:
+      label: Area
+      description: "Affected area: fuzzer, generator, web, ci, docs, or ops"
+      placeholder: e.g. web

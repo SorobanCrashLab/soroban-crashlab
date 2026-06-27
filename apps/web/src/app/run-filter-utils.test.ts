@@ -55,10 +55,23 @@ assert.equal(filterBySeverity(runs, ['low', 'high']).length, 2);
 // filterBySearchTerm
 assert.deepEqual(filterBySearchTerm(runs, ''), runs);
 assert.deepEqual(filterBySearchTerm(runs, '   '), runs);
+
+// id matching (case-insensitive)
 assert.equal(filterBySearchTerm(runs, 'r3').length, 1);
-assert.equal(filterBySearchTerm(runs, 'R3').length, 1);  // case-insensitive
-assert.equal(filterBySearchTerm(runs, 'run').length, 0);  // our ids are r1..r4
+assert.equal(filterBySearchTerm(runs, 'R3').length, 1);
+
+// non-id fields should match too
+assert.equal(filterBySearchTerm(runs, 'critical').length, 1); // severity
+assert.equal(filterBySearchTerm(runs, 'budget').length, 1); // area
+assert.equal(filterBySearchTerm(runs, 'failed').length, 1); // status
+assert.equal(filterBySearchTerm(runs, 'auth sig').length, 1); // crashDetail.failureCategory + signature (tokenized)
+
+// all tokens must match
+assert.equal(filterBySearchTerm(runs, 'auth xdr').length, 0);
+
+assert.equal(filterBySearchTerm(runs, 'run').length, 0);
 assert.equal(filterBySearchTerm([], 'r1').length, 0);
+
 
 // filterByCrash
 assert.deepEqual(filterByCrash(runs, null), runs);

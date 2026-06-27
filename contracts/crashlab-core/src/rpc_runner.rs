@@ -10,11 +10,14 @@
 //!
 //! # Usage
 //! ```rust,no_run
-//! use crashlab_core::{CaseSeed, RpcContractRunner};
+//! use crashlab_core::{CaseSeed, RpcContractRunner, ContractRunner};
 //!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut runner = RpcContractRunner::new("https://rpc-futurenet.stellar.org:443")?;
 //! let seed = CaseSeed { id: 1, payload: vec![1, 2, 3] };
 //! let signature = runner.run_seed(&seed)?;
+//! # Ok(())
+//! # }
 //! ```
 
 use crate::{CaseSeed, CrashSignature};

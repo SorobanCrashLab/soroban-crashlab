@@ -1,7 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import dynamic from 'next/dynamic';
+import { LoadingSpinner } from "../components/LoadingSkeleton";
 import DashboardSectionLayoutEditor from "./dashboard-section-layout-editor";
 import {
   DASHBOARD_LAYOUT_STORAGE_KEY,
@@ -11,13 +14,14 @@ import {
   type DashboardSectionConfig,
   type DashboardSectionId,
 } from "./dashboard-layout-utils";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import AddTaggingAndLabelsUi from "./add-tagging-and-labels-ui";
+
+const AddTaggingAndLabelsUi = dynamic(
+  () => import("./add-tagging-and-labels-ui"),
+  { ssr: false }
+);
 import { runMatchesTagFilter } from "./run-tags-utils";
 import { FuzzingRun } from "./types";
-import { dedupedFetchJson } from "../lib/request-dedup";
+import { fetchRuns } from "../lib/api-client";
 
 const makeSuggestedLabels = (run: FuzzingRun): string[] => [
   run.area,
@@ -38,11 +42,9 @@ function DashboardContent() {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      setDataState("loading");
       try {
-        const res = await fetch("/api/runs");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const data = await dedupedFetchJson<{ runs?: FuzzingRun[] }>("/api/runs");
+        const data = await fetchRuns();
         if (!cancelled) {
           setRuns(data.runs ?? []);
           setDataState("success");
@@ -57,6 +59,7 @@ function DashboardContent() {
     };
   }, []);
 
+
   useEffect(() => {
     const loadLayout = () => {
       try {
@@ -70,73 +73,6 @@ function DashboardContent() {
     return () => window.removeEventListener("dashboard-layout-updated", loadLayout);
   }, []);
 
-  const recentRuns = runs.slice(0, 8);
-  const visibleSections = getVisibleDashboardSections(layout);
-
-  const sectionContent: Record<DashboardSectionId, ReactNode> = {
-    stats: (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {[
-          { label: "Total", value: runs.length },
-          { label: "Failed", value: runs.filter((r) => r.status === "failed").length },
-          { label: "Running", value: runs.filter((r) => r.status === "running").length },
-          { label: "Critical", value: runs.filter((r) => r.severity === "critical").length },
-        ].map((stat) => (
-          <div key={stat.label} className="card card-padding stat-card">
-            <div className="stat-value">{dataState === "loading" ? "..." : stat.value}</div>
-            <div className="stat-label">{stat.label}</div>
-          </div>
-        ))}
-      </div>
-    ),
-    "widget-editor": (
-      <div className="section">
-        <DashboardSectionLayoutEditor />
-      </div>
-    ),
-    "recent-runs": (
-      <div className="section">
-        <h2 className="heading-section mb-3">Recent Runs</h2>
-        <div className="card table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Status</th>
-                <th>Area</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentRuns.map((run) => (
-                <tr key={run.id}>
-                  <td className="code-text text-meta">{run.id}</td>
-                  <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
-                  <td>{run.area}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    ),
-    "quick-actions": (
-      <div className="section card card-padding">
-        <h3 className="font-semibold text-sm mb-3">Quick Actions</h3>
-        <div className="flex flex-col gap-2">
-          <Link href="/runs" className="link">Browse all runs</Link>
-          <Link href="/analytics" className="link">Open analytics</Link>
-        </div>
-      </div>
-    ),
-  };
-
-  return (
-    <div className="container-full page-padding fade-in">
-      <h1 className="heading-page mb-6">Dashboard</h1>
-      {dataState === "error" && <div className="card card-padding mb-4">Connection error</div>}
-      {visibleSections.map((section) => (
-        <div key={section.id}>{sectionContent[section.id]}</div>
-      ))}
   const setActiveTag = useCallback(
     (tag: string) => {
       const next = new URLSearchParams(searchParams.toString());
@@ -173,55 +109,109 @@ function DashboardContent() {
       </div>
 
       {dataState === "error" && (
-        <div className="card card-padding mb-4 sm:mb-6" style={{ borderLeft: "4px solid #CC1016" }}>
+        <div role="alert" className="card card-padding mb-4 sm:mb-6" style={{ borderLeft: "4px solid #CC1016" }}>
           <p className="font-semibold" style={{ color: "#CC1016" }}>Connection Error</p>
         </div>
       )}
 
       {dataState === "loading" && (
-        <div className="card card-padding flex items-center justify-center py-8">
-          <span className="text-meta">Loading data...</span>
+        <div role="status" aria-live="polite" className="card card-padding py-8 sm:py-12">
+          <LoadingSpinner label="Loading dashboard..." />
         </div>
       )}
 
       {dataState === "success" && (
         <>
-          <div className="section">
-            <AddTaggingAndLabelsUi
-              runs={filteredRuns}
-              activeTag={activeTag}
-              onActiveTagChange={setActiveTag}
-            />
-          </div>
-
-          <div className="section">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="heading-section">Recent Runs</h2>
-              <Link href="/runs" className="link text-xs sm:text-sm">View all</Link>
-            </div>
-            <div className="card table-responsive">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Status</th>
-                    <th>Area</th>
-                    <th>Tags</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentRuns.map((run) => (
-                    <tr key={run.id}>
-                      <td className="code-text text-meta">{run.id}</td>
-                      <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
-                      <td>{run.area}</td>
-                      <td className="text-meta">{(run.tags ?? []).join(", ") || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {getVisibleDashboardSections(layout).map((section) => {
+            const sectionContent: Record<DashboardSectionId, ReactNode> = {
+              stats: (
+                <div className="section">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: "Total", value: filteredRuns.length },
+                      { label: "Failed", value: filteredRuns.filter((r) => r.status === "failed").length },
+                      { label: "Running", value: filteredRuns.filter((r) => r.status === "running").length },
+                      { label: "Critical", value: filteredRuns.filter((r) => r.severity === "critical").length },
+                    ].map((stat) => (
+                      <div key={stat.label} className="card card-padding stat-card">
+                        <div className="stat-value">{stat.value}</div>
+                        <div className="stat-label">{stat.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ),
+              "widget-editor": (
+                <div className="section">
+                  <DashboardSectionLayoutEditor />
+                </div>
+              ),
+              "recent-runs": (
+                <>
+                  <div className="section">
+                    <AddTaggingAndLabelsUi
+                      runs={filteredRuns}
+                      activeTag={activeTag}
+                      onActiveTagChange={setActiveTag}
+                    />
+                  </div>
+                  <div className="section">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="heading-section">Recent Runs</h2>
+                      <Link href="/runs" className="link text-xs sm:text-sm">View all</Link>
+                    </div>
+                    <div className="card table-responsive">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Status</th>
+                            <th>Area</th>
+                            <th>Tags</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentRuns.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-16 text-center">
+                                <div className="flex flex-col items-center gap-3">
+                                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-full text-zinc-300">
+                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                  </div>
+                                  <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No matching fuzzing runs</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            recentRuns.map((run) => (
+                              <tr key={run.id}>
+                                <td className="code-text text-meta">{run.id}</td>
+                                <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
+                                <td>{run.area}</td>
+                                <td className="text-meta">{(run.tags ?? []).join(", ") || "—"}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ),
+              "quick-actions": (
+                <div className="section card card-padding">
+                  <h3 className="font-semibold text-sm mb-3">Quick Actions</h3>
+                  <div className="flex flex-col gap-2">
+                    <Link href="/runs" className="link">Browse all runs</Link>
+                    <Link href="/analytics" className="link">Open analytics</Link>
+                  </div>
+                </div>
+              ),
+            };
+            return <div key={section.id}>{sectionContent[section.id]}</div>;
+          })}
         </>
       )}
     </div>

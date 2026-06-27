@@ -282,8 +282,7 @@ function testFilterByCategoryEmptyMatch(): void {
 }
 
 function testFilterByCategoryNoMatch(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const emptyRules: typeof snapshot.alertRules = [];
+  const emptyRules: ReturnType<typeof createDefaultAlertingSettingsSnapshot>['alertRules'] = [];
   const filtered = filterAlertRulesByCategory(emptyRules, 'reliability');
   assert.deepEqual(filtered, []);
 }

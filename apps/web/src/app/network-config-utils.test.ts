@@ -209,6 +209,57 @@ function testMutations(): void {
   assert.equal(notFound, undefined);
 }
 
+function testCompleteNetworkValidation(): void {
+  const baseConfig: NetworkConfig = {
+    id: 'my-network',
+    name: 'My Custom Network',
+    networkPassphrase: 'My Custom Passphrase',
+    horizonUrl: 'https://horizon.custom.io',
+    rpcUrl: 'https://rpc.custom.io',
+    isBuiltIn: false,
+    addedAt: referenceTime.toISOString(),
+  };
+
+  // Valid config → should pass
+  const validResult = validateNetworkConfig(baseConfig);
+  assert.equal(validResult, null);
+
+  // Invalid: missing required horizon URL
+  const noHorizonResult = validateNetworkConfig({
+    ...baseConfig,
+    horizonUrl: '',
+  });
+  assert.ok(noHorizonResult !== null);
+
+  // Invalid: missing required RPC URL
+  const noRpcResult = validateNetworkConfig({
+    ...baseConfig,
+    rpcUrl: '',
+  });
+  assert.ok(noRpcResult !== null);
+
+  // Invalid: empty passphrase
+  const noPassphraseResult = validateNetworkConfig({
+    ...baseConfig,
+    networkPassphrase: '',
+  });
+  assert.ok(noPassphraseResult !== null);
+
+  // Invalid: name with leading whitespace
+  const whitespaceNameResult = validateNetworkConfig({
+    ...baseConfig,
+    name: ' Leading Space',
+  });
+  assert.ok(whitespaceNameResult !== null);
+
+  // Invalid: non-HTTPS URLs (except localhost/127.0.0.1)
+  const httpUrlResult = validateNetworkConfig({
+    ...baseConfig,
+    horizonUrl: 'http://example.com',
+  });
+  assert.ok(httpUrlResult !== null);
+}
+
 testDefaultStoreShape();
 testRoundTrip();
 testNullInput();
@@ -218,5 +269,6 @@ testUrlValidation();
 testNameValidation();
 testDuplicateCheck();
 testMutations();
+testCompleteNetworkValidation();
 
 console.log('network-config-utils.test.ts: all assertions passed');

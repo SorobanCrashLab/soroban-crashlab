@@ -8,6 +8,9 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatSize } from './utils/format';
+import { triggerBrowserDownload } from './utils/browser-download';
+import { api } from '../lib/api-client';
 
 // --- Types ---
 
@@ -55,17 +58,7 @@ async function uploadArtifact(file: File): Promise<Artifact> {
  * GET /api/artifacts
  */
 async function fetchArtifacts(): Promise<Artifact[]> {
-  const response = await fetch('/api/artifacts', {
-    method: 'GET',
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to list artifacts');
-  }
-
-  const data = await response.json();
+  const data = await api.artifacts.list();
   return data.artifacts || [];
 }
 
@@ -74,37 +67,7 @@ async function fetchArtifacts(): Promise<Artifact[]> {
  * GET /api/artifacts/:id
  */
 async function downloadArtifactContent(id: string): Promise<Blob> {
-  const response = await fetch(`/api/artifacts/${id}`, {
-    method: 'GET',
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to download artifact');
-  }
-
-  return await response.blob();
-}
-
-
-// --- Helper Functions ---
-
-function triggerBrowserDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function formatFileSize(bytes?: number): string {
-  if (bytes === undefined) return 'Unknown size';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return api.artifacts.download(id);
 }
 
 // --- Main Component ---
@@ -305,7 +268,7 @@ export default function ArtifactStorageIntegration() {
                       <h3 className="text-lg font-semibold text-gray-900">{artifact.name}</h3>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-sm text-gray-500 font-medium">
-                          {formatFileSize(artifact.sizeBytes)}
+                          {formatSize(artifact.sizeBytes)}
                         </span>
                         <span className="text-gray-300 text-xs">•</span>
                         <span className="text-sm text-gray-500">

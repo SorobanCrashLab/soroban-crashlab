@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { sanitizeMarkdown } from '../lib/sanitize';
 
 interface MarkdownPreviewProps {
     content: string;
@@ -19,6 +20,17 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
             scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700">
             <ReactMarkdown 
                 remarkPlugins={[remarkGfm]}
+                urlTransform={(url) => {
+                    try {
+                        const parsed = new URL(url, "https://github.com");
+                        if (parsed.protocol === "javascript:" || parsed.protocol === "data:" || parsed.protocol === "vbscript:") {
+                            return "#";
+                        }
+                    } catch {
+                        return url;
+                    }
+                    return url;
+                }}
                 components={{
                     h1: ({ children }) => (
                         <h1 className="text-2xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -76,7 +88,7 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
                     ),
                 }}
             >
-                {content}
+                {sanitizeMarkdown(content)}
             </ReactMarkdown>
         </div>
     );

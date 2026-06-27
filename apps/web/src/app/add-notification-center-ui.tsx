@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { loadPreferences, filterByPreferences, isInQuietHours } from './notification-preferences-utils';
+import { loadPreferences, filterByPreferences } from './notification-preferences-utils';
 import type { NotificationType, NotificationPriority } from './notification-preferences-utils';
+import { api, type NotificationFeedItem } from '../lib/api-client';
 
 export type { NotificationType, NotificationPriority };
 
@@ -27,16 +28,7 @@ interface NotificationCenterProps {
 
 const POLL_INTERVAL_MS = 30000;
 
-type FeedItem = {
-  id: string;
-  title: string;
-  message: string;
-  severity: 'info' | 'success' | 'warning' | 'error';
-  createdAt: string;
-  read: boolean;
-};
-
-function mapFeedItemToNotification(item: FeedItem): Notification {
+function mapFeedItemToNotification(item: NotificationFeedItem): Notification {
   const priorityMap: Record<string, NotificationPriority> = {
     error: 'critical',
     warning: 'high',
@@ -67,10 +59,8 @@ export default function NotificationCenter({ className = '' }: NotificationCente
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await fetch('/api/notifications');
-      if (!res.ok) return;
-      const data = await res.json();
-      const feed: FeedItem[] = data.notifications ?? [];
+      const data = await api.notifications.list();
+      const feed: NotificationFeedItem[] = data.notifications ?? [];
       const mapped = feed.map(mapFeedItemToNotification);
       setNotifications((prev) => {
         const prevIds = new Set(prev.map((n) => n.id));
@@ -305,7 +295,7 @@ export default function NotificationCenter({ className = '' }: NotificationCente
           </div>
 
           {/* Notifications List */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto" aria-live="polite">
             {filteredNotifications.length === 0 ? (
               <div className="p-8 text-center">
                 <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">

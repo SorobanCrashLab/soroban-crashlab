@@ -218,7 +218,10 @@ describe("validateCaseBundle", () => {
   });
 
   it("accepts legacy runtime-failure category", () => {
-    const bundle = makeValidBundle({ signature: { category: "runtime-failure", digest: 1, signature_hash: 1 } });
+    const bundle = makeValidBundle({
+      signature: { category: "runtime-failure", digest: 1, signature_hash: 1 },
+      environment: { os: "linux", arch: "x86_64", family: "unix", version: "1.0.0" },
+    });
     const result = validateCaseBundle(bundle);
     expect(result.valid).toBe(true);
     expect(result.errors).toHaveLength(0);
@@ -228,7 +231,10 @@ describe("validateCaseBundle", () => {
   it("accepts all stable failure categories without warnings", () => {
     const categories = ["auth", "budget", "state", "xdr"];
     for (const category of categories) {
-      const bundle = makeValidBundle({ signature: { category, digest: 1, signature_hash: 1 } });
+      const bundle = makeValidBundle({
+        signature: { category, digest: 1, signature_hash: 1 },
+        environment: { os: "linux", arch: "x86_64", family: "unix", version: "1.0.0" },
+      });
       const result = validateCaseBundle(bundle);
       expect(result.valid).toBe(true);
       expect(result.warnings).toHaveLength(0);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import MarkdownPreview from './MarkdownPreview';
 
 type ReportingTemplateKind = 'issue' | 'pr';
 
@@ -88,6 +89,7 @@ export default function CreateReportingTemplatesPage60() {
   const [templates, setTemplates] = useState<ReportingTemplate[]>(DEFAULT_TEMPLATES);
   const [selectedId, setSelectedId] = useState<string>(DEFAULT_TEMPLATES[0]!.id);
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
   const saveTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -393,16 +395,51 @@ export default function CreateReportingTemplatesPage60() {
                   </label>
                 </div>
 
-                <label className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Template body</span>
-                  <textarea
-                    value={selectedTemplate.body}
-                    onChange={(e) => updateSelectedTemplate({ body: e.target.value })}
-                    className="min-h-[320px] px-3 py-2 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-mono"
-                    placeholder="Write markdown here…"
-                    spellCheck={false}
-                  />
-                </label>
+                {/* Tab navigation */}
+                <div className="border-b border-zinc-200 dark:border-zinc-800">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('edit')}
+                      className={`px-4 py-2 text-sm font-semibold border-b-2 transition ${
+                        activeTab === 'edit'
+                          ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                          : 'border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
+                      }`}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('preview')}
+                      className={`px-4 py-2 text-sm font-semibold border-b-2 transition ${
+                        activeTab === 'preview'
+                          ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                          : 'border-transparent text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
+                      }`}
+                    >
+                      Preview
+                    </button>
+                  </div>
+                </div>
+
+                {activeTab === 'edit' ? (
+                  <label className="flex flex-col gap-1">
+                    <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Template body</span>
+                    <textarea
+                      value={selectedTemplate.body}
+                      onChange={(e) => updateSelectedTemplate({ body: e.target.value })}
+                      className="min-h-[320px] px-3 py-2 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-mono"
+                      placeholder="Write markdown here…"
+                      spellCheck={false}
+                    />
+                  </label>
+                ) : (
+                  <div>
+                    <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-2">Preview</div>
+                    <MarkdownPreview content={selectedTemplate.body || '*No content yet. Switch to Edit tab to add markdown.*'} />
+                  </div>
+                )}
 
                 <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/20 p-4">
                   <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-1">Selection</div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { FuzzingRun } from "./types";
 import { collectRunArtifacts } from "./utils/artifact-collection";
+import { triggerBrowserDownload } from "./utils/browser-download";
 
 type DownloadState = "idle" | "loading" | "error";
 
@@ -27,17 +28,10 @@ export default function AddDownloadableRunArtifactBundle({
         runs: collected,
       };
 
-      const blob = new Blob([JSON.stringify(bundle, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `soroban-artifacts-bundle-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      triggerBrowserDownload(
+        new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }),
+        `soroban-artifacts-bundle-${new Date().toISOString().slice(0, 10)}.json`,
+      );
       setState("idle");
     } catch {
       setState("error");

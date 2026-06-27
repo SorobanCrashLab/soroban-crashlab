@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import React, { useState, KeyboardEvent } from 'react';
 import { FuzzingRun } from './types';
 
 interface TimelineScrubberProps {
@@ -17,7 +17,6 @@ export default function TimelineScrubber({
   error = null 
 }: TimelineScrubberProps) {
   const [index, setIndex] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleIndexChange = (newIndex: number) => {
     if (newIndex >= 0 && newIndex < runs.length) {
@@ -119,8 +118,9 @@ export default function TimelineScrubber({
               disabled={index <= 0}
               className="p-2 rounded-lg hover:bg-white dark:hover:bg-zinc-800 disabled:opacity-30 transition-all active:scale-90"
               title="Previous Run"
+              aria-label="Previous run"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
@@ -129,8 +129,9 @@ export default function TimelineScrubber({
               disabled={index >= runs.length - 1}
               className="p-2 rounded-lg hover:bg-white dark:hover:bg-zinc-800 disabled:opacity-30 transition-all active:scale-90"
               title="Next Run"
+              aria-label="Next run"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -176,7 +177,7 @@ export default function TimelineScrubber({
         <div className="flex justify-between w-full px-1 mt-10">
           {runs.map((run, i) => {
             const isSelected = i === index;
-            const isNear = Math.abs(i - index) < 2;
+            Math.abs(i - index) < 2;
             const isEndpoint = i === 0 || i === runs.length - 1;
             
             if (!isEndpoint && !isSelected && runs.length > 20) return null;
@@ -187,7 +188,7 @@ export default function TimelineScrubber({
                 className={`flex flex-col items-center transition-all duration-300 ${isSelected ? 'scale-110' : 'scale-100 opacity-40'}`}
               >
                 <div className={`w-1 h-2 rounded-full mb-2 ${isSelected ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-700'}`} />
-                <span className={`text-[9px] font-bold tracking-tighter ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-400'}`}>
+                <span className={`text-[9px] font-bold tracking-tighter ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400'}`}>
                   {isEndpoint || isSelected ? run.id.slice(-4) : ''}
                 </span>
               </div>
@@ -198,25 +199,25 @@ export default function TimelineScrubber({
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 p-3 sm:p-5 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-2xl border border-zinc-200 dark:border-zinc-800/50 backdrop-blur-sm">
         <div className="space-y-1">
-          <div className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Status</div>
+          <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Status</div>
           <div className="flex items-center gap-2">
              <StatusBadge status={currentRun.status} />
           </div>
         </div>
         <div className="space-y-1">
-          <div className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Product Area</div>
+          <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Product Area</div>
           <div className="text-sm font-bold text-zinc-800 dark:text-zinc-200 capitalize">{currentRun.area}</div>
         </div>
         <div className="space-y-1">
-          <div className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Risk Level</div>
+          <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Risk Level</div>
           <div className="flex items-center gap-2">
             <SeverityBadge severity={currentRun.severity} />
           </div>
         </div>
         <div className="space-y-1">
-          <div className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Seeds / Instructions</div>
+          <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Seeds / Instructions</div>
           <div className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-            {currentRun.seedCount.toLocaleString()} <span className="text-zinc-400 font-normal">/</span> {(currentRun.cpuInstructions / 1_000_000).toFixed(1)}M
+            {currentRun.seedCount.toLocaleString()} <span className="text-zinc-500 dark:text-zinc-400 font-normal">/</span> {(currentRun.cpuInstructions / 1_000_000).toFixed(1)}M
           </div>
         </div>
       </div>

@@ -25,22 +25,32 @@ export function useMaintainerMode(): {
   const [storageError, setStorageError] = useState(false);
 
   useEffect(() => {
-    // Schedule on next tick so setState calls go through React's batching,
-    // avoiding the react-hooks/set-state-in-effect lint rule.
-    const t = window.setTimeout(() => {
-      setMounted(true);
+    const syncState = () => {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
         setIsMaintainer(stored === 'true');
       } catch (error) {
-        // localStorage unavailable or quota exceeded
         if (isQuotaExceededError(error)) {
           setStorageError(true);
-          console.warn('localStorage quota exceeded, maintainer mode will not persist');
         }
       }
+    };
+
+    // Schedule on next tick so setState calls go through React's batching,
+    // avoiding the react-hooks/set-state-in-effect lint rule.
+    const t = window.setTimeout(() => {
+      setMounted(true);
+      syncState();
     }, 0);
-    return () => window.clearTimeout(t);
+
+    window.addEventListener('maintainer-mode-change', syncState);
+    window.addEventListener('storage', syncState);
+
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('maintainer-mode-change', syncState);
+      window.removeEventListener('storage', syncState);
+    };
   }, []);
 
   const toggle = useCallback(() => {
@@ -55,6 +65,7 @@ export function useMaintainerMode(): {
           console.warn('localStorage quota exceeded, maintainer mode will not persist');
         }
       }
+      window.dispatchEvent(new Event('maintainer-mode-change'));
       return next;
     });
   }, []);

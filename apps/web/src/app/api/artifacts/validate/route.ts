@@ -14,7 +14,7 @@ export const CASE_BUNDLE_SCHEMA_VERSION = 2;
  */
 const CaseSeedSchema = z.object({
   id: z.number().int().nonnegative(),
-  payload: z.array(z.number().int().min(0).max(255)).max(64),
+  payload: z.array(z.number().int().min(0).max(255)).min(1, "too short").max(64, "too long"),
 });
 
 /**
@@ -60,6 +60,7 @@ const CaseBundleSchema = z.object({
  * Legacy bundles lack the schema field but must still contain seed + signature.
  */
 const LegacyCaseBundleSchema = z.object({
+  schema: z.never().optional(),
   seed: CaseSeedSchema,
   signature: CrashSignatureSchema,
   environment: EnvironmentFingerprintSchema.nullable().optional(),
@@ -105,6 +106,21 @@ export interface ValidationResult {
   } | null;
 }
 
+function flattenIssues(issues: z.ZodIssue[]): z.ZodIssue[] {
+  const flat: z.ZodIssue[] = [];
+  for (const issue of issues) {
+    if (issue.code === "invalid_union" && "unionErrors" in issue) {
+      const unionErrors = (issue as any).unionErrors as z.ZodError[];
+      for (const subError of unionErrors) {
+        flat.push(...flattenIssues(subError.issues));
+      }
+    } else {
+      flat.push(issue);
+    }
+  }
+  return flat;
+}
+
 /**
  * Validate a raw JSON object against the CaseBundle schema and seed constraints.
  *
@@ -121,10 +137,13 @@ export function validateCaseBundle(data: unknown): ValidationResult {
   // 1. Schema-level validation (Zod)
   const parseResult = AcceptedCaseBundleSchema.safeParse(data);
   if (!parseResult.success) {
-    const issues = parseResult.error.issues;
+    const issues = flattenIssues(parseResult.error.issues);
     for (const issue of issues) {
       const path = issue.path.length > 0 ? issue.path.join(".") : "root";
-      result.errors.push(`Schema violation at ${path}: ${issue.message}`);
+      const errMsg = `Schema violation at ${path}: ${issue.message}`;
+      if (!result.errors.includes(errMsg)) {
+        result.errors.push(errMsg);
+      }
     }
     return result;
   }

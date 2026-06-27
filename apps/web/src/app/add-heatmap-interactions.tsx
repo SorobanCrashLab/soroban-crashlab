@@ -534,7 +534,7 @@ export default function AddHeatmapInteractions() {
       )}
 
       {dataState === "error" && (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-red-200 bg-red-50/60 px-4 py-10 text-center dark:border-red-900/50 dark:bg-red-950/20">
+        <div role="alert" className="flex flex-col items-center gap-4 rounded-2xl border border-red-200 bg-red-50/60 px-4 py-10 text-center dark:border-red-900/50 dark:bg-red-950/20">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40">
             <svg
               className="h-6 w-6 text-red-600 dark:text-red-400"

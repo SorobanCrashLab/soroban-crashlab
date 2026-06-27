@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   validateNetworkConfig,
   validateNetworkStore,
@@ -6,8 +6,9 @@ import {
   type NetworkConfig,
 } from "@/app/network-config-utils";
 import { getStore, setStore } from "./_store";
+import { createdResponse, successResponse } from '@/lib/api-response-utils';
+import { jsonError, readJsonBody, withRouteErrorHandling } from "@/lib/route-handler";
 
-// Private slugify helper - server always generates id from name
 function slugify(name: string, existingNetworks: NetworkConfig[]): string {
   const base = name
     .trim()
@@ -26,30 +27,18 @@ function slugify(name: string, existingNetworks: NetworkConfig[]): string {
   return candidate;
 }
 
-/**
- * GET /api/networks
- * Returns the list of all configured networks.
- */
-export async function GET() {
+export const GET = withRouteErrorHandling("GET /api/networks", async () => {
   const store = getStore();
-  return NextResponse.json({
+  return successResponse({
     networks: store.networks,
     activeNetworkId: store.activeNetworkId,
-    total: store.networks.length,
-  });
-}
+  }, { total: store.networks.length });
+});
 
-/**
- * POST /api/networks
- * Adds a new custom network. Body: { name, networkPassphrase, horizonUrl, rpcUrl, friendbotUrl? }
- */
-export async function POST(request: NextRequest) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+export const POST = withRouteErrorHandling("POST /api/networks", async (request: NextRequest) => {
+  const parsedBody = await readJsonBody(request);
+  if ("error" in parsedBody) return parsedBody.error;
+  const body = parsedBody.body;
 
   if (
     typeof body !== "object" ||
@@ -59,10 +48,7 @@ export async function POST(request: NextRequest) {
     typeof (body as Record<string, unknown>).horizonUrl !== "string" ||
     typeof (body as Record<string, unknown>).rpcUrl !== "string"
   ) {
-    return NextResponse.json(
-      { error: "Missing required fields: name, networkPassphrase, horizonUrl, rpcUrl." },
-      { status: 400 },
-    );
+    return jsonError("Missing required fields: name, networkPassphrase, horizonUrl, rpcUrl.", 400);
   }
 
   const raw = body as Record<string, unknown>;
@@ -86,15 +72,15 @@ export async function POST(request: NextRequest) {
 
   const configError = validateNetworkConfig(candidate);
   if (configError) {
-    return NextResponse.json({ error: configError }, { status: 422 });
+    return jsonError(configError, 422);
   }
 
   const storeError = validateNetworkStore(store, candidate);
   if (storeError) {
-    return NextResponse.json({ error: storeError }, { status: 409 });
+    return jsonError(storeError, 409);
   }
 
   setStore(addNetwork(store, candidate));
 
-  return NextResponse.json({ network: candidate }, { status: 201 });
-}
+  return createdResponse({ network: candidate });
+});

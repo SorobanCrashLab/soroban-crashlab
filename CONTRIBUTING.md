@@ -241,16 +241,45 @@ cargo -V
 
 Also paste the exact failing command and the first relevant error block.
 
-## Branch and PR flow
+## Branch naming
 
-1. Create a branch from `main` named `feat/<short-name>` or `fix/<short-name>`.
-2. Keep PRs focused on one issue.
-3. Link the issue in the PR description using `Closes #<number>`.
-4. Include test evidence and reproduction notes for behavior changes.
-5. If your change alters a public API, persisted schema, CLI contract, or
-   documented maintainer workflow, call that out clearly in the PR so the next
-   release maintainer can update [`CHANGELOG.md`](CHANGELOG.md) and run the
-   compatibility review in [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
+Create branches from `main` using the convention `issue/<number>-<kebab-case-description>`.
+
+```bash
+git checkout -b issue/137-contributing-md
+```
+
+## Pull Request process
+
+1. **One issue per PR.** Keep scope limited to the files listed in the issue to avoid merge conflicts.
+2. **PR title format.** Use [Conventional Commits](https://www.conventionalcommits.org/):
+   ```
+   type(area): short summary (ROADMAP-NNN)
+   ```
+   Examples:
+   ```
+   docs(root): add CONTRIBUTING.md with PR policy (ROADMAP-137)
+   feat(web): add run cancellation button (ROADMAP-142)
+   fix(core): handle timeout edge case in replay (ROADMAP-138)
+   ```
+3. **Link the issue.** Include `Closes #<issue_number>` in the PR body.
+4. **Test evidence.** Include output from relevant verification commands and reproduction notes for behavior changes.
+5. **API / schema / CLI changes.** If your change alters a public API, persisted schema, CLI contract, or documented maintainer workflow, call that out clearly in the PR so the next release maintainer can update [`CHANGELOG.md`](CHANGELOG.md) and run the compatibility review in [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
+
+## Lockfile policy
+
+Do not commit changes to `pnpm-lock.yaml` or `package-lock.json`. If your
+change requires a dependency update, open a separate PR that only touches the
+lockfile.
+
+## package.json changes
+
+If your PR modifies `package.json`, add a **Maintainer approval** section in the
+PR body describing why the change is needed. Examples of valid reasons:
+
+- Adding a new dependency required by the feature
+- Updating a dependency to fix a security vulnerability
+- Changing a script for the build or dev workflow
 
 ## Conflict of interest disclosures
 

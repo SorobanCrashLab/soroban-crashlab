@@ -2,6 +2,10 @@
 import { useEffect, useState, useCallback } from "react";
 import type { FuzzingRun } from "./types";
 import { simulateSeedReplay } from "./replay";
+import AddRunReplayHistoryWithTimestamps, {
+  buildReplayHistoryEntryFromReplay,
+  recordRunReplayHistoryEntry,
+} from "./add-run-replay-history-with-timestamps";
 
 /**
  * Issue #275: Add Run replay UI
@@ -33,6 +37,8 @@ interface ReplayResult {
   seedsFailed: number;
   duration: number;
   traces: string[];
+  startedAt: string;
+  completedAt: string;
 }
 
 const DEFAULT_CONFIG: ReplayConfig = {
@@ -56,8 +62,7 @@ export default function AddRunReplayUi({ runs = [] }: AddRunReplayUiProps) {
     total: 0,
   });
   const [result, setResult] = useState<ReplayResult | null>(null);
-  const [replayHistory, setReplayHistory] = useState<ReplayResult[]>([]);
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(() => new Date());
 
   const handleSelectRun = (runId: string) => {
     const run = runs.find((r) => r.id === runId);
@@ -99,12 +104,16 @@ export default function AddRunReplayUi({ runs = [] }: AddRunReplayUiProps) {
       const { newRunId } = await simulateSeedReplay(selectedRun.id);
       const endTime = Date.now();
       const duration = endTime - startedAt;
+      const startedAtIso = new Date(startedAt).toISOString();
+      const completedAtIso = new Date(endTime).toISOString();
 
       const replayResult: ReplayResult = {
         runId: newRunId,
         seedsReplayed: totalSeeds,
         seedsFailed: Math.floor(totalSeeds * 0.05),
         duration,
+        startedAt: startedAtIso,
+        completedAt: completedAtIso,
         traces: [
           "Trace 1: contract::transfer -> assert_balance_nonnegative",
           "Trace 2: contract::mint -> overflow_check",
@@ -112,8 +121,18 @@ export default function AddRunReplayUi({ runs = [] }: AddRunReplayUiProps) {
         ],
       };
 
+      const historyEntry = buildReplayHistoryEntryFromReplay({
+        id: `replay-history-${newRunId}`,
+        sourceRunId: selectedRun.id,
+        replayRunId: newRunId,
+        startedAt: startedAtIso,
+        completedAt: completedAtIso,
+        seedsReplayed: replayResult.seedsReplayed,
+        seedsFailed: replayResult.seedsFailed,
+      });
+
       setResult(replayResult);
-      setReplayHistory((prev) => [replayResult, ...prev].slice(0, 5));
+      recordRunReplayHistoryEntry(historyEntry);
       setProgress((prev) => ({
         ...prev,
         status: "completed",
@@ -132,7 +151,7 @@ export default function AddRunReplayUi({ runs = [] }: AddRunReplayUiProps) {
     if (progress.status !== "running" || !progress.startTime) return;
 
     const interval = window.setInterval(() => {
-      setNow(Date.now());
+      setNow(new Date());
     }, 1000);
 
     return () => window.clearInterval(interval);
@@ -394,7 +413,7 @@ export default function AddRunReplayUi({ runs = [] }: AddRunReplayUiProps) {
               {progress.startTime && (
                 <div className="text-xs text-zinc-500">
                   Elapsed:{" "}
-                  {Math.floor((now - progress.startTime) / 1000)}s
+                  {Math.floor((now.getTime() - progress.startTime) / 1000)}s
                 </div>
               )}
             </div>
@@ -454,35 +473,10 @@ export default function AddRunReplayUi({ runs = [] }: AddRunReplayUiProps) {
             </div>
           )}
 
-          {/* Replay History */}
-          {replayHistory.length > 0 && (
-            <div className="p-6 rounded-[2rem] border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-              <h3 className="text-lg font-bold mb-4">Recent Replays</h3>
-              <div className="space-y-3">
-                {replayHistory.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800"
-                  >
-                    <div>
-                      <div className="font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                        {item.runId}
-                      </div>
-                      <div className="text-xs text-zinc-500">
-                        {item.seedsReplayed} seeds ·{" "}
-                        {(item.duration / 1000).toFixed(1)}s
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-rose-600 dark:text-rose-400">
-                        {item.seedsFailed} failed
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <AddRunReplayHistoryWithTimestamps
+            sourceRunId={selectedRun?.id}
+            title="Recent Replays"
+          />
 
           {!selectedRun && (
             <div className="p-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-center text-zinc-500">

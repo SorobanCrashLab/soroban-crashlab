@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FuzzingRun } from '../types';
-import { dedupedFetchJson } from '../../lib/request-dedup';
+import { fetchRuns } from '../../lib/api-client';
 
 export default function AnalyticsPage() {
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
@@ -11,7 +11,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    dedupedFetchJson<{ runs?: FuzzingRun[] }>('/api/runs')
+    fetchRuns()
       .then((data) => {
         if (!cancelled) {
           setRuns(data.runs ?? []);
@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
       </div>
 
       {dataState === 'loading' && (
-        <div className="card card-padding flex items-center justify-center py-8 sm:py-12">
+        <div role="status" aria-live="polite" className="card card-padding flex items-center justify-center py-8 sm:py-12">
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#0A66C2', borderTopColor: 'transparent' }} />
             <span className="text-meta">Loading analytics...</span>
@@ -78,40 +78,54 @@ export default function AnalyticsPage() {
       )}
 
       {dataState === 'success' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-          <div className="card card-padding">
-            <h3 className="font-semibold text-xs sm:text-sm mb-3 sm:mb-4" style={{ color: 'var(--text-secondary)' }}>By Status</h3>
-            <div className="space-y-1.5 sm:space-y-2">
-              {Object.entries(byStatus).map(([key, count]) => (
-                <div key={key} className="flex justify-between items-center py-0.5 sm:py-1">
-                  <span className="text-meta text-xs sm:text-sm">{key}</span>
-                  <span className="font-semibold text-sm sm:text-base">{count}</span>
-                </div>
-              ))}
+        <div>
+          {runs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-full text-zinc-300 mb-4">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 002 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">No analytics data yet</h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 max-w-sm">Start fuzzing runs to see failure clustering, heatmaps, trends and comparisons here.</p>
             </div>
-          </div>
-          <div className="card card-padding">
-            <h3 className="font-semibold text-xs sm:text-sm mb-3 sm:mb-4" style={{ color: 'var(--text-secondary)' }}>By Severity</h3>
-            <div className="space-y-1.5 sm:space-y-2">
-              {Object.entries(bySeverity).map(([key, count]) => (
-                <div key={key} className="flex justify-between items-center py-0.5 sm:py-1">
-                  <span className="text-meta text-xs sm:text-sm">{key}</span>
-                  <span className="font-semibold text-sm sm:text-base">{count}</span>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+              <div className="card card-padding">
+                <h3 className="font-semibold text-xs sm:text-sm mb-3 sm:mb-4" style={{ color: 'var(--text-secondary)' }}>By Status</h3>
+                <div className="space-y-1.5 sm:space-y-2">
+                  {Object.entries(byStatus).map(([key, count]) => (
+                    <div key={key} className="flex justify-between items-center py-0.5 sm:py-1">
+                      <span className="text-meta text-xs sm:text-sm">{key}</span>
+                      <span className="font-semibold text-sm sm:text-base">{count}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-          <div className="card card-padding">
-            <h3 className="font-semibold text-xs sm:text-sm mb-3 sm:mb-4" style={{ color: 'var(--text-secondary)' }}>By Area</h3>
-            <div className="space-y-1.5 sm:space-y-2">
-              {Object.entries(byArea).map(([key, count]) => (
-                <div key={key} className="flex justify-between items-center py-0.5 sm:py-1">
-                  <span className="text-meta text-xs sm:text-sm">{key}</span>
-                  <span className="font-semibold text-sm sm:text-base">{count}</span>
+              </div>
+              <div className="card card-padding">
+                <h3 className="font-semibold text-xs sm:text-sm mb-3 sm:mb-4" style={{ color: 'var(--text-secondary)' }}>By Severity</h3>
+                <div className="space-y-1.5 sm:space-y-2">
+                  {Object.entries(bySeverity).map(([key, count]) => (
+                    <div key={key} className="flex justify-between items-center py-0.5 sm:py-1">
+                      <span className="text-meta text-xs sm:text-sm">{key}</span>
+                      <span className="font-semibold text-sm sm:text-base">{count}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+              <div className="card card-padding">
+                <h3 className="font-semibold text-xs sm:text-sm mb-3 sm:mb-4" style={{ color: 'var(--text-secondary)' }}>By Area</h3>
+                <div className="space-y-1.5 sm:space-y-2">
+                  {Object.entries(byArea).map(([key, count]) => (
+                    <div key={key} className="flex justify-between items-center py-0.5 sm:py-1">
+                      <span className="text-meta text-xs sm:text-sm">{key}</span>
+                      <span className="font-semibold text-sm sm:text-base">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

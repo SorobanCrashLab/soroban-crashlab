@@ -272,6 +272,13 @@ jest.mock('./add-run-replay-ui', () => ({
   default: () => null,
 }));
 
+jest.mock('./add-run-replay-history-with-timestamps', () => ({
+  __esModule: true,
+  default: () => null,
+  recordRunReplayHistoryEntry: jest.fn(),
+  buildReplayHistoryEntryFromReplay: jest.fn(),
+}));
+
 jest.mock('./add-bulk-actions-for-runs', () => ({
   __esModule: true,
   default: () => null,
@@ -531,7 +538,7 @@ describe('Dashboard Filters Integration in filteredRuns', () => {
       }, { timeout: 2000 });
 
       // Set a search term that matches no runs
-      const setSearchButton = screen.getByTestId('set-search-filter');
+      screen.getByTestId('set-search-filter');
       // Modify the mock to use a non-matching term
       const dashboardFilters = screen.getByTestId('dashboard-filters');
       const customButton = document.createElement('button');

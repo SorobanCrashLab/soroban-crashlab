@@ -1,0 +1,89 @@
+name: Feature request
+description: Request a new feature or improvement to an existing capability.
+labels: ["type:docs", "priority:p1", "area:docs"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please search existing issues and the [roadmap](https://github.com/SorobanCrashLab/soroban-crashlab/blob/main/docs/ROADMAP.md) to avoid duplicates.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What limitation or gap are you running into? Describe the context clearly.
+      placeholder: |
+        e.g. "When running a deep campaign, there is no way to see which mutation
+        strategies contributed the most failures without reading raw logs."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed feature
+      description: Describe the feature or improvement you would like to see.
+      placeholder: |
+        e.g. "Add a per-strategy breakdown panel to the analytics page that shows
+        failure counts grouped by mutator name."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: |
+        What workarounds or alternative approaches have you tried or considered?
+        Why are they insufficient?
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: |
+        List concrete, testable conditions that would confirm the feature is complete.
+        Use checkboxes where possible.
+      placeholder: |
+        - [ ] Panel is visible on the analytics page
+        - [ ] Data is grouped by mutator name
+        - [ ] Works in both light and dark mode
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the system does this feature belong to?
+      options:
+        - fuzzer
+        - generator
+        - web
+        - ci
+        - docs
+        - ops
+        - security
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How urgent is this to you?
+      options:
+        - p0 – critical / blocking
+        - p1 – high / needed soon
+        - p2 – medium / nice to have
+        - p3 – low / future consideration
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: |
+        Links, screenshots, related issues, prior art, or any other information
+        that would help maintainers evaluate this request.

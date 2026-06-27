@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { FuzzingRun, RunStatus, RunArea, RunSeverity } from './types';
+import { FuzzingRun, RunStatus } from './types';
 
 function makeRun(overrides: Partial<FuzzingRun> & { startedAt?: string; finishedAt?: string }): FuzzingRun {
   const baseTime = new Date('2024-01-15T10:00:00Z').toISOString();
@@ -180,7 +180,7 @@ function testStatusColorMapping() {
 function testRunPositioning() {
   console.log('Running testRunPositioning...');
   
-  const baseTime = new Date('2024-01-15T10:00:00Z').getTime();
+  const _baseTime = new Date('2024-01-15T10:00:00Z').getTime();
   const runs: FuzzingRun[] = [
     makeRun({ id: 'run-1', startedAt: '2024-01-15T10:00:00Z', duration: 60000 }),
     makeRun({ id: 'run-2', startedAt: '2024-01-15T10:01:00Z', duration: 60000 }),
@@ -288,7 +288,7 @@ function testMinimumWidth() {
   ];
 
   const filtered = filterTimelineRuns(runs);
-  const { minTime, timeRange } = calculateTimeBounds(filtered);
+  const { minTime: _minTime, timeRange } = calculateTimeBounds(filtered);
   
   const shortRun = filtered[0];
   const start = new Date(shortRun.startedAt!).getTime();

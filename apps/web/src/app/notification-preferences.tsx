@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   type NotificationPreferences as Prefs,
   type NotificationType,
@@ -52,16 +52,11 @@ interface NotificationPreferencesPageProps {
 export default function NotificationPreferencesPage({
   className = '',
 }: NotificationPreferencesPageProps) {
-  const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFERENCES);
-  const [loaded, setLoaded] = useState(false);
+  const [prefs, setPrefs] = useState<Prefs>(() => loadPreferences());
+  const [loaded] = useState(true);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    setPrefs(loadPreferences());
-    setLoaded(true);
-  }, []);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
