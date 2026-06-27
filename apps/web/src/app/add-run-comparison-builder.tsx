@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { FuzzingRun } from "./types";
+import { buildComparisonMockRuns } from "../fixtures/runs";
 
 /**
  * Issue #258: Add Run comparison builder
@@ -51,20 +52,7 @@ const COMPARISON_MODES: ComparisonMode[] = [
   },
 ];
 
-const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 10 }, (_, i) => ({
-  id: `run-${1000 + i}`,
-  status: ["completed", "failed", "running"][i % 3] as FuzzingRun["status"],
-  area: ["auth", "state", "budget", "xdr"][i % 4] as FuzzingRun["area"],
-  severity: ["low", "medium", "high", "critical"][
-    i % 4
-  ] as FuzzingRun["severity"],
-  duration: 120000 + Math.random() * 3600000,
-  seedCount: Math.floor(10000 + Math.random() * 90000),
-  cpuInstructions: Math.floor(400000 + Math.random() * 900000),
-  memoryBytes: Math.floor(1_500_000 + Math.random() * 8_000_000),
-  minResourceFee: Math.floor(500 + Math.random() * 5000),
-  crashDetail: null,
-}));
+const MOCK_RUNS = buildComparisonMockRuns();
 
 export default function AddRunComparisonBuilder() {
   const [comparisonSlots, setComparisonSlots] = useState<ComparisonSlot[]>([

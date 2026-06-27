@@ -136,3 +136,79 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@layer utilities {
+  .bg-theme {
+    background: var(--background);
+  }
+
+  .text-theme {
+    color: var(--foreground);
+  }
+
+  .border-header {
+    border-color: var(--header-border-color);
+  }
+
+  .status-badge {
+    background-color: var(--status-badge-bg);
+    color: var(--status-badge-fg);
+    border-color: var(--status-badge-border);
+  }
+
+  .status-badge-running {
+    --status-badge-bg: var(--status-running-bg);
+    --status-badge-fg: var(--status-running-fg);
+    --status-badge-border: var(--status-running-border);
+  }
+
+  .status-badge-completed {
+    --status-badge-bg: var(--status-completed-bg);
+    --status-badge-fg: var(--status-completed-fg);
+    --status-badge-border: var(--status-completed-border);
+  }
+
+  .status-badge-failed {
+    --status-badge-bg: var(--status-failed-bg);
+    --status-badge-fg: var(--status-failed-fg);
+    --status-badge-border: var(--status-failed-border);
+  }
+
+  .status-badge-cancelled {
+    --status-badge-bg: var(--status-cancelled-bg);
+    --status-badge-fg: var(--status-cancelled-fg);
+    --status-badge-border: var(--status-cancelled-border);
+  }
+
+  .text-token-primary {
+    color: var(--color-text);
+  }
+
+  .text-token-muted {
+    color: var(--color-muted);
+  }
+
+  .text-token-accent {
+    color: var(--color-accent);
+  }
+
+  .bg-token-bg {
+    background: var(--color-bg);
+  }
+
+  .bg-token-surface {
+    background: var(--color-surface);
+  }
+
+  .bg-token-elevated {
+    background: var(--color-elevated);
+  }
+
+  .border-token {
+    border-color: var(--color-border);
+  }
+
+  .text-token-border {
+    color: var(--color-border);
+  }
+}

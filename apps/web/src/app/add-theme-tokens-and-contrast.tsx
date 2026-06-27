@@ -148,22 +148,17 @@ export default function ThemeTokensAndContrastDemo() {
     (mode === "dark" ? "#071024" : "#f8fafc");
 
   return (
-    <div className="min-h-screen p-6" style={{ background: "var(--color-bg)" }}>
+    <div className="min-h-screen p-6 bg-token-bg">
       <div className="max-w-5xl mx-auto">
         <header className="flex items-center justify-between mb-6">
           <h1
-            className="text-2xl font-semibold"
-            style={{ color: "var(--color-text)" }}
+            className="text-2xl font-semibold text-token-primary"
           >
             Theme tokens & contrast demo
           </h1>
           <div className="flex items-center gap-3">
             <div
-              className="flex items-center gap-3 px-3 py-2 rounded-lg border"
-              style={{
-                borderColor: "var(--color-border)",
-                background: "var(--color-elevated)",
-              }}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg border border-token bg-token-elevated"
             >
               <label className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-300">
                 Mode
@@ -172,11 +167,7 @@ export default function ThemeTokensAndContrastDemo() {
                 aria-label="Theme mode"
                 value={mode}
                 onChange={(e) => setMode(e.target.value as Mode)}
-                className="bg-transparent text-sm px-2 py-1 border rounded"
-                style={{
-                  borderColor: "var(--color-border)",
-                  color: "var(--color-text)",
-                }}
+                className="bg-transparent text-sm px-2 py-1 border rounded border-token text-token-primary"
               >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
@@ -184,11 +175,7 @@ export default function ThemeTokensAndContrastDemo() {
             </div>
 
             <div
-              className="flex items-center gap-3 px-3 py-2 rounded-lg border"
-              style={{
-                borderColor: "var(--color-border)",
-                background: "var(--color-elevated)",
-              }}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg border border-token bg-token-elevated"
             >
               <label className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-300">
                 Contrast
@@ -213,21 +200,15 @@ export default function ThemeTokensAndContrastDemo() {
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="col-span-2">
             <div
-              className="rounded-lg shadow-sm p-4"
-              style={{
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-              }}
+              className="rounded-lg shadow-sm p-4 bg-token-surface border border-token"
             >
               <h2
-                className="text-lg font-medium mb-2"
-                style={{ color: "var(--color-text)" }}
+                className="text-lg font-medium mb-2 text-token-primary"
               >
                 Dashboard sample
               </h2>
               <p
-                className="text-sm mb-4"
-                style={{ color: "var(--color-muted)" }}
+                className="text-sm mb-4 text-token-muted"
               >
                 This small panel demonstrates the theme tokens applied as CSS
                 variables. Toggle theme and contrast to see tokens update.
@@ -235,84 +216,60 @@ export default function ThemeTokensAndContrastDemo() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div
-                  className="p-3 rounded"
-                  style={{
-                    background: "var(--color-elevated)",
-                    border: "1px solid var(--color-border)",
-                  }}
+                  className="p-3 rounded bg-token-elevated border border-token"
                 >
                   <div
-                    className="text-sm font-semibold mb-1"
-                    style={{ color: "var(--color-primary)" }}
+                    className="text-sm font-semibold mb-1 text-token-primary"
                   >
                     Primary
                   </div>
                   <div
-                    className="text-xs"
-                    style={{ color: "var(--color-muted)" }}
+                    className="text-xs text-token-muted"
                   >
                     Use for headings, important labels
                   </div>
                 </div>
 
                 <div
-                  className="p-3 rounded"
-                  style={{
-                    background: "var(--color-elevated)",
-                    border: "1px solid var(--color-border)",
-                  }}
+                  className="p-3 rounded bg-token-elevated border border-token"
                 >
                   <div
-                    className="text-sm font-semibold mb-1"
-                    style={{ color: "var(--color-accent)" }}
+                    className="text-sm font-semibold mb-1 text-token-accent"
                   >
                     Accent
                   </div>
                   <div
-                    className="text-xs"
-                    style={{ color: "var(--color-muted)" }}
+                    className="text-xs text-token-muted"
                   >
                     Use for interactive elements and highlights
                   </div>
                 </div>
 
                 <div
-                  className="p-3 rounded"
-                  style={{
-                    background: "var(--color-elevated)",
-                    border: "1px solid var(--color-border)",
-                  }}
+                  className="p-3 rounded bg-token-elevated border border-token"
                 >
                   <div
-                    className="text-sm font-semibold mb-1"
-                    style={{ color: "var(--color-text)" }}
+                    className="text-sm font-semibold mb-1 text-token-primary"
                   >
                     Surface
                   </div>
                   <div
-                    className="text-xs"
-                    style={{ color: "var(--color-muted)" }}
+                    className="text-xs text-token-muted"
                   >
                     Cards and panels
                   </div>
                 </div>
 
                 <div
-                  className="p-3 rounded"
-                  style={{
-                    background: "var(--color-elevated)",
-                    border: "1px solid var(--color-border)",
-                  }}
+                  className="p-3 rounded bg-token-elevated border border-token"
                 >
                   <div
-                    className="text-sm font-semibold mb-1"
-                    style={{ color: "var(--color-border)" }}
+                    className="text-sm font-semibold mb-1 text-token-border"
                   >
                     Border
                   </div>
                   <div
-                    className="text-xs"
-                    style={{ color: "var(--color-muted)" }}
+                    className="text-xs text-token-muted"
                   >
                     Dividers, outlines
                   </div>
@@ -323,15 +280,10 @@ export default function ThemeTokensAndContrastDemo() {
 
           <aside>
             <div
-              className="rounded-lg shadow-sm p-4"
-              style={{
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-              }}
+              className="rounded-lg shadow-sm p-4 bg-token-surface border border-token"
             >
               <h3
-                className="text-md font-medium mb-3"
-                style={{ color: "var(--color-text)" }}
+                className="text-md font-medium mb-3 text-token-primary"
               >
                 Tokens
               </h3>
@@ -347,16 +299,12 @@ export default function ThemeTokensAndContrastDemo() {
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-10 h-10 rounded border"
-                          style={{
-                            background: value,
-                            borderColor: "var(--color-border)",
-                          }}
+                          className="w-10 h-10 rounded border border-token"
+                          style={{ background: value }}
                         />
                         <div>
                           <div
-                            className="text-sm font-medium"
-                            style={{ color: "var(--color-text)" }}
+                            className="text-sm font-medium text-token-primary"
                           >
                             {t.name}
                           </div>
@@ -367,8 +315,7 @@ export default function ThemeTokensAndContrastDemo() {
                       </div>
                       <div className="text-right">
                         <div
-                          className="text-sm font-mono"
-                          style={{ color: "var(--color-text)" }}
+                          className="text-sm font-mono text-token-primary"
                         >
                           {cssVar}
                         </div>

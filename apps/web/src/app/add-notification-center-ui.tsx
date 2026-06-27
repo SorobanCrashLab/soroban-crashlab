@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { MOCK_NOTIFICATIONS } from '../fixtures/notifications';
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -22,70 +23,6 @@ export interface Notification {
 interface NotificationCenterProps {
   className?: string;
 }
-
-// Mock notifications for demonstration
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'notif-1',
-    type: 'error',
-    priority: 'critical',
-    title: 'Critical Failure Detected',
-    message: 'Run run-1023 encountered a panic in contract::transfer. Immediate attention required.',
-    timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
-    read: false,
-    actionLabel: 'View Details',
-    actionUrl: '/runs/run-1023',
-    dismissible: true,
-    runId: 'run-1023'
-  },
-  {
-    id: 'notif-2',
-    type: 'warning',
-    priority: 'high',
-    title: 'Resource Usage Alert',
-    message: 'Run run-1022 exceeded memory threshold (8.5MB). Consider optimizing contract logic.',
-    timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-    read: false,
-    actionLabel: 'Analyze',
-    actionUrl: '/runs/run-1022',
-    dismissible: true,
-    runId: 'run-1022'
-  },
-  {
-    id: 'notif-3',
-    type: 'success',
-    priority: 'medium',
-    title: 'Campaign Completed',
-    message: 'Fuzzing campaign "Token Transfer Tests" completed successfully with 50,000 seeds.',
-    timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-    read: true,
-    actionLabel: 'View Report',
-    dismissible: true
-  },
-  {
-    id: 'notif-4',
-    type: 'info',
-    priority: 'low',
-    title: 'System Update',
-    message: 'CrashLab has been updated to v2.1.0 with improved mutation algorithms.',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    read: true,
-    dismissible: true
-  },
-  {
-    id: 'notif-5',
-    type: 'warning',
-    priority: 'medium',
-    title: 'Invariant Violation',
-    message: 'Property assertion failed in run run-1021: balance should never be negative.',
-    timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-    read: false,
-    actionLabel: 'Investigate',
-    actionUrl: '/runs/run-1021',
-    dismissible: true,
-    runId: 'run-1021'
-  }
-];
 
 export default function NotificationCenter({ className = '' }: NotificationCenterProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);

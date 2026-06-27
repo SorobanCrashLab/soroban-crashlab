@@ -63,40 +63,10 @@ import BulkActionsForRuns, { BulkAction } from "./add-bulk-actions-for-runs";
 import AddDownloadableRunArtifactBundle from "./add-downloadable-run-artifact-bundle";
 import CampaignConfigForm from "./CampaignConfigForm";
 import { CampaignConfig } from "./types";
+import { buildMockRuns } from "../fixtures/runs";
 
 // Mock data for demonstration
-const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 25 }, (_, i) => ({
-  id: `run-${1000 + i}`,
-  status: ["completed", "failed", "running", "cancelled"][i % 4] as RunStatus,
-  area: ["auth", "state", "budget", "xdr"][i % 4] as RunArea,
-  severity: ["low", "medium", "high", "critical"][i % 4] as RunSeverity,
-  duration: 120000 + Math.random() * 3600000, // 2m to 1h
-  seedCount: Math.floor(10000 + Math.random() * 90000),
-  cpuInstructions: Math.floor(400000 + Math.random() * 900000),
-  memoryBytes: Math.floor(1_500_000 + Math.random() * 8_000_000),
-  minResourceFee: Math.floor(500 + Math.random() * 5000),
-  crashDetail:
-    i % 4 === 1
-      ? {
-          failureCategory: i % 8 === 1 ? "Panic" : "InvariantViolation",
-          signature: `sig:${1000 + i}:contract::transfer:assert_balance_nonnegative`,
-          payload: JSON.stringify(
-            {
-              contract: "token",
-              method: "transfer",
-              args: {
-                from: "GABCD...1234",
-                to: "GXYZ...7890",
-                amount: 999999999,
-              },
-            },
-            null,
-            2,
-          ),
-          replayAction: `cargo run --bin crash-replay -- --run-id run-${1000 + i}`,
-        }
-      : null,
-})).reverse();
+const MOCK_RUNS = buildMockRuns();
 
 const ITEMS_PER_PAGE = 10;
 const CPU_WARNING = 900_000;

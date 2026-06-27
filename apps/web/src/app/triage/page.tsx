@@ -15,28 +15,11 @@ import {
   getColumnRuns,
   type TriageColumnDef,
 } from './triage-board-utils';
-
-// ---------------------------------------------------------------------------
-// Mock data loader (replace with real API call when backend is wired)
-// ---------------------------------------------------------------------------
-const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 18 }, (_, i) => ({
-  id: `run-${1000 + i}`,
-  status: (['failed', 'running', 'cancelled', 'completed'] as RunStatus[])[i % 4],
-  area: (['auth', 'state', 'budget', 'xdr'] as RunArea[])[i % 4],
-  severity: (['low', 'medium', 'high', 'critical'] as RunSeverity[])[i % 4],
-  duration: 120_000 + i * 30_000,
-  seedCount: 10_000 + i * 1_000,
-  cpuInstructions: 400_000 + i * 10_000,
-  memoryBytes: 1_500_000 + i * 100_000,
-  minResourceFee: 500 + i * 50,
-  crashDetail: i % 4 === 0
-    ? { failureCategory: 'InvariantViolation', signature: `sig:${1000 + i}`, payload: '{}', replayAction: `cargo run --bin replay-single-seed -- bundle-${i}.json` }
-    : null,
-}));
+import { buildTriageMockRuns } from '../../fixtures/runs';
 
 async function fetchRuns(): Promise<FuzzingRun[]> {
   await new Promise((r) => setTimeout(r, 700));
-  return MOCK_RUNS;
+  return buildTriageMockRuns();
 }
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import type { FuzzingRun } from './types';
+import { triggerBrowserDownload } from './utils/browser-download';
 
 type ExportRunCsvProps = {
   runs: FuzzingRun[];
@@ -31,16 +32,10 @@ export default function AddExportRunCsv({ runs }: ExportRunCsvProps) {
           ].join(','))
         ];
         
-        const csvString = csvRows.join('\n');
-        const blob = new Blob([csvString], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `soroban-runs-export-${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        triggerBrowserDownload(
+          new Blob([csvRows.join('\n')], { type: 'text/csv' }),
+          `soroban-runs-export-${new Date().toISOString().split('T')[0]}.csv`,
+        );
       } catch (error) {
         console.error('CSV Export failed:', error);
       } finally {

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import type { FuzzingRun } from './types';
+import { downloadTextFile } from './utils/browser-download';
 
 type ExportRunJsonProps = {
   runs: FuzzingRun[];
@@ -16,16 +17,10 @@ export default function AddExportRunJson({ runs }: ExportRunJsonProps) {
     // Simulate slight delay for UX
     setTimeout(() => {
       try {
-        const jsonString = JSON.stringify(runs, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `soroban-runs-export-${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        downloadTextFile(
+          JSON.stringify(runs, null, 2),
+          `soroban-runs-export-${new Date().toISOString().split('T')[0]}.json`,
+        );
       } catch (error) {
         console.error('Export failed:', error);
       } finally {

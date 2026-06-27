@@ -8,6 +8,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatSize } from './utils/format';
+import { triggerBrowserDownload } from './utils/browser-download';
 
 // --- Types ---
 
@@ -98,25 +100,6 @@ async function downloadArtifactContent(id: string): Promise<Blob> {
   return new Blob([JSON.stringify(dummyData, null, 2)], { type: 'application/json' });
 }
 
-// --- Helper Functions ---
-
-function triggerBrowserDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function formatFileSize(bytes?: number): string {
-  if (bytes === undefined) return 'Unknown size';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 // --- Main Component ---
 
@@ -292,7 +275,7 @@ export default function ArtifactStorageIntegration() {
                       <h3 className="text-lg font-semibold text-gray-900">{artifact.name}</h3>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-sm text-gray-500 font-medium">
-                          {formatFileSize(artifact.sizeBytes)}
+                          {formatSize(artifact.sizeBytes)}
                         </span>
                         <span className="text-gray-300 text-xs">•</span>
                         <span className="text-sm text-gray-500">

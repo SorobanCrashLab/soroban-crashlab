@@ -29,16 +29,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
-        style={{ background: "var(--background)", color: "var(--foreground)" }}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-theme text-theme`}
       >
         <header
-          className="border-b p-6 flex items-center justify-between"
-          style={{
-            borderColor: "var(--header-border-color)",
-            background: "var(--background)",
-            color: "var(--foreground)",
-          }}
+          className="border-b p-6 flex items-center justify-between border-header bg-theme text-theme"
         >
           <div className="font-semibold text-xl tracking-tight">
             Soroban CrashLab

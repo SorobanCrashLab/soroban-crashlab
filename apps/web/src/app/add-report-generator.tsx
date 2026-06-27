@@ -8,6 +8,7 @@
  */
 
 import React, { useState } from 'react';
+import { triggerBrowserDownload } from './utils/browser-download';
 import { FuzzingRun, RunArea, RunSeverity } from './types';
 
 // --- Types ---
@@ -107,18 +108,10 @@ export default function ReportGenerator({ availableRuns }: ReportGeneratorProps)
   const handleDownload = () => {
     if (!generatedReport) return;
 
-    const blob = new Blob([JSON.stringify(generatedReport, null, 2)], {
-      type: 'application/json',
-    });
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `crashlab-report-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    triggerBrowserDownload(
+      new Blob([JSON.stringify(generatedReport, null, 2)], { type: 'application/json' }),
+      `crashlab-report-${new Date().toISOString().slice(0, 10)}.json`,
+    );
   };
 
   return (

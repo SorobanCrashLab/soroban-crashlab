@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { FuzzingRun } from "./types";
 import { simulateSeedReplay } from "./replay";
+import { buildReplayMockRuns } from "../fixtures/runs";
 
 /**
  * Issue #275: Add Run replay UI
@@ -44,23 +45,7 @@ const DEFAULT_CONFIG: ReplayConfig = {
   timeoutMs: 30000,
 };
 
-const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 5 }, (_, i) => ({
-  id: `run-${1000 + i}`,
-  status: "failed",
-  area: ["auth", "state", "budget", "xdr"][i % 4] as FuzzingRun["area"],
-  severity: ["high", "critical"][i % 2] as FuzzingRun["severity"],
-  duration: 120000 + Math.random() * 3600000,
-  seedCount: Math.floor(100 + Math.random() * 900),
-  cpuInstructions: Math.floor(400000 + Math.random() * 900000),
-  memoryBytes: Math.floor(1_500_000 + Math.random() * 8_000_000),
-  minResourceFee: Math.floor(500 + Math.random() * 5000),
-  crashDetail: {
-    failureCategory: "Panic",
-    signature: `sig:${1000 + i}:contract::transfer:assert_balance_nonnegative`,
-    payload: JSON.stringify({ contract: "token", method: "transfer" }),
-    replayAction: `cargo run --bin crash-replay -- --run-id run-${1000 + i}`,
-  },
-}));
+const MOCK_RUNS = buildReplayMockRuns();
 
 export default function AddRunReplayUi() {
   const [selectedRun, setSelectedRun] = useState<FuzzingRun | null>(null);
