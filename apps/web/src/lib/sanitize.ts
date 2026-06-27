@@ -12,3 +12,11 @@ export function sanitizeUrl(url: string): string {
 export function sanitizeMarkdown(md: string): string {
   return md.replace(MARKDOWN_DANGEROUS_LINK, "$1");
 }
+
+export function sanitizeSearchParams(searchParams: URLSearchParams): URLSearchParams {
+  const sanitized = new URLSearchParams();
+  for (const [key, value] of searchParams.entries()) {
+    sanitized.append(key, sanitizeUrl(value));
+  }
+  return sanitized;
+}
