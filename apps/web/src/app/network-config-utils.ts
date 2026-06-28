@@ -24,7 +24,11 @@ export interface NetworkLoadResult {
   error: string | null;
 }
 
-export const BUILT_IN_NETWORK_IDS = ["mainnet", "testnet", "futurenet"] as const;
+export const BUILT_IN_NETWORK_IDS = [
+  "mainnet",
+  "testnet",
+  "futurenet",
+] as const;
 
 const BUILT_IN_NETWORKS: NetworkConfig[] = [
   {
@@ -58,7 +62,9 @@ const BUILT_IN_NETWORKS: NetworkConfig[] = [
   },
 ];
 
-export function createDefaultNetworkStore(referenceTime = new Date()): NetworkStore {
+export function createDefaultNetworkStore(
+  referenceTime = new Date(),
+): NetworkStore {
   return {
     networks: BUILT_IN_NETWORKS.map((n) => ({ ...n })),
     activeNetworkId: "testnet",
@@ -79,7 +85,16 @@ const isIsoDateString = (value: unknown): value is string =>
 function parseNetworkConfig(raw: unknown): NetworkConfig | null {
   if (!isObject(raw)) return null;
 
-  const { id, name, networkPassphrase, horizonUrl, rpcUrl, friendbotUrl, isBuiltIn, addedAt } = raw;
+  const {
+    id,
+    name,
+    networkPassphrase,
+    horizonUrl,
+    rpcUrl,
+    friendbotUrl,
+    isBuiltIn,
+    addedAt,
+  } = raw;
 
   if (
     typeof id !== "string" ||
@@ -148,7 +163,11 @@ export function readNetworkStore(
 
   const { networks, activeNetworkId, lastUpdated } = parsed;
 
-  if (!Array.isArray(networks) || typeof activeNetworkId !== "string" || !isIsoDateString(lastUpdated)) {
+  if (
+    !Array.isArray(networks) ||
+    typeof activeNetworkId !== "string" ||
+    !isIsoDateString(lastUpdated)
+  ) {
     return {
       status: "error",
       snapshot: null,
@@ -166,7 +185,9 @@ export function readNetworkStore(
   }
 
   // Re-merge built-ins: replace any built-in in the store with canonical values
-  const customNetworks = (parsedNetworks as NetworkConfig[]).filter((n) => !n.isBuiltIn);
+  const customNetworks = (parsedNetworks as NetworkConfig[]).filter(
+    (n) => !n.isBuiltIn,
+  );
   const mergedNetworks: NetworkConfig[] = [
     ...BUILT_IN_NETWORKS.map((n) => ({ ...n })),
     ...customNetworks,
@@ -183,7 +204,10 @@ export function readNetworkStore(
   };
 }
 
-export function validateNetworkUrl(raw: string, fieldName: string): string | null {
+export function validateNetworkUrl(
+  raw: string,
+  fieldName: string,
+): string | null {
   if (!raw.trim()) {
     return `${fieldName} is required.`;
   }
@@ -195,19 +219,29 @@ export function validateNetworkUrl(raw: string, fieldName: string): string | nul
     return `${fieldName} is not a valid URL.`;
   }
 
-  if (url.protocol === "https:") {
-    return null;
+  // Validate protocol
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    return `${fieldName} must use HTTP or HTTPS protocol.`;
   }
 
+  // For HTTP, only allow localhost or 127.0.0.1
   if (url.protocol === "http:") {
     const hostname = url.hostname;
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return null;
+    if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+      return `${fieldName} must use HTTPS (HTTP is only allowed for localhost).`;
     }
-    return `${fieldName} must use HTTPS (HTTP is only allowed for localhost).`;
   }
 
-  return `${fieldName} must use HTTPS.`;
+  // Validate RPC URL format has a valid path structure
+  if (fieldName.includes("RPC")) {
+    const path = url.pathname;
+    // RPC URLs typically have paths like /v1/<key> or /rpc or root /
+    if (path !== "/" && !path.startsWith("/v") && !path.startsWith("/rpc")) {
+      return `${fieldName} must have a valid path format (e.g., /, /v1/key, /rpc).`;
+    }
+  }
+
+  return null;
 }
 
 export function validateNetworkConfig(config: NetworkConfig): string | null {
@@ -234,14 +268,20 @@ export function validateNetworkConfig(config: NetworkConfig): string | null {
   if (rpcError) return rpcError;
 
   if (config.friendbotUrl !== undefined && config.friendbotUrl !== "") {
-    const friendbotError = validateNetworkUrl(config.friendbotUrl, "Friendbot URL");
+    const friendbotError = validateNetworkUrl(
+      config.friendbotUrl,
+      "Friendbot URL",
+    );
     if (friendbotError) return friendbotError;
   }
 
   return null;
 }
 
-export function validateNetworkStore(store: NetworkStore, incoming: NetworkConfig): string | null {
+export function validateNetworkStore(
+  store: NetworkStore,
+  incoming: NetworkConfig,
+): string | null {
   const incomingName = incoming.name.trim().toLowerCase();
   const incomingHorizonUrl = incoming.horizonUrl;
 
@@ -262,7 +302,10 @@ export function validateNetworkStore(store: NetworkStore, incoming: NetworkConfi
   return null;
 }
 
-export function addNetwork(store: NetworkStore, config: NetworkConfig): NetworkStore {
+export function addNetwork(
+  store: NetworkStore,
+  config: NetworkConfig,
+): NetworkStore {
   return {
     ...store,
     networks: [...store.networks, { ...config }],
@@ -278,7 +321,10 @@ export function removeNetwork(store: NetworkStore, id: string): NetworkStore {
   };
 }
 
-export function switchActiveNetwork(store: NetworkStore, id: string): NetworkStore {
+export function switchActiveNetwork(
+  store: NetworkStore,
+  id: string,
+): NetworkStore {
   return {
     ...store,
     activeNetworkId: id,
@@ -286,6 +332,9 @@ export function switchActiveNetwork(store: NetworkStore, id: string): NetworkSto
   };
 }
 
-export function findNetworkById(store: NetworkStore, id: string): NetworkConfig | undefined {
+export function findNetworkById(
+  store: NetworkStore,
+  id: string,
+): NetworkConfig | undefined {
   return store.networks.find((n) => n.id === id);
 }
