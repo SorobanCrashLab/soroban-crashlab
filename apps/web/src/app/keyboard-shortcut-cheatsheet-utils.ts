@@ -67,7 +67,7 @@ export const KEYBOARD_SHORTCUT_CHEATSHEET: KeyboardShortcut[] = [
     id: "navigate-rows",
     category: "dashboard",
     keys: ["↑", "↓"],
-    description: "Move selection between fuzzing runs in tables",
+    description: "Move between rows in data tables (Home/End jump to first/last row)",
   },
   {
     id: "open-run",

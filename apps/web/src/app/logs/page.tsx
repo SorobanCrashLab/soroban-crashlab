@@ -22,6 +22,7 @@ import {
 } from './log-viewer-page-utils';
 import { useDebounce } from '../../lib/useDebounce';
 import { MOCK_LOG_ENTRIES } from '../../fixtures/logs';
+import { useDataTableKeyboardNav } from '../use-data-table-keyboard-nav';
 
 async function fetchLogs(): Promise<LogEntry[]> {
   await new Promise((r) => setTimeout(r, 800));
@@ -126,6 +127,19 @@ export default function LogViewerPage() {
     [entries, levelFilter, debouncedSearchQuery],
   );
 
+  const { getRowProps } = useDataTableKeyboardNav({
+    rowCount: visible.length,
+    onActivate: (index) => {
+      const entry = visible[index];
+      if (!entry) {
+        return;
+      }
+      const row = document.getElementById(logEntryAnchorId(entry));
+      row?.scrollIntoView({ block: 'nearest' });
+      row?.querySelector<HTMLElement>('a')?.focus();
+    },
+  });
+
   return (
     <div className="container-full page-padding fade-in">
       {/* Page header */}
@@ -201,7 +215,10 @@ export default function LogViewerPage() {
 
             {/* Log table */}
             <div className="table-responsive">
-              <table className="data-table w-full text-xs sm:text-sm font-mono">
+              <table
+                className="data-table w-full text-xs sm:text-sm font-mono"
+                aria-label="Log entries"
+              >
                 <thead>
                   <tr>
                     <th scope="col" className="w-24 sm:w-52">Timestamp</th>
@@ -211,8 +228,13 @@ export default function LogViewerPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((entry) => (
-                    <tr key={entry.id} id={logEntryAnchorId(entry)}>
+                  {visible.map((entry, index) => (
+                    <tr
+                      key={entry.id}
+                      id={logEntryAnchorId(entry)}
+                      {...getRowProps(index)}
+                      aria-label={`Log entry ${entry.level} from ${entry.source}`}
+                    >
                       <td className="text-meta whitespace-nowrap text-[10px] sm:text-xs">
                         <a
                           href={logEntryAnchorHref(entry)}

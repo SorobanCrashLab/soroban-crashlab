@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FuzzingRun, RunStatus } from './types';
 import { formatDuration } from './utils/format';
+import { useDataTableKeyboardNav } from './use-data-table-keyboard-nav';
+import type { DataTableRowKeyboardProps } from './use-data-table-keyboard-nav';
 
 /** Height of a single data row in pixels — must match the rendered row height. */
 const ROW_HEIGHT = 57;
@@ -51,6 +53,7 @@ const VirtualRow = ({
     visibleColumns,
     selectedRunIds = new Set(),
     onToggleRunSelection,
+    rowKeyboardProps,
 }: {
     run: FuzzingRun;
     top: number;
@@ -59,28 +62,18 @@ const VirtualRow = ({
     visibleColumns: string[];
     selectedRunIds?: Set<string>;
     onToggleRunSelection?: (id: string) => void;
+    rowKeyboardProps: DataTableRowKeyboardProps;
 }) => {
-    const handleKeyDown = useCallback(
-        (e: React.KeyboardEvent<HTMLTableRowElement>) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onSelectRun(run.id);
-            }
-        },
-        [run.id, onSelectRun],
-    );
-
     return (
         <tr
             style={{ position: 'absolute', top, left: 0, right: 0, height: ROW_HEIGHT, display: 'flex', alignItems: 'center' }}
-            tabIndex={0}
+            {...rowKeyboardProps}
             className={`group transition-colors cursor-pointer border-b border-zinc-100 dark:border-zinc-800 w-full ${
                 selectedRunIds.has(run.id)
                     ? "bg-blue-50/80 dark:bg-blue-900/20"
                     : "hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
             }`}
             onClick={() => onSelectRun(run.id)}
-            onKeyDown={handleKeyDown}
             aria-label={`Fuzzing run ${run.id}, status ${run.status}`}
         >
             {onToggleRunSelection && (
@@ -183,6 +176,24 @@ export default function VirtualizedRunTable({
 }: VirtualizedRunTableProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [scrollTop, setScrollTop] = useState(0);
+
+    const { getRowProps } = useDataTableKeyboardNav({
+        rowCount: runs.length,
+        onActivate: (index) => {
+            const run = runs[index];
+            if (run) {
+                onSelectRun(run.id);
+            }
+        },
+        onFocusRow: (index) => {
+            const el = scrollRef.current;
+            if (!el) {
+                return;
+            }
+            el.scrollTop = index * ROW_HEIGHT;
+            setScrollTop(index * ROW_HEIGHT);
+        },
+    });
 
     /** Recalculate on scroll — wrapped in useCallback for stable identity. */
     const handleScroll = useCallback(() => {
@@ -314,18 +325,22 @@ export default function VirtualizedRunTable({
                         <tbody
                             style={{ position: 'relative', display: 'block', height: totalHeight }}
                         >
-                            {visibleRuns.map((run, i) => (
+                            {visibleRuns.map((run, i) => {
+                                const rowIndex = firstVisible + i;
+                                return (
                                 <VirtualRow
                                     key={run.id}
                                     run={run}
-                                    top={(firstVisible + i) * ROW_HEIGHT}
+                                    top={rowIndex * ROW_HEIGHT}
                                     onSelectRun={onSelectRun}
                                     onViewReport={onViewReport}
                                     visibleColumns={visibleColumns}
                                     selectedRunIds={selectedRunIds}
                                     onToggleRunSelection={onToggleRunSelection}
+                                    rowKeyboardProps={getRowProps(rowIndex)}
                                 />
-                            ))}
+                            );
+                            })}
                         </tbody>
                     </table>
                 </div>

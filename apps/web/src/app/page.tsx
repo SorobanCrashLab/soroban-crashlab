@@ -13,6 +13,7 @@ const AddTaggingAndLabelsUi = dynamic(
 import { runMatchesTagFilter } from "./run-tags-utils";
 import { FuzzingRun } from "./types";
 import { fetchRuns } from "../lib/api-client";
+import { useDataTableKeyboardNav } from "./use-data-table-keyboard-nav";
 
 const makeSuggestedLabels = (run: FuzzingRun): string[] => [
   run.area,
@@ -72,6 +73,16 @@ function DashboardContent() {
 
   const recentRuns = filteredRuns.slice(0, 8);
 
+  const { getRowProps } = useDataTableKeyboardNav({
+    rowCount: recentRuns.length,
+    onActivate: (index) => {
+      const run = recentRuns[index];
+      if (run) {
+        router.push(`/runs/${run.id}`);
+      }
+    },
+  });
+
   return (
     <div className="container-full page-padding fade-in">
       <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -112,13 +123,16 @@ function DashboardContent() {
               <Link href="/runs" className="link text-xs sm:text-sm">View all</Link>
             </div>
             <div className="card table-responsive">
-                <table className="data-table">
+                <table
+                  className="data-table"
+                  aria-label="Recent fuzzing runs"
+                >
                   <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Status</th>
-                      <th>Area</th>
-                      <th>Tags</th>
+                      <th scope="col">ID</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Area</th>
+                      <th scope="col">Tags</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -136,8 +150,14 @@ function DashboardContent() {
                         </td>
                       </tr>
                     ) : (
-                      recentRuns.map((run) => (
-                        <tr key={run.id}>
+                      recentRuns.map((run, index) => (
+                        <tr
+                          key={run.id}
+                          {...getRowProps(index)}
+                          className="cursor-pointer"
+                          onClick={() => router.push(`/runs/${run.id}`)}
+                          aria-label={`Fuzzing run ${run.id}, status ${run.status}`}
+                        >
                           <td className="code-text text-meta">{run.id}</td>
                           <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
                           <td>{run.area}</td>

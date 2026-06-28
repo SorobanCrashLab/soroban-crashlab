@@ -2,6 +2,7 @@
 
 import { FuzzingRun, RunStatus } from './types';
 import AddReplayFromUiAction from './add-replay-from-ui-action';
+import { useDataTableKeyboardNav } from './use-data-table-keyboard-nav';
 
 interface RunHistoryTableProps {
     /** Array of fuzzing runs to display */
@@ -43,6 +44,16 @@ export default function RunHistoryTable({
     onReplayRun,
     visibleColumns = ['id', 'status', 'duration', 'seedCount', 'report'] 
 }: RunHistoryTableProps) {
+    const { getRowProps } = useDataTableKeyboardNav({
+        rowCount: runs.length,
+        onActivate: (index) => {
+            const run = runs[index];
+            if (run) {
+                onSelectRun(run.id);
+            }
+        },
+    });
+
     if (runs.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-xl bg-zinc-50 dark:bg-zinc-900/20 border-zinc-200 dark:border-zinc-800">
@@ -55,7 +66,7 @@ export default function RunHistoryTable({
     return (
         <div className="w-full overflow-hidden border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm bg-white dark:bg-zinc-950">
             <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse" aria-label="Fuzzing run history">
                     <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
                             {visibleColumns.includes('id') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Run ID</th>}
@@ -67,18 +78,13 @@ export default function RunHistoryTable({
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                        {runs.map((run) => (
+                        {runs.map((run, index) => (
                             <tr
                                 key={run.id}
-                                tabIndex={0}
+                                {...getRowProps(index)}
                                 className="group hover:bg-zinc-50 dark:hover:bg-zinc-900/30 transition-colors cursor-pointer"
                                 onClick={() => onSelectRun(run.id)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        onSelectRun(run.id);
-                                    }
-                                }}
+                                aria-label={`Fuzzing run ${run.id}, status ${run.status}`}
                             >
                                 {visibleColumns.includes('id') && (
                                     <td className="px-6 py-4">

@@ -417,6 +417,12 @@ body {
   background: var(--hover-bg);
 }
 
+.data-table tbody tr[tabindex="0"]:focus-visible td {
+  background: var(--hover-bg);
+  outline: 2px solid #0A66C2;
+  outline-offset: -2px;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
