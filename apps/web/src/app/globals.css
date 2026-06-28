@@ -798,6 +798,46 @@ nav, header, .nav-bar {
   }
 }
 
+/* ===== Reduced motion support ===== */
+@media (prefers-reduced-motion: reduce) {
+  html, body, * {
+    /* Disable animations and transitions for users who prefer reduced motion */
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    animation-play-state: paused !important;
+    animation-name: none !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+    transition-property: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Turn off specific animations used across the app */
+  .skeleton {
+    animation: none !important;
+    background-size: auto !important;
+  }
+
+  .fade-in,
+  .parallax-slow,
+  .parallax-medium,
+  .parallax-fast,
+  .lazy-enter,
+  .lazy-enter-active,
+  .drawer,
+  .drawer.open,
+  nav,
+  header,
+  .nav-bar,
+  .card {
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    box-shadow: none !important;
+  }
+}
+
 @media (min-width: 768px) {
   .stat-grid {
     grid-template-columns: repeat(5, 1fr);
