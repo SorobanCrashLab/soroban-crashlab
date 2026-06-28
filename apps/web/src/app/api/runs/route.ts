@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { errorResponse, successResponse, status } from '@/lib/api-response-utils';
 import { logger } from '@/lib/logger';
 import { withRouteErrorHandling } from '@/lib/route-handler';
+import { sanitizeSearchParams } from '@/lib/sanitize';
 
 export const GET = withRouteErrorHandling('GET /api/runs', async (request: Request) => {
   const { searchParams } = new URL(request.url);
@@ -8,13 +10,14 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
 
   if (apiUrl) {
     try {
-      const qs = searchParams.toString();
+      const sanitizedSearchParams = sanitizeSearchParams(searchParams);
+      const qs = sanitizedSearchParams.toString();
       const res = await fetch(`${apiUrl}/api/runs${qs ? `?${qs}` : ''}`, {
         cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();
-        return NextResponse.json(data);
+        return successResponse(data);
       }
     } catch (error) {
       logger.error('GET /api/runs upstream fetch failed', { error });
@@ -27,13 +30,10 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
 
   const enableMock = process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA !== 'false';
   if (!enableMock) {
-    return NextResponse.json(
-      { error: 'Mock data disabled and no backend configured', runs: [], total: 0 },
-      { status: 503 },
-    );
+    return errorResponse('Mock data disabled and no backend configured', status.serviceUnavailable);
   }
 
   const { buildMockRuns } = await import('@/app/mockRuns');
   const runs = buildMockRuns();
-  return NextResponse.json({ runs, total: runs.length });
+  return successResponse({ runs }, { total: runs.length });
 });

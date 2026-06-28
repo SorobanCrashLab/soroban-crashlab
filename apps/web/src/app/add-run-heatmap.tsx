@@ -20,7 +20,7 @@ export default function RunHeatmap({
     }
 
     let values: number[] = [];
-    let extractValue = (r: FuzzingRun) => 0;
+    let extractValue = (_r: FuzzingRun): number => 0;
 
     switch (metric) {
       case 'cpu':

@@ -25,7 +25,7 @@ function setupLocalStorage() {
       removeItem: (key: string) => { delete store[key]; },
       clear: () => { Object.keys(store).forEach(k => delete store[k]); },
       length: 0,
-      key: (_: number) => null,
+      key: (_index: number) => null,
     },
     writable: true,
     configurable: true,
@@ -98,7 +98,7 @@ function setupLocalStorage() {
 }
 
 {
-  const store = setupLocalStorage();
+  setupLocalStorage();
   savePreferences({ ...DEFAULT_PREFERENCES, soundEnabled: true });
   const loaded = loadPreferences();
   assert.equal(loaded.soundEnabled, true);

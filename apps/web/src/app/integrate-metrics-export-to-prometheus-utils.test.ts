@@ -261,7 +261,7 @@ async function testPrometheusAdapterHealthCheckRealImplementation(): Promise<voi
     healthPath: "/-/healthy",
     timeoutMs: 5000,
     enabled: true,
-    fetchImpl: async (input, init) => {
+    fetchImpl: async (_input, _init) => {
       return new Response(JSON.stringify({ status: "healthy" }), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -287,7 +287,7 @@ async function testPrometheusAdapterHealthCheckUnhealthy(): Promise<void> {
     healthPath: "/-/healthy",
     timeoutMs: 5000,
     enabled: true,
-    fetchImpl: async (input, init) => {
+    fetchImpl: async (_input, _init) => {
       return new Response(JSON.stringify({ status: "unhealthy" }), {
         status: 503,
         headers: { "content-type": "application/json" },

@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
 
 const mockRuns = [
   {
@@ -79,6 +80,7 @@ test.describe('Runs list', () => {
 
     await expect(page.getByRole('heading', { name: 'Fuzzing Runs' })).toBeVisible();
     await expect(page.getByText(`${mockRuns.length} Total Runs`)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Replay History' })).toBeVisible();
 
     const tableContainer = page.getByRole('region', { name: 'Virtualized fuzzing run table' });
     await expect(tableContainer.locator('th').filter({ hasText: /Run ID|Run Identifier/i })).toBeVisible();
@@ -138,6 +140,8 @@ test.describe('Runs list', () => {
     await retryResponse;
 
     await expect(page.getByRole('heading', { name: 'Fuzzing Runs' })).toBeVisible();
-    await expect(page.locator('tbody tr')).toHaveCount(mockRuns.length);
+    await expect(
+      page.getByRole('region', { name: 'Virtualized fuzzing run table' }).locator('tbody tr'),
+    ).toHaveCount(mockRuns.length);
   });
 });

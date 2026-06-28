@@ -207,7 +207,7 @@ export function getPresetStatus(
 export function applyPreset(
   preset: AlertPreset,
   existingRules: AlertRule[],
-  referenceTime = new Date(),
+  _referenceTime = new Date(),
 ): PresetApplicationResult {
   const existingIds = new Set(existingRules.map((r) => r.id));
   const addedRuleIds: string[] = [];

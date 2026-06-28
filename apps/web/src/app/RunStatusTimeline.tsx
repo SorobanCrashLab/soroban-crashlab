@@ -126,7 +126,7 @@ export default function RunStatusTimeline({
                     />
                 </div>
 
-                {steps.map((step, idx) => {
+                {steps.map((step) => {
                     const isCompleted = step.isComplete;
                     const isActive = step.isActive;
                     

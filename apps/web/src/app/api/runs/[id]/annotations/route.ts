@@ -2,24 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildMockRuns } from '@/app/mockRuns';
 import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 
-// In-memory store keyed by run ID (persists for the lifetime of the process)
 const annotationStore = new Map<string, string[]>();
 
 function getAnnotations(id: string): string[] {
   if (annotationStore.has(id)) {
     return annotationStore.get(id)!;
   }
-  // Seed from mock data on first access
   const run = buildMockRuns().find((r) => r.id === id);
   const initial = run?.annotations ?? [];
   annotationStore.set(id, [...initial]);
   return annotationStore.get(id)!;
 }
 
-/**
- * GET /api/runs/[id]/annotations
- * Returns the current annotation list for a run.
- */
 export const GET = withRouteErrorHandling(
   'GET /api/runs/[id]/annotations',
   async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -32,10 +26,6 @@ export const GET = withRouteErrorHandling(
   },
 );
 
-/**
- * POST /api/runs/[id]/annotations
- * Appends a new annotation. Body: { text: string }
- */
 export const POST = withRouteErrorHandling(
   'POST /api/runs/[id]/annotations',
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -62,10 +52,6 @@ export const POST = withRouteErrorHandling(
   },
 );
 
-/**
- * DELETE /api/runs/[id]/annotations
- * Removes an annotation by index. Body: { index: number }
- */
 export const DELETE = withRouteErrorHandling(
   'DELETE /api/runs/[id]/annotations',
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {

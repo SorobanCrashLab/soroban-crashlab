@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   createDefaultAlertingSettingsSnapshot,
   readAlertingSettingsSnapshot,
-  serializeAlertingSettingsSnapshot,
   validateAlertingSettingsSnapshot,
   type AlertingSettingsSnapshot,
 } from '@/app/alerting-settings-page-utils';

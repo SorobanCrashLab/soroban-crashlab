@@ -6,6 +6,7 @@ import RunIssueLinkPage53 from '../../add-run-issue-link-page-53';
 import RunStatusTimeline from '../../RunStatusTimeline';
 import DownloadArtifactsButton from './DownloadArtifactsButton';
 import ContractStateDiffView from '../../components/ContractStateDiffView';
+import AddRunReplayHistoryWithTimestamps from '../../add-run-replay-history-with-timestamps';
 
 interface RunDetailPageProps {
     params: Promise<{ id: string }>;
@@ -106,13 +107,25 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                             </svg>
                             Run Annotations
                         </h2>
-                        <ul className="space-y-3">
-                            {run.annotations.map((note, index) => (
-                                <li key={index} className="text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-950/60 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm leading-relaxed">
-                                    {note}
-                                </li>
-                            ))}
-                        </ul>
+                        {run.annotations && run.annotations.length > 0 ? (
+                            <ul className="space-y-3">
+                                {run.annotations.map((note, index) => (
+                                    <li key={index} className="text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-950/60 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm leading-relaxed">
+                                        {note}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <div className="flex flex-col items-center gap-3 py-8 text-center">
+                                <div className="p-3 bg-indigo-100/60 dark:bg-indigo-900/30 rounded-full text-indigo-400 dark:text-indigo-500">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                    </svg>
+                                </div>
+                                <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">No annotations yet</p>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500">Run results will appear here once notes are added</p>
+                            </div>
+                        )}
                     </section>
                 )}
 
@@ -120,6 +133,10 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                     <h2 className="text-lg font-semibold mb-3">Ledger State Change Diff</h2>
                     <ContractStateDiffView changes={ledgerChanges} />
                 </section>
+
+                <div className="mt-6">
+                    <AddRunReplayHistoryWithTimestamps sourceRunId={run.id} />
+                </div>
             </div>
         </div>
     );

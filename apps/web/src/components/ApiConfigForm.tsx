@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ApiConfig,
   ValidationErrors,
@@ -11,10 +11,68 @@ import {
   resetStorage,
 } from '../app/settings/api/api-config-utils';
 
+const numericFields = new Set<keyof ApiConfig>([
+  'rateLimitMaxRequests',
+  'rateLimitWindowSeconds',
+]);
+
+const dangerStyle = { color: '#CC1016' };
+const successStyle = { color: '#057642' };
+
+type InputProps = {
+  id: string;
+  label: string;
+  type?: string;
+  placeholder: string;
+  value: string | number;
+  error?: string;
+  onChange: (value: string) => void;
+  min?: number;
+  step?: number;
+};
+
+function Field({
+  id,
+  label,
+  type = 'text',
+  placeholder,
+  value,
+  error,
+  onChange,
+  min,
+  step,
+}: InputProps) {
+  return (
+    <div>
+      <label htmlFor={id} className="input-label">
+        {label}
+      </label>
+
+      <input
+        id={id}
+        type={type}
+        className="input-field mt-1"
+        placeholder={placeholder}
+        value={value}
+        min={min}
+        step={step}
+        onChange={(e) => onChange(e.target.value)}
+      />
+
+      {error && (
+        <p className="text-xs mt-1" style={dangerStyle}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ApiConfigForm() {
   const [config, setConfig] = useState<ApiConfig>(() =>
     typeof window === 'undefined' ? DEFAULT_CONFIG : loadFromStorage(),
   );
+
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [saved, setSaved] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -25,16 +83,23 @@ export default function ApiConfigForm() {
 
   const handleChange = useCallback(
     (field: keyof ApiConfig, value: string) => {
-      const numericFields: (keyof ApiConfig)[] = ['rateLimitMaxRequests', 'rateLimitWindowSeconds'];
-      const updated: ApiConfig = {
+      const updated = {
         ...config,
-        [field]: numericFields.includes(field) ? (value === '' ? 0 : parseInt(value, 10)) : value,
+        [field]: numericFields.has(field)
+          ? value === ''
+            ? 0
+            : Number(value)
+          : value,
       };
+
       setConfig(updated);
       setSaved(false);
 
-      const newErrors = validateConfig(updated);
-      setErrors((prev) => ({ ...prev, [field]: newErrors[field] }));
+      const validation = validateConfig(updated);
+      setErrors((prev) => ({
+        ...prev,
+        [field]: validation[field],
+      }));
     },
     [config],
   );
@@ -42,15 +107,20 @@ export default function ApiConfigForm() {
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      const newErrors = validateConfig(config);
-      setErrors(newErrors);
-      if (Object.keys(newErrors).length > 0) return;
+
+      const validation = validateConfig(config);
+      setErrors(validation);
+
+      if (Object.keys(validation).length) return;
 
       if (saveToStorage(config)) {
         setSaved(true);
-      } else {
-        setErrors({ backendUrl: 'Failed to save configuration. Storage may be unavailable.' });
+        return;
       }
+
+      setErrors({
+        backendUrl: 'Failed to save configuration. Storage may be unavailable.',
+      });
     },
     [config],
   );
@@ -63,7 +133,25 @@ export default function ApiConfigForm() {
   }, []);
 
   const isConfigured = mounted && config.backendUrl.trim() !== '';
-  const hasErrors = Object.values(errors).some(Boolean);
+  const hasErrors = useMemo(() => Object.values(errors).some(Boolean), [errors]);
+
+  const currentConfig = useMemo(
+    () => [
+      {
+        label: 'Backend URL',
+        value: config.backendUrl || 'Not set',
+      },
+      {
+        label: 'Max Requests',
+        value: config.rateLimitMaxRequests,
+      },
+      {
+        label: 'Window',
+        value: `${config.rateLimitWindowSeconds}s`,
+      },
+    ],
+    [config],
+  );
 
   return (
     <div className="space-y-6">
@@ -83,12 +171,19 @@ export default function ApiConfigForm() {
         >
           <div
             className="w-2 h-2 rounded-full mt-1 flex-shrink-0"
-            style={{ background: isConfigured ? '#057642' : '#C37D16' }}
+            style={{
+              background: isConfigured ? '#057642' : '#C37D16',
+            }}
           />
+
           <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <p
+              className="text-sm font-semibold"
+              style={{ color: 'var(--text-primary)' }}
+            >
               {isConfigured ? 'API configured' : 'API not configured'}
             </p>
+
             <p className="text-meta text-xs mt-0.5">
               {isConfigured
                 ? `Connected to ${config.backendUrl}`
@@ -100,87 +195,63 @@ export default function ApiConfigForm() {
 
       <form
         id="api-config-form"
-        onSubmit={handleSubmit}
-        noValidate
         className="card card-padding space-y-5"
+        noValidate
+        onSubmit={handleSubmit}
       >
-        <div>
-          <label htmlFor="api-backend-url" className="input-label">
-            Backend API URL
-          </label>
-          <input
-            id="api-backend-url"
-            type="url"
-            className="input-field mt-1"
-            placeholder="https://api.example.com"
-            value={config.backendUrl}
-            onChange={(e) => handleChange('backendUrl', e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          {errors.backendUrl && (
-            <p className="text-xs mt-1" style={{ color: '#CC1016' }}>
-              {errors.backendUrl}
-            </p>
-          )}
-          <p className="text-meta text-xs mt-1">
-            Leave blank to continue using mock data.
-          </p>
-        </div>
+        <Field
+          id="api-backend-url"
+          label="Backend API URL"
+          type="url"
+          placeholder="https://api.example.com"
+          value={config.backendUrl}
+          error={errors.backendUrl}
+          onChange={(value) => handleChange('backendUrl', value)}
+        />
+
+        <p className="text-meta text-xs -mt-3">
+          Leave blank to continue using mock data.
+        </p>
 
         <div className="divider" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="api-rate-limit-max" className="input-label">
-              Rate Limit — Max Requests
-            </label>
-            <input
-              id="api-rate-limit-max"
-              type="number"
-              min={1}
-              step={1}
-              className="input-field mt-1"
-              placeholder="100"
-              value={config.rateLimitMaxRequests || ''}
-              onChange={(e) => handleChange('rateLimitMaxRequests', e.target.value)}
-            />
-            {errors.rateLimitMaxRequests && (
-              <p className="text-xs mt-1" style={{ color: '#CC1016' }}>
-                {errors.rateLimitMaxRequests}
-              </p>
-            )}
-          </div>
+          <Field
+            id="api-rate-limit-max"
+            label="Rate Limit — Max Requests"
+            type="number"
+            placeholder="100"
+            min={1}
+            step={1}
+            value={config.rateLimitMaxRequests || ''}
+            error={errors.rateLimitMaxRequests}
+            onChange={(value) => handleChange('rateLimitMaxRequests', value)}
+          />
 
-          <div>
-            <label htmlFor="api-rate-limit-window" className="input-label">
-              Rate Limit — Window (seconds)
-            </label>
-            <input
-              id="api-rate-limit-window"
-              type="number"
-              min={1}
-              step={1}
-              className="input-field mt-1"
-              placeholder="60"
-              value={config.rateLimitWindowSeconds || ''}
-              onChange={(e) => handleChange('rateLimitWindowSeconds', e.target.value)}
-            />
-            {errors.rateLimitWindowSeconds && (
-              <p className="text-xs mt-1" style={{ color: '#CC1016' }}>
-                {errors.rateLimitWindowSeconds}
-              </p>
-            )}
-          </div>
+          <Field
+            id="api-rate-limit-window"
+            label="Rate Limit — Window (seconds)"
+            type="number"
+            placeholder="60"
+            min={1}
+            step={1}
+            value={config.rateLimitWindowSeconds || ''}
+            error={errors.rateLimitWindowSeconds}
+            onChange={(value) => handleChange('rateLimitWindowSeconds', value)}
+          />
         </div>
 
         <div className="flex items-center justify-between pt-2">
           <button
             type="button"
+            className="btn-outline"
             id="api-config-reset"
             onClick={handleReset}
-            className="btn-outline"
-            style={{ height: '36px', fontSize: '14px', padding: '0 16px' }}
+            style={{
+              height: '36px',
+              fontSize: '14px',
+              padding: '0 16px',
+            }}
           >
             Reset to defaults
           </button>
@@ -190,17 +261,22 @@ export default function ApiConfigForm() {
               <span
                 id="api-config-saved-indicator"
                 className="text-sm font-semibold"
-                style={{ color: '#057642' }}
+                style={successStyle}
               >
                 Saved
               </span>
             )}
+
             <button
-              type="submit"
               id="api-config-save"
+              type="submit"
               className="btn-primary"
               disabled={hasErrors}
-              style={{ height: '36px', fontSize: '14px', padding: '0 20px' }}
+              style={{
+                height: '36px',
+                fontSize: '14px',
+                padding: '0 20px',
+              }}
             >
               Save configuration
             </button>
@@ -209,30 +285,34 @@ export default function ApiConfigForm() {
       </form>
 
       <div className="card card-padding">
-        <h3 className="font-semibold text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
+        <h3
+          className="font-semibold text-sm mb-3"
+          style={{ color: 'var(--text-secondary)' }}
+        >
           Current Configuration
         </h3>
+
         {mounted ? (
           <div className="space-y-2">
-            {[
-              { label: 'Backend URL', value: config.backendUrl || 'Not set' },
-              { label: 'Max Requests', value: String(config.rateLimitMaxRequests) },
-              { label: 'Window', value: `${config.rateLimitWindowSeconds}s` },
-            ].map((row) => (
-              <div key={row.label} className="flex justify-between items-center py-1">
-                <span className="text-meta">{row.label}</span>
+            {currentConfig.map(({ label, value }) => (
+              <div
+                key={label}
+                className="flex justify-between items-center py-1"
+              >
+                <span className="text-meta">{label}</span>
+
                 <span
                   className="text-sm font-medium"
                   style={{ color: 'var(--text-primary)' }}
                 >
-                  {row.value}
+                  {value}
                 </span>
               </div>
             ))}
           </div>
         ) : (
           <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="skeleton h-5 rounded" />
             ))}
           </div>

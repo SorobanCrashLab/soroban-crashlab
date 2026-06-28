@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 import { createSentryAdapter } from "@/lib/integrations/sentry-adapter";
 import type { SentryConfig, CrashReport } from "./integrate-sentry-integration-for-crash-reporting-utils";
@@ -34,33 +34,6 @@ export default function IntegrateSentryIntegrationForCrashReporting() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const sentryAdapter = createSentryAdapter();
-
-  const loadConfig = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const savedConfig = await sentryAdapter.loadConfig();
-      if (savedConfig) {
-        setConfig(savedConfig);
-      }
-    } catch (err) {
-      setError("Failed to load Sentry configuration.");
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [sentryAdapter]);
-
-  const loadReports = useCallback(async () => {
-    setError(null);
-    try {
-      const reports = await sentryAdapter.fetchRecentReports();
-      setRecentReports(reports);
-    } catch (err) {
-      setError("Failed to load recent crash reports.");
-      console.error(err);
-    }
-  }, [sentryAdapter]);
 
   useEffect(() => {
     let cancelled = false;

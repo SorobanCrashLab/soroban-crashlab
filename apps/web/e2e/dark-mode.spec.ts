@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 const THEME_STORAGE_KEY = 'crashlab:theme';
 

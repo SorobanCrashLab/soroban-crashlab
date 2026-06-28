@@ -6,7 +6,6 @@ import {
   applyPreset,
   buildPresetsFromExisting,
   getPresetChannels,
-  getPresetStatus,
   type AlertPreset,
   type PresetId,
   type PresetStatus,

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FuzzingRun } from './types';
+import { formatDurationCompact } from './utils/format';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -98,15 +99,6 @@ function applyFilter(run: FuzzingRun, filter: QueryFilter): boolean {
   }
 }
 
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
-}
 
 /* ── Component ──────────────────────────────────────────────────────── */
 
@@ -461,7 +453,7 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
                             {run.severity}
                           </span>
                         </td>
-                        <td className="py-2 px-3">{formatDuration(run.duration)}</td>
+                        <td className="py-2 px-3">{formatDurationCompact(run.duration)}</td>
                         <td className="py-2 px-3">{run.seedCount.toLocaleString()}</td>
                       </tr>
                     ))}

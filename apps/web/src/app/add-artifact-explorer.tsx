@@ -5,17 +5,10 @@ import ArtifactPreviewModal from './implement-artifact-preview-modal-component';
 import { useDebounce } from '../lib/useDebounce';
 import { api } from '../lib/api-client';
 import type { Artifact } from './types';
+import { MOCK_ARTIFACTS } from '../fixtures/artifacts';
+import { formatSize } from './utils/format';
 
 export type { Artifact };
-
-const MOCK_ARTIFACTS: Artifact[] = [
-  { id: 'art-001', name: 'seed_2026_03_29_001.bin', type: 'seed', size: 1024 * 45, updatedAt: '2026-03-29T10:00:00Z', runId: 'run-1000', content_hash: 'a1b2c3d4' },
-  { id: 'art-002', name: 'fuzzer_stdout.log', type: 'log', size: 1024 * 128, updatedAt: '2026-03-29T10:05:00Z', runId: 'run-1000' },
-  { id: 'art-003', name: 'execution_trace.json', type: 'trace', size: 1024 * 1024 * 2.5, updatedAt: '2026-03-29T10:10:00Z', runId: 'run-1001', content_hash: 'e5f6g7h8' },
-  { id: 'art-004', name: 'coverage_report_nightly.zip', type: 'coverage', size: 1024 * 512, updatedAt: '2026-03-29T09:30:00Z' },
-  { id: 'art-005', name: 'mutant_envelope_fail.xdr', type: 'seed', size: 1024 * 12, updatedAt: '2026-03-28T22:00:00Z', runId: 'run-1005' },
-  { id: 'art-006', name: 'bundle_archive.tar.gz', type: 'bundle', size: 1024 * 1024 * 15.2, updatedAt: '2026-03-28T18:45:00Z' },
-];
 
 export function mapMetadataToArtifact(meta: { id: string; name: string; createdAt: string; sizeBytes: number }): Artifact {
   const lowerName = meta.name.toLowerCase();
@@ -52,12 +45,6 @@ export function mapMetadataToArtifact(meta: { id: string; name: string; createdA
   };
 }
 
-const formatSize = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
 export default function ArtifactExplorer() {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,7 +74,9 @@ export default function ArtifactExplorer() {
   }, []);
 
   useEffect(() => {
-    loadArtifacts();
+    queueMicrotask(() => {
+      void loadArtifacts();
+    });
   }, [loadArtifacts]);
 
   const filteredArtifacts = useMemo(() => {

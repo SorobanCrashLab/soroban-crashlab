@@ -34,7 +34,7 @@ use crate::{CaseSeed, CrashSignature, RegressionFixture, RegressionGroup};
 ///
 /// let seed = CaseSeed { id: 1, payload: vec![0xA0, 0x01, 0x02] };
 /// let sig = CrashSignature {
-///     category: "runtime-failure",
+///     category: "runtime-failure".to_string(),
 ///     digest: 12345,
 ///     signature_hash: 0x1234567890ABCDEF,
 /// };

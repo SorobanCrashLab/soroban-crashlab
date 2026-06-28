@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { simulateSeedReplay } from "./replay";
 import { getReplayButtonLabel, ReplayButtonStatus } from "./replay-ui-utils";
+import {
+  buildReplayHistoryEntryFromReplay,
+  recordRunReplayHistoryEntry,
+} from "./add-run-replay-history-with-timestamps";
 
 interface AddReplayFromUiActionProps {
   /** Run ID to replay */
@@ -42,8 +46,19 @@ export default function AddReplayFromUiAction({
     setStatus("loading");
     setErrorMessage(null);
     setReplayedRunId(null);
+    const startedAt = new Date().toISOString();
     try {
       const { newRunId } = await simulateSeedReplay(runId);
+      const completedAt = new Date().toISOString();
+      recordRunReplayHistoryEntry(
+        buildReplayHistoryEntryFromReplay({
+          id: `replay-history-${newRunId}`,
+          sourceRunId: runId,
+          replayRunId: newRunId,
+          startedAt,
+          completedAt,
+        }),
+      );
       onReplayInitiated({ id: newRunId, status: "running" });
       setReplayedRunId(newRunId);
       setStatus("success");

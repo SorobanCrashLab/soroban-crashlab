@@ -108,7 +108,7 @@ export default function AddTaggingAndLabelsUi({
     if (runs.length > 0) {
       void loadTags();
     } else {
-      setPersistedTags({});
+      queueMicrotask(() => setPersistedTags({}));
     }
 
     return () => {

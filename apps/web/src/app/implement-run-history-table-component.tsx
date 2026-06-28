@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { FuzzingRun, RunStatus, RunSeverity } from "./types";
+import { useDataTableKeyboardNav } from "./use-data-table-keyboard-nav";
 import {
   getSortIndicator,
   getNextSortState,
@@ -133,6 +134,16 @@ export default function EnhancedRunHistoryTable({
     });
   }, [runs, sort]);
 
+  const { getRowProps } = useDataTableKeyboardNav({
+    rowCount: sortedRuns.length,
+    onActivate: (index) => {
+      const run = sortedRuns[index];
+      if (run) {
+        onSelectRun(run.id);
+      }
+    },
+  });
+
   const toggleSort = (field: keyof FuzzingRun & string) => {
     setSort((current) => getNextSortState(current, field));
   };
@@ -186,7 +197,7 @@ export default function EnhancedRunHistoryTable({
   return (
     <div className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-2xl transition-all hover:shadow-blue-500/5">
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse" aria-label="Fuzzing run history">
           <thead>
             <tr className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-900">
               {onToggleRunSelection && (
@@ -260,9 +271,10 @@ export default function EnhancedRunHistoryTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-50 dark:divide-zinc-900/50">
-            {sortedRuns.map((run) => (
+            {sortedRuns.map((run, index) => (
               <tr
                 key={run.id}
+                {...getRowProps(index)}
                 className={`group transition-all cursor-pointer ${
                   selectedRunIds.has(run.id) 
                     ? "bg-blue-50/80 dark:bg-blue-900/20" 
@@ -273,6 +285,7 @@ export default function EnhancedRunHistoryTable({
                      onSelectRun(run.id);
                   }
                 }}
+                aria-label={`Fuzzing run ${run.id}, status ${run.status}`}
               >
                 {onToggleRunSelection && (
                   <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
@@ -286,13 +299,13 @@ export default function EnhancedRunHistoryTable({
                     </div>
                   </td>
                 )}
-                {visibleColumns.includes("id") && (
-                  <td className="px-6 py-5">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-mono group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                          #{run.id.split("-").pop()}
-                        </span>
+{visibleColumns.includes("id") && (
+                   <td className="px-6 py-5">
+                     <div className="flex flex-col">
+                       <div className="flex items-center gap-1.5">
+                         <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-mono group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={run.id}>
+                           #{run.id.split("-").pop()}
+                         </span>
                         {run.annotations && run.annotations.length > 0 && (
                           <svg
                             className="w-3.5 h-3.5 text-indigo-500"

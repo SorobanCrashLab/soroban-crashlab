@@ -6,7 +6,6 @@ import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-han
 
 const ISSUES_API_URL = process.env.ISSUES_API_URL || process.env.NEXT_PUBLIC_API_URL;
 
-// In-memory store keyed by run ID (persists for the lifetime of the process)
 const issueStore = new Map<string, RunIssueLink[]>();
 
 function getIssues(id: string): RunIssueLink[] {
@@ -19,10 +18,6 @@ function getIssues(id: string): RunIssueLink[] {
   return issueStore.get(id)!;
 }
 
-/**
- * GET /api/runs/[id]/issues
- * Returns the current issue links for a run.
- */
 export const GET = withRouteErrorHandling(
   'GET /api/runs/[id]/issues',
   async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -37,10 +32,6 @@ export const GET = withRouteErrorHandling(
   },
 );
 
-/**
- * POST /api/runs/[id]/issues
- * Appends a new issue link. Body: { label: string; href: string }
- */
 export const POST = withRouteErrorHandling(
   'POST /api/runs/[id]/issues',
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -85,10 +76,6 @@ export const POST = withRouteErrorHandling(
   },
 );
 
-/**
- * DELETE /api/runs/[id]/issues
- * Removes an issue link by href. Body: { href: string }
- */
 export const DELETE = withRouteErrorHandling(
   'DELETE /api/runs/[id]/issues',
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {

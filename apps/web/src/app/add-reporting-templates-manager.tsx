@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { triggerBrowserDownload } from './utils/browser-download';
 import { useDebounce } from '../lib/useDebounce';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -347,13 +348,10 @@ export default function ReportingTemplatesManager() {
 
     /** Export all templates as a JSON file download. */
     const handleExport = useCallback(() => {
-        const blob = new Blob([JSON.stringify(templates, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `crashlab-templates-${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        triggerBrowserDownload(
+            new Blob([JSON.stringify(templates, null, 2)], { type: 'application/json' }),
+            `crashlab-templates-${Date.now()}.json`,
+        );
     }, [templates]);
 
     /** Import templates from a JSON file, merging by id. */

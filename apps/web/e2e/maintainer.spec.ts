@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test.describe('Maintainer Mode Toggling', () => {
   test('should toggle maintainer mode and show/hide the maintainer tab', async ({ page }) => {

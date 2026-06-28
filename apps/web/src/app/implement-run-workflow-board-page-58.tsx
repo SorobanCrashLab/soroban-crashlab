@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FuzzingRun, RunStatus } from './types';
+import { formatDurationCompact } from './utils/format';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -95,15 +96,6 @@ function getWorkflowState(
   if (runStatus === 'completed') return 'closed';
   if (runStatus === 'failed') return 'in-review';
   return 'open';
-}
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
 }
 
 /* ── Component ──────────────────────────────────────────────────────── */
@@ -411,7 +403,7 @@ export default function ImplementRunWorkflowBoardPage58({ runs = [] }: Props) {
                       </div>
                       <div className="flex justify-between">
                         <span>Duration:</span>
-                        <span className="font-medium">{formatDuration(run.duration)}</span>
+                        <span className="font-medium">{formatDurationCompact(run.duration)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Seeds:</span>

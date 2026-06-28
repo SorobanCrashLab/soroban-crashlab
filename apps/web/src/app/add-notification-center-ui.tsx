@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { loadPreferences, filterByPreferences, isInQuietHours } from './notification-preferences-utils';
+import { loadPreferences, filterByPreferences } from './notification-preferences-utils';
 import type { NotificationType, NotificationPriority } from './notification-preferences-utils';
 import { api, type NotificationFeedItem } from '../lib/api-client';
 

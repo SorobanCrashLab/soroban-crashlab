@@ -3,7 +3,6 @@ import { buildMockRuns } from '@/app/mockRuns';
 import { addTag, normalizeTag, removeTag } from '@/app/run-tags-utils';
 import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 
-// In-memory store keyed by run ID (persists for the lifetime of the process)
 const tagStore = new Map<string, string[]>();
 
 function getTags(id: string): string[] {
@@ -15,10 +14,6 @@ function getTags(id: string): string[] {
   return tagStore.get(id)!;
 }
 
-/**
- * GET /api/runs/[id]/tags
- * Returns the current tag list for a run.
- */
 export const GET = withRouteErrorHandling(
   'GET /api/runs/[id]/tags',
   async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -31,10 +26,6 @@ export const GET = withRouteErrorHandling(
   },
 );
 
-/**
- * POST /api/runs/[id]/tags
- * Adds a tag (normalized to kebab-case). Body: { tag: string }
- */
 export const POST = withRouteErrorHandling(
   'POST /api/runs/[id]/tags',
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -55,7 +46,7 @@ export const POST = withRouteErrorHandling(
     const current = getTags(id);
     const result = addTag(current, raw);
     if (!result.success) {
-      return jsonError(result.error, 400);
+      return jsonError(result.error ?? 'Failed to add tag', 400);
     }
 
     tagStore.set(id, result.tags);
@@ -63,10 +54,6 @@ export const POST = withRouteErrorHandling(
   },
 );
 
-/**
- * DELETE /api/runs/[id]/tags
- * Removes a tag by value. Body: { tag: string }
- */
 export const DELETE = withRouteErrorHandling(
   'DELETE /api/runs/[id]/tags',
   async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   validateNetworkConfig,
   validateNetworkStore,
@@ -6,9 +6,9 @@ import {
   type NetworkConfig,
 } from "@/app/network-config-utils";
 import { getStore, setStore } from "./_store";
+import { createdResponse, successResponse } from '@/lib/api-response-utils';
 import { jsonError, readJsonBody, withRouteErrorHandling } from "@/lib/route-handler";
 
-// Private slugify helper - server always generates id from name
 function slugify(name: string, existingNetworks: NetworkConfig[]): string {
   const base = name
     .trim()
@@ -27,23 +27,14 @@ function slugify(name: string, existingNetworks: NetworkConfig[]): string {
   return candidate;
 }
 
-/**
- * GET /api/networks
- * Returns the list of all configured networks.
- */
 export const GET = withRouteErrorHandling("GET /api/networks", async () => {
   const store = getStore();
-  return NextResponse.json({
+  return successResponse({
     networks: store.networks,
     activeNetworkId: store.activeNetworkId,
-    total: store.networks.length,
-  });
+  }, { total: store.networks.length });
 });
 
-/**
- * POST /api/networks
- * Adds a new custom network. Body: { name, networkPassphrase, horizonUrl, rpcUrl, friendbotUrl? }
- */
 export const POST = withRouteErrorHandling("POST /api/networks", async (request: NextRequest) => {
   const parsedBody = await readJsonBody(request);
   if ("error" in parsedBody) return parsedBody.error;
@@ -91,5 +82,5 @@ export const POST = withRouteErrorHandling("POST /api/networks", async (request:
 
   setStore(addNetwork(store, candidate));
 
-  return NextResponse.json({ network: candidate }, { status: 201 });
+  return createdResponse({ network: candidate });
 });
