@@ -66,6 +66,14 @@ assert.equal(filterBySearchTerm(runs, 'budget').length, 1); // area
 assert.equal(filterBySearchTerm(runs, 'failed').length, 1); // status
 assert.equal(filterBySearchTerm(runs, 'auth sig').length, 1); // crashDetail.failureCategory + signature (tokenized)
 
+// fuzzy matching: small typos should still match
+assert.equal(filterBySearchTerm(runs, 'critcal').length, 1); // fuzzy(severity=critical)
+assert.equal(filterBySearchTerm(runs, 'auth signatue').length, 1); // fuzzy(signature)
+
+// fuzzy matching still keeps token AND semantics
+assert.equal(filterBySearchTerm(runs, 'crtiical xdr').length, 0);
+
+
 // all tokens must match
 assert.equal(filterBySearchTerm(runs, 'auth xdr').length, 0);
 
