@@ -286,13 +286,13 @@ export default function EnhancedRunHistoryTable({
                     </div>
                   </td>
                 )}
-                {visibleColumns.includes("id") && (
-                  <td className="px-6 py-5">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-mono group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                          #{run.id.split("-").pop()}
-                        </span>
+{visibleColumns.includes("id") && (
+                   <td className="px-6 py-5">
+                     <div className="flex flex-col">
+                       <div className="flex items-center gap-1.5">
+                         <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-mono group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={run.id}>
+                           #{run.id.split("-").pop()}
+                         </span>
                         {run.annotations && run.annotations.length > 0 && (
                           <svg
                             className="w-3.5 h-3.5 text-indigo-500"
