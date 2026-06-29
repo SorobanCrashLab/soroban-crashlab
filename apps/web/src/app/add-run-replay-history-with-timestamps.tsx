@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   appendReplayHistoryEntry,
@@ -15,6 +16,7 @@ import {
   serializeReplayHistory,
   sortReplayHistoryByTimestamp,
 } from "./run-replay-history-utils";
+import { useDataTableKeyboardNav } from "./use-data-table-keyboard-nav";
 
 interface AddRunReplayHistoryWithTimestampsProps {
   /** When set, only replays sourced from this run are shown. */
@@ -61,6 +63,7 @@ export default function AddRunReplayHistoryWithTimestamps({
   sourceRunId,
   title = "Replay History",
 }: AddRunReplayHistoryWithTimestampsProps) {
+  const router = useRouter();
   const [history, setHistory] = useState<RunReplayHistoryEntry[]>([]);
   const [now, setNow] = useState(() => new Date());
 
@@ -91,6 +94,16 @@ export default function AddRunReplayHistoryWithTimestamps({
     return sortReplayHistoryByTimestamp(filtered, "desc");
   }, [history, sourceRunId]);
 
+  const { getRowProps } = useDataTableKeyboardNav({
+    rowCount: visibleHistory.length,
+    onActivate: (index) => {
+      const entry = visibleHistory[index];
+      if (entry) {
+        router.push(`/runs/${entry.replayRunId}`);
+      }
+    },
+  });
+
   return (
     <section
       className="card card-padding"
@@ -119,20 +132,26 @@ export default function AddRunReplayHistoryWithTimestamps({
         </div>
       ) : (
         <div className="table-responsive">
-          <table className="data-table">
+          <table className="data-table" aria-label="Run replay history">
             <thead>
               <tr>
-                <th>Replay Run</th>
-                {!sourceRunId && <th>Source Run</th>}
-                <th>Started</th>
-                <th>Completed</th>
-                <th>Duration</th>
-                <th>Status</th>
+                <th scope="col">Replay Run</th>
+                {!sourceRunId && <th scope="col">Source Run</th>}
+                <th scope="col">Started</th>
+                <th scope="col">Completed</th>
+                <th scope="col">Duration</th>
+                <th scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
-              {visibleHistory.map((entry) => (
-                <tr key={entry.id}>
+              {visibleHistory.map((entry, index) => (
+                <tr
+                  key={entry.id}
+                  {...getRowProps(index)}
+                  className="cursor-pointer"
+                  onClick={() => router.push(`/runs/${entry.replayRunId}`)}
+                  aria-label={`Replay run ${entry.replayRunId}, status ${entry.status}`}
+                >
                   <td>
                     <Link href={`/runs/${entry.replayRunId}`} className="link code-text">
                       {entry.replayRunId}

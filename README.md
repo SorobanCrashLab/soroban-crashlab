@@ -145,6 +145,7 @@ cargo build --release --target wasm32-unknown-unknown
 | [Environment Variables](docs/ENVIRONMENT_VARIABLES.md) | Web app, API route, and deployment configuration reference |
 | [Release Process](docs/RELEASE_PROCESS.md) | Maintainer checklist for releases |
 | [Product Vision](docs/VISION.md) | 90% done criteria and roadmap alignment |
+| [Maintainer Onboarding Checklist](docs/MAINTAINER_ONBOARDING.md) | Step-by-step guide for onboarding new maintainers |
 | [Contributing Guide](CONTRIBUTING.md) | How to contribute to CrashLab |
 | [Security Policy](.github/SECURITY.md) | Vulnerability reporting and handling |
 | [Security Guide](docs/SECURITY.md) | Severity classification, contributor security model, and safe artifact handling |

@@ -16,7 +16,7 @@ The format is intentionally lightweight:
 
 ### Changed
 
-- None yet.
+- Closed auto-generated stub issues #924, #925, #926, #927 (no acceptance criteria defined; TBD placeholders with no actionable work).
 
 ### Fixed
 

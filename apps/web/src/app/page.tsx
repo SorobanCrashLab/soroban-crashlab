@@ -14,6 +14,7 @@ import {
   type DashboardSectionConfig,
   type DashboardSectionId,
 } from "./dashboard-layout-utils";
+import { ResourceFeeInsightPanel } from "./implement-resource-fee-insight-panel-component";
 
 const AddTaggingAndLabelsUi = dynamic(
   () => import("./add-tagging-and-labels-ui"),
@@ -22,6 +23,7 @@ const AddTaggingAndLabelsUi = dynamic(
 import { runMatchesTagFilter } from "./run-tags-utils";
 import { FuzzingRun } from "./types";
 import { fetchRuns } from "../lib/api-client";
+import { useDataTableKeyboardNav } from "./use-data-table-keyboard-nav";
 
 const makeSuggestedLabels = (run: FuzzingRun): string[] => [
   run.area,
@@ -73,6 +75,7 @@ function DashboardContent() {
     return () => window.removeEventListener("dashboard-layout-updated", loadLayout);
   }, []);
 
+  const recentRuns = runs.slice(0, 8);
   const setActiveTag = useCallback(
     (tag: string) => {
       const next = new URLSearchParams(searchParams.toString());
@@ -96,6 +99,16 @@ function DashboardContent() {
 
   const recentRuns = filteredRuns.slice(0, 8);
 
+  const { getRowProps } = useDataTableKeyboardNav({
+    rowCount: recentRuns.length,
+    onActivate: (index) => {
+      const run = recentRuns[index];
+      if (run) {
+        router.push(`/runs/${run.id}`);
+      }
+    },
+  });
+
   return (
     <div className="container-full page-padding fade-in">
       <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -108,6 +121,39 @@ function DashboardContent() {
         </Link>
       </div>
 
+      {dataState === "success" && (
+        <div className="section mb-6">
+          <Link href="/analytics/clusters" className="card card-padding card-interactive block">
+            <h2 className="heading-section">Failure Signature Clusters</h2>
+            <p className="text-meta mt-1">Group repeated crashes by signature and open representative samples for triage.</p>
+          </Link>
+        </div>
+      )}
+
+      {dataState === "loading" && <div className="card card-padding text-meta">Loading...</div>}
+
+      {dataState === "success" && (
+        <div className="card table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Area</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentRuns.map((run) => (
+                <tr key={run.id}>
+                  <td className="code-text text-meta">{run.id}</td>
+                  <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
+                  <td>{run.area}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {dataState === "error" && (
         <div role="alert" className="card card-padding mb-4 sm:mb-6" style={{ borderLeft: "4px solid #CC1016" }}>
           <p className="font-semibold" style={{ color: "#CC1016" }}>Connection Error</p>
@@ -212,6 +258,70 @@ function DashboardContent() {
             };
             return <div key={section.id}>{sectionContent[section.id]}</div>;
           })}
+          <div className="section">
+            <ResourceFeeInsightPanel runs={filteredRuns} dataState={dataState} />
+          </div>
+
+          <div className="section">
+            <AddTaggingAndLabelsUi
+              runs={filteredRuns}
+              activeTag={activeTag}
+              onActiveTagChange={setActiveTag}
+            />
+          </div>
+
+          <div className="section">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="heading-section">Recent Runs</h2>
+              <Link href="/runs" className="link text-xs sm:text-sm">View all</Link>
+            </div>
+            <div className="card table-responsive">
+                <table
+                  className="data-table"
+                  aria-label="Recent fuzzing runs"
+                >
+                  <thead>
+                    <tr>
+                      <th scope="col">ID</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Area</th>
+                      <th scope="col">Tags</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentRuns.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-16 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-full text-zinc-300">
+                              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No matching fuzzing runs</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      recentRuns.map((run, index) => (
+                        <tr
+                          key={run.id}
+                          {...getRowProps(index)}
+                          className="cursor-pointer"
+                          onClick={() => router.push(`/runs/${run.id}`)}
+                          aria-label={`Fuzzing run ${run.id}, status ${run.status}`}
+                        >
+                          <td className="code-text text-meta">{run.id}</td>
+                          <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
+                          <td>{run.area}</td>
+                          <td className="text-meta">{(run.tags ?? []).join(", ") || "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+          </div>
         </>
       )}
     </div>
