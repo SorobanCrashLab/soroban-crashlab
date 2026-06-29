@@ -1,6 +1,6 @@
 # Maintainer Wave Playbook
 
-This document defines how Soroban CrashLab is operated during Drips Wave cycles.
+This document defines how Soroban CrashLab is operated during Drips Wave cycles. For new maintainers joining the project, follow the [Maintainer Onboarding Checklist](docs/MAINTAINER_ONBOARDING.md) to verify your local setup and understand core operational responsibilities.
 
 ## 🌊 Wave 4 Specific Context
 - **Contributor Limit**: Each contributor can resolve a maximum of **4 issues** across this entire org (down from 7 last wave). Keep an eye on assigning too many issues to a single applicant.
