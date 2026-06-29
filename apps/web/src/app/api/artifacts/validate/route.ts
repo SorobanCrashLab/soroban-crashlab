@@ -110,7 +110,7 @@ function flattenIssues(issues: z.ZodIssue[]): z.ZodIssue[] {
   const flat: z.ZodIssue[] = [];
   for (const issue of issues) {
     if (issue.code === "invalid_union" && "unionErrors" in issue) {
-      const unionErrors = (issue as any).unionErrors as z.ZodError[];
+      const unionErrors = (issue as unknown as { unionErrors: z.ZodError[] }).unionErrors;
       for (const subError of unionErrors) {
         flat.push(...flattenIssues(subError.issues));
       }

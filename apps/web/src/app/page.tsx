@@ -129,6 +129,7 @@ function DashboardContent() {
             </tbody>
           </table>
         </div>
+      )}
       {dataState === "error" && (
         <div role="alert" className="card card-padding mb-4 sm:mb-6" style={{ borderLeft: "4px solid #CC1016" }}>
           <p className="font-semibold" style={{ color: "#CC1016" }}>Connection Error</p>

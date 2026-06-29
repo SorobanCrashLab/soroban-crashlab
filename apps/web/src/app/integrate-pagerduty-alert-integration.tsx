@@ -208,7 +208,7 @@ export default function IntegratePagerdutyAlertIntegration() {
           <p className="text-zinc-600 dark:text-zinc-400 max-w-2xl leading-relaxed">
             Automatically page your on-call team when a fuzzing run encounters a critical failure.
             Incidents are dispatched via the PagerDuty Events API v2 with stable dedup-keys so
-            duplicate crashes don't create noise.
+            duplicate crashes don&apos;t create noise.
           </p>
         </div>
 
