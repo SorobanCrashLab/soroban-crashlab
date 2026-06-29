@@ -1,21 +1,22 @@
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import * as Sentry from '@sentry/nextjs';
 import { initSentryClient, sentryAdapter } from './sentry-client';
 
-jest.mock('@sentry/nextjs', () => ({
-  init: jest.fn(),
-  captureException: jest.fn(),
-  captureMessage: jest.fn(),
+vi.mock('@sentry/nextjs', () => ({
+  init: vi.fn(),
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
 }));
 
 describe('Sentry Client Integration', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     process.env = { ...originalEnv };
     // Suppress console output during tests
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterAll(() => {
