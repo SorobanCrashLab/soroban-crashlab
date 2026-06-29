@@ -177,7 +177,6 @@ export default function TimelineScrubber({
         <div className="flex justify-between w-full px-1 mt-10">
           {runs.map((run, i) => {
             const isSelected = i === index;
-            Math.abs(i - index) < 2;
             const isEndpoint = i === 0 || i === runs.length - 1;
             
             if (!isEndpoint && !isSelected && runs.length > 20) return null;

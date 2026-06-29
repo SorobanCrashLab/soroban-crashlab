@@ -16,7 +16,7 @@ describe('GET /api/artifacts', () => {
   it('returns a list of artifacts', async () => {
     const { listArtifactMetadata } = await import('@/lib/artifact-fs-adapter');
     
-    (listArtifactMetadata as any).mockResolvedValue([
+    (listArtifactMetadata as unknown as { mockResolvedValue: (value: unknown) => unknown }).mockResolvedValue([
       {
         id: 'bundle-1.json',
         name: 'bundle-1.json',
@@ -46,7 +46,7 @@ describe('GET /api/artifacts', () => {
 
   it('returns empty list when no artifacts exist', async () => {
     const { listArtifactMetadata } = await import('@/lib/artifact-fs-adapter');
-    (listArtifactMetadata as any).mockResolvedValue([]);
+    (listArtifactMetadata as unknown as { mockResolvedValue: (value: unknown) => unknown }).mockResolvedValue([]);
 
     const request = new NextRequest('http://localhost/api/artifacts', {
       method: 'GET',
@@ -69,7 +69,7 @@ describe('POST /api/artifacts', () => {
   it('saves an uploaded artifact and returns metadata', async () => {
     const { saveArtifact } = await import('@/lib/artifact-fs-adapter');
     
-    (saveArtifact as any).mockResolvedValue({
+    (saveArtifact as unknown as { mockResolvedValue: (value: unknown) => unknown }).mockResolvedValue({
       id: 'test-bundle.json',
       name: 'test-bundle.json',
       createdAt: '2026-06-26T10:00:00.000Z',
@@ -113,7 +113,7 @@ describe('POST /api/artifacts', () => {
   it('calls saveArtifact with file name and buffer', async () => {
     const { saveArtifact } = await import('@/lib/artifact-fs-adapter');
     
-    (saveArtifact as any).mockResolvedValue({
+    (saveArtifact as unknown as { mockResolvedValue: (value: unknown) => unknown }).mockResolvedValue({
       id: 'artifact.bin',
       name: 'artifact.bin',
       createdAt: '2026-06-26T10:00:00.000Z',

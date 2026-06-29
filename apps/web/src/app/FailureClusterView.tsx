@@ -17,7 +17,7 @@ const severityBadgeClasses = {
   critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
 } as const;
 
-const buildRepresentativeHref = (pathname: string, queryString: string, runId: string): string => {
+const _buildRepresentativeHref = (pathname: string, queryString: string, runId: string): string => {
   const params = new URLSearchParams(queryString);
   params.set('run', runId);
   const nextQuery = params.toString();
@@ -37,7 +37,7 @@ function parseContractCall(run: FuzzingRun): { contract: string; method: string 
   return null;
 }
 
-export default function FailureClusterView({ runs, pathname, queryString }: FailureClusterViewProps) {
+export default function FailureClusterView({ runs, pathname: _pathname, queryString: _queryString }: FailureClusterViewProps) {
   const clusters = buildFailureClusters(runs);
   const runById = new Map(runs.map((run) => [run.id, run]));
 

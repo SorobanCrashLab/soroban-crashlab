@@ -22,7 +22,7 @@ import {
  */
 export default function CrashTrendPage() {
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
-  const [dataState, setDataState] = useState<'loading' | 'success' | 'error'>('loading');
+  const [_dataState, setDataState] = useState<'loading' | 'success' | 'error'>('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -32,8 +32,6 @@ export default function CrashTrendPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const isLoading = dataState === 'loading';
-  const hasError = dataState === 'error';
 
   // Filter state
   const [selectedAreas, setSelectedAreas] = useState<RunArea[]>([]);
