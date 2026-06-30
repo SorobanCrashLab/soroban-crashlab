@@ -1,10 +1,19 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import dynamic from 'next/dynamic';
 import { LoadingSpinner } from "../components/LoadingSkeleton";
+import DashboardSectionLayoutEditor from "./dashboard-section-layout-editor";
+import {
+  DASHBOARD_LAYOUT_STORAGE_KEY,
+  DEFAULT_DASHBOARD_LAYOUT,
+  getVisibleDashboardSections,
+  parseDashboardLayout,
+  type DashboardSectionConfig,
+  type DashboardSectionId,
+} from "./dashboard-layout-utils";
 import { ResourceFeeInsightPanel } from "./implement-resource-fee-insight-panel-component";
 
 const AddTaggingAndLabelsUi = dynamic(
@@ -26,6 +35,7 @@ const makeSuggestedLabels = (run: FuzzingRun): string[] => [
 function DashboardContent() {
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
   const [dataState, setDataState] = useState<"loading" | "error" | "success">("loading");
+  const [layout, setLayout] = useState<DashboardSectionConfig[]>(DEFAULT_DASHBOARD_LAYOUT);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -49,6 +59,20 @@ function DashboardContent() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+
+  useEffect(() => {
+    const loadLayout = () => {
+      try {
+        setLayout(parseDashboardLayout(localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)));
+      } catch {
+        setLayout(DEFAULT_DASHBOARD_LAYOUT);
+      }
+    };
+    loadLayout();
+    window.addEventListener("dashboard-layout-updated", loadLayout);
+    return () => window.removeEventListener("dashboard-layout-updated", loadLayout);
   }, []);
 
   const recentRuns = runs.slice(0, 8);
@@ -144,6 +168,96 @@ function DashboardContent() {
 
       {dataState === "success" && (
         <>
+          {getVisibleDashboardSections(layout).map((section) => {
+            const sectionContent: Record<DashboardSectionId, ReactNode> = {
+              stats: (
+                <div className="section">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: "Total", value: filteredRuns.length },
+                      { label: "Failed", value: filteredRuns.filter((r) => r.status === "failed").length },
+                      { label: "Running", value: filteredRuns.filter((r) => r.status === "running").length },
+                      { label: "Critical", value: filteredRuns.filter((r) => r.severity === "critical").length },
+                    ].map((stat) => (
+                      <div key={stat.label} className="card card-padding stat-card">
+                        <div className="stat-value">{stat.value}</div>
+                        <div className="stat-label">{stat.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ),
+              "widget-editor": (
+                <div className="section">
+                  <DashboardSectionLayoutEditor />
+                </div>
+              ),
+              "recent-runs": (
+                <>
+                  <div className="section">
+                    <AddTaggingAndLabelsUi
+                      runs={filteredRuns}
+                      activeTag={activeTag}
+                      onActiveTagChange={setActiveTag}
+                    />
+                  </div>
+                  <div className="section">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="heading-section">Recent Runs</h2>
+                      <Link href="/runs" className="link text-xs sm:text-sm">View all</Link>
+                    </div>
+                    <div className="card table-responsive">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Status</th>
+                            <th>Area</th>
+                            <th>Tags</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentRuns.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-16 text-center">
+                                <div className="flex flex-col items-center gap-3">
+                                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-full text-zinc-300">
+                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                  </div>
+                                  <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No matching fuzzing runs</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            recentRuns.map((run) => (
+                              <tr key={run.id}>
+                                <td className="code-text text-meta">{run.id}</td>
+                                <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
+                                <td>{run.area}</td>
+                                <td className="text-meta">{(run.tags ?? []).join(", ") || "—"}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ),
+              "quick-actions": (
+                <div className="section card card-padding">
+                  <h3 className="font-semibold text-sm mb-3">Quick Actions</h3>
+                  <div className="flex flex-col gap-2">
+                    <Link href="/runs" className="link">Browse all runs</Link>
+                    <Link href="/analytics" className="link">Open analytics</Link>
+                  </div>
+                </div>
+              ),
+            };
+            return <div key={section.id}>{sectionContent[section.id]}</div>;
+          })}
           <div className="section">
             <ResourceFeeInsightPanel runs={filteredRuns} dataState={dataState} />
           </div>
