@@ -140,6 +140,7 @@ cargo build --release --target wasm32-unknown-unknown
 | Document | Description |
 |----------|-------------|
 | [Architecture Guide](docs/ARCHITECTURE.md) | System architecture, data flow, and design decisions |
+| [API Reference](docs/API.md) | HTTP API for the dashboard's Next.js routes (runs, artifacts, settings, and more) |
 | [Reproducibility Guide](docs/REPRODUCIBILITY.md) | Deterministic guarantees and troubleshooting |
 | [Roadmap](docs/ROADMAP.md) | Milestone overview and issue tracking |
 | [Environment Variables](docs/ENVIRONMENT_VARIABLES.md) | Web app, API route, and deployment configuration reference |
