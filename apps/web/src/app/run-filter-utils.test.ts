@@ -26,9 +26,28 @@ function makeRun(overrides: Partial<FuzzingRun> = {}): FuzzingRun {
 }
 
 const runs: FuzzingRun[] = [
-  makeRun({ id: 'r1', status: 'running', area: 'auth', severity: 'low', crashDetail: null }),
+  makeRun({
+    id: 'r1',
+    status: 'running',
+    area: 'auth',
+    severity: 'low',
+    crashDetail: null,
+    queuedAt: '2024-01-02T03:04:05Z',
+  }),
   makeRun({ id: 'r2', status: 'completed', area: 'state', severity: 'high', crashDetail: null }),
-  makeRun({ id: 'r3', status: 'failed', area: 'budget', severity: 'critical', crashDetail: { failureCategory: 'auth', signature: 'sig', payload: 'p', replayAction: 'r' } }),
+  makeRun({
+    id: 'r3',
+    status: 'failed',
+    area: 'budget',
+    severity: 'critical',
+    crashDetail: {
+      failureCategory: 'auth',
+      signature: 'sig',
+      signatureHash: 42,
+      payload: 'p',
+      replayAction: 'r',
+    },
+  }),
   makeRun({ id: 'r4', status: 'cancelled', area: 'xdr', severity: 'medium', crashDetail: null }),
 ];
 
@@ -69,6 +88,11 @@ assert.equal(filterBySearchTerm(runs, 'auth sig').length, 1); // crashDetail.fai
 // fuzzy matching: small typos should still match
 assert.equal(filterBySearchTerm(runs, 'critcal').length, 1); // fuzzy(severity=critical)
 assert.equal(filterBySearchTerm(runs, 'auth signatue').length, 1); // fuzzy(signature)
+
+// optional timestamp fields should match too (tokenized)
+assert.equal(filterBySearchTerm(runs, '2024-01-02').length, 1); // queuedAt of r1
+assert.equal(filterBySearchTerm(runs, '03:04:05').length, 1); // queuedAt of r1
+
 
 // fuzzy matching still keeps token AND semantics
 assert.equal(filterBySearchTerm(runs, 'crtiical xdr').length, 0);

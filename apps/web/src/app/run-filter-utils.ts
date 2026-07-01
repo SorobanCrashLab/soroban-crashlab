@@ -133,8 +133,13 @@ function runToSearchableText(r: FuzzingRun): string {
     r.cpuInstructions,
     r.memoryBytes,
     r.minResourceFee,
+    // Optional timestamps (often searched during triage)
+    r.queuedAt,
+    r.startedAt,
+    r.finishedAt,
     crash?.failureCategory,
     crash?.signature,
+    crash?.signatureHash,
     crash?.payload,
     crash?.replayAction,
     ...(r.tags ?? []),
