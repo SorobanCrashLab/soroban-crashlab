@@ -59,12 +59,12 @@
     "test:e2e:all": "playwright test"
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.62.0",
-    "next": "16.1.6",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "@sentry/nextjs": "^10.69.0",
+    "next": "16.2.12",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
-    "recharts": "^3.8.1",
+    "recharts": "^3.10.1",
     "remark-gfm": "^4.0.1",
     "zod": "^3.24.2"
   },
