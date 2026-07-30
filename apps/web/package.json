@@ -89,7 +89,7 @@
     "@vitest/coverage-istanbul": "^2.1.8",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.12",
     "size-limit": "^11.2.0",
     "tailwindcss": "^4",
     "typescript": "^5.9.3",
