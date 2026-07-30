@@ -12,7 +12,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -30,7 +30,7 @@ jobs:
       run:
         working-directory: contracts/crashlab-core
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Cargo dependencies
@@ -45,7 +45,7 @@ jobs:
       run:
         working-directory: contracts/soroban-example
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Rust stable with wasm32 target
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -62,7 +62,7 @@ jobs:
   secrets-scan:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Install Gitleaks
@@ -76,7 +76,7 @@ jobs:
   ops-scripts-syntax:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: bash -n scripts/backlog-freshness-review.sh
       - run: bash -n scripts/contracts/build-soroban-example.sh
 
@@ -87,7 +87,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
 
@@ -157,5 +157,5 @@ jobs:
       run:
         working-directory: contracts/crashlab-core
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cargo run --bin crashlab -- regression-suite fixtures/
