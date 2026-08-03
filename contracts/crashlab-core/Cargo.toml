@@ -11,11 +11,11 @@ flate2 = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.10"
 sha2 = "0.10"
-soroban-sdk = { version = "22.0.0", optional = true }
+soroban-sdk = { version = "27.0.3", optional = true }
 env_logger = "0.10.0"
 
 [dev-dependencies]
-soroban-sdk = { version = "22.0.0", features = ["testutils"] }
+soroban-sdk = { version = "27.0.3", features = ["testutils"] }
 filetime = "0.2"
 
 [features]
