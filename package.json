@@ -46,7 +46,7 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3",
