@@ -65,11 +65,11 @@
     "test:widget-layout-profile-utils": "npx tsc src/app/widget-layout-profile-utils.ts src/app/widget-layout-profile-utils.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --skipLibCheck && node build/test-tmp/app/widget-layout-profile-utils.test.js"
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.62.0",
-    "next": "16.1.6",
+    "@sentry/nextjs": "^10.70.0",
+    "next": "16.3.2",
     "nodemailer": "^7.0.13",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
