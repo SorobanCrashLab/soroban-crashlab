@@ -79,7 +79,7 @@
     "@playwright/test": "1.61.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/jest": "^30.0.0",
-    "@types/node": "^20",
+    "@types/node": "^26",
     "@types/nodemailer": "^6.4.19",
     "@types/react": "^19",
     "@types/react-dom": "^19",
