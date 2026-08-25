@@ -1,4 +1,5 @@
 import type { FuzzingRun } from "./types";
+import { deltaPercent, classifyDelta as classifyDeltaBase } from "./run-metrics";
 
 export type SideBySideDataState = "loading" | "error" | "success";
 
@@ -48,20 +49,15 @@ const LOWER_IS_BETTER: SideBySideMetric[] = [
 ];
 
 export function computeSideBySideDelta(baseline: number, candidate: number): number {
-  if (baseline === 0) return 0;
-  return ((candidate - baseline) / baseline) * 100;
+  return deltaPercent(baseline, candidate);
 }
 
 export function classifyDelta(
   deltaPercent: number,
   metric?: SideBySideMetric,
 ): "regression" | "improvement" | "stable" {
-  if (Math.abs(deltaPercent) < 10) return "stable";
   const lowerIsBetter = metric ? LOWER_IS_BETTER.includes(metric) : true;
-  if (lowerIsBetter) {
-    return deltaPercent > 10 ? "regression" : "improvement";
-  }
-  return deltaPercent > 10 ? "improvement" : "regression";
+  return classifyDeltaBase(deltaPercent, lowerIsBetter);
 }
 
 export function formatSideBySideMetric(metric: SideBySideMetric, value: number): string {

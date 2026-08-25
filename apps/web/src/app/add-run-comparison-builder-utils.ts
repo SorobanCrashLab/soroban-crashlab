@@ -1,4 +1,5 @@
 import type { FuzzingRun } from "./types";
+import { deltaPercent } from "./run-metrics";
 
 export type BuilderDataState = "loading" | "error" | "success";
 export type ComparisonMetric =
@@ -41,8 +42,7 @@ export function createInitialSlots(): ComparisonSlot[] {
 }
 
 export function calculateDeltaPercent(baseline: number, candidate: number): number {
-  if (baseline === 0) return 0;
-  return ((candidate - baseline) / baseline) * 100;
+  return deltaPercent(baseline, candidate);
 }
 
 export function buildComparisonRows(

@@ -1,4 +1,5 @@
 import type { FuzzingRun } from "./types";
+import { deltaPercent as computeDeltaPercent } from "./run-metrics";
 
 export type ChartsDataState = "loading" | "error" | "success";
 export type ComparisonMetric = "duration" | "cpuInstructions" | "memoryBytes" | "minResourceFee";
@@ -8,13 +9,6 @@ export interface ChartRow extends FuzzingRun {
   delta: number;
   percentage: number;
   baseline: boolean;
-}
-
-export function computeDeltaPercent(baseline: number, value: number): number {
-  if (baseline === 0) {
-    return 0;
-  }
-  return ((value - baseline) / baseline) * 100;
 }
 
 export function selectChartRuns(runs: FuzzingRun[]): FuzzingRun[] {

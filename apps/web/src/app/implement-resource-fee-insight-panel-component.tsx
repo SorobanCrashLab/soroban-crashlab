@@ -8,6 +8,7 @@ import {
   groupRunsByContractCall,
   isExpensiveRun,
 } from "./resource-fee-utils";
+import { avgCpu, maxCpu, avgMemory, maxMemory, avgFee, maxFee, formatNumber } from "./run-metrics";
 
 export type ResourceFeeInsightDataState = "loading" | "error" | "success";
 
@@ -55,26 +56,15 @@ export function computeResourceMetrics(runs: FuzzingRun[]): ResourceMetrics {
     };
   }
 
-  const totalCpu = runs.reduce((sum, run) => sum + run.cpuInstructions, 0);
-  const totalMemory = runs.reduce((sum, run) => sum + run.memoryBytes, 0);
-  const totalFee = runs.reduce((sum, run) => sum + run.minResourceFee, 0);
-
-  const avgCpu = Math.round(totalCpu / runs.length);
-  const maxCpu = Math.max(...runs.map(run => run.cpuInstructions));
-  const avgMemory = Math.round(totalMemory / runs.length);
-  const maxMemory = Math.max(...runs.map(run => run.memoryBytes));
-  const avgFee = Math.round(totalFee / runs.length);
-  const maxFee = Math.max(...runs.map(run => run.minResourceFee));
-
   const expensiveRuns = runs.filter((run) => isExpensiveRun(run, DEFAULT_THRESHOLDS));
 
   return {
-    avgCpu,
-    maxCpu,
-    avgMemory,
-    maxMemory,
-    avgFee,
-    maxFee,
+    avgCpu: avgCpu(runs),
+    maxCpu: maxCpu(runs),
+    avgMemory: avgMemory(runs),
+    maxMemory: maxMemory(runs),
+    avgFee: avgFee(runs),
+    maxFee: maxFee(runs),
     expensiveRuns,
     totalRuns: runs.length,
   };
@@ -82,16 +72,6 @@ export function computeResourceMetrics(runs: FuzzingRun[]): ResourceMetrics {
 
 function getResourceLevel(value: number, warning: number, critical: number): 'normal' | 'warning' | 'critical' {
   return classifyResourceLevel(value, warning, critical);
-}
-
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
-  }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
-  }
-  return num.toString();
 }
 
 export function ResourceFeeInsightPanel({

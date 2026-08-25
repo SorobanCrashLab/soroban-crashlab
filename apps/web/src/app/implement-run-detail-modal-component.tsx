@@ -5,6 +5,7 @@ import { FuzzingRun, RunStatus, RunArea, RunSeverity } from './types';
 import { simulateSeedReplay } from './replay';
 import { generateMarkdownReport } from './report-utils';
 import ReportModal from './ReportModal';
+import { formatDuration, formatBytes, formatFee } from './run-metrics';
 
 type ReplayUiStatus = 'idle' | 'running' | 'completed' | 'failed';
 
@@ -15,28 +16,6 @@ interface RunDetailModalProps {
     /** Called when a replay finishes so the dashboard can list the new run */
     onReplayComplete?: (run: FuzzingRun) => void;
 }
-
-const formatBytes = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const formatFee = (fee: number): string => `${fee.toLocaleString()} stroops`;
-
-const formatDuration = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    if (hours > 0) {
-        return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-    } else if (minutes > 0) {
-        return `${minutes}m ${seconds % 60}s`;
-    } else {
-        return `${seconds}s`;
-    }
-};
 
 const getStatusColor = (status: RunStatus): string => {
     switch (status) {
