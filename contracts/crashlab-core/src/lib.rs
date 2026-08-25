@@ -1,6 +1,7 @@
 pub mod auth_matrix;
 pub mod health;
 pub mod prng;
+pub mod prometheus;
 pub mod reproducer;
 pub mod retry;
 pub mod signature_hash;
