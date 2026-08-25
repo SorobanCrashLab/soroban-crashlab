@@ -1,4 +1,5 @@
 pub mod auth_matrix;
+pub mod job_registry;
 pub mod health;
 pub mod prng;
 pub mod reproducer;
