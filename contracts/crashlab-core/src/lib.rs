@@ -1,3 +1,4 @@
+pub mod api_key;
 pub mod auth_matrix;
 pub mod health;
 pub mod prng;
