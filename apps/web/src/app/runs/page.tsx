@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import { captureRunListContext } from './swipe/run-list-context';
 import type { BulkAction } from '../add-bulk-actions-for-runs';
 import {
   applyBulkActionToRuns,
@@ -57,8 +58,18 @@ export default function RunsPage() {
   }, []);
 
   const goToRun = useCallback((runId: string) => {
+    captureRunListContext(
+      visibleRuns.map((r) => r.id),
+      {
+        status: viewState.filters.status as string[],
+        area: viewState.filters.area as string[],
+        severity: viewState.filters.severity as string[],
+        searchTerm: viewState.search,
+      },
+      viewState.sort,
+    );
     router.push(`/runs/${runId}`);
-  }, [router]);
+  }, [router, visibleRuns, viewState]);
 
   useEffect(() => {
     let cancelled = false;
