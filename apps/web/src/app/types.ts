@@ -71,6 +71,8 @@ export interface FuzzingRun {
     annotations?: string[];
     /** User-defined tags for triage and filtering */
     tags?: string[];
+    /** Deterministic replay verification fingerprint */
+    replayFingerprint?: import('./replay/fingerprint').ReplayFingerprint;
 }
 
 /**
