@@ -6,9 +6,17 @@ import { loadPreferences, filterByPreferences } from './notification-preferences
 import type { NotificationType, NotificationPriority } from './notification-preferences-utils';
 import {
   mergeNotificationFeed,
-  countUnread,
   pruneDismissedIds,
 } from './notification-feed-utils';
+import {
+  loadReadState,
+  mergeReadState,
+  markNotificationRead,
+  markAllNotificationsRead,
+  isNotificationRead,
+  subscribeToReadStateChanges,
+  type ReadState,
+} from './notification-read-state-utils';
 import { api, type NotificationFeedItem } from '../lib/api-client';
 import { NOTIFICATION_POLL_INTERVAL_MS } from '../lib/timeouts';
 
@@ -55,15 +63,30 @@ function mapFeedItemToNotification(item: NotificationFeedItem): Notification {
 
 export default function NotificationCenter({ className = '' }: NotificationCenterProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [readState, setReadState] = useState<ReadState>(() => loadReadState());
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const readStateRef = useRef<ReadState>(readState);
   // Ids the user dismissed locally, so a poll doesn't resurrect them (#1077).
   const dismissedIdsRef = useRef<Set<string>>(new Set());
 
   const prefs = loadPreferences();
+
+  // Keep ref in sync so callbacks see the latest read state.
+  useEffect(() => {
+    readStateRef.current = readState;
+  }, [readState]);
+
+  // Cross-tab sync: when another tab writes to localStorage, pick it up.
+  useEffect(() => {
+    const unsub = subscribeToReadStateChanges((newState) => {
+      setReadState((prev) => mergeReadState(prev, newState));
+    });
+    return unsub;
+  }, []);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -144,25 +167,27 @@ export default function NotificationCenter({ className = '' }: NotificationCente
     }
   }, [isOpen]);
 
-  const effectiveNotifications = notifications.filter((n) =>
-    filterByPreferences(n, prefs),
-  );
-  const unreadCount = countUnread(effectiveNotifications);
+  const effectiveNotifications = notifications
+    .filter((n) => filterByPreferences(n, prefs))
+    .map((n) => ({
+      ...n,
+      read: isNotificationRead(readState, n.id, n.read),
+    }));
+  const unreadCount = effectiveNotifications.filter((n) => !n.read).length;
   const filteredNotifications = filter === 'unread' 
     ? effectiveNotifications.filter(n => !n.read)
     : effectiveNotifications;
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev: Notification[]) => 
-      prev.map((n: Notification) => n.id === id ? { ...n, read: true } : n)
-    );
-  };
+  const markAsRead = useCallback((id: string) => {
+    setReadState((prev) => markNotificationRead(id, prev));
+  }, []);
 
-  const markAllAsRead = () => {
-    setNotifications((prev: Notification[]) => 
-      prev.map((n: Notification) => ({ ...n, read: true }))
-    );
-  };
+  const markAllAsRead = useCallback(() => {
+    setNotifications((prev) => {
+      setReadState((rs) => markAllNotificationsRead(prev.map((n) => n.id), rs));
+      return prev.map((n) => ({ ...n, read: true }));
+    });
+  }, []);
 
   const dismissNotification = (id: string) => {
     // Remember the dismissal, otherwise the next poll re-adds the notification

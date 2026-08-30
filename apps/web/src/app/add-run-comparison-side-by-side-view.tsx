@@ -7,6 +7,7 @@ import {
   type SideBySideDataState,
   buildSideBySideRows,
   formatDeltaLabel,
+  getComparisonRunOptions,
   getSideBySideStateMessage,
   selectComparableRuns,
   summarizeSideBySideRows,
@@ -124,9 +125,9 @@ export default function AddRunComparisonSideBySideView({
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
               >
                 <option value="">Select a run...</option>
-                {comparableRuns.map((run) => (
-                  <option key={run.id} value={run.id} disabled={run.id === rightRunId}>
-                    {run.id} — {run.area} ({run.status})
+                {getComparisonRunOptions(comparableRuns, rightRunId).map((option) => (
+                  <option key={option.run.id} value={option.run.id} disabled={option.disabled}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -153,9 +154,9 @@ export default function AddRunComparisonSideBySideView({
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
               >
                 <option value="">Select a run...</option>
-                {comparableRuns.map((run) => (
-                  <option key={run.id} value={run.id} disabled={run.id === leftRunId}>
-                    {run.id} — {run.area} ({run.status})
+                {getComparisonRunOptions(comparableRuns, leftRunId).map((option) => (
+                  <option key={option.run.id} value={option.run.id} disabled={option.disabled}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -225,7 +226,7 @@ export default function AddRunComparisonSideBySideView({
             </>
           ) : (
             <div className="rounded-2xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-              <p className="text-sm text-zinc-500">Select two different runs to open the side-by-side comparison.</p>
+              <p className="text-sm text-zinc-500">Select two different runs to compare.</p>
             </div>
           )}
         </>

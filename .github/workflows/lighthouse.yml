@@ -13,8 +13,8 @@ permissions:
 # A push to the same PR supersedes the in-flight audit rather than racing it
 # for the sticky comment.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lighthouse:

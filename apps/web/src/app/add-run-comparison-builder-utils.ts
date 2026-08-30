@@ -40,9 +40,17 @@ export function createInitialSlots(): ComparisonSlot[] {
   ];
 }
 
-export function calculateDeltaPercent(baseline: number, candidate: number): number {
+export function calculateDeltaPercent(
+  baseline: number,
+  candidate: number,
+  baselineId?: string,
+  candidateId?: string,
+): number {
+  if (baselineId && candidateId && baselineId === candidateId) return 0;
   if (baseline === 0) return 0;
-  return ((candidate - baseline) / baseline) * 100;
+  const delta = ((candidate - baseline) / baseline) * 100;
+  if (!Number.isFinite(delta)) return 0;
+  return delta;
 }
 
 export function buildComparisonRows(
@@ -50,6 +58,7 @@ export function buildComparisonRows(
   candidate: FuzzingRun,
   metrics: ComparisonMetric[],
 ): ComparisonRow[] {
+  if (baseline.id === candidate.id) return [];
   return metrics.map((metric) => {
     const baselineValue = baseline[metric] as number;
     const candidateValue = candidate[metric] as number;
@@ -57,7 +66,12 @@ export function buildComparisonRows(
       metric,
       baseline: baselineValue,
       candidate: candidateValue,
-      deltaPercent: calculateDeltaPercent(baselineValue, candidateValue),
+      deltaPercent: calculateDeltaPercent(
+        baselineValue,
+        candidateValue,
+        baseline.id,
+        candidate.id,
+      ),
     };
   });
 }

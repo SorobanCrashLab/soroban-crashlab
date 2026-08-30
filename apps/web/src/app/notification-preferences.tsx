@@ -7,6 +7,7 @@ import {
   type NotificationPriority,
   type DigestFrequency,
   DEFAULT_PREFERENCES,
+  getQuietHoursPreviewText,
   validatePreferences,
   loadPreferences,
   savePreferences,
@@ -329,37 +330,42 @@ export default function NotificationPreferencesPage({
           </label>
 
           {prefs.quietHoursEnabled && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label
-                  htmlFor="quiet-start"
-                  className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
-                >
-                  {t('notifications.quietHours.start')}
-                </label>
-                <input
-                  type="time"
-                  id="quiet-start"
-                  value={prefs.quietHoursStart}
-                  onChange={(e) => handleTimeChange('quietHoursStart', e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="quiet-start"
+                    className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
+                  >
+                    {t('notifications.quietHours.start')}
+                  </label>
+                  <input
+                    type="time"
+                    id="quiet-start"
+                    value={prefs.quietHoursStart}
+                    onChange={(e) => handleTimeChange('quietHoursStart', e.target.value)}
+                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="quiet-end"
+                    className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
+                  >
+                    {t('notifications.quietHours.end')}
+                  </label>
+                  <input
+                    type="time"
+                    id="quiet-end"
+                    value={prefs.quietHoursEnd}
+                    onChange={(e) => handleTimeChange('quietHoursEnd', e.target.value)}
+                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label
-                  htmlFor="quiet-end"
-                  className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
-                >
-                  {t('notifications.quietHours.end')}
-                </label>
-                <input
-                  type="time"
-                  id="quiet-end"
-                  value={prefs.quietHoursEnd}
-                  onChange={(e) => handleTimeChange('quietHoursEnd', e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                {getQuietHoursPreviewText(prefs.quietHoursStart, prefs.quietHoursEnd)}
+              </p>
             </div>
           )}
         </section>

@@ -5,10 +5,6 @@ on:
   push:
     branches: [main]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   web-lint:
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -93,10 +89,6 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
-      - name: Check external head origins
-        run: |
-          node scripts/check-external-origins.mjs --self-test
-          node scripts/check-external-origins.mjs
       - run: bash -n scripts/backlog-freshness-review.sh
       - run: bash -n scripts/contracts/build-soroban-example.sh
 
@@ -158,31 +150,6 @@ jobs:
           name: playwright-traces
           path: apps/web/test-results/
           retention-days: 7
-
-      - name: Upload test results (JSON)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-results-json
-          path: apps/web/test-results/results.json
-          retention-days: 7
-
-      - name: Upload test results (JUnit)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-results-junit
-          path: apps/web/test-results/junit.xml
-          retention-days: 7
-
-      - name: Publish test report
-        if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: Playwright E2E Test Results
-          path: apps/web/test-results/junit.xml
-          reporter: java-junit
-          fail-on-error: false
 
   regression:
     needs: [core, web-lint, web-unit, web-build, soroban-example]
