@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jsonError, readJsonBody, withRouteErrorHandling } from '../../../../lib/route-handler';
+import { readJsonBody, withRouteErrorHandling } from '../../../../lib/route-handler';
 import { getDeliveryHistoryStore, updateDeliveryHistoryStore } from '../history/route';
 import { retryDeliveryItem, computeDeliveryStats } from '../../../webhook-retry-dashboard-utils';
+import { codedErrorResponse } from '../../../../lib/error-codes';
 
 export const POST = withRouteErrorHandling('POST /api/webhooks/retry', async (request: NextRequest) => {
   const parsedBody = await readJsonBody(request);
@@ -11,14 +12,17 @@ export const POST = withRouteErrorHandling('POST /api/webhooks/retry', async (re
   const id = typeof body?.id === 'string' ? body.id.trim() : null;
 
   if (!id) {
-    return jsonError('Field "id" is required.', 400);
+    return codedErrorResponse('WEBHOOK_DELIVERY_ID_REQUIRED');
   }
 
   const items = getDeliveryHistoryStore();
   const existing = items.find((item) => item.id === id);
 
   if (!existing) {
-    return jsonError(`Webhook delivery record with ID "${id}" not found.`, 404);
+    return codedErrorResponse(
+      'WEBHOOK_DELIVERY_NOT_FOUND',
+      `Webhook delivery record with ID "${id}" not found.`,
+    );
   }
 
   const { updatedItems, retriedItem } = retryDeliveryItem(items, id);

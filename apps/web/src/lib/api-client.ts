@@ -7,6 +7,12 @@ import {
   CampaignConfig,
 } from '../app/types';
 import { dedupedFetchJson, HttpError } from './request-dedup';
+import type {
+  RunsListResponse,
+  RunDetailResponse,
+  WebhookHistoryResponse,
+  WebhookDeliveryItem,
+} from './schemas/runs';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -94,9 +100,9 @@ export const api = {
     // analytics) independently fetch /api/runs on mount, so concurrent calls
     // share one in-flight request instead of issuing duplicate network calls.
     list: (signal?: AbortSignal) =>
-      dedupedFetchJson<{ runs: FuzzingRun[]; total: number }>(apiUrl('/runs'), signal),
+      dedupedFetchJson<RunsListResponse>(apiUrl('/runs'), signal),
     get: (id: string, signal?: AbortSignal) =>
-      dedupedFetchJson<FuzzingRun>(apiUrl(`/runs/${encodeURIComponent(id)}`), signal),
+      dedupedFetchJson<RunDetailResponse>(apiUrl(`/runs/${encodeURIComponent(id)}`), signal),
     issues: {
       list: (runId: string, signal?: AbortSignal) =>
         apiFetch<{ runId: string; issues: RunIssueLink[] }>(
@@ -197,7 +203,9 @@ export const api = {
   },
   webhooks: {
     list: (signal?: AbortSignal) =>
-      apiFetch<{ webhooks: unknown[] }>('/webhooks', { signal }),
+      apiFetch<{ webhooks: WebhookDeliveryItem[] }>('/webhooks', { signal }),
+    history: (signal?: AbortSignal) =>
+      apiFetch<WebhookHistoryResponse>('/webhooks/history', { signal }),
   },
   integrations: {
     list: (signal?: AbortSignal) =>
@@ -205,7 +213,7 @@ export const api = {
   },
 };
 
-export async function fetchRuns(signal?: AbortSignal): Promise<{ runs: FuzzingRun[]; total: number }> {
+export async function fetchRuns(signal?: AbortSignal): Promise<RunsListResponse> {
   return api.runs.list(signal);
 }
 
@@ -236,7 +244,7 @@ function statusOf(err: unknown): number | undefined {
   return undefined;
 }
 
-export async function fetchRun(id: string, signal?: AbortSignal): Promise<FuzzingRun | null> {
+export async function fetchRun(id: string, signal?: AbortSignal): Promise<RunDetailResponse | null> {
   try {
     return await api.runs.get(id, signal);
   } catch (err) {

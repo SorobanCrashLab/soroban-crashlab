@@ -159,17 +159,22 @@ describe('dedupedFetchJson', () => {
     });
 
     it('shares a rejection with every concurrent caller', async () => {
-      const { dedupedFetchJson } = await loadModule();
+      const { dedupedFetchJson, NO_RETRY_FETCH_POLICY } = await loadModule();
       const gate = deferred<Response>();
       fetchMock.mockReturnValue(gate.promise);
 
-      const first = dedupedFetchJson('/api/runs');
-      const second = dedupedFetchJson('/api/runs');
+      // Use NO_RETRY to avoid internal retry consuming the gate promise twice
+      const first = dedupedFetchJson('/api/runs', undefined, NO_RETRY_FETCH_POLICY);
+      const second = dedupedFetchJson('/api/runs', undefined, NO_RETRY_FETCH_POLICY);
       const boom = new Error('network down');
       gate.reject(boom);
 
-      await expect(first).rejects.toBe(boom);
-      await expect(second).rejects.toBe(boom);
+      // Both callers receive the same wrapped NetworkError
+      const [r1, r2] = await Promise.allSettled([first, second]);
+      expect(r1.status).toBe('rejected');
+      expect(r2.status).toBe('rejected');
+      // Both reference the same underlying rejection (same promise instance)
+      expect(first).toBe(second);
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
@@ -204,11 +209,12 @@ describe('dedupedFetchJson', () => {
       expect(json).not.toHaveBeenCalled();
     });
 
-    it('propagates a network-level rejection', async () => {
-      const { dedupedFetchJson } = await loadModule();
+    it('propagates a network-level rejection as NetworkError', async () => {
+      const { dedupedFetchJson, NetworkError } = await loadModule();
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
-      await expect(dedupedFetchJson('/api/runs')).rejects.toThrow('Failed to fetch');
+      const err = await dedupedFetchJson('/api/runs').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(NetworkError);
     });
 
     it('propagates a malformed-JSON rejection', async () => {
@@ -219,26 +225,29 @@ describe('dedupedFetchJson', () => {
         json: () => Promise.reject(new SyntaxError('Unexpected token <')),
       } as unknown as Response);
 
+      // SyntaxError happens after the successful fetch response — it is NOT a
+      // network error, so it propagates as-is (not wrapped in NetworkError).
       await expect(dedupedFetchJson('/api/runs')).rejects.toThrow('Unexpected token <');
     });
 
     it('clears the in-flight entry after a failure so a retry can succeed', async () => {
-      const { dedupedFetchJson } = await loadModule();
+      const { dedupedFetchJson, NetworkError, NO_RETRY_FETCH_POLICY } = await loadModule();
       fetchMock.mockRejectedValueOnce(new Error('network down'));
       fetchMock.mockResolvedValueOnce(jsonResponse({ total: 3 }));
 
-      await expect(dedupedFetchJson('/api/runs')).rejects.toThrow('network down');
-      await expect(dedupedFetchJson('/api/runs')).resolves.toEqual({ total: 3 });
+      const firstErr = await dedupedFetchJson('/api/runs', undefined, NO_RETRY_FETCH_POLICY).catch((e: unknown) => e);
+      expect(firstErr).toBeInstanceOf(NetworkError);
+      await expect(dedupedFetchJson('/api/runs', undefined, NO_RETRY_FETCH_POLICY)).resolves.toEqual({ total: 3 });
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
     it('clears the in-flight entry after a non-ok response', async () => {
-      const { dedupedFetchJson } = await loadModule();
+      const { dedupedFetchJson, NO_RETRY_FETCH_POLICY } = await loadModule();
       fetchMock.mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 500 }));
       fetchMock.mockResolvedValueOnce(jsonResponse({ total: 1 }));
 
-      await expect(dedupedFetchJson('/api/runs')).rejects.toThrow('HTTP 500');
-      await expect(dedupedFetchJson('/api/runs')).resolves.toEqual({ total: 1 });
+      await expect(dedupedFetchJson('/api/runs', undefined, NO_RETRY_FETCH_POLICY)).rejects.toThrow('HTTP 500');
+      await expect(dedupedFetchJson('/api/runs', undefined, NO_RETRY_FETCH_POLICY)).resolves.toEqual({ total: 1 });
     });
   });
 
@@ -358,10 +367,11 @@ describe('dedupedFetchJson', () => {
     });
 
     it('never holds a rejected request for the grace window', async () => {
-      const { dedupedFetchJson, __dedupeEntryCount } = await loadModule();
+      const { dedupedFetchJson, __dedupeEntryCount, NetworkError } = await loadModule();
       fetchMock.mockRejectedValue(new Error('network down'));
 
-      await expect(dedupedFetchJson('/api/runs')).rejects.toThrow('network down');
+      const err = await dedupedFetchJson('/api/runs').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(NetworkError);
 
       // Evicted immediately, with no timer pending: a transient blip must not
       // be sticky for 30s.
@@ -449,5 +459,216 @@ describe('dedupedFetchJson', () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(1_000);
     });
+  });
+});
+
+// =============================================================================
+// #1383 — Typed errors, timeout racing, retry, and multi-caller fan-out
+// =============================================================================
+
+describe('typed error taxonomy (#1383)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('throws HttpError (not a plain Error) on non-ok status', async () => {
+    const { dedupedFetchJson, HttpError } = await loadModule();
+    fetchMock.mockResolvedValue(jsonResponse({}, { ok: false, status: 404 }));
+
+    const err = await dedupedFetchJson('/api/runs').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(HttpError);
+    expect((err as InstanceType<typeof HttpError>).status).toBe(404);
+  });
+
+  it('throws TimeoutError when the AbortController deadline fires', async () => {
+    vi.useFakeTimers();
+    const { dedupedFetchJson, TimeoutError, NO_RETRY_FETCH_POLICY } = await loadModule();
+
+    // fetch never resolves — simulates a hung connection
+    fetchMock.mockReturnValue(new Promise(() => {}));
+
+    const pending = dedupedFetchJson('/api/slow', undefined, {
+      ...NO_RETRY_FETCH_POLICY,
+      timeoutMs: 100,
+    });
+
+    // Advance past the per-attempt timeout
+    await vi.advanceTimersByTimeAsync(101);
+
+    const err = await pending.catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(TimeoutError);
+    vi.useRealTimers();
+  });
+
+  it('throws NetworkError on a fetch() rejection that is not an abort', async () => {
+    const { dedupedFetchJson, NetworkError, NO_RETRY_FETCH_POLICY } = await loadModule();
+
+    const cause = new TypeError('Failed to fetch');
+    // Make retry give up immediately: max 1 attempt, so NetworkError surfaces
+    fetchMock.mockRejectedValue(cause);
+
+    const err = await dedupedFetchJson('/api/runs', undefined, NO_RETRY_FETCH_POLICY).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as InstanceType<typeof NetworkError>).cause).toBe(cause);
+  });
+
+  it('NetworkError carries the cause', async () => {
+    const { dedupedFetchJson, NetworkError, NO_RETRY_FETCH_POLICY } = await loadModule();
+    const rootCause = new TypeError('net::ERR_NAME_NOT_RESOLVED');
+    fetchMock.mockRejectedValue(rootCause);
+
+    const err = await dedupedFetchJson('/api/runs', undefined, NO_RETRY_FETCH_POLICY).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(NetworkError);
+    expect((err as InstanceType<typeof NetworkError>).cause).toBe(rootCause);
+  });
+});
+
+describe('timeout and single retry (#1383)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('succeeds on the second attempt after a network error', async () => {
+    const { dedupedFetchJson } = await loadModule();
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(jsonResponse({ total: 5 }));
+
+    // DEFAULT_FETCH_POLICY: maxAttempts=2, retryJitterMs=0 — retry is immediate
+    const result = await dedupedFetchJson('/api/runs');
+    expect(result).toEqual({ total: 5 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does NOT retry on HttpError (deterministic server error)', async () => {
+    const { dedupedFetchJson, DEFAULT_FETCH_POLICY } = await loadModule();
+    fetchMock.mockResolvedValue(jsonResponse({}, { ok: false, status: 500 }));
+
+    await expect(
+      dedupedFetchJson('/api/runs', undefined, { ...DEFAULT_FETCH_POLICY, retryJitterMs: 0 }),
+    ).rejects.toThrow('HTTP 500');
+
+    // Only one attempt — HttpError is not retryable
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('exhausts attempts and throws after maxAttempts network errors', async () => {
+    const { dedupedFetchJson, NetworkError } = await loadModule();
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const policy = { timeoutMs: 10_000, maxAttempts: 2, retryJitterMs: 0 };
+    const err = await dedupedFetchJson('/api/runs', undefined, policy).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(NetworkError);
+    // maxAttempts=2: one initial + one retry
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('NO_RETRY_FETCH_POLICY issues exactly one fetch attempt', async () => {
+    const { dedupedFetchJson, NO_RETRY_FETCH_POLICY } = await loadModule();
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await dedupedFetchJson('/api/runs', undefined, NO_RETRY_FETCH_POLICY).catch(() => {});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('multi-caller fan-out on failure (#1383)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('broadcasts one rejection to all concurrent awaiters simultaneously', async () => {
+    const { dedupedFetchJson, NO_RETRY_FETCH_POLICY } = await loadModule();
+
+    const gate = deferred<Response>();
+    fetchMock.mockReturnValue(gate.promise);
+
+    const policy = { ...NO_RETRY_FETCH_POLICY };
+    const first = dedupedFetchJson('/api/runs', undefined, policy);
+    const second = dedupedFetchJson('/api/runs', undefined, policy);
+    const third = dedupedFetchJson('/api/runs', undefined, policy);
+
+    // All three share the same in-flight promise
+    expect(second).toBe(first);
+    expect(third).toBe(first);
+
+    const boom = new Error('network down');
+    gate.reject(boom);
+
+    // All three awaiters receive the same rejection — no unhandled rejection
+    const [r1, r2, r3] = await Promise.allSettled([first, second, third]);
+    expect(r1.status).toBe('rejected');
+    expect(r2.status).toBe('rejected');
+    expect(r3.status).toBe('rejected');
+
+    if (r1.status === 'rejected') expect(r1.reason).toBe(boom);
+    if (r2.status === 'rejected') expect(r2.reason).toBe(boom);
+    if (r3.status === 'rejected') expect(r3.reason).toBe(boom);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('cache holds result for all concurrent callers on success', async () => {
+    const { dedupedFetchJson, NO_RETRY_FETCH_POLICY } = await loadModule();
+
+    const gate = deferred<Response>();
+    fetchMock.mockReturnValue(gate.promise);
+
+    const policy = { ...NO_RETRY_FETCH_POLICY };
+    const first = dedupedFetchJson('/api/runs', undefined, policy);
+    const second = dedupedFetchJson('/api/runs', undefined, policy);
+    const third = dedupedFetchJson('/api/runs', undefined, policy);
+
+    gate.resolve(jsonResponse({ total: 99 }));
+
+    const results = await Promise.all([first, second, third]);
+    for (const r of results) {
+      expect(r).toEqual({ total: 99 });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('FetchPolicy named constants (#1383)', () => {
+  it('DEFAULT_FETCH_POLICY has maxAttempts > 1 (retry enabled)', async () => {
+    const { DEFAULT_FETCH_POLICY } = await loadModule();
+    expect(DEFAULT_FETCH_POLICY.maxAttempts).toBeGreaterThan(1);
+  });
+
+  it('NO_RETRY_FETCH_POLICY has maxAttempts === 1', async () => {
+    const { NO_RETRY_FETCH_POLICY } = await loadModule();
+    expect(NO_RETRY_FETCH_POLICY.maxAttempts).toBe(1);
+  });
+
+  it('DEFAULT_FETCH_POLICY.timeoutMs matches API_FETCH_TIMEOUT_MS', async () => {
+    const { DEFAULT_FETCH_POLICY } = await loadModule();
+    const { API_FETCH_TIMEOUT_MS } = await import('./timeouts');
+    expect(DEFAULT_FETCH_POLICY.timeoutMs).toBe(API_FETCH_TIMEOUT_MS);
   });
 });

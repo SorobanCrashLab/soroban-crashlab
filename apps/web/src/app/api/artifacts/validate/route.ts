@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { codedErrorResponse } from "@/lib/error-codes";
 
 /**
  * CaseBundle schema version constant.
@@ -245,14 +246,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (contentLength) {
     const size = parseInt(contentLength, 10);
     if (!isNaN(size) && size > 1024 * 1024) {
-      return NextResponse.json(
-        {
-          valid: false,
-          errors: ["Request body exceeds 1 MiB limit."],
-          warnings: [],
-        },
-        { status: 413 }
-      );
+      return codedErrorResponse('ARTIFACT_PAYLOAD_TOO_LARGE');
     }
   }
 
@@ -260,31 +254,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      {
-        valid: false,
-        errors: ["Invalid JSON in request body."],
-        warnings: [],
-      },
-      { status: 400 }
-    );
+    return codedErrorResponse('ARTIFACT_INVALID_JSON');
   }
 
   // Expect { bundle: <CaseBundle> }
   if (!body || typeof body !== "object" || !("bundle" in body)) {
-    return NextResponse.json(
-      {
-        valid: false,
-        errors: ['Missing "bundle" field in request body.'],
-        warnings: [],
-      },
-      { status: 400 }
-    );
+    return codedErrorResponse('ARTIFACT_MISSING_BUNDLE_FIELD');
   }
 
   const bundle = (body as Record<string, unknown>).bundle;
   const result = validateCaseBundle(bundle);
 
-  const status = result.valid ? 200 : 422;
-  return NextResponse.json(result, { status });
+  const httpStatus = result.valid ? 200 : 422;
+  const response: Record<string, unknown> = { ...result };
+  if (!result.valid) {
+    // Additive: include machine-readable code on validation failures
+    response.code = 'ARTIFACT_INVALID_BUNDLE';
+  }
+  return NextResponse.json(response, { status: httpStatus });
 }
