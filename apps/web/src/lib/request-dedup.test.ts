@@ -291,6 +291,33 @@ describe('dedupedFetchJson', () => {
       expect(signalOfCall(fetchMock).aborted).toBe(true);
       void pending.catch(() => {});
     });
+
+    it('evicts an aborted in-flight entry so a subsequent identical request refetches', async () => {
+      const { dedupedFetchJson, __dedupeEntryCount } = await loadModule();
+      fetchMock.mockImplementation(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          }),
+      );
+
+      const controller = new AbortController();
+      const first = dedupedFetchJson('/api/runs', controller.signal);
+      expect(__dedupeEntryCount()).toBe(1);
+
+      controller.abort();
+      await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+
+      // The aborted entry was evicted rather than served as a cached result.
+      expect(__dedupeEntryCount()).toBe(0);
+
+      // A subsequent identical request therefore triggers a fresh fetch.
+      fetchMock.mockResolvedValue(jsonResponse({ total: 2 }));
+      await expect(dedupedFetchJson('/api/runs')).resolves.toEqual({ total: 2 });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
   });
 
   /**

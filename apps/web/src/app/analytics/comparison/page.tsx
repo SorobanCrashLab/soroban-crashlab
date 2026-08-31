@@ -7,7 +7,7 @@ import type { FuzzingRun } from '../../types';
 import { fetchRuns } from '../../../lib/api-client';
 
 const AddRunComparisonSideBySideView = dynamic(
-  () => import('../../add-run-comparison-side-by-side-view'),
+  () => import('../../../components/add-run-comparison-side-by-side-view'),
   { ssr: false },
 );
 

@@ -7,8 +7,7 @@ import {
   CampaignConfig,
 } from '../app/types';
 import { dedupedFetchJson, HttpError } from './request-dedup';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+import { API_BASE } from './api-base';
 
 export class ApiError extends Error {
   status: number;

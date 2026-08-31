@@ -28,6 +28,8 @@ import { fetchRuns } from '../../lib/api-client';
 import { LoadingSpinner } from '../../components/LoadingSkeleton';
 import { ListState } from '../../components/ListState';
 import { PageHeader } from '../../components/PageHeader';
+import { PullToRefreshIndicator } from '../../components/PullToRefreshIndicator';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 
 const BulkActionsForRuns = dynamic(() => import('../add-bulk-actions-for-runs'), {
   loading: () => <LoadingSpinner />,
@@ -163,8 +165,20 @@ export default function RunsPage() {
     [],
   );
 
+  const handleRefresh = useCallback(async () => {
+    setFetchAttempt((n) => n + 1);
+    // Give the effect time to kick off before resolving
+    await new Promise<void>((resolve) => setTimeout(resolve, 600));
+  }, []);
+
+  const { isPulling, isRefreshing, pullDistance } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    disabled: dataState === 'loading',
+  });
+
   return (
     <div className="container-full page-padding fade-in">
+      <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} pullDistance={pullDistance} />
       <PageHeader
         title="Fuzzing Runs"
         description="Select runs to cancel, retry, delete, export, tag, or assign in bulk"

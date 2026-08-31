@@ -92,6 +92,38 @@ test.describe('Mobile responsive layout', () => {
     await expect(page.locator('.drawer.open')).toHaveCount(0);
   });
 
+  test('traps focus inside the mobile drawer while tabbing', async ({ page }) => {
+    await page.goto('/');
+
+    await page.getByRole('button', { name: 'Open navigation menu' }).click();
+    await expect(page.locator('.drawer.open')).toBeVisible();
+
+    // On open, focus moves to the first focusable element (the close button).
+    await expect(page.getByRole('button', { name: 'Close navigation menu' })).toBeFocused();
+
+    // Tab a few times — focus must always remain inside the drawer.
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Tab');
+      const isInsideDrawer = await page.evaluate(() => {
+        return document.querySelector('.drawer')?.contains(document.activeElement) ?? false;
+      });
+      expect(isInsideDrawer).toBe(true);
+    }
+  });
+
+  test('closes the drawer on Escape and restores focus to the hamburger', async ({ page }) => {
+    await page.goto('/');
+
+    const hamburger = page.getByRole('button', { name: 'Open navigation menu' });
+    await hamburger.click();
+    await expect(page.locator('.drawer.open')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.drawer.open')).toHaveCount(0);
+
+    await expect(hamburger).toBeFocused();
+  });
+
   test('closes navigation drawer with Escape key press', async ({ page }) => {
     await page.goto('/');
 
@@ -135,6 +167,27 @@ test.describe('Mobile responsive layout', () => {
       return document.documentElement.scrollWidth > document.documentElement.clientWidth;
     });
     expect(hasHorizontalOverflow).toBe(false);
+  });
+
+  test('uses compact, non-scrolling navigation throughout the tablet range', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto('/');
+
+    const desktopNav = page.locator('header nav');
+    await expect(desktopNav).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeHidden();
+
+    const navDoesNotScroll = await desktopNav.evaluate((nav) => nav.scrollWidth <= nav.clientWidth);
+    expect(navDoesNotScroll).toBe(true);
+    await expect(desktopNav.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('title', 'Dashboard');
+
+    const tabletLabelVisible = await desktopNav.locator('.tablet-nav-label').first().isVisible();
+    expect(tabletLabelVisible).toBe(false);
+    await expect(page.locator('.tablet-search-label')).toBeHidden();
+
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await expect(desktopNav.locator('.tablet-nav-label').first()).toBeVisible();
+    await expect(page.locator('.tablet-search-label')).toBeVisible();
   });
 
   test('transitions navigation UI elements seamlessly when resizing from desktop to mobile viewport', async ({ page }) => {

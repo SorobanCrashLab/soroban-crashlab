@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from './ThemeProvider';
 import { useEffect, useRef, useState } from 'react';
 import { useMaintainerMode } from '../app/useMaintainerMode';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const allNavItems = [
   { href: '/', label: 'Dashboard', icon: '◉' },
@@ -24,6 +25,7 @@ export default function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
   const showMaintainer = mmMounted && isMaintainer;
   const navItems = showMaintainer ? allNavItems : allNavItems.filter(i => i.href !== '/maintainer');
 
@@ -45,16 +47,34 @@ export default function NavBar() {
 
   useEffect(() => {
     if (!drawerOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setDrawerOpen(false);
-    };
-    document.addEventListener('keydown', handleKeyDown);
+    // Lock body scroll while the drawer is open. Escape and focus trapping are
+    // handled by useFocusTrap so the keydown listener is not duplicated here.
     document.body.style.overflow = 'hidden';
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
     };
   }, [drawerOpen]);
+
+  // Make the page content (the sibling shell) inert while the drawer is open
+  // so background focus is effectively removed — the focus trap can never
+  // cycle into the page behind the drawer.
+  useEffect(() => {
+    const shell = document.getElementById('page-shell');
+    if (!shell) return;
+    shell.inert = drawerOpen;
+    shell.setAttribute('aria-hidden', String(drawerOpen));
+    return () => {
+      shell.inert = false;
+      shell.removeAttribute('aria-hidden');
+    };
+  }, [drawerOpen]);
+
+  useFocusTrap(
+    drawerRef,
+    hamburgerRef,
+    drawerOpen,
+    () => setDrawerOpen(false),
+  );
 
   const isActive = (href: string) =>
     pathname === href || (href !== '/' && pathname.startsWith(href));
@@ -62,7 +82,7 @@ export default function NavBar() {
   return (
     <>
       <header
-        className="fixed top-0 left-0 right-0 z-50 h-[52px] flex items-center px-3 sm:px-4 border-b"
+        className="tablet-header fixed top-0 left-0 right-0 z-50 h-[52px] flex items-center px-3 sm:px-4 border-b"
         style={{
           background: 'var(--nav-bg)',
           borderColor: 'var(--border-color)',
@@ -70,7 +90,7 @@ export default function NavBar() {
           transition: 'background 0.3s ease, border-color 0.3s ease, backdrop-filter 0.3s ease',
         }}
       >
-        <Link href="/" className="flex items-center gap-2 mr-4 shrink-0">
+        <Link href="/" className="tablet-brand flex items-center gap-2 mr-4 shrink-0">
           <div
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center"
             style={{ background: '#0A66C2' }}
@@ -78,7 +98,7 @@ export default function NavBar() {
             <span className="text-white font-bold text-xs sm:text-sm">SC</span>
           </div>
           <span
-            className="font-bold text-base sm:text-lg hidden xs:inline"
+            className="tablet-brand-name font-bold text-base sm:text-lg hidden xs:inline"
             style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}
           >
             CrashLab
@@ -92,27 +112,31 @@ export default function NavBar() {
               key={item.href}
               href={item.href}
               className="top-nav-link shrink-0"
+              aria-label={item.label}
+              title={item.label}
               style={{
                 color: isActive(item.href) ? 'var(--text-primary)' : 'var(--text-secondary)',
                 borderBottomColor: isActive(item.href) ? 'var(--text-primary)' : 'transparent',
               }}
             >
               <span className="top-nav-icon text-sm">{item.icon}</span>
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="tablet-nav-label text-[10px] font-medium">{item.label}</span>
             </Link>
           ))}
         </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
+        <div className="tablet-actions flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
           {/* Search - hidden on small mobile */}
           <Link
             id="navbar-search-link"
             href="/runs/query"
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-decoration-none"
+            className="tablet-search hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-decoration-none"
+            aria-label="Search runs"
+            title="Search runs"
             style={{ background: mounted ? (theme === 'dark' ? '#1a1a1a' : '#EEF3F8') : 'var(--hover-bg)', cursor: 'pointer' }}
           >
             <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>🔍</span>
-            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Search runs...</span>
+            <span className="tablet-search-label text-xs" style={{ color: 'var(--text-secondary)' }}>Search runs...</span>
           </Link>
 
           {/* Theme toggle */}
@@ -142,6 +166,7 @@ export default function NavBar() {
 
           {/* Hamburger - mobile only */}
           <button
+            ref={hamburgerRef}
             onClick={() => setDrawerOpen(true)}
             className="flex md:hidden items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg"
             style={{

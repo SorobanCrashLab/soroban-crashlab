@@ -11,6 +11,20 @@ import type { RunStatus } from '../lib/run-status';
 // Re-exports from other modules (for backward compatibility)
 export type { RunStatus } from '../lib/run-status';
 
+// Contract-specific types live in ./contracts (single source of truth) and are
+// re-exported here so existing `import ... from '../types'` call sites keep
+// working unchanged.
+export type {
+  SorobanAuthMode,
+  ContractCallStatus,
+  ContractCallStep,
+  LedgerChangeType,
+  LedgerStateChange,
+  ContractCallInfo,
+  ContractCallFeeSummary,
+  LedgerFieldDiff,
+} from './contracts';
+
 // Domain Types
 export type RunArea = 'auth' | 'state' | 'budget' | 'xdr';
 export type RunSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -57,6 +71,10 @@ export interface CorpusStatPoint {
   corpusSize: number;
   edgesFound: number;
   totalEdges: number;
+  /** Executions per second at this sample point (engine telemetry). */
+  execsPerSec: number;
+  /** Percentage of engine code covered at this sample point. */
+  coveragePct: number;
 }
 
 export interface CrashGroupSummary {
@@ -105,29 +123,6 @@ export interface SignatureFrequency {
   area: RunArea;
   /** Highest severity observed for this signature */
   severity: RunSeverity;
-}
-
-export type ContractCallStatus = 'success' | 'failed' | 'pending';
-
-export interface ContractCallStep {
-  id: string;
-  sequence: number;
-  caller: string;
-  callee: string;
-  method: string;
-  depth: number;
-  status: ContractCallStatus;
-  durationMs: number;
-}
-
-export type LedgerChangeType = 'created' | 'updated' | 'deleted';
-
-export interface LedgerStateChange {
-  id: string;
-  entryType: string;
-  changeType: LedgerChangeType;
-  before?: string;
-  after?: string;
 }
 
 export type CampaignSeedSource = 'random' | 'corpus' | 'replay';
