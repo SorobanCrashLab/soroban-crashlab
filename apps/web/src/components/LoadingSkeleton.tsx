@@ -151,7 +151,7 @@ export function GenericPageSkeleton({
   return (
     <div role="status" aria-live="polite" aria-label="Loading page content" className="space-y-6">
       {/* Page header skeleton */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex-between mb-2">
         <div className="skeleton h-7 w-48" />
         <div className="skeleton h-9 w-28" />
       </div>
@@ -194,7 +194,7 @@ export function GenericPageSkeleton({
       {variant === "list" && (
         <div className="card divide-y divide-zinc-100 dark:divide-zinc-900">
           {Array.from({ length: rows }).map((_, i) => (
-            <div key={i} className="flex items-center justify-between p-4">
+            <div key={i} className="flex-between p-4">
               <div className="skeleton h-4 w-1/3" />
               <div className="skeleton h-6 w-16 rounded-full" />
             </div>

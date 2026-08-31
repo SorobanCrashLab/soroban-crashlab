@@ -26,11 +26,11 @@ const TextPreview: React.FC<TextPreviewProps> = ({
     <div
       className={`overflow-auto ${maxHeight} rounded-lg border border-zinc-200 dark:border-zinc-700`}
     >
-      <pre className="font-mono text-xs leading-relaxed p-4 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap break-all">
+      <pre className="font-mono text-xs leading-relaxed p-4 surface-soft text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap break-all">
         {truncatedLines.join('\n')}
       </pre>
       {isTruncated && (
-        <div className="px-4 py-2 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border-t border-zinc-200 dark:border-zinc-700">
+        <div className="px-4 py-2 text-xs text-muted bg-zinc-100 dark:bg-zinc-800 border-t border-zinc-200 dark:border-zinc-700">
           Showing {maxLines} of {lines.length} lines ({content.length} bytes)
         </div>
       )}

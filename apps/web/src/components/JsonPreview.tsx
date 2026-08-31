@@ -22,7 +22,7 @@ const JsonPreview: React.FC<JsonPreviewProps> = ({
       className={`overflow-auto ${maxHeight} rounded-lg border border-zinc-200 dark:border-zinc-700`}
     >
       <pre
-        className="font-mono text-xs leading-relaxed p-4 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 whitespace-pre"
+        className="font-mono text-xs leading-relaxed p-4 surface-soft text-zinc-800 dark:text-zinc-200 whitespace-pre"
         dangerouslySetInnerHTML={{ __html: highlighted }}
       />
     </div>

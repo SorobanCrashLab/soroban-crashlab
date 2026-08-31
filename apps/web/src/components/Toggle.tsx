@@ -47,14 +47,14 @@ export const Toggle = forwardRef<HTMLButtonElement, ToggleProps>(function Toggle
     : checked ? 'translate-x-6' : 'translate-x-1';
 
   return (
-    <div className={`flex items-center justify-between gap-3 ${className}`}>
+    <div className={`flex-between gap-3 ${className}`}>
       {(label || description) && (
         <div className="flex flex-col">
           {label && (
             <label
               htmlFor={id}
               onClick={handleToggle}
-              className={`text-sm font-medium cursor-pointer text-zinc-900 dark:text-zinc-100 ${
+              className={`text-sm-medium cursor-pointer text-zinc-900 dark:text-zinc-100 ${
                 disabled ? 'opacity-50 cursor-not-allowed' : ''
               } ${labelClassName}`}
             >

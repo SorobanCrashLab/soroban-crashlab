@@ -38,7 +38,7 @@ export function PageHeader({
     return (
       <Link
         href={href}
-        className="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:text-zinc-100 mb-2 transition"
+        className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-zinc-900 dark:text-zinc-100 mb-2 transition"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />

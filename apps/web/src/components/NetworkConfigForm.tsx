@@ -235,9 +235,9 @@ export default function NetworkConfigForm() {
         {!listLoading && !listError && (
           <div className="space-y-2">
             {networks.map((network) => (
-              <div key={network.id} className="flex items-center justify-between py-2 gap-3">
+              <div key={network.id} className="flex-between py-2 gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                  <p className="text-sm-medium truncate" style={{ color: 'var(--text-primary)' }}>
                     {network.name}
                     {network.id === activeNetworkId && (
                       <span className="ml-2 text-xs font-semibold" style={successStyle}>
@@ -314,7 +314,7 @@ export default function NetworkConfigForm() {
 
         <div className="flex items-center justify-end gap-3 pt-2">
           {saveState === 'saved' && (
-            <span className="text-sm font-semibold" style={successStyle}>
+            <span className="text-sm-semibold" style={successStyle}>
               Added
             </span>
           )}

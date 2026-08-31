@@ -245,7 +245,7 @@ export default function ApiConfigForm() {
 
           <div>
             <p
-              className="text-sm font-semibold"
+              className="text-sm-semibold"
               style={{ color: 'var(--text-primary)' }}
             >
               {isConfigured ? 'API configured' : 'API not configured'}
@@ -319,7 +319,7 @@ export default function ApiConfigForm() {
           />
         </div>
 
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex-between pt-2">
           <Button
             type="button"
             variant="outline"
@@ -338,7 +338,7 @@ export default function ApiConfigForm() {
             {saved && (
               <span
                 id="api-config-saved-indicator"
-                className="text-sm font-semibold"
+                className="text-sm-semibold"
                 style={successStyle}
               >
                 Saved
@@ -380,7 +380,7 @@ export default function ApiConfigForm() {
                 <span className="text-meta">{label}</span>
 
                 <span
-                  className="text-sm font-medium"
+                  className="text-sm-medium"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   {value}
