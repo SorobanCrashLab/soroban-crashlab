@@ -140,6 +140,7 @@ All error responses return a standardized JSON structure with an appropriate HTT
 ### Health & Monitoring
 | Method | Path | Description |
 | --- | --- | --- |
+| `GET` | `/api/health` | Aggregate health check with per-dependency status |
 | `GET` | `/api/health/metrics` | Health check probe of metrics system via Prometheus adapter |
 | `GET` | `/api/notifications` | Fetch system notification feed |
 | `GET` | `/api/integrations/prometheus/health` | Lightweight Prometheus exporter health probe |
@@ -898,6 +899,44 @@ GitHub OAuth 2.0 redirect handler. Validates the CSRF `state` parameter against 
 ---
 
 ## Health & Monitoring API
+
+### `GET /api/health`
+
+Aggregate health check with dependency status. Probes the dashboard's core dependencies (database, Prometheus metrics exporter, and the optional backend) and reports configuration presence for each integration.
+
+**Response** `200 OK`:
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-08-30T12:00:00.000Z",
+  "uptimeSec": 3600,
+  "version": "1.0.0",
+  "dependencies": {
+    "database": { "status": "ok", "latencyMs": 4, "detail": { "type": "sqlite" } },
+    "metrics": { "status": "ok", "latencyMs": 12, "detail": { "endpoint": "http://localhost:9090", "statusCode": 200 } },
+    "backend": { "status": "not_configured", "latencyMs": 0, "message": "Backend not configured (mock mode)" },
+    "smtp": { "status": "not_configured", "latencyMs": 0, "message": "SMTP not configured" },
+    "slack": { "status": "not_configured", "latencyMs": 0, "message": "Slack not configured" },
+    "discord": { "status": "not_configured", "latencyMs": 0, "message": "Discord not configured" },
+    "github": { "status": "not_configured", "latencyMs": 0, "message": "GitHub not configured" },
+    "jira": { "status": "not_configured", "latencyMs": 0, "message": "Jira not configured" },
+    "linear": { "status": "not_configured", "latencyMs": 0, "message": "Linear not configured" },
+    "sentry": { "status": "not_configured", "latencyMs": 0, "message": "Sentry not configured" },
+    "datadog": { "status": "not_configured", "latencyMs": 0, "message": "Datadog not configured" }
+  }
+}
+```
+
+Each dependency reports one of `ok`, `degraded`, `unavailable`, or `not_configured`. The overall `status` is one of `healthy`, `degraded`, or `unhealthy`.
+
+- `healthy` — all configured dependencies are operational.
+- `degraded` — a supporting dependency (e.g. the metrics exporter) is down or unhealthy.
+- `unhealthy` — a critical dependency (the database, or a configured backend) is unavailable.
+
+**Errors:** `503 Service Unavailable` when the overall status is `unhealthy` (critical dependency down) or when the health check itself throws.
+
+---
 
 ### `GET /api/health/metrics`
 

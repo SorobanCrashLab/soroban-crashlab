@@ -85,6 +85,7 @@
     "test:dashboard-layout-utils": "npx tsc src/app/dashboard-layout-utils.ts src/app/dashboard-layout-utils.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --skipLibCheck --jsx react  && node build/test-tmp/app/dashboard-layout-utils.test.js",
     "test:webhook-retry-dashboard": "npx tsc src/app/webhook-retry-dashboard-utils.ts src/app/webhook-retry-dashboard-utils.test.ts src/fixtures/webhook-delivery-history.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --skipLibCheck --jsx react  && node build/test-tmp/app/webhook-retry-dashboard-utils.test.js && npx tsc src/app/integrations/webhooks/retry-dashboard/page.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --skipLibCheck --jsx react  && node build/test-tmp/app/integrations/webhooks/retry-dashboard/page.test.js",
     "test:api-runs": "npx vitest run src/app/api/runs/route.test.ts",
+    "test:health": "npx vitest run src/app/api/health/route.test.ts",
     "test:api-key-auth": "npx vitest run src/lib/api-key-auth.test.ts",
     "size": "size-limit",
     "test:e2e:all": "playwright test",
@@ -99,7 +100,7 @@
     "test:shareable-report": "npx tsc src/lib/shareable-report-utils.ts src/lib/shareable-report-utils.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react  && node build/test-tmp/lib/shareable-report-utils.test.js",
     "test:prometheus-label": "npx tsc src/lib/integrations/prometheus-adapter.ts src/lib/integrations/prometheus-adapter.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react  && node build/test-tmp/lib/integrations/prometheus-adapter.test.js",
     "test:onboarding-durable": "npx tsc src/app/hooks/useOnboardingWizard.ts src/app/hooks/useOnboardingWizard.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react  && node build/test-tmp/app/hooks/useOnboardingWizard.test.js",
-    "test:segment-error-boundaries": "npx tsc src/components/segment-error-messages.ts src/components/SegmentError.tsx src/components/error-boundary-utils.ts src/components/ErrorBoundary.tsx src/components/segment-error.integration.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react-jsx && node build/test-tmp/components/segment-error.integration.test.js && npm run test:run-table-columns",
+    "test:segment-error-boundaries": "npx tsc src/components/segment-error-messages.ts src/components/SegmentError.tsx src/components/error-boundary-utils.ts src/components/ErrorBoundary.tsx src/components/segment-error.integration.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react-jsx && node build/test-tmp/components/segment-error.integration.test.js && npm run test:run-table-columns && npm run test:health",
     "test:flaky-classification": "npx tsc src/app/analytics/flaky/flaky-classification.ts src/app/analytics/flaky/flaky-classification.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop && node build/test-tmp/app/analytics/flaky/flaky-classification.test.js"
   },
   "dependencies": {
