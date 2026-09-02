@@ -113,7 +113,7 @@ export default function RunMetadataEditor({
           border: '1px solid var(--border-color)',
         }}
       >
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex-between mb-3">
           <h2
             className="text-lg font-semibold"
             style={{ color: 'var(--text-primary)' }}
@@ -189,7 +189,7 @@ export default function RunMetadataEditor({
         border: '1px solid var(--border-color)',
       }}
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex-between mb-4">
         <h2
           className="text-lg font-semibold"
           style={{ color: 'var(--text-primary)' }}
@@ -324,7 +324,7 @@ export default function RunMetadataEditor({
         <div className="flex items-center justify-end gap-3 pt-2">
           {saveState === 'saved' && (
             <span
-              className="text-sm font-semibold"
+              className="text-sm-semibold"
               style={{ color: '#057642' }}
               data-testid="save-success"
             >

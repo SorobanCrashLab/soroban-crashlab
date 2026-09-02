@@ -40,7 +40,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
   return (
     <div className={`${fullWidth ? 'w-full' : 'inline-block'} ${wrapperClassName}`}>
       {label && (
-        <label htmlFor={id} className={`input-label flex items-center justify-between ${labelClassName}`}>
+        <label htmlFor={id} className={`input-label flex-between ${labelClassName}`}>
           <span>
             {label}
             {required && <span className="text-red-500 ml-1" aria-hidden="true">*</span>}

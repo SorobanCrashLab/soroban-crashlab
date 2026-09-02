@@ -58,7 +58,7 @@ export const StatCard = memo(function StatCard({
       >
         <span>{isPositive ? '↑' : '↓'}</span>
         <span>{t.value}</span>
-        {t.label && <span className="text-zinc-500 dark:text-zinc-400 ml-1 font-normal">{t.label}</span>}
+        {t.label && <span className="text-muted ml-1 font-normal">{t.label}</span>}
       </span>
     );
   };

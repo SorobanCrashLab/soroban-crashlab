@@ -1193,6 +1193,57 @@ nav, header, .nav-bar {
   }
 }
 
+/* ================================================================
+   Reusable layout / typography utilities
+
+   These collapse the most frequently repeated inline Tailwind class
+   combos into single semantic classes. Values mirror the Tailwind
+   defaults they replace so the rendered appearance is unchanged.
+   (See issue #1195.)
+   ================================================================ */
+
+.flex-center {
+  display: flex;
+  align-items: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Small text at medium/semibold weight (was `text-sm font-medium` / `text-sm font-semibold`) */
+.text-sm-medium {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.text-sm-semibold {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Muted secondary text (was `text-zinc-500 dark:text-zinc-400`)
+   Mirrors the Tailwind zinc palette: 500 = #71717a, 400 = #a1a1aa. */
+.text-muted {
+  color: #71717a;
+}
+
+.dark .text-muted {
+  color: #a1a1aa;
+}
+
+/* Soft neutral surface (was `bg-zinc-50 dark:bg-zinc-900`)
+   Mirrors the Tailwind zinc palette: 50 = #fafafa, 900 = #18181b. */
+.surface-soft {
+  background-color: #fafafa;
+}
+
+.dark .surface-soft {
+  background-color: #18181b;
+}
+
 @layer utilities {
   .bg-theme {
     background: var(--background);

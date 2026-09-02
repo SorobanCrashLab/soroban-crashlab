@@ -30,7 +30,7 @@ export function PageSection({
   return (
     <Component id={id} className={`section ${className}`}>
       {hasHeader && (
-        <div className={`flex items-center justify-between mb-3 ${headerClassName}`}>
+        <div className={`flex-between mb-3 ${headerClassName}`}>
           <div>
             {title && (
               typeof title === 'string' ? (

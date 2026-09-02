@@ -28,6 +28,7 @@ const HexPreview: React.FC<HexPreviewProps> = ({
         {hexDump}
       </pre>
       {isTruncated && (
+        <div className="px-4 py-2 text-xs text-muted bg-zinc-800 dark:bg-zinc-900 border-t border-zinc-700">
         <div className="px-4 py-2 text-xs"
              style={{ color: 'var(--text-secondary)', background: '#1a1a1a', borderTop: '1px solid #333' }}>
           Hex dump truncated — showing first portion of the file

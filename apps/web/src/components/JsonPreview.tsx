@@ -25,6 +25,7 @@ const JsonPreview: React.FC<JsonPreviewProps> = ({
       style={{ border: '1px solid var(--border-color)' }}
     >
       <pre
+        className="font-mono text-xs leading-relaxed p-4 surface-soft text-zinc-800 dark:text-zinc-200 whitespace-pre"
         className="font-mono text-xs leading-relaxed p-4 whitespace-pre"
         style={{ background: 'var(--surface)', color: 'var(--text-primary)' }}
         dangerouslySetInnerHTML={{ __html: highlighted }}

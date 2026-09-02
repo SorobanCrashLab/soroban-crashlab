@@ -175,7 +175,7 @@ function DashboardContent() {
       )}
       {dataState === "error" && (
         <div role="alert" className="card card-padding mb-4 sm:mb-6" style={{ borderLeft: "4px solid #CC1016" }}>
-          <div className="flex items-center justify-between">
+          <div className="flex-between">
             <div>
               <p className="font-semibold" style={{ color: "#CC1016" }}>Connection Error</p>
               <p className="text-meta">Could not reach the backend API.</p>
@@ -253,12 +253,12 @@ function DashboardContent() {
                             <tr>
                               <td colSpan={4} className="px-6 py-16 text-center">
                                 <div className="flex flex-col items-center gap-3">
-                                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-full text-zinc-300">
+                                  <div className="p-4 surface-soft rounded-full text-zinc-300">
                                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                   </div>
-                                  <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No matching fuzzing runs</span>
+                                  <span className="text-sm-medium text-muted">No matching fuzzing runs</span>
                                 </div>
                               </td>
                             </tr>
@@ -335,12 +335,12 @@ function DashboardContent() {
                       <tr>
                         <td colSpan={4} className="px-6 py-16 text-center">
                           <div className="flex flex-col items-center gap-3">
-                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-full text-zinc-300">
+                            <div className="p-4 surface-soft rounded-full text-zinc-300">
                               <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
                             </div>
-                            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No matching fuzzing runs</span>
+                            <span className="text-sm-medium text-muted">No matching fuzzing runs</span>
                           </div>
                         </td>
                       </tr>
