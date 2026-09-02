@@ -37,13 +37,13 @@ export const GET = withRouteErrorHandling(
         return errorResponse('Upstream error', status.badGateway);
       }
       const data = (await upstream.json()) as unknown;
-      return NextResponse.json(data, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } });
+      return NextResponse.json({ data }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } });
     }
 
     const run = await findRunById(id);
     if (!run) {
       return errorResponse('Run not found', status.notFound);
     }
-    return withFixtureCaching(request, run);
+    return withFixtureCaching(request, { data: run });
   },
 );

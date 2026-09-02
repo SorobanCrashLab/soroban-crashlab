@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { jsonError, readJsonBody, withRouteErrorHandling } from '../../../../lib/route-handler';
+import { successResponse } from '../../../../lib/api-response-utils';
 import { getDeliveryHistoryStore, updateDeliveryHistoryStore } from '../history/route';
 import { retryDeliveryItem, computeDeliveryStats } from '../../../webhook-retry-dashboard-utils';
 
@@ -25,7 +26,7 @@ export const POST = withRouteErrorHandling('POST /api/webhooks/retry', async (re
   updateDeliveryHistoryStore(updatedItems);
   const stats = computeDeliveryStats(updatedItems);
 
-  return NextResponse.json({
+  return successResponse({
     success: true,
     item: retriedItem,
     stats,

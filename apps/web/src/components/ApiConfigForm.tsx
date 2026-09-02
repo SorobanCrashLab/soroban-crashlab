@@ -25,7 +25,6 @@ const numericFields = new Set<keyof ApiConfig>([
   'rateLimitWindowSeconds',
 ]);
 
-const dangerStyle = { color: '#CC1016' };
 const successStyle = { color: '#057642' };
 
 type InputProps = {

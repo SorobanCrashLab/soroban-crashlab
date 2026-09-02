@@ -51,7 +51,7 @@ describe('POST /api/integrations/jira', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.issue).toEqual(mockIssue);
+    expect(data.data.issue).toEqual(mockIssue);
     expect(mockAdapter.createIssue).toHaveBeenCalledWith({
       summary: 'Crash report issue',
       description: 'details',
@@ -96,7 +96,7 @@ describe('GET /api/integrations/jira/[issueKey]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.issue).toEqual(mockIssue);
+    expect(data.data.issue).toEqual(mockIssue);
     expect(mockAdapter.fetchIssue).toHaveBeenCalledWith('PROJ-123');
   });
 
@@ -147,6 +147,6 @@ describe('GET /api/integrations/jira/[issueKey]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.issue.key).toBe('PROJ-123');
+    expect(data.data.issue.key).toBe('PROJ-123');
   });
 });

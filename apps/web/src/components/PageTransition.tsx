@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
 export interface PageTransitionProps {
@@ -15,11 +15,6 @@ export interface PageTransitionProps {
  */
 export function PageTransition({ children, className = '' }: PageTransitionProps) {
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   return (
     <div

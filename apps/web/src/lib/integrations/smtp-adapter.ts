@@ -70,7 +70,7 @@ export function createSmtpAdapter(options: SmtpAdapterOptions = {}) {
           throw new Error(`Failed to load config: ${response.statusText}`);
         }
 
-        return await response.json();
+        return ((await response.json()) as { data: SmtpConfig | null }).data ?? null;
       } catch (error) {
         console.error('Error loading SMTP config:', error);
         throw error;
@@ -126,8 +126,8 @@ export function createSmtpAdapter(options: SmtpAdapterOptions = {}) {
           };
         }
 
-        const result = await response.json();
-        return { success: result.success ?? true };
+        const result = (await response.json()) as { data?: { success?: boolean; error?: string } };
+        return { success: result.data?.success ?? true };
       } catch (error) {
         console.error('Error testing SMTP connection:', error);
         return {
@@ -161,7 +161,7 @@ export function createSmtpAdapter(options: SmtpAdapterOptions = {}) {
           };
         }
 
-        return await response.json();
+        return ((await response.json()) as { data: SendTestEmailResult }).data;
       } catch (error) {
         console.error('Error sending test email:', error);
         return {
@@ -187,8 +187,8 @@ export function createSmtpAdapter(options: SmtpAdapterOptions = {}) {
           throw new Error(`Failed to fetch history: ${response.statusText}`);
         }
 
-        const data = (await response.json()) as EmailHistoryResponse;
-        return data.history ?? [];
+        const json = (await response.json()) as { data?: EmailHistoryResponse };
+        return json.data?.history ?? [];
       } catch (error) {
         console.error('Error fetching SMTP email history:', error);
         throw error;

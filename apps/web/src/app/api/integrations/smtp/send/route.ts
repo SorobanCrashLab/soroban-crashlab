@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { sendEmail, validateEmail } from '@/lib/integrations/smtp-email';
 import { getStoredSmtpConfig, recordEmailLogEntry } from '@/lib/integrations/smtp-store';
 
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
+    return errorResponse('Request body must be valid JSON.', 400);
   }
 
   const to =
@@ -23,17 +24,17 @@ export async function POST(request: NextRequest) {
       : undefined;
 
   if (typeof to !== 'string' || !validateEmail(to)) {
-    return NextResponse.json(
-      { error: 'Field "to" must be a valid email address.' },
-      { status: 400 },
+    return errorResponse(
+      'Field "to" must be a valid email address.',
+      400,
     );
   }
 
   const config = getStoredSmtpConfig();
   if (!config) {
-    return NextResponse.json(
-      { error: 'No SMTP configuration saved yet. Save your configuration before sending a test email.' },
-      { status: 404 },
+    return errorResponse(
+      'No SMTP configuration saved yet. Save your configuration before sending a test email.',
+      404,
     );
   }
 
@@ -54,5 +55,8 @@ export async function POST(request: NextRequest) {
     error: result.error,
   });
 
-  return NextResponse.json(result, { status: result.success ? 200 : 422 });
+  if (result.success) {
+    return successResponse(result);
+  }
+  return errorResponse(result.error || 'Failed to send test email.', 422);
 }

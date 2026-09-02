@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { selectArtifactRepository } from '@/lib/storage/artifact-repository';
 import { jsonError, withRouteErrorHandling } from '@/lib/route-handler';
+import { successResponse } from '@/lib/api-response-utils';
 import { recordAuditEvent } from '@/lib/audit/audit-sink';
 
 export const GET = withRouteErrorHandling(
@@ -49,7 +50,7 @@ export const DELETE = withRouteErrorHandling(
 
     recordAuditEvent({ action: 'artifact.delete', target: id });
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
       message: 'Artifact deleted successfully',
     });

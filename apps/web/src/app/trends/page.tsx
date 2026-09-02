@@ -1,7 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { FuzzingRun, RunArea, RunSeverity } from "../types";
 import { FilterBar } from "./FilterBar";

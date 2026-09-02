@@ -278,7 +278,25 @@ export default function LogViewerPage() {
               : visible.length === 0
                 ? {
                     state: "empty",
+                    type: "logs",
                     message: "No log entries match the current filters.",
+                    description:
+                      levelFilter !== "all" || searchQuery
+                        ? "Try clearing search queries or adjusting severity filters to display logs."
+                        : "No log records have been generated yet for this session.",
+                    action:
+                      levelFilter !== "all" || searchQuery ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLevelFilter("all");
+                            setSearchQuery("");
+                          }}
+                          className="btn-outline text-xs sm:text-sm px-3 sm:px-4 py-1.5"
+                        >
+                          Clear Filters
+                        </button>
+                      ) : undefined,
                   }
                 : { state: "success" })}
         >

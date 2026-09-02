@@ -9,7 +9,7 @@
  * precedence at the component level).
  */
 
-import { NextResponse } from 'next/server';
+import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { buildDedupKey } from '../../../../integrate-pagerduty-alert-integration-utils';
 import type { TriggerAlertPayload } from '../../../../../lib/integrations/pagerduty-adapter';
 import { PAGERDUTY_FETCH_TIMEOUT_MS } from '../../../../../lib/timeouts';
@@ -25,16 +25,16 @@ export async function POST(request: Request) {
     ).trim();
 
     if (!integrationKey) {
-      return NextResponse.json(
-        { error: 'PagerDuty integration key is not configured' },
-        { status: 400 },
+      return errorResponse(
+        'PagerDuty integration key is not configured',
+        400,
       );
     }
 
     if (!body.runId || !body.signature || !body.summary) {
-      return NextResponse.json(
-        { error: 'runId, signature, and summary are required' },
-        { status: 400 },
+      return errorResponse(
+        'runId, signature, and summary are required',
+        400,
       );
     }
 
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
       if (pdResponse.ok || pdResponse.status === 202) {
         const responseBody = await pdResponse.json().catch(() => ({}));
-        return NextResponse.json({
+        return successResponse({
           success: true,
           dedupKey,
           pdIncidentKey: responseBody.dedup_key ?? dedupKey,
@@ -76,21 +76,18 @@ export async function POST(request: Request) {
       }
 
       const errorText = await pdResponse.text().catch(() => pdResponse.statusText);
-      return NextResponse.json(
-        { success: false, error: errorText },
-        { status: 200 },
-      );
+      return errorResponse(errorText, 200);
     } catch (networkError) {
       // Return a mock success in offline/dev environments so the UI can still
       // be exercised without a real PagerDuty account.
       console.warn('[pagerduty/trigger] Could not reach PagerDuty Events API:', networkError);
-      return NextResponse.json({
+      return successResponse({
         success: true,
         dedupKey,
         warning: 'Alert queued locally – could not reach PagerDuty API',
       });
     }
   } catch {
-    return NextResponse.json({ error: 'Failed to parse request body' }, { status: 400 });
+    return errorResponse('Failed to parse request body', 400);
   }
 }

@@ -10,14 +10,14 @@ describe('/api/sentry/reports', () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
     const json = await response.json();
-    expect(Array.isArray(json.reports)).toBe(true);
-    expect(json.reports.length).toBeGreaterThan(0);
+    expect(Array.isArray(json.data.reports)).toBe(true);
+    expect(json.data.reports.length).toBeGreaterThan(0);
   });
 
   it('each report has the fields the client adapter depends on', async () => {
     const response = await GET(request());
     const json = await response.json();
-    for (const report of json.reports) {
+    for (const report of json.data.reports) {
       expect(typeof report.id).toBe('string');
       expect(typeof report.timestamp).toBe('string');
       expect(typeof report.signature).toBe('string');

@@ -37,7 +37,7 @@ describe('/api/integrations/smtp/test-connection', () => {
 
     const response = await POST(makeRequest(validConfig));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true });
+    expect(await response.json()).toEqual({ data: { success: true } });
   });
 
   it('returns 422 with an error message when the transporter fails to verify', async () => {
@@ -48,7 +48,6 @@ describe('/api/integrations/smtp/test-connection', () => {
     const response = await POST(makeRequest(validConfig));
     expect(response.status).toBe(422);
     const json = await response.json();
-    expect(json.success).toBe(false);
     expect(json.error).toContain('Invalid login');
   });
 

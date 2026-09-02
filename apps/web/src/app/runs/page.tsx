@@ -28,6 +28,8 @@ import { fetchRuns } from '../../lib/api-client';
 import { LoadingSpinner } from '../../components/LoadingSkeleton';
 import { ListState } from '../../components/ListState';
 import { PageHeader } from '../../components/PageHeader';
+import { PullToRefreshIndicator } from '../../components/PullToRefreshIndicator';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 
 const BulkActionsForRuns = dynamic(() => import('../add-bulk-actions-for-runs'), {
   loading: () => <LoadingSpinner />,
@@ -163,8 +165,20 @@ export default function RunsPage() {
     [],
   );
 
+  const handleRefresh = useCallback(async () => {
+    setFetchAttempt((n) => n + 1);
+    // Give the effect time to kick off before resolving
+    await new Promise<void>((resolve) => setTimeout(resolve, 600));
+  }, []);
+
+  const { isPulling, isRefreshing, pullDistance } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    disabled: dataState === 'loading',
+  });
+
   return (
     <div className="container-full page-padding fade-in">
+      <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} pullDistance={pullDistance} />
       <PageHeader
         title="Fuzzing Runs"
         description="Select runs to cancel, retry, delete, export, tag, or assign in bulk"
@@ -191,7 +205,17 @@ export default function RunsPage() {
           : dataState === 'error'
           ? { state: 'error', message: 'Failed to load fuzzing runs', onRetry: () => setFetchAttempt((n) => n + 1) }
           : runs.length === 0
-          ? { state: 'empty', message: 'No fuzzing runs found.' }
+          ? {
+              state: 'empty',
+              type: 'runs',
+              message: 'No fuzzing runs found',
+              description: 'No fuzzing campaigns or runs have been recorded yet. Trigger a run from the dashboard or launch a fuzzing session to view results.',
+              action: (
+                <Link href="/" className="btn-primary text-xs sm:text-sm px-4 py-2 inline-flex items-center">
+                  Back to Dashboard
+                </Link>
+              ),
+            }
           : { state: 'success' })}
       >
         <BulkActionsForRuns

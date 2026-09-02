@@ -1,4 +1,9 @@
 import type { FuzzingRun } from './types';
+import type { ContractCallInfo, ContractCallFeeSummary } from '../types';
+
+// Re-exported from the shared contract-types module (../types) for backward
+// compatibility — single source of truth lives in src/types/contracts.ts.
+export type { ContractCallInfo, ContractCallFeeSummary } from '../types';
 
 export interface ResourceThresholds {
   cpuWarning: number;
@@ -41,11 +46,6 @@ export function isExpensiveRun(
   );
 }
 
-export interface ContractCallInfo {
-  contract: string;
-  method: string;
-}
-
 export function parseContractCall(run: FuzzingRun): ContractCallInfo | null {
   if (!run.crashDetail?.payload) return null;
   try {
@@ -60,16 +60,6 @@ export function parseContractCall(run: FuzzingRun): ContractCallInfo | null {
     return null;
   }
   return null;
-}
-
-export interface ContractCallFeeSummary {
-  contract: string;
-  method: string;
-  runCount: number;
-  maxFee: number;
-  avgFee: number;
-  maxCpu: number;
-  representativeRunId: string;
 }
 
 export function groupRunsByContractCall(runs: FuzzingRun[]): ContractCallFeeSummary[] {

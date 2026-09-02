@@ -13,13 +13,13 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { FuzzingRun, RunSeverity } from '../../types';
 import { fetchRuns } from '../../../lib/api-client';
+import { CategoryCard, SummaryCard } from '../../../components/failure-taxonomy';
 import {
     buildCategoryBreakdown,
     filterRunsByCategories,
     groupBreakdownByFamily,
     summarizeTaxonomy,
     toggleCategory,
-    type CategoryBreakdown,
 } from './failure-taxonomy-utils';
 
 type DataState = 'loading' | 'success' | 'error';
@@ -30,90 +30,6 @@ const SEVERITY_COLORS: Record<RunSeverity, string> = {
     medium: '#0A66C2',
     low: '#057642',
 };
-
-const ACCENT = '#0A66C2';
-
-/** Headline number in the summary strip. */
-function SummaryCard({ label, value, hint }: { label: string; value: number; hint: string }) {
-    return (
-        <div className="card card-padding">
-            <div className="text-meta">{label}</div>
-            <div className="font-semibold text-2xl mt-1" style={{ color: 'var(--text-primary)' }}>
-                {value.toLocaleString()}
-            </div>
-            <div className="text-caption mt-0.5">{hint}</div>
-        </div>
-    );
-}
-
-/** Proportion bar showing how much of all failures a category accounts for. */
-function ShareBar({ share, color }: { share: number; color: string }) {
-    return (
-        <div
-            className="h-1.5 rounded-full overflow-hidden mt-2"
-            style={{ background: 'var(--chip-bg)' }}
-            role="presentation"
-        >
-            <div
-                className="h-full rounded-full"
-                style={{ width: `${Math.max(share * 100, 2)}%`, background: color }}
-            />
-        </div>
-    );
-}
-
-/** One selectable category card. */
-function CategoryCard({
-    entry,
-    isSelected,
-    onToggle,
-}: {
-    entry: CategoryBreakdown;
-    isSelected: boolean;
-    onToggle: () => void;
-}) {
-    const color = SEVERITY_COLORS[entry.topSeverity];
-
-    return (
-        <button
-            type="button"
-            onClick={onToggle}
-            aria-pressed={isSelected}
-            className="card card-padding card-interactive text-left w-full"
-            style={isSelected ? { borderColor: ACCENT, background: 'var(--highlight-bg)' } : undefined}
-        >
-            <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                        {entry.definition.label}
-                    </h3>
-                    <p className="text-meta mt-0.5 text-xs">{entry.definition.description}</p>
-                </div>
-                <span className="font-semibold text-lg shrink-0" style={{ color }}>
-                    {entry.count}
-                </span>
-            </div>
-
-            <ShareBar share={entry.share} color={color} />
-
-            <div className="flex flex-wrap gap-1.5 mt-3">
-                <span className="chip text-xs" style={{ color, background: `color-mix(in srgb, ${color} 12%, transparent)` }}>
-                    {entry.topSeverity}
-                </span>
-                {entry.areas.map((area) => (
-                    <span key={area} className="chip text-xs">
-                        {area}
-                    </span>
-                ))}
-                <span className="chip text-xs">
-                    {entry.signatures.length} signature{entry.signatures.length === 1 ? '' : 's'}
-                </span>
-            </div>
-
-            <p className="text-caption mt-2">{entry.definition.triageHint}</p>
-        </button>
-    );
-}
 
 export default function FailureTaxonomyPage() {
     const [runs, setRuns] = useState<FuzzingRun[]>([]);

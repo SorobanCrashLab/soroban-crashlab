@@ -42,7 +42,7 @@ export default defineConfig({
         'src/app/**/loading.tsx',
         'src/app/**/not-found.tsx',
         'src/instrumentation*.ts',
-        'src/middleware.ts',
+        'src/proxy.ts',
       ],
     },
   },

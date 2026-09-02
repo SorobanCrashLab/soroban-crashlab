@@ -48,7 +48,7 @@ async function fetchIssuesForRuns(
       const res = await fetch(`/api/runs/${run.id}/issues`);
       if (!res.ok) return;
       const data = await res.json();
-      issueMap.set(run.id, (data.issues ?? []) as RunIssueLink[]);
+      issueMap.set(run.id, (data.data?.issues ?? []) as RunIssueLink[]);
     }),
   );
 

@@ -48,7 +48,7 @@ describe('/api/integrations/smtp/send', () => {
 
     const response = await POST(makeRequest({ to: 'recipient@example.com' }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, messageId: '<test@example.com>' });
+    expect(await response.json()).toEqual({ data: { success: true, messageId: '<test@example.com>' } });
 
     const log = getEmailLog();
     expect(log[0]).toMatchObject({
@@ -67,7 +67,7 @@ describe('/api/integrations/smtp/send', () => {
     const response = await POST(makeRequest({ to: 'recipient@example.com' }));
     expect(response.status).toBe(422);
     const json = await response.json();
-    expect(json.success).toBe(false);
+    expect(json.error).toContain('Connection refused');
 
     const log = getEmailLog();
     expect(log[0]).toMatchObject({ to: 'recipient@example.com', status: 'failed' });

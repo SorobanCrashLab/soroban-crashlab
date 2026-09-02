@@ -1,16 +1,12 @@
-import { NextResponse } from 'next/server';
 import { selectArtifactRepository } from '@/lib/storage/artifact-repository';
 import { jsonError, withRouteErrorHandling } from '@/lib/route-handler';
-import { createdResponse } from '@/lib/api-response-utils';
+import { createdResponse, successResponse } from '@/lib/api-response-utils';
 
 export const GET = withRouteErrorHandling(
   'GET /api/artifacts',
   async () => {
     const artifacts = await selectArtifactRepository().list();
-    return NextResponse.json({
-      artifacts,
-      total: artifacts.length,
-    });
+    return successResponse({ artifacts, total: artifacts.length }, { total: artifacts.length });
   },
   'Failed to list artifacts',
 );

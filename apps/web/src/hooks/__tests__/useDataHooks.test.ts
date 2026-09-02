@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { useRuns } from '../useRuns';
 import { useRun } from '../useRun';
 import { useIssues } from '../useIssues';
+import { usePullToRefresh } from '../usePullToRefresh';
 
 describe('useRuns hook', () => {
   it('exports useRuns function', () => {
@@ -52,5 +53,29 @@ describe('useIssues hook', () => {
       initialIssues,
     };
     expect(options.initialIssues).toHaveLength(1);
+  });
+});
+
+describe('usePullToRefresh hook', () => {
+  it('exports usePullToRefresh function', () => {
+    expect(usePullToRefresh).toBeDefined();
+    expect(typeof usePullToRefresh).toBe('function');
+  });
+
+  it('accepts onRefresh callback and disabled flag', () => {
+    const options = {
+      onRefresh: async () => {},
+      disabled: false,
+    };
+    expect(typeof options.onRefresh).toBe('function');
+    expect(options.disabled).toBe(false);
+  });
+
+  it('accepts optional containerRef', () => {
+    const options = {
+      onRefresh: async () => {},
+      containerRef: { current: null },
+    };
+    expect(options.containerRef.current).toBeNull();
   });
 });

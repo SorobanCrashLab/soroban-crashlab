@@ -28,6 +28,16 @@ const buckets =
 
 globalForRateLimit.crashlabApiRateLimitBuckets = buckets;
 
+/**
+ * Generates a correlation ID for request tracing.
+ *
+ * Format: `<timestamp>-<random>-<random>` — sortable by issuance time and
+ * unique enough to correlate a request across logs and responses.
+ */
+export function generateCorrelationId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}-${Math.random().toString(36).substring(2, 11)}`;
+}
+
 export function proxy(request: NextRequest): NextResponse {
   if (request.method === 'OPTIONS') {
     return NextResponse.next();
@@ -49,7 +59,7 @@ export function proxy(request: NextRequest): NextResponse {
   const resetSeconds = Math.ceil((bucket.resetAt - now) / 1000);
 
   const CORRELATION_ID_HEADER = 'x-correlation-id';
-  const correlationId = request.headers.get(CORRELATION_ID_HEADER) || `${Date.now()}-${Math.random().toString(36).substring(2, 11)}-${Math.random().toString(36).substring(2, 11)}`;
+  const correlationId = request.headers.get(CORRELATION_ID_HEADER) || generateCorrelationId();
 
   if (bucket.count > RATE_LIMIT_MAX_REQUESTS) {
     const response = NextResponse.json(

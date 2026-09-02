@@ -57,5 +57,5 @@ signal: AbortSignal.timeout(API_FETCH_TIMEOUT_MS),
     limit: searchParams.has('limit') ? Number(searchParams.get('limit')) : undefined,
   });
   const data = { runs, total };
-  return withFixtureCaching(request, data);
+  return withFixtureCaching(request, { data, total: data.total });
 });

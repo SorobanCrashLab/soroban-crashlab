@@ -5,8 +5,13 @@
  * All functions are free of React or browser dependencies for deterministic testing.
  */
 
+import type { SorobanAuthMode } from '../types';
+
+// Re-exported from the shared contract-types module (../types) for backward
+// compatibility — single source of truth lives in src/types/contracts.ts.
+export type { SorobanAuthMode } from '../types';
+
 export type CIReplayStatus = 'idle' | 'queued' | 'running' | 'passed' | 'failed' | 'timeout';
-export type SorobanAuthMode = 'Enforce' | 'Record' | 'RecordAllowNonroot';
 
 export interface CIJobConfig {
   jobId: string;

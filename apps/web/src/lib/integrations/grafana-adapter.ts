@@ -64,7 +64,7 @@ export function createGrafanaAdapter(options: GrafanaAdapterOptions = {}) {
           throw new Error(`Failed to load config: ${response.statusText}`);
         }
 
-        return await response.json();
+        return ((await response.json()) as { data: GrafanaConfig | null }).data ?? null;
       } catch (error) {
         console.error('Error loading Grafana config:', error);
         throw error;
@@ -120,8 +120,8 @@ export function createGrafanaAdapter(options: GrafanaAdapterOptions = {}) {
           };
         }
 
-        const result = await response.json();
-        return { success: result.success ?? true };
+        const result = (await response.json()) as { data?: { success?: boolean } };
+        return { success: result.data?.success ?? true };
       } catch (error) {
         console.error('Error testing Grafana connection:', error);
         return {
@@ -155,7 +155,7 @@ export function createGrafanaAdapter(options: GrafanaAdapterOptions = {}) {
           };
         }
 
-        return await response.json();
+        return ((await response.json()) as { data: CreateAnnotationResult }).data;
       } catch (error) {
         console.error('Error creating Grafana annotation:', error);
         return {
@@ -181,8 +181,8 @@ export function createGrafanaAdapter(options: GrafanaAdapterOptions = {}) {
           throw new Error(`Failed to fetch annotations: ${response.statusText}`);
         }
 
-        const data = (await response.json()) as GrafanaAnnotationsResponse;
-        return data.annotations ?? [];
+        const json = (await response.json()) as { data?: GrafanaAnnotationsResponse };
+        return json.data?.annotations ?? [];
       } catch (error) {
         console.error('Error fetching Grafana annotations:', error);
         throw error;

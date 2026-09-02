@@ -75,9 +75,15 @@ export function useRuns(options: UseRunsOptions = {}): UseRunsResult {
 
   useEffect(() => {
     if (!autoFetch) return;
-    void loadData();
+
+    const timer = setTimeout(() => {
+      // Deferred so the effect body performs no synchronous state update
+      // (react-hooks/set-state-in-effect).
+      void loadData();
+    }, 0);
 
     return () => {
+      clearTimeout(timer);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }

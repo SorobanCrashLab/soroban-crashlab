@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import {
   createApiToken,
   listApiTokens,
   ApiTokenScope,
 } from '../../../../lib/storage/api-token-store';
+import { errorResponse, createdResponse, successResponse } from '../../../../lib/api-response-utils';
 
 export async function GET() {
   const tokens = listApiTokens();
-  return NextResponse.json({ tokens });
+  return successResponse({ tokens });
 }
 
 export async function POST(request: NextRequest) {
@@ -16,10 +17,7 @@ export async function POST(request: NextRequest) {
     const { name, scope, expiresAt } = body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Token name is required.' },
-        { status: 400 },
-      );
+      return errorResponse('Token name is required.', 400);
     }
 
     const validScopes: ApiTokenScope[] = ['read', 'write'];
@@ -29,10 +27,7 @@ export async function POST(request: NextRequest) {
     if (expiresAt) {
       const parsed = new Date(expiresAt);
       if (isNaN(parsed.getTime())) {
-        return NextResponse.json(
-          { error: 'Invalid expiry date format.' },
-          { status: 400 },
-        );
+        return errorResponse('Invalid expiry date format.', 400);
       }
       validatedExpiry = parsed.toISOString();
     }
@@ -43,18 +38,12 @@ export async function POST(request: NextRequest) {
       expiresAt: validatedExpiry,
     });
 
-    return NextResponse.json(
-      {
-        message: 'Token created successfully. Store this secret safely as it will not be shown again.',
-        secret,
-        token,
-      },
-      { status: 201 },
-    );
+    return createdResponse({
+      message: 'Token created successfully. Store this secret safely as it will not be shown again.',
+      secret,
+      token,
+    });
   } catch {
-    return NextResponse.json(
-      { error: 'Failed to process token creation request.' },
-      { status: 400 },
-    );
+    return errorResponse('Failed to process token creation request.', 400);
   }
 }

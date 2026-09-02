@@ -8,4 +8,6 @@ export * from './Toggle';
 export * from './PageTransition';
 export * from './LoadingSkeleton';
 export * from './ListState';
+export * from './EmptyState';
+export * from './EmptyStateIllustration';
 export * from './Toast';

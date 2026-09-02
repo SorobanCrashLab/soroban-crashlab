@@ -3,6 +3,11 @@
 import Link from 'next/link';
 import { buildMockRuns } from '../../mockRuns';
 import { FuzzingRun, RunArea, RunSeverity } from '../../types';
+import {
+  classifyFlakySignature,
+  MIN_REPLAYS,
+  type FlakinessTier,
+} from './flaky-classification';
 
 interface FlakySignature {
   signature: string;
@@ -15,6 +20,7 @@ interface FlakySignature {
   seedSpread: number;
   flakyScore: number;
   sampleRunId: string;
+  tier: FlakinessTier;
 }
 
 interface FlakySummary {
@@ -24,6 +30,8 @@ interface FlakySummary {
   flakyRate: number;
   averageScore: number;
   signatures: FlakySignature[];
+  insufficientSignatures: FlakySignature[];
+  unstableSignatures: FlakySignature[];
 }
 
 const severityWeight: Record<RunSeverity, number> = {
@@ -93,6 +101,10 @@ export default function FlakyAnalyticsPage() {
           />
         </section>
 
+        <div className="mb-6">
+          <FlakinessLegend insufficient={summary.insufficientSignatures.length} />
+        </div>
+
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/60">
             <div className="border-b border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-950">
@@ -110,6 +122,7 @@ export default function FlakyAnalyticsPage() {
                   <tr>
                     <th className="px-5 py-3">Signature</th>
                     <th className="px-5 py-3">Area</th>
+                    <th className="px-5 py-3">Tier</th>
                     <th className="px-5 py-3">Occurrences</th>
                     <th className="px-5 py-3">Seed spread</th>
                     <th className="px-5 py-3">Score</th>
@@ -130,6 +143,9 @@ export default function FlakyAnalyticsPage() {
                         <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
                           {signature.area}
                         </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <TierBadge tier={signature.tier} />
                       </td>
                       <td className="px-5 py-4 text-zinc-700 dark:text-zinc-300">
                         {signature.occurrences}
@@ -194,6 +210,45 @@ export default function FlakyAnalyticsPage() {
             </div>
           </aside>
         </div>
+
+        {summary.insufficientSignatures.length > 0 && (
+          <section className="mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/60">
+            <div className="border-b border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-950">
+              <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
+                Insufficient replay data
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Signatures with fewer than {MIN_REPLAYS} replays. A minimum of{' '}
+                {MIN_REPLAYS} replays is required for flakiness analysis.
+              </p>
+            </div>
+            <ul className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
+              {summary.insufficientSignatures.map((signature) => (
+                <li
+                  key={signature.signature}
+                  className="flex items-center gap-3 px-5 py-4"
+                >
+                  <TierBadge tier="INSUFFICIENT" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-zinc-950 dark:text-zinc-50">
+                      {signature.category}
+                    </div>
+                    <div className="truncate font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                      {signature.signature}
+                    </div>
+                  </div>
+                  <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {signature.occurrences} replay
+                    {signature.occurrences === 1 ? '' : 's'}
+                  </div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Sample: {signature.sampleRunId}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </div>
   );
@@ -214,15 +269,18 @@ function buildFlakySummary(runs: FuzzingRun[]): FlakySummary {
 
   const signatures = Array.from(bySignature.entries())
     .map(([signature, signatureRuns]) => toFlakySignature(signature, signatureRuns))
-    .filter((signature): signature is FlakySignature => signature !== null)
     .sort((a, b) => b.flakyScore - a.flakyScore);
 
-  const flakyRuns = signatures.reduce((total, signature) => total + signature.occurrences, 0);
+  const flakyRuns = signatures
+    .filter((s) => s.tier === 'FLAKY')
+    .reduce((total, signature) => total + signature.occurrences, 0);
+  const insufficientSignatures = signatures.filter((s) => s.tier === 'INSUFFICIENT');
+  const unstableSignatures = signatures.filter((s) => s.tier !== 'INSUFFICIENT');
   const averageScore =
-    signatures.length === 0
+    unstableSignatures.length === 0
       ? 0
-      : signatures.reduce((total, signature) => total + signature.flakyScore, 0) /
-        signatures.length;
+      : unstableSignatures.reduce((total, signature) => total + signature.flakyScore, 0) /
+        unstableSignatures.length;
 
   return {
     totalRuns: runs.length,
@@ -231,14 +289,12 @@ function buildFlakySummary(runs: FuzzingRun[]): FlakySummary {
     flakyRate: runs.length === 0 ? 0 : (flakyRuns / runs.length) * 100,
     averageScore,
     signatures,
+    insufficientSignatures,
+    unstableSignatures,
   };
 }
 
-function toFlakySignature(signature: string, runs: FuzzingRun[]): FlakySignature | null {
-  if (runs.length < 2) {
-    return null;
-  }
-
+function toFlakySignature(signature: string, runs: FuzzingRun[]): FlakySignature {
   const sortedRuns = [...runs].sort(
     (a, b) => runTimestamp(a).getTime() - runTimestamp(b).getTime(),
   );
@@ -250,6 +306,7 @@ function toFlakySignature(signature: string, runs: FuzzingRun[]): FlakySignature
   const spreadScore = Math.min(seedSpread / 750, 25);
   const weightedScore =
     (recurrenceScore + spreadScore + 15) * severityWeight[lastRun.severity];
+  const flakyScore = Math.min(weightedScore, 100);
 
   return {
     signature,
@@ -260,8 +317,9 @@ function toFlakySignature(signature: string, runs: FuzzingRun[]): FlakySignature
     firstSeen: runTimestamp(firstRun).toISOString(),
     lastSeen: runTimestamp(lastRun).toISOString(),
     seedSpread,
-    flakyScore: Math.min(weightedScore, 100),
+    flakyScore,
     sampleRunId: lastRun.id,
+    tier: classifyFlakySignature(sortedRuns.length, flakyScore),
   };
 }
 
@@ -289,6 +347,57 @@ function MetricPanel({
       <div className="text-sm font-medium opacity-80">{label}</div>
       <div className="mt-2 text-3xl font-bold">{value}</div>
       <div className="mt-1 text-sm opacity-75">{detail}</div>
+    </div>
+  );
+}
+
+const TIER_BADGE_STYLES: Record<FlakinessTier, string> = {
+  FLAKY: 'bg-orange-100 text-orange-800 dark:bg-orange-950/70 dark:text-orange-200',
+  STABLE: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-200',
+  INSUFFICIENT:
+    'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+};
+
+function TierBadge({ tier }: { tier: FlakinessTier }) {
+  const tooltip =
+    tier === 'INSUFFICIENT'
+      ? 'Minimum 2 replays required for flakiness analysis'
+      : tier === 'FLAKY'
+        ? 'Outcome varies across replays — likely unstable'
+        : 'Outcome consistent across replays';
+  return (
+    <span
+      title={tooltip}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${TIER_BADGE_STYLES[tier]}`}
+    >
+      {tier}
+    </span>
+  );
+}
+
+function FlakinessLegend({ insufficient }: { insufficient: number }) {
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900/70">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+        Classification legend
+      </p>
+      <ul className="mt-3 space-y-2 text-zinc-600 dark:text-zinc-400">
+        <li className="flex items-center gap-2">
+          <TierBadge tier="FLAKY" />
+          <span>Outcome varies across replays.</span>
+        </li>
+        <li className="flex items-center gap-2">
+          <TierBadge tier="STABLE" />
+          <span>Outcome is consistent across replays.</span>
+        </li>
+        <li className="flex items-center gap-2">
+          <TierBadge tier="INSUFFICIENT" />
+          <span>
+            Fewer than {MIN_REPLAYS} replays — insufficient for flakiness
+            analysis ({insufficient} signature{insufficient === 1 ? '' : 's'}).
+          </span>
+        </li>
+      </ul>
     </div>
   );
 }

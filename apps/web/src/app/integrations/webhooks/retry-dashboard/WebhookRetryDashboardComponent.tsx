@@ -34,7 +34,7 @@ export default function WebhookRetryDashboardComponent() {
       const res = await fetch(`/api/webhooks/history?status=${statusFilter}&search=${encodeURIComponent(searchQuery)}`);
       if (res.ok) {
         const data = await res.json();
-        setItems(data.items);
+        setItems(data.data?.items ?? []);
       } else {
         // Fallback to local computation if API unavailable (e.g. static export)
         const filtered = filterDeliveryItems(MOCK_WEBHOOK_DELIVERY_HISTORY, statusFilter, searchQuery);
@@ -77,10 +77,10 @@ export default function WebhookRetryDashboardComponent() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.item) {
+        if (data.data?.item) {
           // Update selected payload item if open in drawer
           if (selectedPayloadItem && selectedPayloadItem.id === id) {
-            setSelectedPayloadItem(data.item);
+            setSelectedPayloadItem(data.data.item);
           }
         }
       }

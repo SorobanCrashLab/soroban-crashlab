@@ -5,6 +5,7 @@ import { STATUS_META } from '../lib/run-status';
 import AddReplayFromUiAction from './add-replay-from-ui-action';
 import { useDataTableKeyboardNav } from './use-data-table-keyboard-nav';
 import TruncatedCell from '@/components/TruncatedCell';
+import { useResponsiveRunColumns } from './use-responsive-run-columns';
 
 interface RunHistoryTableProps {
     /** Array of fuzzing runs to display */
@@ -57,6 +58,9 @@ export default function RunHistoryTable({
     onReplayRun,
     visibleColumns = ['id', 'status', 'duration', 'seedCount', 'report'] 
 }: RunHistoryTableProps) {
+    /** Responsive column set — adapts to phone and portrait-tablet viewports. */
+    const effectiveColumns = useResponsiveRunColumns(visibleColumns);
+
     const { getRowProps } = useDataTableKeyboardNav({
         rowCount: runs.length,
         onActivate: (index) => {
@@ -82,12 +86,12 @@ export default function RunHistoryTable({
                 <table className="w-full text-left border-collapse" aria-label="Fuzzing run history">
                     <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
-                            {visibleColumns.includes('id') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Run ID</th>}
-                            {visibleColumns.includes('status') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Status</th>}
-                            {visibleColumns.includes('duration') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Duration</th>}
-                            {visibleColumns.includes('seedCount') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Seed Count</th>}
+                            {effectiveColumns.includes('id') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Run ID</th>}
+                            {effectiveColumns.includes('status') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Status</th>}
+                            {effectiveColumns.includes('duration') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Duration</th>}
+                            {effectiveColumns.includes('seedCount') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Seed Count</th>}
                             {onReplayRun && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Actions</th>}
-                            {visibleColumns.includes('report') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Report</th>}
+                            {effectiveColumns.includes('report') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Report</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -99,7 +103,7 @@ export default function RunHistoryTable({
                                 onClick={() => onSelectRun(run.id)}
                                 aria-label={`Fuzzing run ${run.id}, status ${run.status}`}
                             >
-                                {visibleColumns.includes('id') && (
+                                {effectiveColumns.includes('id') && (
                                     <td className="px-6 py-4 max-w-[200px]">
                                         <button
                                             type="button"
@@ -113,17 +117,17 @@ export default function RunHistoryTable({
                                         </button>
                                     </td>
                                 )}
-                                {visibleColumns.includes('status') && (
+                                {effectiveColumns.includes('status') && (
                                     <td className="px-6 py-4">
                                         <StatusBadge status={run.status} />
                                     </td>
                                 )}
-                                {visibleColumns.includes('duration') && (
+                                {effectiveColumns.includes('duration') && (
                                     <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400 text-right tabular-nums">
                                         {formatDuration(run.duration)}
                                     </td>
                                 )}
-                                {visibleColumns.includes('seedCount') && (
+                                {effectiveColumns.includes('seedCount') && (
                                     <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400 text-right tabular-nums">
                                         {run.seedCount.toLocaleString()}
                                     </td>
@@ -136,7 +140,7 @@ export default function RunHistoryTable({
                                         />
                                     </td>
                                 )}
-                                {visibleColumns.includes('report') && (
+                                {effectiveColumns.includes('report') && (
                                     <td className="px-6 py-4 text-right">
                                         <button
                                             type="button"

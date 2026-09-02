@@ -6,7 +6,7 @@
  * configuration for monitoring and debugging purposes.
  */
 
-import { NextResponse } from 'next/server';
+import { successResponse } from '@/lib/api-response-utils';
 import { withRouteErrorHandling } from '@/lib/route-handler';
 
 export const GET = withRouteErrorHandling(
@@ -32,7 +32,7 @@ export const GET = withRouteErrorHandling(
       timestamp: new Date().toISOString(),
     };
 
-    return NextResponse.json(metricsStatus);
+    return successResponse(metricsStatus);
   },
   'Failed to retrieve Datadog metrics configuration',
 );

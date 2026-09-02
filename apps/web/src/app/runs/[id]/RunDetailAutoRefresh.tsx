@@ -39,9 +39,9 @@ export default function RunDetailAutoRefresh({ runId, initialStatus }: RunDetail
           cache: 'no-store',
         });
         if (res.ok) {
-          const data = (await res.json()) as { status?: RunStatus };
-          if (data.status && data.status !== status) {
-            setStatus(data.status);
+          const data = (await res.json()) as { data?: { status?: RunStatus } };
+          if (data.data?.status && data.data.status !== status) {
+            setStatus(data.data.status);
             router.refresh();
           }
         }

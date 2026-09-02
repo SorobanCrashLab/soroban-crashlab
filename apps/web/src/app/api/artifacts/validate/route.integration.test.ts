@@ -25,8 +25,8 @@ describe("POST /api/artifacts/validate", () => {
     const response = await POST(request);
     expect(response.status).toBe(200);
     const json = await response.json();
-    expect(json.valid).toBe(true);
-    expect(json.errors).toHaveLength(0);
+    expect(json.data.valid).toBe(true);
+    expect(json.data.errors).toHaveLength(0);
   });
 
   it("returns 400 for invalid JSON", async () => {
@@ -38,8 +38,8 @@ describe("POST /api/artifacts/validate", () => {
     const response = await POST(request);
     expect(response.status).toBe(400);
     const json = await response.json();
-    expect(json.valid).toBe(false);
-    expect(json.errors[0]).toContain("Invalid JSON");
+    expect(json.data.valid).toBe(false);
+    expect(json.data.errors[0]).toContain("Invalid JSON");
   });
 
   it("returns 400 for missing bundle field", async () => {
@@ -47,8 +47,8 @@ describe("POST /api/artifacts/validate", () => {
     const response = await POST(request);
     expect(response.status).toBe(400);
     const json = await response.json();
-    expect(json.valid).toBe(false);
-    expect(json.errors[0]).toContain('Missing "bundle"');
+    expect(json.data.valid).toBe(false);
+    expect(json.data.errors[0]).toContain('Missing "bundle"');
   });
 
   it("returns 422 for schema-invalid bundle", async () => {
@@ -62,8 +62,8 @@ describe("POST /api/artifacts/validate", () => {
     const response = await POST(request);
     expect(response.status).toBe(422);
     const json = await response.json();
-    expect(json.valid).toBe(false);
-    expect(json.errors.length).toBeGreaterThan(0);
+    expect(json.data.valid).toBe(false);
+    expect(json.data.errors.length).toBeGreaterThan(0);
   });
 
   it("returns 413 for oversized body", async () => {
@@ -78,8 +78,8 @@ describe("POST /api/artifacts/validate", () => {
     const response = await POST(request);
     expect(response.status).toBe(413);
     const json = await response.json();
-    expect(json.valid).toBe(false);
-    expect(json.errors[0]).toContain("1 MiB");
+    expect(json.data.valid).toBe(false);
+    expect(json.data.errors[0]).toContain("1 MiB");
   });
 
   it("returns 422 for payload with constraint violations", async () => {
@@ -93,7 +93,7 @@ describe("POST /api/artifacts/validate", () => {
     const response = await POST(request);
     expect(response.status).toBe(422);
     const json = await response.json();
-    expect(json.valid).toBe(false);
-    expect(json.errors.some((e: string) => e.includes("too short"))).toBe(true);
+    expect(json.data.valid).toBe(false);
+    expect(json.data.errors.some((e: string) => e.includes("too short"))).toBe(true);
   });
 });

@@ -435,6 +435,54 @@ html.theme-ready body {
   justify-content: center;
 }
 
+/* Tablet navigation (768–1023px)
+ *
+ * The dashboard has eight primary destinations.  Keeping every text label,
+ * the search field, and global controls in the 52px header at tablet widths
+ * forces the navigation strip to scroll.  Use a consistent, touch-friendly
+ * icon rail in this range, then restore the full desktop navigation at 1024px.
+ * Labels remain available through each link's accessible name and title.
+ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tablet-header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .tablet-brand {
+    margin-right: 8px;
+  }
+
+  .tablet-brand-name,
+  .tablet-nav-label,
+  .tablet-search-label {
+    display: none;
+  }
+
+  .top-nav-link {
+    flex: 0 0 44px;
+    width: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .top-nav-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .tablet-actions {
+    gap: 8px;
+  }
+
+  .tablet-search {
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;

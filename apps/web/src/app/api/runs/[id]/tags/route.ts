@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { buildMockRuns } from '@/app/mockRuns';
 import { addTag, normalizeTag, removeTag } from '@/app/run-tags-utils';
 import { getTagStore } from '@/app/api/mock-store';
 import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
+import { successResponse, createdResponse } from '@/lib/api-response-utils';
 
 const tagStore = getTagStore();
 
@@ -23,7 +24,7 @@ export const GET = withRouteErrorHandling(
     if (!run) {
       return jsonError('Run not found', 404);
     }
-    return NextResponse.json({ runId: id, tags: getTags(id) });
+    return successResponse({ runId: id, tags: getTags(id) });
   },
 );
 
@@ -51,7 +52,7 @@ export const POST = withRouteErrorHandling(
     }
 
     tagStore.set(id, result.tags);
-    return NextResponse.json({ runId: id, tags: result.tags }, { status: 201 });
+    return createdResponse({ runId: id, tags: result.tags });
   },
 );
 
@@ -80,6 +81,6 @@ export const DELETE = withRouteErrorHandling(
 
     const next = removeTag(current, normalized);
     tagStore.set(id, next);
-    return NextResponse.json({ runId: id, tags: next });
+    return successResponse({ runId: id, tags: next });
   },
 );
