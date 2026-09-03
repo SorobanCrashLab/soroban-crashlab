@@ -79,7 +79,9 @@ test.describe('Mobile responsive layout', () => {
     expect(hasHorizontalOverflow).toBe(false);
 
     await expect(page.getByRole('link', { name: 'View All Runs' })).toBeVisible();
-    await expect(page.getByRole('table')).toBeVisible();
+    // The dashboard renders several tables; assert the first one is visible
+    // rather than matching every table (strict-mode violation otherwise).
+    await expect(page.getByRole('table').first()).toBeVisible();
   });
 
   test('closes the mobile drawer with the close button', async ({ page }) => {
@@ -199,5 +201,24 @@ test.describe('Mobile responsive layout', () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible();
+  });
+
+  test('provides 44px minimum touch targets for interactive elements', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    const targets = [
+      page.getByRole('button', { name: 'Open navigation menu' }),
+      page.getByRole('button', { name: /Switch to (light|dark) mode/i }),
+      page.getByRole('link', { name: 'View All Runs' }),
+    ];
+
+    for (const target of targets) {
+      await expect(target).toBeVisible();
+      const box = await target.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+    }
   });
 });

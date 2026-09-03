@@ -964,6 +964,58 @@ nav, header, .nav-bar {
   }
 }
 
+/* ===== Touch-friendly hit targets (min 44px) ===== */
+
+/*
+ * Interactive elements get a comfortable minimum touch target on mobile and
+ * touch-only devices (Apple HIG / WCAG 2.5.5 recommend 44px). We bump the
+ * *minimum* size rather than the fixed size so compact utilities (e.g.
+ * Tailwind h-7/w-7 icon buttons) grow to 44px while larger controls keep
+ * their natural dimensions. Per the CSS box model min-height/min-width win
+ * over height/width, and these unlayered rules beat layered Tailwind
+ * utilities, so every call site is covered without touching each component.
+ *
+ * Inline text links are intentionally exempt: min-height/min-width have no
+ * effect on inline-level boxes, so links inside prose keep their natural tap
+ * area (explicitly allowed by WCAG 2.5.8).
+ */
+@media (max-width: 767px), (hover: none) {
+  button,
+  [role="button"],
+  a,
+  .chip,
+  .chip-add,
+  .nav-strip-item,
+  .breadcrumb-link,
+  .drawer-item,
+  .top-nav-link {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Remove the 300ms double-tap zoom delay on touch controls. */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* Slightly larger tap surface for custom checkboxes; checkbox rows rely on
+     the wrapping label for most of the hit area, so the visual stays compact. */
+  .checkbox {
+    width: 22px;
+    height: 22px;
+  }
+}
+
 /* ===== Reduced motion support ===== */
 @media (prefers-reduced-motion: reduce) {
   html, body, * {
