@@ -6,7 +6,7 @@
  * in-memory cache, matching the lightweight pattern used throughout this codebase.
  */
 
-import { NextResponse } from 'next/server';
+import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import type { PagerDutyConfig } from '../../../../integrate-pagerduty-alert-integration-utils';
 
 // Module-level in-memory store (same pattern as other lightweight integrations).
@@ -14,9 +14,9 @@ let storedConfig: PagerDutyConfig | null = null;
 
 export async function GET() {
   if (!storedConfig) {
-    return NextResponse.json({ error: 'No configuration saved yet' }, { status: 404 });
+    return errorResponse('No configuration saved yet', 404);
   }
-  return NextResponse.json(storedConfig);
+  return successResponse(storedConfig);
 }
 
 export async function POST(request: Request) {
@@ -24,12 +24,12 @@ export async function POST(request: Request) {
     const body = (await request.json()) as PagerDutyConfig;
 
     if (!body || typeof body.integrationKey !== 'string') {
-      return NextResponse.json({ error: 'Invalid configuration payload' }, { status: 400 });
+      return errorResponse('Invalid configuration payload', 400);
     }
 
     storedConfig = body;
-    return NextResponse.json({ success: true });
+    return successResponse({ success: true });
   } catch {
-    return NextResponse.json({ error: 'Failed to parse request body' }, { status: 400 });
+    return errorResponse('Failed to parse request body', 400);
   }
 }

@@ -54,12 +54,12 @@ describe('/api/sentry/config', () => {
   it('POST accepts a valid config', async () => {
     const response = await POST(makePostRequest(validConfig));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(validConfig);
+    expect(await response.json()).toEqual({ data: validConfig });
   });
 
   it('GET then returns the previously saved config', async () => {
     const response = await GET();
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(validConfig);
+    expect(await response.json()).toEqual({ data: validConfig });
   });
 });

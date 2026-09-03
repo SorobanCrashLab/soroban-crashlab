@@ -2,6 +2,8 @@
 
 This document describes the system architecture of Soroban CrashLab, including the data flow between the fuzzer generator and web dashboard.
 
+> **Note:** For in-depth rationale on specific design choices (e.g., why we use XOR-shift PRNG, why we enforce a multi-tier split), please refer to the [Architecture Decision Records (ADRs)](adr/README.md).
+
 ## System Overview
 
 ```

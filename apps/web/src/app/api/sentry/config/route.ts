@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import {
   validateSentryConfig,
   type SentryConfig,
 } from '@/app/integrate-sentry-integration-for-crash-reporting-utils';
+import { errorResponse, successResponse } from '@/lib/api-response-utils';
 
 // In-memory store (persists for the lifetime of the process)
 let config: SentryConfig | null = null;
@@ -13,9 +14,9 @@ let config: SentryConfig | null = null;
  */
 export async function GET() {
   if (!config) {
-    return NextResponse.json({ error: 'No Sentry configuration saved yet.' }, { status: 404 });
+    return errorResponse('No Sentry configuration saved yet.', 404);
   }
-  return NextResponse.json(config);
+  return successResponse(config);
 }
 
 /**
@@ -27,19 +28,19 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
+    return errorResponse('Request body must be valid JSON.', 400);
   }
 
   if (typeof body !== 'object' || body === null) {
-    return NextResponse.json({ error: 'Request body must be a JSON object.' }, { status: 400 });
+    return errorResponse('Request body must be a JSON object.', 400);
   }
 
   const candidate = body as SentryConfig;
   const validation = validateSentryConfig(candidate);
   if (!validation.isValid) {
-    return NextResponse.json({ error: validation.errors.join('; ') }, { status: 422 });
+    return errorResponse(validation.errors.join('; '), 422);
   }
 
   config = candidate;
-  return NextResponse.json(config, { status: 200 });
+  return successResponse(config);
 }

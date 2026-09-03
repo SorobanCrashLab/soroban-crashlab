@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import ArtifactGallery from "./ArtifactGallery";
 import type { FuzzingRun } from "../../types";
 
@@ -42,47 +42,40 @@ const mockRunWithUndefinedArtifacts: FuzzingRun = {
 
 describe("ArtifactGallery", () => {
   it("should render empty state when artifacts array is empty", () => {
-    render(<ArtifactGallery run={mockRunWithZeroArtifacts} />);
+    const html = renderToStaticMarkup(<ArtifactGallery run={mockRunWithZeroArtifacts} />);
 
-    expect(
-      screen.getByText("No artifacts were produced by this run"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/run may have failed before generating any artifacts/i),
-    ).toBeInTheDocument();
+    expect(html).toContain("No artifacts were produced by this run");
+    expect(html).toContain("This run may have failed before generating any artifacts");
+    expect(html).toContain("artifacts empty state illustration");
   });
 
   it("should render empty state when artifacts field is undefined", () => {
-    render(<ArtifactGallery run={mockRunWithUndefinedArtifacts} />);
+    const html = renderToStaticMarkup(<ArtifactGallery run={mockRunWithUndefinedArtifacts} />);
 
-    expect(
-      screen.getByText("No artifacts were produced by this run"),
-    ).toBeInTheDocument();
+    expect(html).toContain("No artifacts were produced by this run");
   });
 
   it("should render artifact list when artifacts exist", () => {
-    render(<ArtifactGallery run={mockRunWithArtifacts} />);
+    const html = renderToStaticMarkup(<ArtifactGallery run={mockRunWithArtifacts} />);
 
-    expect(screen.getByText("Artifacts (2)")).toBeInTheDocument();
-    expect(screen.getByText("crash.bin")).toBeInTheDocument();
-    expect(screen.getByText("seed.dat")).toBeInTheDocument();
-    expect(screen.getByText("100.0 KB")).toBeInTheDocument();
-    expect(screen.getByText("50.0 KB")).toBeInTheDocument();
+    expect(html).toContain("Artifacts (2)");
+    expect(html).toContain("crash.bin");
+    expect(html).toContain("seed.dat");
+    expect(html).toContain("100.0 KB");
+    expect(html).toContain("50.0 KB");
   });
 
   it("should not crash when rendering with zero artifacts", () => {
     expect(() => {
-      render(<ArtifactGallery run={mockRunWithZeroArtifacts} />);
+      renderToStaticMarkup(<ArtifactGallery run={mockRunWithZeroArtifacts} />);
     }).not.toThrow();
   });
 
   it("should hide download and action buttons when no artifacts", () => {
-    const { container } = render(
+    const html = renderToStaticMarkup(
       <ArtifactGallery run={mockRunWithZeroArtifacts} />,
     );
 
-    // Ensure no artifact-specific action buttons are rendered
-    const buttons = container.querySelectorAll("button");
-    expect(buttons).toHaveLength(0);
+    expect(html).not.toContain("<button");
   });
 });

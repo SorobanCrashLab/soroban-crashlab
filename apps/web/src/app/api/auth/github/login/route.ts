@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response-utils';
 
 const GITHUB_AUTH_URL = 'https://github.com/login/oauth/authorize';
 const STATE_COOKIE_NAME = 'github_oauth_state';
@@ -18,10 +19,7 @@ export async function GET(request: NextRequest) {
 
   if (!clientId) {
     logger.warn('GET /api/auth/github/login: GITHUB_CLIENT_ID is not configured');
-    return NextResponse.json(
-      { error: 'GitHub OAuth is not configured.' },
-      { status: 503 }
-    );
+    return errorResponse('GitHub OAuth is not configured.', 503);
   }
 
   const state = crypto.randomUUID();

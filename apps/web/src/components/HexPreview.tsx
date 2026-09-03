@@ -20,13 +20,17 @@ const HexPreview: React.FC<HexPreviewProps> = ({
 
   return (
     <div
-      className={`overflow-auto ${maxHeight} rounded-lg border border-zinc-200 dark:border-zinc-700 font-mono`}
+      className={`overflow-auto ${maxHeight} rounded-lg font-mono`}
+      style={{ border: '1px solid var(--border-color)' }}
     >
-      <pre className="text-xs leading-relaxed p-4 bg-zinc-900 dark:bg-zinc-950 text-green-400 dark:text-green-400 whitespace-pre">
+      <pre className="text-xs leading-relaxed p-4 whitespace-pre"
+           style={{ background: '#0c0c0c', color: '#4ade80' }}>
         {hexDump}
       </pre>
       {isTruncated && (
-        <div className="px-4 py-2 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-800 dark:bg-zinc-900 border-t border-zinc-700">
+        <div className="px-4 py-2 text-xs text-muted bg-zinc-800 dark:bg-zinc-900 border-t border-zinc-700">
+        <div className="px-4 py-2 text-xs"
+             style={{ color: 'var(--text-secondary)', background: '#1a1a1a', borderTop: '1px solid #333' }}>
           Hex dump truncated — showing first portion of the file
         </div>
       )}

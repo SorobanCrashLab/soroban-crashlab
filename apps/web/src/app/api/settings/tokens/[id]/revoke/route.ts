@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { revokeApiToken } from '../../../../../../lib/storage/api-token-store';
 
 export async function POST(
@@ -7,13 +8,13 @@ export async function POST(
 ) {
   const { id } = await context.params;
   if (!id) {
-    return NextResponse.json({ error: 'Token ID required.' }, { status: 400 });
+    return errorResponse('Token ID required.', 400);
   }
 
   const success = revokeApiToken(id);
   if (!success) {
-    return NextResponse.json({ error: 'Token not found.' }, { status: 404 });
+    return errorResponse('Token not found.', 404);
   }
 
-  return NextResponse.json({ message: 'Token revoked successfully.' });
+  return successResponse({ message: 'Token revoked successfully.' });
 }

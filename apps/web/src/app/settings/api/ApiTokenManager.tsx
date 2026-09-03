@@ -25,7 +25,7 @@ export default function ApiTokenManager() {
       const res = await fetch('/api/settings/tokens');
       if (res.ok) {
         const data = await res.json();
-        setTokens(data.tokens || []);
+        setTokens(data.data?.tokens || []);
       }
     } catch {
       // Ignore network errors in mock mode
@@ -41,7 +41,7 @@ export default function ApiTokenManager() {
         const res = await fetch('/api/settings/tokens');
         if (res.ok && mounted) {
           const data = await res.json();
-          setTokens(data.tokens || []);
+          setTokens(data.data?.tokens || []);
         }
       } catch {
         // Ignore
@@ -83,7 +83,7 @@ export default function ApiTokenManager() {
         return;
       }
 
-      setCreatedSecret(data.secret);
+      setCreatedSecret(data.data?.secret ?? null);
       setName('');
       setExpiresAt('');
       fetchTokens();

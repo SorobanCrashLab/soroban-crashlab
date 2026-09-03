@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server';
 import { logger } from './logger';
 import { checkRequestSize, RequestSizeLimitConfig } from './request-size-limits';
 
+function isResponseLike(value: unknown): value is Response {
+  return value instanceof Response || (
+    typeof value === 'object' &&
+    value !== null &&
+    'status' in value &&
+    typeof (value as { status?: unknown }).status === 'number'
+  );
+}
+
 /**
  * Standard error envelope returned by API routes: { error: string }.
  */
@@ -23,6 +32,15 @@ export async function readJsonBody(
   }
 }
 
+function ensureRouteResponse(value: unknown, fallbackMessage: string): Response {
+  if (isResponseLike(value)) {
+    return value as Response;
+  }
+
+  logger.error('Route handler returned an invalid response payload', { value });
+  return jsonError(fallbackMessage, 500);
+}
+
 /**
  * Wraps a route handler so any uncaught exception is logged and converted
  * into a consistent 500 { error } response instead of an unhandled
@@ -30,12 +48,13 @@ export async function readJsonBody(
  */
 export function withRouteErrorHandling<Args extends unknown[]>(
   routeLabel: string,
-  handler: (...args: Args) => Promise<NextResponse>,
+  handler: (...args: Args) => Promise<Response>,
   fallbackMessage = 'An unexpected error occurred.',
-): (...args: Args) => Promise<NextResponse> {
+): (...args: Args) => Promise<Response> {
   return async (...args: Args) => {
     try {
-      return await handler(...args);
+      const response = await handler(...args);
+      return ensureRouteResponse(response, fallbackMessage);
     } catch (error) {
       logger.error(`${routeLabel} failed`, { error });
       return jsonError(fallbackMessage, 500);
@@ -49,10 +68,10 @@ export function withRouteErrorHandling<Args extends unknown[]>(
  */
 export function withSizeLimitAndLogging<Args extends unknown[]>(
   routeLabel: string,
-  handler: (...args: Args) => Promise<NextResponse>,
+  handler: (...args: Args) => Promise<Response>,
   sizeConfig?: RequestSizeLimitConfig,
   fallbackMessage = 'An unexpected error occurred.',
-): (...args: Args) => Promise<NextResponse> {
+): (...args: Args) => Promise<Response> {
   return async (...args: Args) => {
     const request = args[0] as Request | undefined;
     const startTime = Date.now();
@@ -72,7 +91,7 @@ export function withSizeLimitAndLogging<Args extends unknown[]>(
         }
       }
 
-      const response = await handler(...args);
+      const response = ensureRouteResponse(await handler(...args), fallbackMessage);
       const duration = Date.now() - startTime;
 
       logger.info(`${routeLabel} completed`, {

@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { buildMockRuns } from '@/app/mockRuns';
 import type { RunIssueLink } from '@/app/types';
 import { getIssueStore } from '@/app/api/mock-store';
 import { tryBackend } from '@/lib/api-proxy';
 import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
+import { successResponse, createdResponse } from '@/lib/api-response-utils';
 
 const ISSUES_API_URL = process.env.ISSUES_API_URL || process.env.NEXT_PUBLIC_API_URL;
 
@@ -28,7 +29,7 @@ export const GET = withRouteErrorHandling(
       if (!run) {
         return jsonError('Run not found', 404);
       }
-      return NextResponse.json({ runId: id, issues: getIssues(id) });
+      return successResponse({ runId: id, issues: getIssues(id) });
     });
   },
 );
@@ -73,7 +74,7 @@ export const POST = withRouteErrorHandling(
     const newLink: RunIssueLink = { label: label.trim(), href };
     issues.push(newLink);
 
-    return NextResponse.json({ runId: id, issues }, { status: 201 });
+    return createdResponse({ runId: id, issues });
   },
 );
 
@@ -101,6 +102,6 @@ export const DELETE = withRouteErrorHandling(
     }
 
     issues.splice(index, 1);
-    return NextResponse.json({ runId: id, issues });
+    return successResponse({ runId: id, issues });
   },
 );

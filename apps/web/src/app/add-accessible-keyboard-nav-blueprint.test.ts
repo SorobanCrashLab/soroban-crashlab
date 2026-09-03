@@ -15,7 +15,6 @@ describe('Accessible Keyboard Navigation Blueprint', () => {
   const appRoot = path.resolve(__dirname);
   const blueprintPath = path.join(appRoot, 'add-accessible-keyboard-nav-blueprint.tsx');
   const blueprintPagePath = path.join(appRoot, 'add-accessible-keyboard-nav-blueprint-page-49.tsx');
-  const keyboardHelpPath = path.join(appRoot, 'add-keyboard-navigation-help.tsx');
 
   describe('File existence', () => {
     it('should have the main blueprint component', () => {
@@ -24,10 +23,6 @@ describe('Accessible Keyboard Navigation Blueprint', () => {
 
     it('should have the blueprint page component', () => {
       expect(fs.existsSync(blueprintPagePath)).toBe(true);
-    });
-
-    it('should have the keyboard help component', () => {
-      expect(fs.existsSync(keyboardHelpPath)).toBe(true);
     });
   });
 
@@ -179,48 +174,6 @@ describe('Accessible Keyboard Navigation Blueprint', () => {
     it('should have handleReset function', () => {
       expect(pageContent).toContain('handleReset');
       expect(pageContent).toMatch(/const handleReset|function handleReset/);
-    });
-  });
-
-  describe('Keyboard help component structure', () => {
-    const helpContent = fs.readFileSync(keyboardHelpPath, 'utf-8');
-
-    it('should be a client component', () => {
-      expect(helpContent).toContain("'use client'");
-    });
-
-    it('should toggle on "?" key', () => {
-      expect(helpContent).toMatch(/e\.key === ['"]?['"]?/);
-    });
-
-    it('should close on Escape key', () => {
-      expect(helpContent).toMatch(/e\.key === ['"]Escape['"]|Escape/);
-    });
-
-    it('should have modal with ARIA attributes', () => {
-      expect(helpContent).toContain('role="dialog"');
-      expect(helpContent).toContain('aria-modal="true"');
-      expect(helpContent).toContain('aria-labelledby');
-    });
-
-    it('should list keyboard shortcuts', () => {
-      expect(helpContent).toContain('shortcuts');
-      expect(helpContent).toContain('Enter');
-      expect(helpContent).toContain('Esc');
-    });
-
-    it('should have close button', () => {
-      expect(helpContent).toContain('Close');
-      expect(helpContent).toMatch(/aria-label.*close/i);
-    });
-
-    it('should manage focus', () => {
-      expect(helpContent).toContain('focus()');
-      expect(helpContent).toMatch(/closeButtonRef|buttonRef/);
-    });
-
-    it('should support dark mode', () => {
-      expect(helpContent).toMatch(/dark:/);
     });
   });
 

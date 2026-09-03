@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { logger } from '@/lib/logger';
+import { successResponse } from '@/lib/api-response-utils';
 import { API_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
 
 interface NotificationFeedItem {
@@ -100,23 +101,24 @@ async function fetchNotificationsFeed(request: NextRequest, feedUrl: string): Pr
 
 export async function GET(request: NextRequest) {
   if (isFalsyToggle(request.nextUrl.searchParams.get('enabled'))) {
-    return NextResponse.json(buildEmptyFeed());
+    return successResponse(buildEmptyFeed(), { total: 0 });
   }
 
   if (isFalsyToggle(process.env.NOTIFICATIONS_FEED_ENABLED ?? null)) {
-    return NextResponse.json(buildEmptyFeed());
+    return successResponse(buildEmptyFeed(), { total: 0 });
   }
 
   const feedUrl = process.env.NOTIFICATIONS_FEED_URL ?? process.env.NOTIFICATIONS_API_URL;
 
   if (!feedUrl) {
-    return NextResponse.json(buildEmptyFeed());
+    return successResponse(buildEmptyFeed(), { total: 0 });
   }
 
   try {
-    return NextResponse.json(await fetchNotificationsFeed(request, feedUrl));
+    const feed = await fetchNotificationsFeed(request, feedUrl);
+    return successResponse(feed, { total: feed.total });
   } catch (error) {
     logger.error('GET /api/notifications failed', { error });
-    return NextResponse.json(buildEmptyFeed());
+    return successResponse(buildEmptyFeed(), { total: 0 });
   }
 }

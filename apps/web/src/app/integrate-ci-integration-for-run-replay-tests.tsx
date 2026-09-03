@@ -16,10 +16,9 @@
 
 import React, { useState } from 'react';
 import { simulateSeedReplay } from './replay';
-import { FuzzingRun } from './types';
+import { FuzzingRun, type SorobanAuthMode } from './types';
 
 export type CIReplayStatus = 'idle' | 'queued' | 'running' | 'passed' | 'failed' | 'timeout';
-export type SorobanAuthMode = 'Enforce' | 'Record' | 'RecordAllowNonroot';
 
 export interface CIJobConfig {
   jobId: string;

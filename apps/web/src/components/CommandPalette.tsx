@@ -238,7 +238,7 @@ export default function CommandPalette() {
           className="max-h-80 overflow-y-auto p-2"
         >
           {results.length === 0 && (
-            <li className="px-3 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+            <li className="px-3 py-6 text-center text-sm text-muted">
               No matching commands.
             </li>
           )}

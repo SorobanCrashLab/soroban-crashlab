@@ -114,7 +114,7 @@ export default function ReplayDiffViewer({
                 </div>
                 <h3 className="text-lg font-bold text-red-900 dark:text-red-100">Runs Not Comparable</h3>
                 <p className="text-sm text-red-700 dark:text-red-300 mt-1 max-w-md">{result.comparability.reason}</p>
-                <div className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
+                <div className="mt-4 text-xs text-muted">
                     <p>Left: {result.metadata.leftRunId} ({result.metadata.leftContractId})</p>
                     <p>Right: {result.metadata.rightRunId} ({result.metadata.rightContractId})</p>
                 </div>
@@ -165,7 +165,7 @@ export default function ReplayDiffViewer({
             {/* Diff table */}
             <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
                 <table className="w-full text-sm">
-                    <thead className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
+                    <thead className="surface-soft/50 border-b border-zinc-200 dark:border-zinc-800">
                         <tr>
                             <th className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-8"></th>
                             <th className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-10">Type</th>
@@ -225,7 +225,7 @@ export default function ReplayDiffViewer({
                                 </td>
                             </tr>
                             {expandedRows.has(op.key) && op.fieldDiffs && op.fieldDiffs.length > 0 && (
-                                <tr className="bg-zinc-50 dark:bg-zinc-900/30">
+                                <tr className="surface-soft/30">
                                     <td colSpan={6} className="px-6 py-3">
                                         <div className="space-y-2 ml-10 border-l-2 border-zinc-200 dark:border-zinc-700 pl-4">
                                             {op.fieldDiffs!.map((field, fIdx) => {
@@ -239,7 +239,7 @@ export default function ReplayDiffViewer({
                                                             {field.key}
                                                         </span>
                                                         {field.type !== 'removed' && (
-                                                            <span className="text-zinc-500 dark:text-zinc-400 text-sm">→</span>
+                                                            <span className="text-muted text-sm">→</span>
                                                         )}
                                                         {field.type !== 'added' && (
                                                             <code className="text-sm text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded font-mono max-w-xs truncate block">
@@ -269,13 +269,13 @@ export default function ReplayDiffViewer({
             </div>
 
             {filteredOps.length === 0 && (
-                <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+                <div className="text-center py-12 text-muted">
                     {filter === 'all' ? 'No differences found' : \`No \${TYPE_LABELS[filter].toLowerCase()} entries\`}
                 </div>
             )}
 
             {/* Metadata footer */}
-            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 flex flex-wrap gap-4">
+            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 text-xs text-muted flex flex-wrap gap-4">
                 <span>Diff time: {result.metadata.diffTimeMs.toFixed(2)}ms</span>
                 <span>Left: {result.metadata.leftRunId}</span>
                 <span>Right: {result.metadata.rightRunId}</span>

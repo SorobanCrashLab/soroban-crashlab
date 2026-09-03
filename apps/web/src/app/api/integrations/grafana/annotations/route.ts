@@ -7,7 +7,7 @@
  * be exercised without a configured Grafana instance.
  */
 
-import { NextResponse } from 'next/server';
+import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import type { GrafanaAnnotation } from '../../../../integrate-grafana-dashboard-annotation-api-utils';
 import { buildAnnotationPayload, joinGrafanaUrl } from '../../../../integrate-grafana-dashboard-annotation-api-utils';
 
@@ -42,7 +42,7 @@ const MOCK_ANNOTATIONS: GrafanaAnnotation[] = [
 ];
 
 export async function GET() {
-  return NextResponse.json({ annotations: MOCK_ANNOTATIONS });
+  return successResponse({ annotations: MOCK_ANNOTATIONS });
 }
 
 export async function POST(request: Request) {
@@ -62,14 +62,11 @@ export async function POST(request: Request) {
     const apiToken = (body.apiToken ?? process.env.GRAFANA_API_TOKEN ?? '').trim();
 
     if (!baseUrl || !apiToken) {
-      return NextResponse.json(
-        { error: 'Grafana base URL and API token are not configured' },
-        { status: 400 },
-      );
+      return errorResponse('Grafana base URL and API token are not configured', 400);
     }
 
     if (!body.runId || !body.text) {
-      return NextResponse.json({ error: 'runId and text are required' }, { status: 400 });
+      return errorResponse('runId and text are required', 400);
     }
 
     const payload = buildAnnotationPayload({
@@ -94,24 +91,24 @@ export async function POST(request: Request) {
 
       if (grafanaResponse.ok) {
         const responseBody = await grafanaResponse.json().catch(() => ({}));
-        return NextResponse.json({
+        return successResponse({
           success: true,
           annotationId: responseBody.id,
         });
       }
 
       const errorText = await grafanaResponse.text().catch(() => grafanaResponse.statusText);
-      return NextResponse.json({ success: false, error: errorText }, { status: 200 });
+      return errorResponse(errorText, 200);
     } catch (networkError) {
       // Return a mock success in offline/dev environments so the UI can still
       // be exercised without a real Grafana instance.
       console.warn('[grafana/annotations] Could not reach Grafana Annotations API:', networkError);
-      return NextResponse.json({
+      return successResponse({
         success: true,
         warning: 'Annotation queued locally – could not reach Grafana API',
       });
     }
   } catch {
-    return NextResponse.json({ error: 'Failed to parse request body' }, { status: 400 });
+    return errorResponse('Failed to parse request body', 400);
   }
 }

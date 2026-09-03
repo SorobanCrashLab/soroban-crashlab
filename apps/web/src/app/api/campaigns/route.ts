@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
+import { createdResponse } from '@/lib/api-response-utils';
 
 export const POST = withRouteErrorHandling('POST /api/campaigns', async (request: NextRequest) => {
     const parsedBody = await readJsonBody(request);
@@ -12,5 +13,5 @@ export const POST = withRouteErrorHandling('POST /api/campaigns', async (request
         ...(parsedBody.body as Record<string, unknown>),
     };
 
-    return NextResponse.json({ campaign }, { status: 201 });
+    return createdResponse({ campaign });
 });

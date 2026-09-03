@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { WebhookConfig, RunEventType } from '@/app/webhook-manager';
 import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
+import { successResponse, createdResponse } from '@/lib/api-response-utils';
 import { getWebhookStore } from '@/lib/webhook-store';
 import { validateWebhookApiKey } from '@/lib/api-key-auth';
 import { WEBHOOK_DELIVERY_TIMEOUT_MS } from '@/lib/timeouts';
@@ -116,7 +117,7 @@ export const GET = withRouteErrorHandling('GET /api/webhooks', async (request: N
     ...wh,
     secret: wh.secret !== undefined ? '***' : undefined,
   }));
-  return NextResponse.json({ webhooks, total: webhooks.length });
+  return successResponse({ webhooks, total: webhooks.length }, { total: webhooks.length });
 });
 
 /**
@@ -146,10 +147,10 @@ export const POST = withRouteErrorHandling('POST /api/webhooks', async (request:
   };
   store.setConfig(stored);
 
-  return NextResponse.json(
-    { ...stored, secret: stored.secret !== undefined ? '***' : undefined },
-    { status: 201 },
-  );
+  return createdResponse({
+    ...stored,
+    secret: stored.secret !== undefined ? '***' : undefined,
+  });
 });
 
 /**
@@ -172,7 +173,7 @@ export const DELETE = withRouteErrorHandling('DELETE /api/webhooks', async (requ
   }
 
   store.deleteConfig(id);
-  return NextResponse.json({ deleted: id });
+  return successResponse({ deleted: id });
 });
 
 /**
@@ -271,7 +272,7 @@ export const PATCH = withRouteErrorHandling('PATCH /api/webhooks', async (reques
 
   store.setConfig(updated);
 
-  return NextResponse.json({
+  return successResponse({
     ...updated,
     secret: updated.secret !== undefined ? '***' : undefined,
   });

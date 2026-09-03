@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { buildMockRuns } from '@/app/mockRuns';
 import { getAnnotationStore } from '@/app/api/mock-store';
 import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
+import { successResponse, createdResponse } from '@/lib/api-response-utils';
 
 const annotationStore = getAnnotationStore();
 
@@ -23,7 +24,7 @@ export const GET = withRouteErrorHandling(
     if (!run) {
       return jsonError('Run not found', 404);
     }
-    return NextResponse.json({ runId: id, annotations: getAnnotations(id) });
+    return successResponse({ runId: id, annotations: getAnnotations(id) });
   },
 );
 
@@ -49,7 +50,7 @@ export const POST = withRouteErrorHandling(
 
     const annotations = getAnnotations(id);
     annotations.push(text.trim());
-    return NextResponse.json({ runId: id, annotations }, { status: 201 });
+    return createdResponse({ runId: id, annotations });
   },
 );
 
@@ -76,6 +77,6 @@ export const DELETE = withRouteErrorHandling(
     }
 
     annotations.splice(index, 1);
-    return NextResponse.json({ runId: id, annotations });
+    return successResponse({ runId: id, annotations });
   },
 );

@@ -45,7 +45,7 @@ describe('GET /api/integrations/linear/[issueId]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.issue).toEqual(mockIssue);
+    expect(data.data.issue).toEqual(mockIssue);
     expect(mockAdapter.fetchIssue).toHaveBeenCalledWith('TEAM-123');
   });
 
@@ -96,6 +96,6 @@ describe('GET /api/integrations/linear/[issueId]', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.issue.identifier).toBe('TEAM-123');
+    expect(data.data.issue.identifier).toBe('TEAM-123');
   });
 });

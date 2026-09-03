@@ -6,25 +6,11 @@
  * runs instead of a copy of it.
  */
 
-import type { LedgerChangeType, LedgerStateChange } from '../types';
+import type { LedgerChangeType, LedgerStateChange, LedgerFieldDiff } from '../types';
 
-/** Field-level comparison of a ledger entry's before/after payloads. */
-export interface LedgerFieldDiff {
-    /** Keys present only in `after`. */
-    added: Record<string, unknown>;
-    /** Keys present only in `before`. */
-    removed: Record<string, unknown>;
-    /** Keys present in both, with different values. */
-    changed: Record<string, { before: unknown; after: unknown }>;
-    /** Keys present in both with identical values. */
-    unchanged: Record<string, unknown>;
-    /**
-     * True when at least one side was non-empty but could not be read as a JSON
-     * object. The caller should fall back to comparing the raw strings rather
-     * than claiming there were no field changes.
-     */
-    parseFailed: boolean;
-}
+// Re-exported from the shared contract-types module (../types) for backward
+// compatibility — single source of truth lives in src/types/contracts.ts.
+export type { LedgerFieldDiff } from '../types';
 
 function emptyDiff(parseFailed: boolean): LedgerFieldDiff {
     return { added: {}, removed: {}, changed: {}, unchanged: {}, parseFailed };

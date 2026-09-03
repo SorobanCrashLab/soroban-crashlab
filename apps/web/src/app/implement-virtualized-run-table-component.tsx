@@ -7,6 +7,7 @@ import { formatDuration } from './utils/format';
 import { useDataTableKeyboardNav } from './use-data-table-keyboard-nav';
 import type { DataTableRowKeyboardProps } from './use-data-table-keyboard-nav';
 import TruncatedCell from '@/components/TruncatedCell';
+import { useResponsiveRunColumns } from './use-responsive-run-columns';
 
 /** Height of a single data row in pixels — must match the rendered row height. */
 const ROW_HEIGHT = 57;
@@ -179,6 +180,9 @@ export default function VirtualizedRunTable({
     const scrollRef = useRef<HTMLDivElement>(null);
     const [scrollTop, setScrollTop] = useState(0);
 
+    /** Responsive column set — adapts to phone and portrait-tablet viewports. */
+    const effectiveColumns = useResponsiveRunColumns(visibleColumns);
+
     const { getRowProps } = useDataTableKeyboardNav({
         rowCount: runs.length,
         onActivate: (index) => {
@@ -274,37 +278,37 @@ export default function VirtualizedRunTable({
                                     </div>
                                 </th>
                             )}
-                            {visibleColumns.includes('id') && (
+                            {effectiveColumns.includes('id') && (
                                 <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex-1 min-w-0">
                                     Run ID
                                 </th>
                             )}
-                            {visibleColumns.includes('status') && (
+                            {effectiveColumns.includes('status') && (
                                 <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-36 shrink-0">
                                     Status
                                 </th>
                             )}
-                            {visibleColumns.includes('area') && (
+                            {effectiveColumns.includes('area') && (
                                 <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0">
                                     Area
                                 </th>
                             )}
-                            {visibleColumns.includes('severity') && (
+                            {effectiveColumns.includes('severity') && (
                                 <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0">
                                     Severity
                                 </th>
                             )}
-                            {visibleColumns.includes('duration') && (
+                            {effectiveColumns.includes('duration') && (
                                 <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0 text-right">
                                     Duration
                                 </th>
                             )}
-                            {visibleColumns.includes('seedCount') && (
+                            {effectiveColumns.includes('seedCount') && (
                                 <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right">
                                     Seed Count
                                 </th>
                             )}
-                            {visibleColumns.includes('report') && (
+                            {effectiveColumns.includes('report') && (
                                 <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right">
                                     Report
                                 </th>
@@ -336,7 +340,7 @@ export default function VirtualizedRunTable({
                                     top={rowIndex * ROW_HEIGHT}
                                     onSelectRun={onSelectRun}
                                     onViewReport={onViewReport}
-                                    visibleColumns={visibleColumns}
+                                    visibleColumns={effectiveColumns}
                                     selectedRunIds={selectedRunIds}
                                     onToggleRunSelection={onToggleRunSelection}
                                     rowKeyboardProps={getRowProps(rowIndex)}

@@ -8,5 +8,5 @@ import { withFixtureCaching } from '@/lib/fixture-caching';
  */
 export async function GET(request: NextRequest) {
   const data = { reports: buildMockCrashReports() };
-  return withFixtureCaching(request, data);
+  return withFixtureCaching(request, { data });
 }

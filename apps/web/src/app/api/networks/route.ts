@@ -35,7 +35,7 @@ export const GET = withRouteErrorHandling("GET /api/networks", async (request: N
     activeNetworkId: store.activeNetworkId,
     total: store.networks.length,
   };
-  return withFixtureCaching(request, data);
+  return withFixtureCaching(request, { data });
 });
 
 export const POST = withRouteErrorHandling("POST /api/networks", async (request: NextRequest) => {

@@ -31,7 +31,7 @@ function ClustersContent() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!cancelled) {
-          setRuns(data.runs ?? []);
+          setRuns(data.data?.runs ?? []);
           setDataState('success');
         }
       } catch {

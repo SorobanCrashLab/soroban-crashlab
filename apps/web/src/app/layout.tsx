@@ -8,6 +8,7 @@ import NavBar from "../components/NavBar";
 import AddKeyboardShortcutCheatsheetModal from "./add-keyboard-shortcut-cheatsheet-modal";
 import OnboardingWizardHost from "./OnboardingWizardHost";
 import CommandPalette from "../components/CommandPalette";
+import PageTransition from "../components/PageTransition";
 import Script from "next/script";
 
 export const metadata: Metadata = {
@@ -64,8 +65,10 @@ export default function RootLayout({
               <AddKeyboardShortcutCheatsheetModal />
               <CommandPalette />
               <OnboardingWizardHost />
-              <main style={{ background: 'var(--bg)', paddingTop: '52px', minHeight: '100vh', transition: 'background 0.3s ease' }}>
-                {children}
+              <main id="page-shell" style={{ background: 'var(--bg)', paddingTop: '52px', minHeight: '100vh', transition: 'background 0.3s ease' }}>
+                <PageTransition>
+                  {children}
+                </PageTransition>
               </main>
             </ToastProvider>
           </ThemeProvider>

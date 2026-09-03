@@ -177,7 +177,7 @@ export default function AlertingSettingsPage({
     fetch(ALERTING_API_URL)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<AlertingSettingsSnapshot>;
+        return res.json().then((json) => (json as { data: AlertingSettingsSnapshot }).data);
       })
       .then(applySnapshot)
       .catch(() => {
@@ -191,7 +191,7 @@ export default function AlertingSettingsPage({
     fetch(ALERTING_API_URL)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<AlertingSettingsSnapshot>;
+        return res.json().then((json) => (json as { data: AlertingSettingsSnapshot }).data);
       })
       .then(applySnapshot)
       .catch(() => {
@@ -292,7 +292,7 @@ export default function AlertingSettingsPage({
     })
       .then((res) => {
         if (!res.ok) return res.json().then((e: { error?: string }) => { throw new Error(e.error ?? `HTTP ${res.status}`); });
-        return res.json() as Promise<AlertingSettingsSnapshot>;
+        return res.json().then((json) => (json as { data: AlertingSettingsSnapshot }).data);
       })
       .then((saved) => {
         applySnapshot(saved);
@@ -314,7 +314,7 @@ export default function AlertingSettingsPage({
     })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<AlertingSettingsSnapshot>;
+        return res.json().then((json) => (json as { data: AlertingSettingsSnapshot }).data);
       })
       .then((saved) => {
         applySnapshot(saved);

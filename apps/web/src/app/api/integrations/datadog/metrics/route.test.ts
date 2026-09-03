@@ -27,14 +27,14 @@ describe('GET /api/integrations/datadog/metrics', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.enabled).toBe(true);
-    expect(data.config.agentHost).toBe('datadog.example.com');
-    expect(data.config.agentPort).toBe(8125);
-    expect(data.config.prefix).toBe('soroban_crashlab.');
-    expect(data.config.globalTags.env).toBe('production');
-    expect(data.config.globalTags.service).toBe('soroban-crashlab-backend');
-    expect(data.status).toBe('active');
-    expect(data.timestamp).toBeDefined();
+    expect(data.data.enabled).toBe(true);
+    expect(data.data.config.agentHost).toBe('datadog.example.com');
+    expect(data.data.config.agentPort).toBe(8125);
+    expect(data.data.config.prefix).toBe('soroban_crashlab.');
+    expect(data.data.config.globalTags.env).toBe('production');
+    expect(data.data.config.globalTags.service).toBe('soroban-crashlab-backend');
+    expect(data.data.status).toBe('active');
+    expect(data.data.timestamp).toBeDefined();
   });
 
   it('returns mock status when Datadog is disabled', async () => {
@@ -46,9 +46,9 @@ describe('GET /api/integrations/datadog/metrics', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.enabled).toBe(false);
-    expect(data.status).toBe('mock');
-    expect(data.config.globalTags.env).toBe('development');
+    expect(data.data.enabled).toBe(false);
+    expect(data.data.status).toBe('mock');
+    expect(data.data.config.globalTags.env).toBe('development');
   });
 
   it('uses default values when environment variables are not set', async () => {
@@ -62,10 +62,10 @@ describe('GET /api/integrations/datadog/metrics', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.enabled).toBe(false);
-    expect(data.config.agentHost).toBe('localhost');
-    expect(data.config.agentPort).toBe(8125);
-    expect(data.config.globalTags.env).toBe('development');
+    expect(data.data.enabled).toBe(false);
+    expect(data.data.config.agentHost).toBe('localhost');
+    expect(data.data.config.agentPort).toBe(8125);
+    expect(data.data.config.globalTags.env).toBe('development');
   });
 
   it('returns valid JSON structure', async () => {
@@ -73,13 +73,13 @@ describe('GET /api/integrations/datadog/metrics', () => {
     const response = await GET(request);
     const data = await response.json();
 
-    expect(data).toHaveProperty('enabled');
-    expect(data).toHaveProperty('config');
-    expect(data).toHaveProperty('status');
-    expect(data).toHaveProperty('timestamp');
-    expect(data.config).toHaveProperty('agentHost');
-    expect(data.config).toHaveProperty('agentPort');
-    expect(data.config).toHaveProperty('prefix');
-    expect(data.config).toHaveProperty('globalTags');
+    expect(data.data).toHaveProperty('enabled');
+    expect(data.data).toHaveProperty('config');
+    expect(data.data).toHaveProperty('status');
+    expect(data.data).toHaveProperty('timestamp');
+    expect(data.data.config).toHaveProperty('agentHost');
+    expect(data.data.config).toHaveProperty('agentPort');
+    expect(data.data.config).toHaveProperty('prefix');
+    expect(data.data.config).toHaveProperty('globalTags');
   });
 });
