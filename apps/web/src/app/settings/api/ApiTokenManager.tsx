@@ -79,7 +79,8 @@ export default function ApiTokenManager() {
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Failed to create token.');
+        const msg = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to create token.';
+        setError(msg);
         return;
       }
 
