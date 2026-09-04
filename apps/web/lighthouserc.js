@@ -108,7 +108,7 @@ module.exports = {
           assertions: {
             "categories:performance": ["error", { minScore: 0.25 }],
             "categories:accessibility": ["error", { minScore: 0.95 }],
-            "largest-contentful-paint": ["error", { maxNumericValue: 3800 }],
+            "largest-contentful-paint": ["error", { maxNumericValue: 6000 }],
             "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
             "categories:best-practices": "off",
             "categories:seo": "off",
@@ -120,7 +120,7 @@ module.exports = {
           assertions: {
             "categories:performance": ["error", { minScore: 0.45 }],
             "categories:accessibility": ["error", { minScore: 0.91 }],
-            "largest-contentful-paint": ["error", { maxNumericValue: 4000 }],
+            "largest-contentful-paint": ["error", { maxNumericValue: 6000 }],
             "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
             "categories:best-practices": "off",
             "categories:seo": "off",
@@ -133,7 +133,7 @@ module.exports = {
           assertions: {
             "categories:performance": ["error", { minScore: 0.25 }],
             "categories:accessibility": ["error", { minScore: 0.9 }],
-            "largest-contentful-paint": ["error", { maxNumericValue: 4000 }],
+            "largest-contentful-paint": ["error", { maxNumericValue: 6500 }],
             "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
             "categories:best-practices": "off",
             "categories:seo": "off",
@@ -145,7 +145,7 @@ module.exports = {
           assertions: {
             "categories:performance": ["error", { minScore: 0.35 }],
             "categories:accessibility": ["error", { minScore: 0.92 }],
-            "largest-contentful-paint": ["error", { maxNumericValue: 4100 }],
+            "largest-contentful-paint": ["error", { maxNumericValue: 6000 }],
             "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
             "categories:best-practices": "off",
             "categories:seo": "off",

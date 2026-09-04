@@ -8,6 +8,7 @@
  */
 
 import { FuzzingRun, RunStatus } from './types';
+import { WEBHOOK_DELIVERY_TIMEOUT_MS, WEBHOOK_MANAGER_BACKOFF_BASE_MS } from '../lib/timeouts';
 
 /**
  * Supported run event types for webhook delivery.
@@ -118,7 +119,7 @@ export class WebhookManager {
     this.webhooks.set(config.id, {
       ...config,
       maxRetries: config.maxRetries ?? 3,
-      timeoutMs: config.timeoutMs ?? 5000,
+      timeoutMs: config.timeoutMs ?? WEBHOOK_DELIVERY_TIMEOUT_MS,
     });
   }
 
@@ -339,7 +340,7 @@ export class WebhookManager {
         }
 
         // Exponential backoff
-        const backoffMs = 100 * Math.pow(2, attempt);
+        const backoffMs = WEBHOOK_MANAGER_BACKOFF_BASE_MS * Math.pow(2, attempt);
         await this.sleep(backoffMs);
       }
     }
@@ -427,7 +428,7 @@ class DefaultHttpClient implements HttpClient {
     },
   ): Promise<{ ok: boolean; status: number }> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), options.timeout || 5000);
+    const timeoutId = setTimeout(() => controller.abort(), options.timeout || WEBHOOK_DELIVERY_TIMEOUT_MS);
 
     try {
       const response = await fetch(url, {

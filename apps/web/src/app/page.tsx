@@ -5,6 +5,10 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import dynamic from 'next/dynamic';
 import { LoadingSpinner } from "../components/LoadingSkeleton";
+import { PageHeader, PageSection, StatCard } from "../components";
+import { useRuns } from "../hooks/useRuns";
+import { usePullToRefresh } from "../hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "../components/PullToRefreshIndicator";
 import DashboardSectionLayoutEditor from "./dashboard-section-layout-editor";
 import {
   DASHBOARD_LAYOUT_STORAGE_KEY,
@@ -25,7 +29,6 @@ const AddTaggingAndLabelsUi = dynamic(
 );
 import { runMatchesTagFilter } from "./run-tags-utils";
 import { FuzzingRun } from "./types";
-import { fetchRuns } from "../lib/api-client";
 import { useDataTableKeyboardNav } from "./use-data-table-keyboard-nav";
 
 const makeSuggestedLabels = (run: FuzzingRun): string[] => [
@@ -38,57 +41,17 @@ const makeSuggestedLabels = (run: FuzzingRun): string[] => [
 const PAGE_SIZE = 10;
 
 function DashboardContent() {
-  const [runs, setRuns] = useState<FuzzingRun[]>([]);
-  const [dataState, setDataState] = useState<"loading" | "error" | "success">("loading");
+  const { runs, dataState, refetch } = useRuns({
+    revalidateOnFocus: true,
+    revalidateOnVisibility: true,
+  });
   const [layout, setLayout] = useState<DashboardSectionConfig[]>(DEFAULT_DASHBOARD_LAYOUT);
-  const [fetchAttempt, setFetchAttempt] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeTag = searchParams.get("filter_tag") ?? "all";
   const rawPage = parseInt(searchParams.get("page") ?? "1", 10);
   const currentPage = isNaN(rawPage) ? 1 : rawPage;
-
-  useEffect(() => {
-    let cancelled = false;
-    const ctrl = new AbortController();
-    const load = async () => {
-      setDataState("loading");
-      try {
-        const data = await fetchRuns(ctrl.signal);
-        if (!cancelled) {
-          setRuns(data.runs ?? []);
-          setDataState("success");
-        }
-      } catch {
-        if (!cancelled) setDataState("error");
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-      ctrl.abort();
-    };
-  }, [fetchAttempt]);
-
-  useEffect(() => {
-    let mounted = true;
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible" && mounted) {
-        setFetchAttempt((n) => n + 1);
-      }
-    };
-    const handleFocus = () => {
-      if (mounted) setFetchAttempt((n) => n + 1);
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener("focus", handleFocus);
-    return () => {
-      mounted = false;
-      document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, []);
 
 
   useEffect(() => {
@@ -154,25 +117,36 @@ function DashboardContent() {
     },
   });
 
+  const handleRefresh = useCallback(async () => {
+    await refetch();
+    await new Promise<void>((resolve) => setTimeout(resolve, 600));
+  }, [refetch]);
+
+  const { isPulling, isRefreshing, pullDistance } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    disabled: dataState === 'loading',
+  });
+
   return (
     <div className="container-full page-padding fade-in">
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <div>
-          <h1 className="heading-page">Dashboard</h1>
-          <p className="text-meta mt-0.5 sm:mt-1">Fuzzing campaign overview</p>
-        </div>
-        <Link href="/runs" className="btn-primary text-xs sm:text-sm px-3 sm:px-6 h-9 sm:h-10">
-          View All Runs
-        </Link>
-      </div>
+      <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} pullDistance={pullDistance} />
+      <PageHeader
+        title="Dashboard"
+        description="Fuzzing campaign overview"
+        actions={
+          <Link href="/runs" className="btn-primary text-xs sm:text-sm px-3 sm:px-6 h-9 sm:h-10">
+            View All Runs
+          </Link>
+        }
+      />
 
       {dataState === "success" && (
-        <div className="section mb-6">
+        <PageSection className="mb-6">
           <Link href="/analytics/clusters" className="card card-padding card-interactive block">
             <h2 className="heading-section">Failure Signature Clusters</h2>
             <p className="text-meta mt-1">Group repeated crashes by signature and open representative samples for triage.</p>
           </Link>
-        </div>
+        </PageSection>
       )}
 
       {dataState === "loading" && <div className="card card-padding text-meta">Loading...</div>}
@@ -201,13 +175,13 @@ function DashboardContent() {
       )}
       {dataState === "error" && (
         <div role="alert" className="card card-padding mb-4 sm:mb-6" style={{ borderLeft: "4px solid #CC1016" }}>
-          <div className="flex items-center justify-between">
+          <div className="flex-between">
             <div>
               <p className="font-semibold" style={{ color: "#CC1016" }}>Connection Error</p>
               <p className="text-meta">Could not reach the backend API.</p>
             </div>
             <button
-              onClick={() => setFetchAttempt((n) => n + 1)}
+              onClick={() => refetch()}
               className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow transition"
               style={{ backgroundColor: "#CC1016" }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#a50d12")}
@@ -233,41 +207,37 @@ function DashboardContent() {
           {getVisibleDashboardSections(layout).map((section) => {
             const sectionContent: Record<DashboardSectionId, ReactNode> = {
               stats: (
-                <div className="section">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <PageSection>
+                  <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-4 gap-3">
                     {[
                       { label: "Total", value: filteredRuns.length },
                       { label: "Failed", value: filteredRuns.filter((r) => r.status === "failed").length },
                       { label: "Running", value: filteredRuns.filter((r) => r.status === "running").length },
                       { label: "Critical", value: filteredRuns.filter((r) => r.severity === "critical").length },
                     ].map((stat) => (
-                      <div key={stat.label} className="card card-padding stat-card">
-                        <div className="stat-value">{stat.value}</div>
-                        <div className="stat-label">{stat.label}</div>
-                      </div>
+                      <StatCard key={stat.label} label={stat.label} value={stat.value} />
                     ))}
                   </div>
-                </div>
+                </PageSection>
               ),
               "widget-editor": (
-                <div className="section">
+                <PageSection>
                   <DashboardSectionLayoutEditor />
-                </div>
+                </PageSection>
               ),
               "recent-runs": (
                 <>
-                  <div className="section">
+                  <PageSection>
                     <AddTaggingAndLabelsUi
                       runs={filteredRuns}
                       activeTag={activeTag}
                       onActiveTagChange={setActiveTag}
                     />
-                  </div>
-                  <div className="section">
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="heading-section">Recent Runs</h2>
-                      <Link href="/runs" className="link text-xs sm:text-sm">View all</Link>
-                    </div>
+                  </PageSection>
+                  <PageSection
+                    title="Recent Runs"
+                    actions={<Link href="/runs" className="link text-xs sm:text-sm">View all</Link>}
+                  >
                     <div className="card table-responsive">
                       <table className="data-table">
                         <thead>
@@ -283,12 +253,12 @@ function DashboardContent() {
                             <tr>
                               <td colSpan={4} className="px-6 py-16 text-center">
                                 <div className="flex flex-col items-center gap-3">
-                                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-full text-zinc-300">
+                                  <div className="p-4 surface-soft rounded-full text-zinc-300">
                                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                   </div>
-                                  <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No matching fuzzing runs</span>
+                                  <span className="text-sm-medium text-muted">No matching fuzzing runs</span>
                                 </div>
                               </td>
                             </tr>
@@ -312,42 +282,41 @@ function DashboardContent() {
                         onPageChange={handlePageChange}
                       />
                     )}
-                  </div>
+                  </PageSection>
                 </>
               ),
               "quick-actions": (
-                <div className="section card card-padding">
+                <PageSection className="card card-padding">
                   <h3 className="font-semibold text-sm mb-3">Quick Actions</h3>
                   <div className="flex flex-col gap-2">
                     <Link href="/runs" className="link">Browse all runs</Link>
                     <Link href="/analytics" className="link">Open analytics</Link>
                   </div>
-                </div>
+                </PageSection>
               ),
             };
             return <div key={section.id}>{sectionContent[section.id]}</div>;
           })}
-          <div className="section">
+          <PageSection>
             <RunHealthScoreWidget runs={filteredRuns} dataState={dataState} />
-          </div>
+          </PageSection>
 
-          <div className="section">
+          <PageSection>
             <ResourceFeeInsightPanel runs={filteredRuns} dataState={dataState} />
-          </div>
+          </PageSection>
 
-          <div className="section">
+          <PageSection>
             <AddTaggingAndLabelsUi
               runs={filteredRuns}
               activeTag={activeTag}
               onActiveTagChange={setActiveTag}
             />
-          </div>
+          </PageSection>
 
-          <div className="section">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="heading-section">Recent Runs</h2>
-              <Link href="/runs" className="link text-xs sm:text-sm">View all</Link>
-            </div>
+          <PageSection
+            title="Recent Runs"
+            actions={<Link href="/runs" className="link text-xs sm:text-sm">View all</Link>}
+          >
             <div className="card table-responsive">
                 <table
                   className="data-table"
@@ -366,12 +335,12 @@ function DashboardContent() {
                       <tr>
                         <td colSpan={4} className="px-6 py-16 text-center">
                           <div className="flex flex-col items-center gap-3">
-                            <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-full text-zinc-300">
+                            <div className="p-4 surface-soft rounded-full text-zinc-300">
                               <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
                             </div>
-                            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">No matching fuzzing runs</span>
+                            <span className="text-sm-medium text-muted">No matching fuzzing runs</span>
                           </div>
                         </td>
                       </tr>
@@ -394,7 +363,7 @@ function DashboardContent() {
                   </tbody>
                 </table>
               </div>
-          </div>
+          </PageSection>
         </>
       )}
     </div>

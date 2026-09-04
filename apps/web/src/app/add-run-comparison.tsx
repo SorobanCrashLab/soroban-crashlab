@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import type { FuzzingRun } from './types';
+import { getStatusMeta } from '../lib/run-status';
 
 interface RunComparisonProps {
   runs: FuzzingRun[];
@@ -14,13 +15,6 @@ const METRICS = [
   { key: 'minResourceFee' as const, label: 'Min Resource Fee', format: (v: number) => `${v.toLocaleString()} stroops` },
   { key: 'seedCount' as const, label: 'Seed Count', format: (v: number) => v.toLocaleString() },
 ];
-
-const STATUS_COLORS = {
-  completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
-};
 
 export default function AddRunComparison({ runs }: RunComparisonProps) {
   const [runA, setRunA] = useState<FuzzingRun | null>(null);
@@ -100,7 +94,7 @@ export default function AddRunComparison({ runs }: RunComparisonProps) {
             <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <span className="font-mono text-sm">{runA.id}</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[runA.status]}`}>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusMeta(runA.status).pillClass}`}>
                   {runA.status}
                 </span>
               </div>
@@ -135,7 +129,7 @@ export default function AddRunComparison({ runs }: RunComparisonProps) {
             <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <span className="font-mono text-sm">{runB.id}</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[runB.status]}`}>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusMeta(runB.status).pillClass}`}>
                   {runB.status}
                 </span>
               </div>

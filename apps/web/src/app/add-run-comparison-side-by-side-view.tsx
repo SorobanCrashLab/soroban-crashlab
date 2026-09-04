@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import type { FuzzingRun } from "./types";
+import { getStatusMeta } from "../lib/run-status";
 import {
   type SideBySideDataState,
   buildSideBySideRows,
   formatDeltaLabel,
+  getComparisonRunOptions,
   getSideBySideStateMessage,
   selectComparableRuns,
   summarizeSideBySideRows,
@@ -16,13 +18,6 @@ interface AddRunComparisonSideBySideViewProps {
   dataState: SideBySideDataState;
   onRetry: () => void;
 }
-
-const STATUS_COLORS: Record<FuzzingRun["status"], string> = {
-  completed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  failed: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-  running: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
-};
 
 const CLASSIFICATION_STYLES = {
   regression: "text-red-600 dark:text-red-400",
@@ -52,7 +47,7 @@ function RunPanelHeader({
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">{label}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <span className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">{run.id}</span>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[run.status]}`}>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getStatusMeta(run.status).pillClass}`}>
           {run.status}
         </span>
       </div>
@@ -130,9 +125,9 @@ export default function AddRunComparisonSideBySideView({
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
               >
                 <option value="">Select a run...</option>
-                {comparableRuns.map((run) => (
-                  <option key={run.id} value={run.id} disabled={run.id === rightRunId}>
-                    {run.id} — {run.area} ({run.status})
+                {getComparisonRunOptions(comparableRuns, rightRunId).map((option) => (
+                  <option key={option.run.id} value={option.run.id} disabled={option.disabled}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -159,9 +154,9 @@ export default function AddRunComparisonSideBySideView({
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
               >
                 <option value="">Select a run...</option>
-                {comparableRuns.map((run) => (
-                  <option key={run.id} value={run.id} disabled={run.id === leftRunId}>
-                    {run.id} — {run.area} ({run.status})
+                {getComparisonRunOptions(comparableRuns, leftRunId).map((option) => (
+                  <option key={option.run.id} value={option.run.id} disabled={option.disabled}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -231,7 +226,7 @@ export default function AddRunComparisonSideBySideView({
             </>
           ) : (
             <div className="rounded-2xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-              <p className="text-sm text-zinc-500">Select two different runs to open the side-by-side comparison.</p>
+              <p className="text-sm text-zinc-500">Select two different runs to compare.</p>
             </div>
           )}
         </>

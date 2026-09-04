@@ -5,8 +5,8 @@
  * Returns 404 if the issue is not found or credentials are not configured.
  */
 
-import { NextResponse } from 'next/server';
 import { withRouteErrorHandling, jsonError, readJsonBody } from '@/lib/route-handler';
+import { successResponse } from '@/lib/api-response-utils';
 import { createJiraIssuesAdapter } from '@/lib/integrations/jira-issues';
 
 interface RouteContext {
@@ -44,7 +44,7 @@ export const POST = withRouteErrorHandling(
       return jsonError('Jira issue could not be created', 503);
     }
 
-    return NextResponse.json({ issue });
+    return successResponse({ issue });
   },
   'Failed to create Jira issue',
 );
@@ -65,7 +65,7 @@ export const GET = withRouteErrorHandling(
       return jsonError('Issue not found or Jira not configured', 404);
     }
 
-    return NextResponse.json({ issue });
+    return successResponse({ issue });
   },
   'Failed to fetch Jira issue',
 );

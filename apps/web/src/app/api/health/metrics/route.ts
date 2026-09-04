@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
 import { createPrometheusMetricsExportDependencies } from "../../../../lib/integrations/prometheus-adapter";
+import { PROMETHEUS_FETCH_TIMEOUT_MS } from "../../../../lib/timeouts";
+import { successResponse } from "../../../../lib/api-response-utils";
 
 /**
  * GET /api/health/metrics
@@ -16,7 +17,7 @@ export async function GET() {
       process.env.PROMETHEUS_ENDPOINT || "http://localhost:9090";
     const prometheusHealthPath =
       process.env.PROMETHEUS_HEALTH_PATH || "/-/healthy";
-    const timeoutMs = parseInt(process.env.PROMETHEUS_TIMEOUT_MS || "5000", 10);
+    const timeoutMs = parseInt(process.env.PROMETHEUS_TIMEOUT_MS || String(PROMETHEUS_FETCH_TIMEOUT_MS), 10);
 
     // Create the Prometheus adapter with real configuration
     const adapter = createPrometheusMetricsExportDependencies({
@@ -30,7 +31,7 @@ export async function GET() {
     const healthResult = await adapter.queryExporterHealth(prometheusEndpoint);
 
     if (!healthResult.healthy || healthResult.statusCode >= 400) {
-      return NextResponse.json(
+      return successResponse(
         {
           status: "unhealthy",
           timestamp: new Date().toISOString(),
@@ -41,7 +42,7 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(
+    return successResponse(
       {
         status: "healthy",
         timestamp: new Date().toISOString(),
@@ -62,7 +63,7 @@ export async function GET() {
       errorMessage.includes("ECONNREFUSED") ||
       errorMessage.includes("timeout");
 
-    return NextResponse.json(
+    return successResponse(
       {
         status: "error",
         timestamp: new Date().toISOString(),

@@ -1,15 +1,38 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DEFAULT_CHANNELS, loadChannelPreferences, saveChannelPreferences, mockNotifications, type NotificationPreference } from '../notification-preferences-utils';
+import {
+  loadReadState,
+  markNotificationRead,
+  markAllNotificationsRead,
+  isNotificationRead,
+  subscribeToReadStateChanges,
+  type ReadState,
+} from '../notification-read-state-utils';
 import { ListState } from '../../components/ListState';
 import { GenericPageSkeleton } from '../../components/LoadingSkeleton';
 
 export default function NotificationCenterPage() {
   const [notifications, setNotifications] = useState(mockNotifications);
+  const [readState, setReadState] = useState<ReadState>(() => (typeof window === 'undefined' ? {} : loadReadState()));
   const [preferences, setPreferences] = useState<NotificationPreference[]>(() => (typeof window === 'undefined' ? [] : loadChannelPreferences()));
   const [activeTab, setActiveTab] = useState<'inbox' | 'preferences'>('inbox');
   const [loading, setLoading] = useState(true);
+
+  // Cross-tab sync for read state.
+  useEffect(() => {
+    const unsub = subscribeToReadStateChanges((newState) => {
+      setReadState((prev) => {
+        const merged = { ...prev };
+        for (const [id, ts] of Object.entries(newState)) {
+          if (!merged[id] || ts > merged[id]) merged[id] = ts;
+        }
+        return merged;
+      });
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate notification preferences once
@@ -17,15 +40,14 @@ export default function NotificationCenterPage() {
     setLoading(false);
   }, []);
 
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(notifications.map(n =>
-      n.id === id ? { ...n, read: true } : n
-    ));
-  };
+  const handleMarkAsRead = useCallback((id: string) => {
+    setReadState((prev) => markNotificationRead(id, prev));
+  }, []);
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
-  };
+  const handleMarkAllAsRead = useCallback(() => {
+    setReadState((prev) => markAllNotificationsRead(notifications.map(n => n.id), prev));
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  }, [notifications]);
 
   const handleToggleChannel = (channelId: string) => {
     const updated = preferences.map(p =>
@@ -55,7 +77,11 @@ export default function NotificationCenterPage() {
     saveChannelPreferences(updated);
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const resolvedNotifications = notifications.map(n => ({
+    ...n,
+    read: isNotificationRead(readState, n.id, n.read),
+  }));
+  const unreadCount = resolvedNotifications.filter(n => !n.read).length;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-8 px-4">
@@ -107,7 +133,7 @@ export default function NotificationCenterPage() {
                   Mark all as read
                 </button>
               )}
-              {notifications.map(notification => (
+              {resolvedNotifications.map(notification => (
                 <div
                   key={notification.id}
                   onClick={() => handleMarkAsRead(notification.id)}

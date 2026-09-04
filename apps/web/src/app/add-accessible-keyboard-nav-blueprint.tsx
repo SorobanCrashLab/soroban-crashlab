@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback, type MouseEvent } from 'react';
+import { shouldIgnoreGlobalShortcut } from '../lib/is-editable-target';
 
 /**
  * Accessible Keyboard Navigation Blueprint
@@ -89,19 +90,19 @@ export default function AddAccessibleKeyboardNavBlueprint() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeElement = document.activeElement;
-      const isInputField = activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement.tagName);
-      
-      // Toggle help with '?' (only when not in input fields)
-      if (e.key === '?' && !isInputField) {
-        e.preventDefault();
-        toggleHelp();
-      }
-      
-      // Close with 'Esc'
       if (e.key === 'Escape' && isHelpOpen) {
         e.preventDefault();
         setIsHelpOpen(false);
+        return;
+      }
+
+      if (shouldIgnoreGlobalShortcut(e)) {
+        return;
+      }
+
+      if (e.key === '?') {
+        e.preventDefault();
+        toggleHelp();
       }
     };
 

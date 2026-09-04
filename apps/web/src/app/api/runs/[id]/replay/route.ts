@@ -9,6 +9,7 @@ import { buildMockRuns } from '../../../../mockRuns';
 import type { FuzzingRun } from '../../../../types';
 import { logger } from '@/lib/logger';
 import { successResponse, errorResponse, status } from '@/lib/api-response-utils';
+import { API_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
 
 export const runtime = 'nodejs';
 
@@ -257,7 +258,7 @@ async function resolveReplayRun(runId: string): Promise<FuzzingRun | null> {
     const upstream = await fetch(`${runsApiUrl}/runs/${encodeURIComponent(runId)}`, {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(API_FETCH_TIMEOUT_MS),
     });
 
     if (upstream.status === 404) {

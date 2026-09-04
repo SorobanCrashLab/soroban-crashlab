@@ -5,7 +5,7 @@
  * a DOM environment and reuse it across different trigger sites.
  */
 
-export type DestructiveAction = 'delete-run' | 'delete-runs' | 'reset-config';
+export type DestructiveAction = 'delete-run' | 'delete-runs' | 'reset-config' | 'revoke-token';
 
 export interface ConfirmDialogConfig {
   title: string;
@@ -56,6 +56,16 @@ export function getConfirmDialogConfig(
         cancelText: 'Cancel',
         variant: 'warning',
       };
+
+    case 'revoke-token':
+      return {
+        title: 'Revoke API Token',
+        message:
+          'Are you sure you want to revoke this API token? Any applications using this token will immediately lose access.',
+        confirmText: 'Revoke Token',
+        cancelText: 'Cancel',
+        variant: 'danger',
+      };
   }
 }
 
@@ -64,7 +74,7 @@ export function getConfirmDialogConfig(
  * proceeding. Non-destructive actions (export, tag, assign) return false.
  */
 export function requiresConfirmation(action: string): boolean {
-  return action === 'delete' || action === 'delete-run' || action === 'delete-runs' || action === 'reset-config';
+  return action === 'delete' || action === 'delete-run' || action === 'delete-runs' || action === 'reset-config' || action === 'revoke-token';
 }
 
 /**

@@ -12,6 +12,7 @@ Soroban CrashLab is an open source dashboard for monitoring and analyzing smart 
 |---|---|
 | Get up and running quickly | [Getting Started](GETTING_STARTED.md) |
 | Understand how the platform works | [Architecture Overview](ARCHITECTURE.md) |
+| Read core design decisions | [Architecture Decision Records (ADRs)](adr/README.md) |
 | Learn the dashboard features | [User Guide](USER_GUIDE.md) |
 | Connect external services | [Integrations Guide](INTEGRATIONS.md) |
 | Deploy to production | [Deployment Guide](DEPLOYMENT.md) |
@@ -62,7 +63,7 @@ soroban-crashlab/
 │   └── web/                    # Next.js web dashboard
 │       └── src/
 │           ├── app/            # Pages, API routes, utilities
-│           │   ├── api/        # 34 REST API endpoints
+│           │   ├── api/        # REST API endpoints
 │           │   ├── runs/       # Run history and detail pages
 │           │   ├── analytics/  # Analytics hub with charts
 │           │   ├── triage/     # Failure triage board

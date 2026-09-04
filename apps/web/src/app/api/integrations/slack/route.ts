@@ -8,8 +8,8 @@
  * instead of scattering unrelated messages across the channel.
  */
 
-import { NextResponse } from "next/server";
 import { withRouteErrorHandling, readJsonBody, jsonError } from "@/lib/route-handler";
+import { successResponse } from "@/lib/api-response-utils";
 import {
   buildRunDetailPreviewBlocks,
   createSlackAdapter,
@@ -87,7 +87,7 @@ export const POST = withRouteErrorHandling(
       });
     }
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
       message: "Notification sent successfully",
       threaded: Boolean(existingThread),

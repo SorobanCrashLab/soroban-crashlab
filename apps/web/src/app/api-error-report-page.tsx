@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { MOCK_API_ERRORS } from '../fixtures/api-errors';
+import { absoluteShort } from './utils/datetime';
 
 /**
  * API Error Report Page
@@ -50,15 +51,7 @@ const getStatusCodeColor = (code: number): string => {
   return STATUS_CODE_COLORS[code] || 'bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700';
 };
 
-const formatDate = (isoString: string): string => {
-  const date = new Date(isoString);
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+const formatDate = (isoString: string): string => absoluteShort(isoString);
 
 const getStatusCodeCategory = (code: number): string => {
   if (code >= 400 && code < 500) return 'Client Error';

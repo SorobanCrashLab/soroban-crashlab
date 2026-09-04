@@ -3,7 +3,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Home from './page';
-import { FuzzingRun } from './types';
 import { DashboardFilters } from './create-advanced-dashboard-filters-page';
 
 // Mock Next.js navigation hooks
@@ -14,16 +13,6 @@ jest.mock('next/navigation', () => ({
 }));
 
 // Mock child components to isolate filteredRuns logic
-jest.mock('./implement-run-history-table-component', () => ({
-  __esModule: true,
-  default: ({ runs }: { runs: FuzzingRun[] }) => (
-    <div data-testid="run-history-table">
-      {runs.map(run => (
-        <div key={run.id} data-testid={`run-${run.id}`}>{run.id}</div>
-      ))}
-    </div>
-  ),
-}));
 
 jest.mock('./RunHistoryTableSkeleton', () => ({
   __esModule: true,
@@ -147,25 +136,12 @@ jest.mock('./RunActivityTimeline', () => ({
   default: () => null,
 }));
 
-jest.mock('./add-run-timeline', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock('./add-run-cluster-overview', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./implement-run-health-score-widget', () => ({
   __esModule: true,
   default: () => null,
 }));
 
-jest.mock('./implement-ingredient-list-component', () => ({
-  __esModule: true,
-  IngredientList: () => null,
-}));
 
 jest.mock('./CampaignConfigForm', () => ({
   __esModule: true,
@@ -177,10 +153,6 @@ jest.mock('./ContributorSLATargets', () => ({
   default: () => null,
 }));
 
-jest.mock('./add-run-filtering-by-severity', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./FailureClusterView', () => ({
   __esModule: true,
@@ -197,10 +169,6 @@ jest.mock('./TimelineScrubber', () => ({
   default: () => null,
 }));
 
-jest.mock('./add-column-customization', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./campaign-milestone-timeline-55', () => ({
   __esModule: true,
@@ -212,10 +180,6 @@ jest.mock('./implement-virtualized-run-table-component', () => ({
   default: () => null,
 }));
 
-jest.mock('./add-reporting-templates-manager', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./integrate-automated-regression-deploy-integration', () => ({
   __esModule: true,
@@ -237,50 +201,18 @@ jest.mock('./implement-widget-layout-editor-component', () => ({
   default: () => null,
 }));
 
-jest.mock('./implement-log-viewer-component', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./add-accessible-keyboard-nav-blueprint', () => ({
   __esModule: true,
   default: () => null,
 }));
 
-jest.mock('./add-artifact-explorer', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./implement-onboarding-checklist-modal-component', () => ({
   __esModule: true,
   default: () => null,
 }));
 
-jest.mock('./add-failure-classification-taxonomy', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock('./add-responsive-layout-improvements', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock('./add-keyboard-navigation-help', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock('./add-run-annotations', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock('./add-run-replay-ui', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./add-run-replay-history-with-timestamps', () => ({
   __esModule: true,
@@ -294,44 +226,17 @@ jest.mock('./add-bulk-actions-for-runs', () => ({
   default: () => null,
 }));
 
-jest.mock('./add-downloadable-run-artifact-bundle', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./implement-resource-fee-insight-panel-component', () => ({
   ResourceFeeInsightPanel: () => null,
 }));
 
-jest.mock('./add-export-run-json', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock('./add-export-run-csv', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock('./add-run-comparison-charts', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./add-run-cluster-visualization', () => ({
   __esModule: true,
   default: () => null,
 }));
 
-jest.mock('./add-run-heatmap', () => ({
-  __esModule: true,
-  default: () => null,
-}));
-
-jest.mock('./add-state-change-diff-view', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./add-tagging-and-labels-ui', () => ({
   __esModule: true,
@@ -363,10 +268,6 @@ jest.mock('./create-run-heatmap-page-55', () => ({
   default: () => null,
 }));
 
-jest.mock('./implement-alerting-settings-page-54', () => ({
-  __esModule: true,
-  default: () => null,
-}));
 
 jest.mock('./create-alerting-settings-page-page', () => ({
   __esModule: true,

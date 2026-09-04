@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import {
   createDefaultAlertingSettingsSnapshot,
   readAlertingSettingsSnapshot,
@@ -6,6 +6,7 @@ import {
   type AlertingSettingsSnapshot,
 } from '@/app/alerting-settings-page-utils';
 import { jsonError, withRouteErrorHandling } from '@/lib/route-handler';
+import { successResponse } from '@/lib/api-response-utils';
 
 // In-memory store (persists for the lifetime of the process)
 let store: AlertingSettingsSnapshot | null = null;
@@ -22,7 +23,7 @@ function getSnapshot(): AlertingSettingsSnapshot {
  * Returns the current alerting settings snapshot.
  */
 export async function GET() {
-  return NextResponse.json(getSnapshot());
+  return successResponse(getSnapshot());
 }
 
 /**
@@ -52,5 +53,5 @@ export const PUT = withRouteErrorHandling('PUT /api/settings/alerting', async (r
     lastUpdated: new Date().toISOString(),
   };
 
-  return NextResponse.json(store);
+  return successResponse(store);
 });

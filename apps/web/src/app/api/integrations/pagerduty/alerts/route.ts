@@ -6,7 +6,7 @@
  * to a real backend in production.
  */
 
-import { NextResponse } from 'next/server';
+import { successResponse } from '@/lib/api-response-utils';
 import type { PagerDutyAlert } from '../../../../integrate-pagerduty-alert-integration-utils';
 
 // Mock data for dev/demo use when PagerDuty is not yet configured.
@@ -43,5 +43,5 @@ const MOCK_ALERTS: PagerDutyAlert[] = [
 ];
 
 export async function GET() {
-  return NextResponse.json({ alerts: MOCK_ALERTS });
+  return successResponse({ alerts: MOCK_ALERTS });
 }

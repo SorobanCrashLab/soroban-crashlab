@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { isTypingContext } from '../app/keyboard-shortcut-cheatsheet-utils';
+import { isEditableTarget } from '../lib/is-editable-target';
 import { commandRegistry, type ScoredEntry } from '../lib/command-palette/registry';
 import { highlightSegments } from '../lib/command-palette/matcher';
 import { addRecent, getRecents } from '../lib/command-palette/recents';
@@ -137,7 +137,7 @@ export default function CommandPalette() {
         return;
       }
 
-      if (isTypingContext(document.activeElement) && document.activeElement !== inputRef.current) {
+      if (isEditableTarget(event.target) && event.target !== inputRef.current) {
         return;
       }
     };
@@ -238,7 +238,7 @@ export default function CommandPalette() {
           className="max-h-80 overflow-y-auto p-2"
         >
           {results.length === 0 && (
-            <li className="px-3 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+            <li className="px-3 py-6 text-center text-sm text-muted">
               No matching commands.
             </li>
           )}

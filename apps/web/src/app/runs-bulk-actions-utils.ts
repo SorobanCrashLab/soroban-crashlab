@@ -5,11 +5,13 @@
  */
 
 import type { FuzzingRun, RunStatus } from './types';
+import { RUN_STATUSES, isTerminalStatus } from '../lib/run-status';
 
 export type BulkActionType = 'cancel' | 'retry' | 'delete' | 'export' | 'tag' | 'assign';
 
 const RETRYABLE_STATUSES: RunStatus[] = ['failed', 'cancelled'];
-const DELETABLE_STATUSES: RunStatus[] = ['completed', 'failed', 'cancelled'];
+/** Any run that has stopped changing state can be deleted. */
+const DELETABLE_STATUSES: RunStatus[] = RUN_STATUSES.filter(isTerminalStatus);
 
 /**
  * Toggles a single run ID in the current selection set.

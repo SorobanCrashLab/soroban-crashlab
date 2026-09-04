@@ -17,6 +17,8 @@ import RunMetadataEditorWrapper from './RunMetadataEditorWrapper';
 import RunAnnotationThreads from './annotation-threads/RunAnnotationThreads';
 import SwipeNavigationWrapper from '../swipe/SwipeNavigationWrapper';
 
+import { absoluteShort } from '../../utils/datetime';
+
 export const dynamic = 'force-dynamic';
 
 interface RunDetailPageProps {
@@ -24,7 +26,7 @@ interface RunDetailPageProps {
 }
 
 const formatBytes = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-const formatDate = (value?: string): string => (value ? new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) : 'Pending');
+const formatDate = (value?: string): string => (value ? absoluteShort(value, 'UTC') : 'Pending');
 
 export default async function RunDetailPage({ params }: RunDetailPageProps) {
     const { id } = await params;

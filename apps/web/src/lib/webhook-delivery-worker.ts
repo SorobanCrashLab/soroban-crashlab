@@ -47,9 +47,9 @@ export interface WebhookDeliveryWorkerOptions {
   onDeadLetter?: (entry: DlqEntry) => void;
 }
 
+import { WEBHOOK_DELIVERY_TIMEOUT_MS, WEBHOOK_DELIVERY_RETRY_BASE_MS } from './timeouts';
+
 const DEFAULT_MAX_ATTEMPTS = 3;
-const DEFAULT_RETRY_BASE_MS = 250;
-const DEFAULT_TIMEOUT_MS = 5000;
 
 export class FetchWebhookDeliveryAdapter implements WebhookDeliveryAdapter {
   async deliver(request: WebhookDeliveryRequest): Promise<{
@@ -60,7 +60,7 @@ export class FetchWebhookDeliveryAdapter implements WebhookDeliveryAdapter {
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
-      request.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      request.timeoutMs ?? WEBHOOK_DELIVERY_TIMEOUT_MS,
     );
 
     try {
@@ -109,8 +109,8 @@ export class WebhookDeliveryWorker {
     this.adapter = options.adapter ?? new FetchWebhookDeliveryAdapter();
     this.store = options.store ?? null;
     this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-    this.retryBaseMs = options.retryBaseMs ?? DEFAULT_RETRY_BASE_MS;
-    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.retryBaseMs = options.retryBaseMs ?? WEBHOOK_DELIVERY_RETRY_BASE_MS;
+    this.timeoutMs = options.timeoutMs ?? WEBHOOK_DELIVERY_TIMEOUT_MS;
     this.now = options.now ?? (() => new Date());
     this.delay =
       options.delay ??

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { escapeHtml } from '../lib/sanitize';
 
 interface JsonPreviewProps {
   content: string;
@@ -10,6 +11,7 @@ interface JsonPreviewProps {
 /**
  * JSON file preview component with basic syntax highlighting.
  * Renders formatted JSON with color-coded keys, strings, numbers, booleans, and nulls.
+ * All content is properly escaped to prevent XSS attacks.
  */
 const JsonPreview: React.FC<JsonPreviewProps> = ({
   content,
@@ -19,10 +21,12 @@ const JsonPreview: React.FC<JsonPreviewProps> = ({
 
   return (
     <div
-      className={`overflow-auto ${maxHeight} rounded-lg border border-zinc-200 dark:border-zinc-700`}
+      className={`overflow-auto ${maxHeight} rounded-lg`}
+      style={{ border: '1px solid var(--border-color)' }}
     >
       <pre
-        className="font-mono text-xs leading-relaxed p-4 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 whitespace-pre"
+        className="font-mono text-xs leading-relaxed p-4 surface-soft text-zinc-800 dark:text-zinc-200 whitespace-pre"
+        style={{ background: 'var(--surface)', color: 'var(--text-primary)' }}
         dangerouslySetInnerHTML={{ __html: highlighted }}
       />
     </div>
@@ -32,30 +36,27 @@ const JsonPreview: React.FC<JsonPreviewProps> = ({
 /**
  * Apply basic syntax highlighting to JSON text.
  * Uses regex to colorize keys, strings, numbers, booleans, and null values.
+ * All HTML special characters are escaped before applying color spans to prevent XSS.
  */
 function highlightJson(json: string): string {
-  const escaped = json
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  const escaped = escapeHtml(json);
 
   return escaped.replace(
     /("(?:[^"\\]|\\.)*")\s*:/g, // keys
-    '<span class="text-blue-600 dark:text-blue-400">$1</span>:'
+    '<span style="color: #2563eb;">$1</span>:'
   ).replace(
     /:\s*("(?:[^"\\]|\\.)*")/g, // string values
-    ':<span class="text-green-700 dark:text-green-400">$1</span>'
+    ':<span style="color: #15803d;">$1</span>'
   ).replace(
     /:\s*(true|false)/g, // booleans
-    ':<span class="text-purple-600 dark:text-purple-400">$1</span>'
+    ':<span style="color: #9333ea;">$1</span>'
   ).replace(
     /:\s*(null)/g, // null
-    ':<span class="text-red-500 dark:text-red-400">$1</span>'
+    ':<span style="color: #dc2626;">$1</span>'
   ).replace(
     /(\b\d+\.?\d*(?:[eE][+-]?\d+)?\b)/g, // numbers (not inside strings)
     (match) => {
-      // Only color numbers that are JSON values (follow : or , or start of array)
-      return `<span class="text-amber-600 dark:text-amber-400">${match}</span>`;
+      return `<span style="color: #d97706;">${match}</span>`;
     }
   );
 }

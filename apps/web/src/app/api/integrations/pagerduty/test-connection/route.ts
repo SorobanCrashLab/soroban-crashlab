@@ -9,8 +9,9 @@
  * any key that passes basic format checks, mirroring the Sentry adapter.
  */
 
-import { NextResponse } from 'next/server';
+import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { isIntegrationKeyReachable } from '../../../../integrate-pagerduty-alert-integration-utils';
+import { PAGERDUTY_FETCH_TIMEOUT_MS } from '../../../../../lib/timeouts';
 
 const PD_EVENTS_API_URL = 'https://events.pagerduty.com/v2/enqueue';
 
@@ -20,13 +21,13 @@ export async function POST(request: Request) {
     const integrationKey = (body.integrationKey ?? '').trim();
 
     if (!integrationKey) {
-      return NextResponse.json({ error: 'integrationKey is required' }, { status: 400 });
+      return errorResponse('integrationKey is required', 400);
     }
 
     if (!isIntegrationKeyReachable(integrationKey)) {
-      return NextResponse.json(
-        { success: false, error: 'Integration key appears invalid – must be at least 32 characters' },
-        { status: 200 },
+      return errorResponse(
+        'Integration key appears invalid – must be at least 32 characters',
+        200,
       );
     }
 
@@ -52,22 +53,22 @@ export async function POST(request: Request) {
             },
           },
         }),
-        signal: AbortSignal.timeout?.(10_000),
+        signal: AbortSignal.timeout?.(PAGERDUTY_FETCH_TIMEOUT_MS),
       });
 
       if (pdResponse.ok || pdResponse.status === 202) {
-        return NextResponse.json({ success: true });
+        return successResponse({ success: true });
       }
 
       const errorBody = await pdResponse.text().catch(() => pdResponse.statusText);
-      return NextResponse.json({ success: false, error: errorBody }, { status: 200 });
+      return errorResponse(errorBody, 200);
     } catch (networkError) {
       // Network not available (e.g. offline dev environment) – fall back to
       // structural validation only, returning success if key format is valid.
       console.warn('[pagerduty/test-connection] Could not reach PagerDuty Events API:', networkError);
-      return NextResponse.json({ success: true, warning: 'Structural validation only – could not reach PagerDuty API' });
+      return successResponse({ success: true, warning: 'Structural validation only – could not reach PagerDuty API' });
     }
   } catch {
-    return NextResponse.json({ error: 'Failed to parse request body' }, { status: 400 });
+    return errorResponse('Failed to parse request body', 400);
   }
 }

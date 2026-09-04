@@ -113,3 +113,48 @@ export function parseResourceFee(input: string): number | null {
   const parsed = parseInt(cleaned, 10);
   return isNaN(parsed) ? null : parsed;
 }
+
+/**
+ * Validate a single fee value: must be a finite number >= 0.
+ * Keeps huge-but-valid numbers (e.g. 1e12) while rejecting all malformed forms.
+ */
+export function isValidFeeValue(fee: unknown): boolean {
+  return typeof fee === 'number' && Number.isFinite(fee) && !Number.isNaN(fee) && fee >= 0;
+}
+
+export interface FeeSanitizeResult<T> {
+  clean: T[];
+  dropped: { count: number; ids: string[] };
+}
+
+/**
+ * Pure sanitizer for fee series data.
+ * Excludes rows with negative, NaN, Infinity, non-number (including string-number)
+ * fees from plotting and returns the dropped run IDs for visible warning.
+ */
+export function sanitizeFeeSeries<T extends { id: string; minResourceFee: unknown }>(
+  rows: T[],
+): FeeSanitizeResult<T> {
+  const clean: T[] = [];
+  const ids: string[] = [];
+  for (const row of rows) {
+    if (!isValidFeeValue(row.minResourceFee)) {
+      ids.push(row.id);
+      continue;
+    }
+    clean.push(row);
+  }
+  return { clean, dropped: { count: ids.length, ids } };
+}
+
+/** Y-axis domain clamped at zero for fee metrics. */
+export const FEE_Y_DOMAIN: readonly [number, string] = [0, 'auto'] as const;
+
+export function getFeeYDomain(): readonly [number, string] {
+  return FEE_Y_DOMAIN;
+}
+
+export function formatMalformedFeeCaption(droppedCount: number): string | null {
+  if (droppedCount === 0) return null;
+  return `${droppedCount} malformed fee ${droppedCount === 1 ? 'row' : 'rows'} hidden`;
+}

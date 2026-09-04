@@ -2,6 +2,7 @@ import {
   resolveTheme,
   parseStoredTheme,
   nextTheme,
+  toggleTheme,
   THEME_STORAGE_KEY,
   type Theme,
 } from './theme-provider-utils';
@@ -130,6 +131,48 @@ function assertEqual<T>(actual: T, expected: T, message?: string): void {
   const lightResult = resolveTheme(null, false);
   assertEqual(darkResult, 'dark');
   assertEqual(lightResult, 'light');
+}
+
+// toggleTheme: computes next theme state deterministically
+{
+  assertEqual(toggleTheme(null, false), 'dark');
+  assertEqual(toggleTheme(null, true), 'light');
+  assertEqual(toggleTheme('light', false), 'dark');
+  assertEqual(toggleTheme('dark', false), 'light');
+  assertEqual(toggleTheme('light', true), 'dark');
+  assertEqual(toggleTheme('dark', true), 'light');
+}
+
+// Hammer-test: 20 synthetic toggles starting from null in light system mode
+{
+  let current: Theme | null = null;
+  const systemPrefersDark = false;
+  const history: Theme[] = [];
+  for (let i = 0; i < 20; i++) {
+    current = toggleTheme(current, systemPrefersDark);
+    history.push(current);
+  }
+  for (let i = 0; i < 20; i++) {
+    const expected = i % 2 === 0 ? 'dark' : 'light';
+    assertEqual(history[i], expected, `Toggle step ${i + 1} expected ${expected} but got ${history[i]}`);
+  }
+  assertEqual(current, 'light', '20 toggles in light system mode should return to light');
+}
+
+// Hammer-test: 20 synthetic toggles starting from null in dark system mode
+{
+  let current: Theme | null = null;
+  const systemPrefersDark = true;
+  const history: Theme[] = [];
+  for (let i = 0; i < 20; i++) {
+    current = toggleTheme(current, systemPrefersDark);
+    history.push(current);
+  }
+  for (let i = 0; i < 20; i++) {
+    const expected = i % 2 === 0 ? 'light' : 'dark';
+    assertEqual(history[i], expected, `Toggle step ${i + 1} expected ${expected} but got ${history[i]}`);
+  }
+  assertEqual(current, 'dark', '20 toggles in dark system mode should return to dark');
 }
 
 console.log('theme-provider-utils.test.ts: all assertions passed');

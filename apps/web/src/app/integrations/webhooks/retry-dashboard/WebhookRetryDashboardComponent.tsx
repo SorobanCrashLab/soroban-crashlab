@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
   WebhookDeliveryHistoryItem,
@@ -17,7 +17,6 @@ import { ListState } from '../../../../components/ListState';
 
 export default function WebhookRetryDashboardComponent() {
   const [items, setItems] = useState<WebhookDeliveryHistoryItem[]>([]);
-  const [stats, setStats] = useState<DeliveryStats | null>(null);
   const [statusFilter, setStatusFilter] = useState<DeliveryStatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -35,21 +34,16 @@ export default function WebhookRetryDashboardComponent() {
       const res = await fetch(`/api/webhooks/history?status=${statusFilter}&search=${encodeURIComponent(searchQuery)}`);
       if (res.ok) {
         const data = await res.json();
-        setItems(data.items);
-        setStats(data.stats);
+        setItems(data.data?.items ?? []);
       } else {
         // Fallback to local computation if API unavailable (e.g. static export)
         const filtered = filterDeliveryItems(MOCK_WEBHOOK_DELIVERY_HISTORY, statusFilter, searchQuery);
-        const computedStats = computeDeliveryStats(MOCK_WEBHOOK_DELIVERY_HISTORY);
         setItems(filtered);
-        setStats(computedStats);
       }
     } catch {
       // Fallback
       const filtered = filterDeliveryItems(MOCK_WEBHOOK_DELIVERY_HISTORY, statusFilter, searchQuery);
-      const computedStats = computeDeliveryStats(MOCK_WEBHOOK_DELIVERY_HISTORY);
       setItems(filtered);
-      setStats(computedStats);
     } finally {
       setIsLoading(false);
     }
@@ -83,10 +77,10 @@ export default function WebhookRetryDashboardComponent() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.item) {
+        if (data.data?.item) {
           // Update selected payload item if open in drawer
           if (selectedPayloadItem && selectedPayloadItem.id === id) {
-            setSelectedPayloadItem(data.item);
+            setSelectedPayloadItem(data.data.item);
           }
         }
       }
@@ -97,6 +91,12 @@ export default function WebhookRetryDashboardComponent() {
       setRetryingId(null);
     }
   };
+
+  // Derived stats: recomputed reactively whenever the item list changes (e.g. after a
+  // manual retry transitions an item from failed to delivered). Keeping this as a memo
+  // of `items` — rather than duplicate state — guarantees the stat cards always agree
+  // with the table below them without requiring a full remount or refetch.
+  const stats = useMemo<DeliveryStats>(() => computeDeliveryStats(items), [items]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);

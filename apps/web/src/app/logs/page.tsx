@@ -25,6 +25,7 @@ import { useDebounce } from "../../lib/useDebounce";
 import { MOCK_LOG_ENTRIES } from "../../fixtures/logs";
 import { useDataTableKeyboardNav } from "../use-data-table-keyboard-nav";
 import LogSeverityBadge from "../../components/LogSeverityBadge";
+import { useRunStream } from "../runs/[id]/useRunStream";
 
 async function fetchLogs(): Promise<LogEntry[]> {
   await new Promise((r) => setTimeout(r, 800));
@@ -59,6 +60,14 @@ export default function LogViewerPage() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [fetchAttempt, setFetchAttempt] = useState(0);
   const [autoscroll, setAutoscroll] = useState(true);
+  useRunStream("run-1001", (envelope) => {
+    if (envelope.event.type !== "LOG_APPEND") return;
+    const logEvent = envelope.event;
+    setEntries((current) => {
+      const known = new Set(current.map((entry) => entry.id));
+      return [...current, ...logEvent.entries.filter((entry) => !known.has(entry.id))];
+    });
+  });
 
   // Refs for scroll intent tracking
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -269,7 +278,25 @@ export default function LogViewerPage() {
               : visible.length === 0
                 ? {
                     state: "empty",
+                    type: "logs",
                     message: "No log entries match the current filters.",
+                    description:
+                      levelFilter !== "all" || searchQuery
+                        ? "Try clearing search queries or adjusting severity filters to display logs."
+                        : "No log records have been generated yet for this session.",
+                    action:
+                      levelFilter !== "all" || searchQuery ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLevelFilter("all");
+                            setSearchQuery("");
+                          }}
+                          className="btn-outline text-xs sm:text-sm px-3 sm:px-4 py-1.5"
+                        >
+                          Clear Filters
+                        </button>
+                      ) : undefined,
                   }
                 : { state: "success" })}
         >

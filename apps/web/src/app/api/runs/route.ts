@@ -4,6 +4,11 @@ import { logger } from '@/lib/logger';
 import { withRouteErrorHandling } from '@/lib/route-handler';
 import { sanitizeSearchParams } from '@/lib/sanitize';
 import { withFixtureCaching } from '@/lib/fixture-caching';
+import { API_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
+import { selectRunStorageDriver } from '@/lib/storage';
+import { paginateKeyset, getRunKeyset, isLegacyOrInvalidCursor } from '@/app/pagination-utils';
+
+const DEFAULT_PAGE_LIMIT = 20;
 
 export const GET = withRouteErrorHandling('GET /api/runs', async (request: Request) => {
   const { searchParams } = new URL(request.url);
@@ -22,7 +27,7 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
       );
       const fetchPromise = fetch(`${apiUrl}/api/runs${qs ? `?${qs}` : ''}`, {
         cache: 'no-store',
-        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        signal: AbortSignal.timeout(API_FETCH_TIMEOUT_MS),
       });
 
       const res = await Promise.race([fetchPromise, timeoutPromise]);
@@ -49,8 +54,34 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
     return errorResponse('Mock data disabled and no backend configured', status.serviceUnavailable);
   }
 
-  const { buildMockRuns } = await import('@/app/mockRuns');
-  const runs = buildMockRuns();
-  const data = { runs, total: runs.length };
-  return withFixtureCaching(request, data);
+  const driver = selectRunStorageDriver();
+  const rawStatus = searchParams.get('status') as import('@/app/types').RunStatus | undefined;
+  const { runs: allRuns } = await driver.listRuns({
+    status: rawStatus,
+  });
+
+  // Parse keyset pagination parameters from the query string.
+  // A legacy offset cursor is detected and reset gracefully to page 1.
+  const rawCursor = searchParams.get('cursor') ?? '';
+  const cursor = rawCursor && !isLegacyOrInvalidCursor(rawCursor) ? rawCursor : undefined;
+  const legacyCursorDetected = rawCursor && isLegacyOrInvalidCursor(rawCursor);
+
+  if (legacyCursorDetected) {
+    logger.warn('GET /api/runs: legacy or invalid cursor supplied, resetting to page 1', {
+      cursor: rawCursor,
+    });
+  }
+
+  const limitParam = parseInt(searchParams.get('limit') ?? '', 10);
+  const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : DEFAULT_PAGE_LIMIT;
+
+  const { items, total, nextCursor, hasMore } = paginateKeyset(allRuns, {
+    cursor,
+    limit,
+    getItemKeyset: getRunKeyset,
+    direction: 'desc',
+  });
+
+  const data = { runs: items, total, nextCursor, hasMore };
+  return withFixtureCaching(request, { data, total: data.total });
 });

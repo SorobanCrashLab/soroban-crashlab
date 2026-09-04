@@ -4,11 +4,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import {
   resolveTheme,
   parseStoredTheme,
-  nextTheme,
+  toggleTheme,
+  THEME_STORAGE_KEY,
   type Theme,
 } from '../app/theme-provider-utils';
-
-const STORAGE_KEY = 'crashlab:theme';
 
 interface ThemeContextType {
   theme: Theme;
@@ -25,7 +24,7 @@ const ThemeContext = createContext<ThemeContextType>({
 function getStoredTheme(): Theme | null {
   if (typeof window === 'undefined') return null;
   try {
-    return parseStoredTheme(localStorage.getItem(STORAGE_KEY));
+    return parseStoredTheme(localStorage.getItem(THEME_STORAGE_KEY));
   } catch {
     return null;
   }
@@ -58,6 +57,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [systemPrefersDark, userTheme],
   );
 
+  // Synchronize userTheme override to localStorage when state commits
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+    try {
+      if (userTheme !== null) {
+        localStorage.setItem(THEME_STORAGE_KEY, userTheme);
+      } else {
+        localStorage.removeItem(THEME_STORAGE_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [userTheme, mounted]);
+
   // Keep the effective theme in sync when the OS-level color scheme changes.
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -78,7 +91,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY) return;
+      if (event.key !== THEME_STORAGE_KEY) return;
       setUserTheme(parseStoredTheme(event.newValue));
     };
     window.addEventListener('storage', onStorage);
@@ -86,16 +99,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggle = useCallback(() => {
-      setUserTheme((prev) => {
-        const next = nextTheme(prev ?? theme);
-        try {
-          localStorage.setItem(STORAGE_KEY, next);
-        } catch {
-          /* ignore */
-        }
-        return next;
-      });
-  }, [theme]);
+    setUserTheme((prev) => toggleTheme(prev, systemPrefersDark));
+  }, [systemPrefersDark]);
 
   return (
     <ThemeContext.Provider value={{ theme, toggle, mounted }}>

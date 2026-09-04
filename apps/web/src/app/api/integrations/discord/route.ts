@@ -5,8 +5,8 @@
  * Accepts a notification payload and forwards it to the configured Discord webhook.
  */
 
-import { NextResponse } from 'next/server';
 import { withRouteErrorHandling, readJsonBody, jsonError } from '@/lib/route-handler';
+import { successResponse } from '@/lib/api-response-utils';
 import { createDiscordAdapter, type DiscordMessage } from '@/lib/integrations/discord-webhook';
 
 export const POST = withRouteErrorHandling(
@@ -36,7 +36,7 @@ export const POST = withRouteErrorHandling(
       return jsonError(result.error || 'Failed to send Discord notification', 500);
     }
 
-    return NextResponse.json({ success: true, message: 'Notification sent successfully' });
+    return successResponse({ success: true, message: 'Notification sent successfully' });
   },
   'Failed to send Discord notification',
 );

@@ -10,6 +10,7 @@
 import { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RunStatus, RunArea, RunSeverity } from "../types";
+import { parseRunStatus } from "../../lib/run-status";
 
 export interface DashboardFilters {
   status: RunStatus[];
@@ -60,9 +61,8 @@ function parseFiltersFromURL(searchParams: URLSearchParams): DashboardFilters {
   if (statusParam) {
     filters.status = statusParam
       .split(",")
-      .filter((s) =>
-        ["running", "completed", "failed", "cancelled"].includes(s),
-      ) as RunStatus[];
+      .map(parseRunStatus)
+      .filter((s): s is RunStatus => s !== null);
   }
 
   const areaParam = searchParams.get("filter_area");

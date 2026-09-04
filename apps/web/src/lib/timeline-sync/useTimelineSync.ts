@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { TimelineIndex, buildTimelineIndex, getCorrelatedFrame, getAdjacentLog, getAdjacentFrame, isMappingAmbiguous, isFrameMappingAmbiguous } from './index';
+import { isEditableTarget } from '../is-editable-target';
 
 export interface UseTimelineSyncOptions {
     epsilonMs?: number;
@@ -198,8 +199,7 @@ export function useTimelineSync(
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Only handle if we have a selection and not in an input
-            const target = e.target as HTMLElement;
-            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+            if (isEditableTarget(e.target)) {
                 return;
             }
 

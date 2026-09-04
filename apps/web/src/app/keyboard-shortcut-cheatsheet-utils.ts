@@ -4,6 +4,8 @@
  * Issue: #856 - Add keyboard shortcut cheatsheet modal
  */
 
+import { isEditableTarget } from "../lib/is-editable-target";
+
 export type ShortcutCategory = "general" | "navigation" | "dashboard";
 
 export interface KeyboardShortcut {
@@ -95,22 +97,8 @@ export const SHORTCUT_CATEGORY_ORDER: ShortcutCategory[] = [
   "dashboard",
 ];
 
-const TYPING_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
-
 export function isTypingContext(activeElement: Element | null): boolean {
-  if (!activeElement) {
-    return false;
-  }
-
-  const tagName = activeElement.tagName;
-  if (TYPING_TAGS.has(tagName)) {
-    return true;
-  }
-
-  return (
-    "isContentEditable" in activeElement &&
-    Boolean((activeElement as HTMLElement).isContentEditable)
-  );
+  return isEditableTarget(activeElement);
 }
 
 export function shouldToggleCheatsheet(

@@ -17,3 +17,12 @@ export function parseStoredTheme(raw: string | null): Theme | null {
 export function nextTheme(current: Theme): Theme {
   return current === 'light' ? 'dark' : 'light';
 }
+
+export function toggleTheme(
+  currentUserTheme: Theme | null,
+  systemPrefersDark: boolean = false,
+): Theme {
+  const currentEffective = resolveTheme(currentUserTheme, systemPrefersDark);
+  return nextTheme(currentEffective);
+}
+

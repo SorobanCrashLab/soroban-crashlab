@@ -1,16 +1,12 @@
-import { NextResponse } from 'next/server';
-import { listArtifactMetadata, saveArtifact } from '@/lib/artifact-fs-adapter';
+import { selectArtifactRepository } from '@/lib/storage/artifact-repository';
 import { jsonError, withRouteErrorHandling } from '@/lib/route-handler';
-import { createdResponse } from '@/lib/api-response-utils';
+import { createdResponse, successResponse } from '@/lib/api-response-utils';
 
 export const GET = withRouteErrorHandling(
   'GET /api/artifacts',
   async () => {
-    const artifacts = await listArtifactMetadata();
-    return NextResponse.json({
-      artifacts,
-      total: artifacts.length,
-    });
+    const artifacts = await selectArtifactRepository().list();
+    return successResponse({ artifacts, total: artifacts.length }, { total: artifacts.length });
   },
   'Failed to list artifacts',
 );
@@ -25,7 +21,7 @@ export const POST = withRouteErrorHandling(
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const metadata = await saveArtifact(file.name, buffer);
+    const metadata = await selectArtifactRepository().put(file.name, buffer);
     return createdResponse({ artifact: metadata });
   },
   'Failed to upload artifact',

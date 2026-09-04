@@ -100,7 +100,8 @@ describe('api-client', () => {
       const { fetchRuns } = await loadModule();
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
-      await expect(fetchRuns()).rejects.toThrow('Failed to fetch');
+      // Network failures are wrapped in NetworkError by the dedup layer
+      await expect(fetchRuns()).rejects.toThrow('Network error');
     });
 
     it('propagates a malformed JSON body', async () => {
@@ -111,6 +112,7 @@ describe('api-client', () => {
         json: () => Promise.reject(new SyntaxError('Unexpected token <')),
       } as unknown as Response);
 
+      // SyntaxError from JSON parsing is NOT a fetch rejection, propagates as-is
       await expect(fetchRuns()).rejects.toThrow('Unexpected token <');
     });
 
@@ -119,8 +121,78 @@ describe('api-client', () => {
       fetchMock.mockRejectedValueOnce(new Error('network down'));
       fetchMock.mockResolvedValueOnce(jsonResponse({ runs: [], total: 0 }));
 
-      await expect(fetchRuns()).rejects.toThrow('network down');
+      // With DEFAULT_FETCH_POLICY (maxAttempts=2), the first dedup call internally
+      // retries and succeeds on attempt 2 — unlike the old no-retry behaviour
+      // where two independent calls were needed.
       await expect(fetchRuns()).resolves.toEqual({ runs: [], total: 0 });
+    });
+
+    it('appends cursor to the request URL when provided', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+      const cursor = 'eyJzb3J0S2V5IjoiMjAyNiIsImlkIjoicnVuLTEifQ';
+
+      await fetchRuns({ cursor });
+
+      // URLSearchParams encodes '=' padding as '%3D'; just verify the key is present
+      expect(requestedUrl(fetchMock)).toContain('cursor=');
+    });
+
+    it('appends limit to the request URL when provided', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+
+      await fetchRuns({ limit: 5 });
+
+      expect(requestedUrl(fetchMock)).toContain('limit=5');
+    });
+
+    it('appends both cursor and limit to the URL when both provided', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+      const cursor = 'eyJzb3J0S2V5IjoiMjAyNiIsImlkIjoicnVuLTIifQ';
+
+      await fetchRuns({ cursor, limit: 10 });
+
+      const url = requestedUrl(fetchMock);
+      expect(url).toContain('cursor=');
+      expect(url).toContain('limit=10');
+    });
+
+    it('forwards abort signal when called with options + signal', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+      const controller = new AbortController();
+
+      await fetchRuns({ limit: 5 }, controller.signal);
+
+      const forwarded = (fetchMock.mock.calls[0][1] as RequestInit).signal as AbortSignal;
+      expect(forwarded.aborted).toBe(false);
+      controller.abort();
+      expect(forwarded.aborted).toBe(true);
+    });
+
+    it('passes through nextCursor and hasMore from the response', async () => {
+      const { fetchRuns } = await loadModule();
+      const nextCursor = 'eyJzb3J0S2V5IjoiMjAyNiIsImlkIjoicnVuLTMifQ==';
+      fetchMock.mockResolvedValue(
+        jsonResponse({ runs: [makeRun()], total: 50, nextCursor, hasMore: true }),
+      );
+
+      const result = await fetchRuns({ limit: 1 });
+
+      expect(result.nextCursor).toBe(nextCursor);
+      expect(result.hasMore).toBe(true);
+      expect(result.total).toBe(50);
+    });
+
+    it('omits cursor from URL when cursor is null', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+
+      await fetchRuns({ cursor: null });
+
+      expect(requestedUrl(fetchMock)).not.toContain('cursor=');
     });
   });
 
@@ -199,7 +271,7 @@ describe('api-client', () => {
       const { fetchRun } = await loadModule();
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
-      await expect(fetchRun('run-1')).rejects.toThrow('Failed to fetch');
+      await expect(fetchRun('run-1')).rejects.toThrow('Network error');
     });
 
     it('accepts an empty id without dropping the path segment', async () => {
@@ -208,6 +280,32 @@ describe('api-client', () => {
 
       await expect(fetchRun('')).resolves.toBeNull();
       expect(requestedUrl(fetchMock)).toBe('/api/runs/');
+    });
+  });
+
+  describe('fetchLatestOnly', () => {
+    it('automatically aborts older requests when called again', async () => {
+      const { fetchLatestOnly } = await loadModule();
+
+      const mockFetcher = vi.fn((query: string, signal: AbortSignal) => {
+        return new Promise<string>((resolve, reject) => {
+          const timer = setTimeout(() => resolve(`result:${query}`), 50);
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        });
+      });
+
+      const latestFetcher = fetchLatestOnly(mockFetcher);
+
+      const promise1 = latestFetcher('query-1');
+      const promise2 = latestFetcher('query-2');
+
+      await expect(promise1).rejects.toThrow('The operation was aborted');
+      await expect(promise2).resolves.toBe('result:query-2');
     });
   });
 

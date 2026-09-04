@@ -15,7 +15,15 @@ import {
   type DimensionKey,
   type SavedCustomChart,
 } from './chart-builder-dsl';
-import ChartPreview from './ChartPreview';
+import dynamic from 'next/dynamic';
+import { GenericPageSkeleton } from '../../../components/LoadingSkeleton';
+
+// Lazy-load recharts via ChartPreview — keeps the chart bundle out of the
+// chart-builder shell until the user actually triggers a preview.
+const ChartPreview = dynamic(() => import('./ChartPreview'), {
+  loading: () => <GenericPageSkeleton />,
+  ssr: false,
+});
 
 const METRIC_OPTIONS: { key: MetricKey; label: string }[] = [
   { key: 'duration', label: 'Duration' },

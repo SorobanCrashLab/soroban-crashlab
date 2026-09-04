@@ -10,6 +10,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { timeOnly } from './utils/datetime';
 
 /**
  * Issue: Integrate Metrics export to Prometheus
@@ -98,7 +99,7 @@ export default function MetricsExportToPrometheus() {
       if (cancelled) return;
       setLatencyData(prev => {
         const newData = [...prev.slice(1), {
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          time: timeOnly(new Date()),
           value: Math.max(10, Math.min(150, prev[prev.length - 1].value + (Math.random() * 20 - 10)))
         }];
         return newData;

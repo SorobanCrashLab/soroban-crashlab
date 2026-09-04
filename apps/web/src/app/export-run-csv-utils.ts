@@ -3,6 +3,7 @@
  */
 
 import type { FuzzingRun } from './types';
+import { csvEscape } from './csv-escape';
 
 export interface CsvColumnDef {
   header: string;
@@ -39,13 +40,18 @@ export function resolveCsvColumns(visibleColumns?: string[]): string[] {
 /**
  * Builds the full CSV document (header row + one row per run) for the
  * given runs, restricted to the resolved set of visible columns.
+ *
+ * All field values (headers and data) are RFC-4180 escaped to handle
+ * commas, double-quotes, and newlines correctly.
  */
 export function buildRunsCsv(runs: FuzzingRun[], visibleColumns?: string[]): string {
   const cols = resolveCsvColumns(visibleColumns);
-  const headers = cols.map((c) => CSV_COLUMN_DEFS[c].header);
+  const headers = cols.map((c) => csvEscape(CSV_COLUMN_DEFS[c].header));
   const rows = [
     headers.join(','),
-    ...runs.map((run) => cols.map((c) => CSV_COLUMN_DEFS[c].value(run)).join(',')),
+    ...runs.map((run) =>
+      cols.map((c) => csvEscape(CSV_COLUMN_DEFS[c].value(run))).join(',')
+    ),
   ];
   return rows.join('\n');
 }

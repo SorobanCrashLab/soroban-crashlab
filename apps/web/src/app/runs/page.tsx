@@ -27,6 +27,9 @@ import type { RunArea, RunSeverity, RunStatus } from '../types';
 import { fetchRuns } from '../../lib/api-client';
 import { LoadingSpinner } from '../../components/LoadingSkeleton';
 import { ListState } from '../../components/ListState';
+import { PageHeader } from '../../components/PageHeader';
+import { PullToRefreshIndicator } from '../../components/PullToRefreshIndicator';
+import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 
 const BulkActionsForRuns = dynamic(() => import('../add-bulk-actions-for-runs'), {
   loading: () => <LoadingSpinner />,
@@ -59,10 +62,11 @@ export default function RunsPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     const load = async () => {
       setDataState('loading');
       try {
-        const data = await fetchRuns();
+        const data = await fetchRuns(controller.signal);
         if (!cancelled) {
           const sorted = (data.runs ?? []).slice().sort((a: FuzzingRun, b: FuzzingRun) => {
             const ta = a.queuedAt ?? a.startedAt ?? '';
@@ -72,8 +76,10 @@ export default function RunsPage() {
           setRuns(sorted);
           setDataState('success');
         }
-      } catch {
-        if (!cancelled) setDataState('error');
+      } catch (err: unknown) {
+        if (!cancelled && (err as Error)?.name !== 'AbortError') {
+          setDataState('error');
+        }
       }
     };
     void load();
@@ -87,9 +93,9 @@ export default function RunsPage() {
 
     return () => {
       cancelled = true;
+      controller.abort();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-    return () => { cancelled = true; };
   }, [fetchAttempt]);
 
   const visibleRuns = useMemo(() => {
@@ -159,29 +165,39 @@ export default function RunsPage() {
     [],
   );
 
+  const handleRefresh = useCallback(async () => {
+    setFetchAttempt((n) => n + 1);
+    // Give the effect time to kick off before resolving
+    await new Promise<void>((resolve) => setTimeout(resolve, 600));
+  }, []);
+
+  const { isPulling, isRefreshing, pullDistance } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    disabled: dataState === 'loading',
+  });
+
   return (
     <div className="container-full page-padding fade-in">
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <div>
-          <h1 className="heading-page">Fuzzing Runs</h1>
-          <p className="text-meta mt-0.5 sm:mt-1">
-            Select runs to cancel, retry, delete, export, tag, or assign in bulk
-          </p>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          {dataState === 'success' && (
-            <span className="chip text-xs sm:text-sm">
-              {visibleRuns.length === runs.length
-                ? `${runs.length} Total Runs`
-                : `${visibleRuns.length} of ${runs.length} Runs`}
-            </span>
-          )}
-          <SavedViewsMenu state={viewState} onApply={applyView} />
-          <Link href="/" className="btn-outline text-xs sm:text-sm px-3 sm:px-6 h-8 sm:h-10">
-            Dashboard
-          </Link>
-        </div>
-      </div>
+      <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} pullDistance={pullDistance} />
+      <PageHeader
+        title="Fuzzing Runs"
+        description="Select runs to cancel, retry, delete, export, tag, or assign in bulk"
+        actions={
+          <>
+            {dataState === 'success' && (
+              <span className="chip text-xs sm:text-sm">
+                {visibleRuns.length === runs.length
+                  ? `${runs.length} Total Runs`
+                  : `${visibleRuns.length} of ${runs.length} Runs`}
+              </span>
+            )}
+            <SavedViewsMenu state={viewState} onApply={applyView} />
+            <Link href="/" className="btn-outline text-xs sm:text-sm px-3 sm:px-6 h-8 sm:h-10">
+              Dashboard
+            </Link>
+          </>
+        }
+      />
 
       <ListState
         {...(dataState === 'loading'
@@ -189,7 +205,17 @@ export default function RunsPage() {
           : dataState === 'error'
           ? { state: 'error', message: 'Failed to load fuzzing runs', onRetry: () => setFetchAttempt((n) => n + 1) }
           : runs.length === 0
-          ? { state: 'empty', message: 'No fuzzing runs found.' }
+          ? {
+              state: 'empty',
+              type: 'runs',
+              message: 'No fuzzing runs found',
+              description: 'No fuzzing campaigns or runs have been recorded yet. Trigger a run from the dashboard or launch a fuzzing session to view results.',
+              action: (
+                <Link href="/" className="btn-primary text-xs sm:text-sm px-4 py-2 inline-flex items-center">
+                  Back to Dashboard
+                </Link>
+              ),
+            }
           : { state: 'success' })}
       >
         <BulkActionsForRuns

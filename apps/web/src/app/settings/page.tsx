@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useMaintainerMode } from '../useMaintainerMode';
 import { loadFromStorage } from './api/api-config-utils';
+import { API_BASE } from '@/lib/api-base';
 
 function readActiveUrl(): string {
   const config = loadFromStorage();
-  return config.backendUrl || process.env.NEXT_PUBLIC_API_URL || '';
+  return config.backendUrl || API_BASE;
 }
 
 export default function SettingsPage() {

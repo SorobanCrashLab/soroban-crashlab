@@ -188,11 +188,13 @@ describe('GET /api/runs', () => {
       const response = await GET(request);
 
       expect(response.status).toBe(200);
-      const data = await response.json();
-      expect(data.data).toHaveProperty('runs');
-      expect(Array.isArray(data.data.runs)).toBe(true);
-      expect(data.data.runs.length).toBeGreaterThan(0);
-      expect(data.total).toBe(data.data.runs.length);
+      const json = await response.json();
+      const data = json.data ?? json;
+      expect(data).toHaveProperty('runs');
+      expect(Array.isArray(data.runs)).toBe(true);
+      expect(data.runs.length).toBeGreaterThan(0);
+      // total reflects ALL runs; the current page may be a subset when keyset-paginated
+      expect(data.total).toBeGreaterThanOrEqual(data.runs.length);
     });
 
     it('mock data contains valid run objects', async () => {
@@ -202,8 +204,9 @@ describe('GET /api/runs', () => {
       const request = new Request('http://localhost:3000/api/runs');
       const response = await GET(request);
 
-      const data = await response.json();
-      const runs = data.data.runs;
+      const json = await response.json();
+      const data = json.data ?? json;
+      const runs = data.runs;
 
       expect(runs.length).toBeGreaterThan(0);
       
@@ -225,6 +228,74 @@ describe('GET /api/runs', () => {
       const response = await GET(request);
 
       expect(response.status).toBe(503);
+    });
+
+    it('applies default limit when no cursor or limit given', async () => {
+      delete process.env.NEXT_PUBLIC_API_URL;
+      process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA = 'true';
+
+      const request = new Request('http://localhost:3000/api/runs');
+      const response = await GET(request);
+
+      const json = await response.json();
+      const data = json.data ?? json;
+      // Default page limit is 20; total mock runs are > 20 so page should be exactly 20
+      expect(data.runs.length).toBeLessThanOrEqual(20);
+      expect(data).toHaveProperty('nextCursor');
+      expect(data).toHaveProperty('hasMore');
+    });
+
+    it('respects explicit limit query param', async () => {
+      delete process.env.NEXT_PUBLIC_API_URL;
+      process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA = 'true';
+
+      const request = new Request('http://localhost:3000/api/runs?limit=5');
+      const response = await GET(request);
+
+      const json = await response.json();
+      const data = json.data ?? json;
+      expect(data.runs.length).toBeLessThanOrEqual(5);
+    });
+
+    it('forwards cursor and returns next page without duplicates', async () => {
+      delete process.env.NEXT_PUBLIC_API_URL;
+      process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA = 'true';
+
+      const page1 = await GET(new Request('http://localhost:3000/api/runs?limit=5'));
+      const page1Json = await page1.json();
+      const page1Data = page1Json.data ?? page1Json;
+      const page1Ids = page1Data.runs.map((r: { id: string }) => r.id);
+      const nextCursor = page1Data.nextCursor as string;
+
+      expect(nextCursor).toBeTruthy();
+
+      const page2 = await GET(
+        new Request(`http://localhost:3000/api/runs?limit=5&cursor=${encodeURIComponent(nextCursor)}`),
+      );
+      const page2Json = await page2.json();
+      const page2Data = page2Json.data ?? page2Json;
+      const page2Ids = page2Data.runs.map((r: { id: string }) => r.id);
+
+      // No item should appear on both pages
+      const overlap = page1Ids.filter((id: string) => page2Ids.includes(id));
+      expect(overlap).toHaveLength(0);
+    });
+
+    it('resets to page 1 and warns when a legacy offset cursor is supplied', async () => {
+      delete process.env.NEXT_PUBLIC_API_URL;
+      process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA = 'true';
+
+      // '42' is a plain-integer legacy offset cursor
+      const response = await GET(
+        new Request('http://localhost:3000/api/runs?cursor=42&limit=5'),
+      );
+
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      const data = json.data ?? json;
+      // Should still return runs (first page)
+      expect(Array.isArray(data.runs)).toBe(true);
+      expect(data.runs.length).toBeGreaterThan(0);
     });
   });
 

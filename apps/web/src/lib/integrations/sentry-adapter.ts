@@ -53,7 +53,7 @@ export function createSentryAdapter(options: SentryAdapterOptions = {}) {
           throw new Error(`Failed to load config: ${response.statusText}`);
         }
 
-        return await response.json();
+        return ((await response.json()) as { data: SentryConfig | null }).data ?? null;
       } catch (error) {
         console.error('Error loading Sentry config:', error);
         throw error;
@@ -109,9 +109,9 @@ export function createSentryAdapter(options: SentryAdapterOptions = {}) {
           };
         }
 
-        const result = await response.json();
+        const result = (await response.json()) as { data?: { success?: boolean } };
         return {
-          success: result.success ?? true,
+          success: result.data?.success ?? true,
         };
       } catch (error) {
         console.error('Error testing Sentry connection:', error);
@@ -140,8 +140,8 @@ export function createSentryAdapter(options: SentryAdapterOptions = {}) {
           throw new Error(`Failed to fetch reports: ${response.statusText}`);
         }
 
-        const data = await response.json() as CrashReportsResponse;
-        return data.reports || [];
+        const data = await response.json() as { data?: CrashReportsResponse };
+        return data.data?.reports || [];
       } catch (error) {
         console.error('Error fetching crash reports:', error);
         throw error;
