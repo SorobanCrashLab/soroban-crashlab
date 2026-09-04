@@ -12,6 +12,7 @@ const allNavItems = [
   { href: '/runs', label: 'Runs', icon: '⊞' },
   { href: '/analytics', label: 'Analytics', icon: '⊟' },
   { href: '/triage', label: 'Triage', icon: '⚠' },
+  { href: '/schedules', label: 'Schedules', icon: '⏱' },
   { href: '/logs', label: 'Logs', icon: '☰' },
   { href: '/integrations', label: 'Integrations', icon: '⊕' },
   { href: '/settings', label: 'Settings', icon: '⚙' },

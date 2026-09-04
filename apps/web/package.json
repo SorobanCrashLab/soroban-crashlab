@@ -26,6 +26,7 @@
     "test:audit-log": "vitest run audit-log",
     "test:search-grammar": "vitest run search-grammar",
     "test:saved-views": "vitest run saved-views",
+    "test:cron": "npx vitest run src/lib/cron src/app/api/schedules",
     "test:api-client": "vitest run src/lib/api-client.test.ts",
     "test:api-error-mapper": "vitest run src/lib/api-error-mapper.test.ts",
     "test:widget-layout-editor": "vitest run src/app/implement-widget-layout-editor-component.test.ts",
