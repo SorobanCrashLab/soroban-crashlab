@@ -102,12 +102,12 @@ export function sanitizeUserContent(content: string): string {
 export function sanitizeSearchQuery(query: string): string {
   const trimmed = query.trim().slice(0, 500);
   if (DANGEROUS_URL_PATTERN.test(trimmed)) return "";
-  return escapeHtml(trimmed);
+  return trimmed;
 }
 
 export function sanitizeQueryParam(value: string): string {
   const trimmed = value.trim().slice(0, 500);
   if (!trimmed) return "";
   if (DANGEROUS_URL_PATTERN.test(trimmed)) return "";
-  return escapeHtml(trimmed);
+  return trimmed;
 }
