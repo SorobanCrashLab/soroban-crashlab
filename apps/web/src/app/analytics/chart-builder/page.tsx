@@ -1,4 +1,4 @@
-import ChartBuilderPage from '@components/ChartBuilderPage';
+import ChartBuilderPage from './ChartBuilderPage';
 
 export const metadata = {
   title: 'Custom Chart Builder | Soroban CrashLab',

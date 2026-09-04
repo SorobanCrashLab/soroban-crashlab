@@ -79,11 +79,14 @@ export const RunsListRequestSchema = z.object({
     .regex(/^\d+$/, 'limit must be a positive integer')
     .transform(Number)
     .optional(),
+  cursor: z.string().optional(),
 });
 
 export const RunsListResponseSchema = z.object({
   runs: z.array(FuzzingRunSchema),
   total: z.number(),
+  nextCursor: z.string().nullable().optional(),
+  hasMore: z.boolean().optional(),
 });
 
 export type RunsListRequest = z.infer<typeof RunsListRequestSchema>;

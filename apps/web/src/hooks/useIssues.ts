@@ -111,7 +111,6 @@ export function useIssues(
     void loadData();
 
     return () => {
-      clearTimeout(timer);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }

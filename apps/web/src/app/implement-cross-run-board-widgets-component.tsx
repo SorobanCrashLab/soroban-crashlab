@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useCallback } from "react";
 import { FuzzingRun } from "./types";
+import { buildAggregateMetrics } from "./run-metrics";
 
 export type CrossRunBoardDataState = "loading" | "error" | "success";
 
@@ -40,36 +41,17 @@ interface WidgetMetrics {
  * Computes comprehensive metrics from fuzzing runs data
  */
 export function computeWidgetMetrics(runs: FuzzingRun[]): WidgetMetrics {
-  const totalRuns = runs.length;
-  const completedRuns = runs.filter((r) => r.status === "completed").length;
-  const failedRuns = runs.filter((r) => r.status === "failed").length;
-  const runningRuns = runs.filter((r) => r.status === "running").length;
-  const cancelledRuns = runs.filter((r) => r.status === "cancelled").length;
-  
-  const avgDuration = totalRuns > 0
-    ? runs.reduce((acc, r) => acc + r.duration, 0) / totalRuns
-    : 0;
-    
-  const avgSeeds = totalRuns > 0
-    ? runs.reduce((acc, r) => acc + r.seedCount, 0) / totalRuns
-    : 0;
-    
-  const criticalIssues = runs.filter((r) => r.severity === "critical").length;
-  
-  const successRate = totalRuns > 0
-    ? (completedRuns / totalRuns) * 100
-    : 0;
-
+  const m = buildAggregateMetrics(runs);
   return {
-    totalRuns,
-    completedRuns,
-    failedRuns,
-    runningRuns,
-    cancelledRuns,
-    avgDuration,
-    avgSeeds,
-    criticalIssues,
-    successRate,
+    totalRuns: m.totalRuns,
+    completedRuns: m.statusCounts.completed,
+    failedRuns: m.statusCounts.failed,
+    runningRuns: m.statusCounts.running,
+    cancelledRuns: m.statusCounts.cancelled,
+    avgDuration: m.avgDuration,
+    avgSeeds: m.avgSeeds,
+    criticalIssues: m.criticalCount,
+    successRate: m.successRate,
   };
 }
 

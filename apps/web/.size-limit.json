@@ -1,24 +1,20 @@
 [
   {
-    "name": "route-group: shell",
-    "path": [
-      ".next/static/chunks/main-app-*.js",
-      ".next/static/chunks/webpack-*.js",
-      ".next/static/chunks/app/layout-*.js"
-    ],
+    "name": "route-group: runtime-bootstrap",
+    "path": [".next/static/chunks/turbopack-*.js"],
     "gzip": true,
-    "limit": "120 kB"
+    "limit": "50 kB"
   },
   {
-    "name": "route-group: analytics-charts",
-    "path": [".next/static/chunks/app/analytics/**/*.js"],
+    "name": "route-group: shared-styles",
+    "path": [".next/static/chunks/*.css"],
     "gzip": true,
-    "limit": "170 kB"
+    "limit": "50 kB"
   },
   {
-    "name": "route-group: editor-grid",
-    "path": [".next/static/chunks/app/**/widget*/**/*.js"],
+    "name": "route-group: static-bundles",
+    "path": [".next/static/chunks/*.js"],
     "gzip": true,
-    "limit": "130 kB"
+    "limit": "1500 kB"
   }
 ]
