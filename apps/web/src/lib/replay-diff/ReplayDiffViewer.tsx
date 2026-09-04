@@ -167,12 +167,12 @@ export default function ReplayDiffViewer({
                 <table className="w-full text-sm">
                     <thead className="surface-soft/50 border-b border-zinc-200 dark:border-zinc-800">
                         <tr>
-                            <th className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-8"></th>
-                            <th className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-10">Type</th>
-                            <th className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400">Ledger Key</th>
-                            <th className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-24">Change</th>
-                            <th className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400">Entry Type</th>
-                            <th className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-24">Details</th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-8"></th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-10">Type</th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400">Ledger Key</th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-24">Change</th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400">Entry Type</th>
+                            <th scope="col" className="px-3 py-2 text-left font-medium text-zinc-600 dark:text-zinc-400 w-24">Details</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">

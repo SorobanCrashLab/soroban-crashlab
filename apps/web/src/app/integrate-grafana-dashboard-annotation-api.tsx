@@ -507,7 +507,7 @@ export default function IntegrateGrafanaDashboardAnnotationApi() {
               <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
                 <tr>
                   {["Run ID", "Text", "Status", "Time", "Grafana ID"].map((heading) => (
-                    <th
+                    <th scope="col"
                       key={heading}
                       className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400"
                     >

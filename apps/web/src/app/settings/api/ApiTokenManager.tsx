@@ -221,13 +221,13 @@ export default function ApiTokenManager() {
             <table className="w-full text-xs text-left" id="api-tokens-table">
               <thead>
                 <tr className="border-b border-slate-700/50 text-meta">
-                  <th className="py-2 px-3">Name</th>
-                  <th className="py-2 px-3">Scope</th>
-                  <th className="py-2 px-3">Masked Key</th>
-                  <th className="py-2 px-3">Status</th>
-                  <th className="py-2 px-3">Created</th>
-                  <th className="py-2 px-3">Last Used</th>
-                  <th className="py-2 px-3 text-right">Actions</th>
+                  <th scope="col" className="py-2 px-3">Name</th>
+                  <th scope="col" className="py-2 px-3">Scope</th>
+                  <th scope="col" className="py-2 px-3">Masked Key</th>
+                  <th scope="col" className="py-2 px-3">Status</th>
+                  <th scope="col" className="py-2 px-3">Created</th>
+                  <th scope="col" className="py-2 px-3">Last Used</th>
+                  <th scope="col" className="py-2 px-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>

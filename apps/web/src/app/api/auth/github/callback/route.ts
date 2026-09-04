@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response-utils';
+import { sanitizeQueryParam, sanitizeSearchParams } from '@/lib/sanitize';
 
 const STATE_COOKIE_NAME = 'github_oauth_state';
 
@@ -9,12 +10,20 @@ const STATE_COOKIE_NAME = 'github_oauth_state';
  * GitHub OAuth 2.0 callback route.
  *
  * Handles the redirect from GitHub after user authorization.
- * Validates the CSRF state parameter before processing the code exchange.
+ * CSRF protection: the login route generates a cryptographically random
+ * `state` (crypto.randomUUID), stores it in a short-lived httpOnly,
+ * sameSite=lax cookie, and includes it in the redirect to GitHub.
+ * This callback verifies the returned `state` query param against the
+ * cookie value and rejects mismatched or missing state with 400 to
+ * prevent CSRF / login-CSRF attacks. The cookie is cleared on every
+ * outcome (success or failure) to enforce single-use semantics.
  */
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const code = searchParams.get('code');
-  const state = searchParams.get('state');
+  const sanitizedParams = sanitizeSearchParams(new URL(request.url).searchParams);
+  const rawCode = sanitizedParams.get('code');
+  const rawState = sanitizedParams.get('state');
+  const code = rawCode ? sanitizeQueryParam(rawCode) : null;
+  const state = rawState ? sanitizeQueryParam(rawState) : null;
   const storedState = request.cookies.get(STATE_COOKIE_NAME)?.value;
 
   // Clear the state cookie regardless of outcome
@@ -33,14 +42,14 @@ export async function GET(request: NextRequest) {
   if (!state || !storedState) {
     logger.warn('GET /api/auth/github/callback: missing state parameter (possible CSRF)');
     return clearCookie(
-      errorResponse('Missing OAuth state parameter. The login flow may have expired or been tampered with.', 403)
+      errorResponse('Missing OAuth state parameter. The login flow may have expired or been tampered with.', 400)
     );
   }
 
   if (state !== storedState) {
     logger.warn('GET /api/auth/github/callback: state mismatch (possible CSRF attack)');
     return clearCookie(
-      errorResponse('OAuth state mismatch. The request may have been tampered with.', 403)
+      errorResponse('OAuth state mismatch. The request may have been tampered with.', 400)
     );
   }
 

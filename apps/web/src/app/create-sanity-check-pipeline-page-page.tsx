@@ -9,128 +9,13 @@ import {
   toggleSanityCheck,
   createNewPipelineRun 
 } from './sanity-check-utils';
+import { MOCK_SANITY_CHECKS, MOCK_PIPELINE_RUNS } from '../fixtures/sanity-checks';
+import { relative } from './utils/datetime';
+import { formatDuration as sharedFormatDuration } from './utils/format';
 
 interface SanityCheckPipelinePageProps {
   className?: string;
 }
-
-const MOCK_SANITY_CHECKS: SanityCheck[] = [
-  {
-    id: 'contract-compilation',
-    name: 'Contract Compilation',
-    description: 'Verify all Soroban contracts compile without errors',
-    category: 'contract',
-    status: 'passed',
-    duration: 2340,
-    lastRun: new Date(Date.now() - 15 * 60 * 1000),
-    enabled: true,
-  },
-  {
-    id: 'wasm-validation',
-    name: 'WASM Validation',
-    description: 'Validate generated WASM binaries are well-formed',
-    category: 'contract',
-    status: 'passed',
-    duration: 1120,
-    lastRun: new Date(Date.now() - 15 * 60 * 1000),
-    enabled: true,
-  },
-  {
-    id: 'stellar-network',
-    name: 'Stellar Network Connectivity',
-    description: 'Check connection to Stellar test network',
-    category: 'environment',
-    status: 'warning',
-    duration: 890,
-    lastRun: new Date(Date.now() - 15 * 60 * 1000),
-    warningMessage: 'Network latency higher than expected (>500ms)',
-    enabled: true,
-  },
-  {
-    id: 'soroban-cli',
-    name: 'Soroban CLI Version',
-    description: 'Verify Soroban CLI is installed and up-to-date',
-    category: 'dependencies',
-    status: 'passed',
-    duration: 450,
-    lastRun: new Date(Date.now() - 15 * 60 * 1000),
-    enabled: true,
-  },
-  {
-    id: 'rust-toolchain',
-    name: 'Rust Toolchain',
-    description: 'Check Rust compiler and cargo versions',
-    category: 'dependencies',
-    status: 'passed',
-    duration: 320,
-    lastRun: new Date(Date.now() - 15 * 60 * 1000),
-    enabled: true,
-  },
-  {
-    id: 'contract-size',
-    name: 'Contract Size Limits',
-    description: 'Ensure contract binaries are within size limits',
-    category: 'contract',
-    status: 'failed',
-    duration: 780,
-    lastRun: new Date(Date.now() - 15 * 60 * 1000),
-    errorMessage: 'crashlab-core.wasm exceeds 64KB limit (actual: 68KB)',
-    enabled: true,
-  },
-  {
-    id: 'env-variables',
-    name: 'Environment Variables',
-    description: 'Validate required environment variables are set',
-    category: 'configuration',
-    status: 'passed',
-    duration: 120,
-    lastRun: new Date(Date.now() - 15 * 60 * 1000),
-    enabled: true,
-  },
-  {
-    id: 'storage-backend',
-    name: 'Storage Backend',
-    description: 'Verify artifact storage is accessible',
-    category: 'environment',
-    status: 'passed',
-    duration: 1450,
-    lastRun: new Date(Date.now() - 15 * 60 * 1000),
-    enabled: true,
-  },
-];
-
-const MOCK_PIPELINE_RUNS: PipelineRun[] = [
-  {
-    id: 'run-1',
-    startedAt: new Date(Date.now() - 15 * 60 * 1000),
-    finishedAt: new Date(Date.now() - 10 * 60 * 1000),
-    status: 'failed',
-    totalChecks: 8,
-    passedChecks: 6,
-    failedChecks: 1,
-    warningChecks: 1,
-  },
-  {
-    id: 'run-2',
-    startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    finishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000 + 5 * 60 * 1000),
-    status: 'passed',
-    totalChecks: 8,
-    passedChecks: 8,
-    failedChecks: 0,
-    warningChecks: 0,
-  },
-  {
-    id: 'run-3',
-    startedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
-    finishedAt: new Date(Date.now() - 6 * 60 * 60 * 1000 + 5 * 60 * 1000),
-    status: 'warning',
-    totalChecks: 8,
-    passedChecks: 7,
-    failedChecks: 0,
-    warningChecks: 1,
-  },
-];
 
 export default function SanityCheckPipelinePage({ className = '' }: SanityCheckPipelinePageProps) {
   const [checks, setChecks] = useState<SanityCheck[]>([]);
@@ -224,21 +109,8 @@ export default function SanityCheckPipelinePage({ className = '' }: SanityCheckP
     }
   };
 
-  const formatDuration = (ms: number) => {
-    if (ms < 1000) return `${ms}ms`;
-    return `${(ms / 1000).toFixed(1)}s`;
-  };
-
-  const formatTimestamp = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(minutes / 60);
-    
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return 'Just now';
-  };
+  const formatDuration = (ms: number) => sharedFormatDuration(ms);
+  const formatTimestamp = (date: Date) => relative(date);
 
   if (isLoading) {
     return (

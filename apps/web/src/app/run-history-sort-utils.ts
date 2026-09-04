@@ -19,7 +19,7 @@ export interface SortIndicator {
   active: boolean;
   /** Glyph to render: up/down arrow for the active column, a neutral ↕ otherwise. */
   symbol: string;
-  /** Value for the `aria-sort` attribute on the `<th>`. */
+  /** Value for the `aria-sort` attribute on the `<th scope="col">`. */
   ariaSort: 'ascending' | 'descending' | 'none';
 }
 

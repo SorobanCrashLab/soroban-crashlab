@@ -11,6 +11,7 @@ import { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RunStatus, RunArea, RunSeverity } from "../types";
 import { parseRunStatus } from "../../lib/run-status";
+import { sanitizeSearchParams } from "../../lib/sanitize";
 
 export interface DashboardFilters {
   status: RunStatus[];
@@ -52,12 +53,15 @@ const DEFAULT_FILTERS: DashboardFilters = {
 
 /**
  * Parse URL search params into DashboardFilters
+ * Search params are sanitized via sanitizeSearchParams to block dangerous
+ * URL protocols before parsing filter values.
  */
 function parseFiltersFromURL(searchParams: URLSearchParams): DashboardFilters {
+  const sanitized = sanitizeSearchParams(searchParams);
   const filters: DashboardFilters = { ...DEFAULT_FILTERS };
 
   // Parse multi-select arrays
-  const statusParam = searchParams.get("filter_status");
+  const statusParam = sanitized.get("filter_status");
   if (statusParam) {
     filters.status = statusParam
       .split(",")
@@ -65,7 +69,7 @@ function parseFiltersFromURL(searchParams: URLSearchParams): DashboardFilters {
       .filter((s): s is RunStatus => s !== null);
   }
 
-  const areaParam = searchParams.get("filter_area");
+  const areaParam = sanitized.get("filter_area");
   if (areaParam) {
     filters.area = areaParam
       .split(",")
@@ -74,7 +78,7 @@ function parseFiltersFromURL(searchParams: URLSearchParams): DashboardFilters {
       ) as RunArea[];
   }
 
-  const severityParam = searchParams.get("filter_severity");
+  const severityParam = sanitized.get("filter_severity");
   if (severityParam) {
     filters.severity = severityParam
       .split(",")
@@ -84,14 +88,14 @@ function parseFiltersFromURL(searchParams: URLSearchParams): DashboardFilters {
   }
 
   // Parse date range
-  const dateStart = searchParams.get("filter_date_start");
-  const dateEnd = searchParams.get("filter_date_end");
+  const dateStart = sanitized.get("filter_date_start");
+  const dateEnd = sanitized.get("filter_date_end");
   if (dateStart) filters.dateRange.start = dateStart;
   if (dateEnd) filters.dateRange.end = dateEnd;
 
   // Parse duration range
-  const durationMin = searchParams.get("filter_duration_min");
-  const durationMax = searchParams.get("filter_duration_max");
+  const durationMin = sanitized.get("filter_duration_min");
+  const durationMax = sanitized.get("filter_duration_max");
   if (durationMin) {
     const parsed = Number.parseInt(durationMin, 10);
     if (Number.isFinite(parsed) && parsed >= 0) {
@@ -106,8 +110,8 @@ function parseFiltersFromURL(searchParams: URLSearchParams): DashboardFilters {
   }
 
   // Parse resource fee range
-  const feeMin = searchParams.get("filter_fee_min");
-  const feeMax = searchParams.get("filter_fee_max");
+  const feeMin = sanitized.get("filter_fee_min");
+  const feeMax = sanitized.get("filter_fee_max");
   if (feeMin) {
     const parsed = Number.parseInt(feeMin, 10);
     if (Number.isFinite(parsed) && parsed >= 0) {
@@ -122,7 +126,7 @@ function parseFiltersFromURL(searchParams: URLSearchParams): DashboardFilters {
   }
 
   // Parse hasCrash tri-state
-  const hasCrashParam = searchParams.get("filter_has_crash");
+  const hasCrashParam = sanitized.get("filter_has_crash");
   if (hasCrashParam === "true") {
     filters.hasCrash = true;
   } else if (hasCrashParam === "false") {

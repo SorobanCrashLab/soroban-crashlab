@@ -1,6 +1,7 @@
 import type { Artifact } from '@/app/types';
 import type { RunStreamEnvelope, RunStreamPayload } from '@/lib/run-stream';
 import { selectRunStorageDriver } from '@/lib/storage';
+import { sanitizeSearchParams } from '@/lib/sanitize';
 
 export const dynamic = 'force-dynamic';
 const encoder = new TextEncoder();
@@ -14,7 +15,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const run = await selectRunStorageDriver().getRun(id);
   if (!run) return new Response('Run not found', { status: 404 });
 
-  const requestedAfter = new URL(request.url).searchParams.get('after') ?? request.headers.get('Last-Event-ID') ?? '0';
+  const sanitizedAfter = sanitizeSearchParams(new URL(request.url).searchParams).get('after');
+  const requestedAfter = sanitizedAfter ?? request.headers.get('Last-Event-ID') ?? '0';
   const after = Math.max(0, Number(requestedAfter) || 0);
   // `updatedAt` is the correct field on the Artifact interface (types.ts). Using
   // `createdAt` here was a prior bug that broke the TypeScript build on main.

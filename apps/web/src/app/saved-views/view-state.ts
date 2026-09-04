@@ -1,3 +1,5 @@
+import { sanitizeSearchParams, sanitizeSearchQuery } from "../../lib/sanitize";
+
 /**
  * Saved-view state and its URL codec (#1430).
  *
@@ -8,6 +10,7 @@
  *
  * The codec is versioned so bookmarks survive schema evolution: v2 is current,
  * and v1 links are mapped forward on decode.
+ * All decoded URL params are sanitized via sanitizeSearchParams / sanitizeSearchQuery.
  */
 
 export const VIEW_CODEC_VERSION = 2;
@@ -90,7 +93,10 @@ const PARAM = {
 } as const;
 
 export function encodeViewState(state: ViewState): string {
-  const normalized = normalizeViewState(state);
+  const normalized = normalizeViewState({
+    ...state,
+    search: state.search ? sanitizeSearchQuery(state.search) : "",
+  });
   const params = new URLSearchParams();
   params.set(PARAM.version, String(VIEW_CODEC_VERSION));
 
@@ -154,14 +160,14 @@ export function migrateLegacyParams(params: URLSearchParams): URLSearchParams {
  * rejected, so a link written by a newer build still resolves to a usable view.
  */
 export function decodeViewState(search: string): ViewState {
-  const raw = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const raw = sanitizeSearchParams(new URLSearchParams(search.startsWith('?') ? search.slice(1) : search));
   const params = raw.get(PARAM.version) === String(VIEW_CODEC_VERSION) ? raw : migrateLegacyParams(raw);
 
   const pageValue = Number(params.get(PARAM.page) ?? '1');
   const direction = params.get(PARAM.sortDirection);
 
   return normalizeViewState({
-    search: params.get(PARAM.search) ?? '',
+    search: sanitizeSearchQuery(params.get(PARAM.search) ?? ''),
     filters: {
       status: splitList(params.get(PARAM.status)),
       area: splitList(params.get(PARAM.area)),
@@ -169,7 +175,7 @@ export function decodeViewState(search: string): ViewState {
       hasCrash: readCrash(params.get(PARAM.crash)),
     },
     sort: {
-      key: params.get(PARAM.sortKey) ?? 'queuedAt',
+      key: sanitizeSearchQuery(params.get(PARAM.sortKey) ?? 'queuedAt'),
       direction: direction === 'asc' ? 'asc' : 'desc',
     },
     columns: splitList(params.get(PARAM.columns)),

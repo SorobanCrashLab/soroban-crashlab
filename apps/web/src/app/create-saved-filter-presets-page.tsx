@@ -202,8 +202,7 @@ export default function CreateSavedFilterPresetsPage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <h3
-                    className="font-semibold text-sm truncate cursor-pointer"
-                    style={{ color: 'var(--text-primary)' }}
+                    className="font-semibold text-sm truncate cursor-pointer text-[var(--text-primary)]"
                     onClick={() => setSelectedId(preset.id)}
                   >
                     {preset.name}
@@ -272,7 +271,7 @@ export default function CreateSavedFilterPresetsPage() {
 
       {selectedPreset && (
         <div className="mt-6 card card-padding">
-          <h2 className="font-semibold text-sm mb-3" style={{ color: 'var(--text-primary)' }}>
+          <h2 className="font-semibold text-sm mb-3 text-[var(--text-primary)]">
             {selectedPreset.name} &mdash; Filters
           </h2>
           {Object.keys(selectedPreset.filters).length === 0 ? (
@@ -282,8 +281,8 @@ export default function CreateSavedFilterPresetsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                    <th className="text-left py-2 pr-4 font-medium text-meta">Field</th>
-                    <th className="text-left py-2 font-medium text-meta">Value</th>
+                    <th scope="col" className="text-left py-2 pr-4 font-medium text-meta">Field</th>
+                    <th scope="col" className="text-left py-2 font-medium text-meta">Value</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -303,7 +302,7 @@ export default function CreateSavedFilterPresetsPage() {
       {showCreateDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-lg shadow-2xl">
-            <h2 className="font-semibold text-base mb-4" style={{ color: 'var(--text-primary)' }}>New Filter Preset</h2>
+            <h2 className="font-semibold text-base mb-4 text-[var(--text-primary)]">New Filter Preset</h2>
             <div className="space-y-4">
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-meta">Name</span>
@@ -361,7 +360,7 @@ export default function CreateSavedFilterPresetsPage() {
       {showImportDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-lg shadow-2xl">
-            <h2 className="font-semibold text-base mb-4" style={{ color: 'var(--text-primary)' }}>Import Filter Preset</h2>
+            <h2 className="font-semibold text-base mb-4 text-[var(--text-primary)]">Import Filter Preset</h2>
             <label className="flex flex-col gap-1">
               <span className="text-sm font-medium text-meta">Paste JSON</span>
               <textarea

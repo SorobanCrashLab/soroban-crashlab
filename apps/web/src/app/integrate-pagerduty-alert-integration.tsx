@@ -531,7 +531,7 @@ export default function IntegratePagerdutyAlertIntegration() {
                 <tr>
                   {["Run ID", "Signature", "Severity", "Status", "Triggered At", "PD Incident"].map(
                     (heading) => (
-                      <th
+                      <th scope="col"
                         key={heading}
                         className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400"
                       >

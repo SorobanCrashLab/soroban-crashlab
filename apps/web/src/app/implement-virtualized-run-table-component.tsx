@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { FuzzingRun, RunStatus } from './types';
 import { STATUS_META } from '../lib/run-status';
 import { formatDuration } from './utils/format';
@@ -34,13 +34,14 @@ interface VirtualizedRunTableProps {
     onToggleAllRunsSelection?: (runIds: string[]) => void;
 }
 
-const StatusBadge = ({ status }: { status: RunStatus }) => (
+const StatusBadge = memo(({ status }: { status: RunStatus }) => (
     <span
         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border status-badge ${STATUS_META[status].badgeClass}`}
     >
         {STATUS_META[status].label}
     </span>
-);
+));
+StatusBadge.displayName = 'StatusBadge';
 
 /**
  * A single virtualized data row.
@@ -48,7 +49,7 @@ const StatusBadge = ({ status }: { status: RunStatus }) => (
  * Rendered absolutely inside the inner scroll container so that only rows
  * currently inside (or just outside) the viewport are in the DOM.
  */
-const VirtualRow = ({
+const VirtualRow = memo(({
     run,
     top,
     onSelectRun,
@@ -118,7 +119,7 @@ const VirtualRow = ({
             {visibleColumns.includes('severity') && (
                 <td
                     className="px-6 w-28 shrink-0 text-sm"
-                    style={{ color: run.severity === 'critical' ? '#C37D16' : run.severity === 'high' ? '#CC1016' : undefined }}
+                    style={{ color: run.severity === 'critical' ? '#946210' : run.severity === 'high' ? '#CC1016' : undefined }}
                 >
                     <TruncatedCell>{run.severity}</TruncatedCell>
                 </td>
@@ -150,7 +151,8 @@ const VirtualRow = ({
             )}
         </tr>
     );
-};
+});
+VirtualRow.displayName = 'VirtualRow';
 
 /**
  * VirtualizedRunTable
@@ -258,7 +260,7 @@ export default function VirtualizedRunTable({
                     <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 flex">
                             {onToggleRunSelection && (
-                                <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 w-12">
+                                <th scope="col" className="px-6 py-4 text-[10px] font-bold text-zinc-400 w-12">
                                     <div className="flex items-center justify-center">
                                         <input
                                             type="checkbox"

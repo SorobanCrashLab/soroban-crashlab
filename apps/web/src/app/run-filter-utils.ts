@@ -1,4 +1,5 @@
 import { FuzzingRun, RunStatus, RunArea, RunSeverity } from './types';
+import { sanitizeSearchQuery } from '../lib/sanitize';
 
 export interface RunFilters {
   status: RunStatus[];
@@ -151,7 +152,8 @@ function runToSearchableText(r: FuzzingRun): string {
 }
 
 export function filterBySearchTerm(runs: FuzzingRun[], term: string): FuzzingRun[] {
-  const tokens = tokenise(term);
+  const sanitized = sanitizeSearchQuery(term);
+  const tokens = tokenise(sanitized);
   if (tokens.length === 0) return runs;
   return runs.filter((r) => {
     const text = runToSearchableText(r);

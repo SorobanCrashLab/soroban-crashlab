@@ -57,6 +57,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="antialiased min-h-screen">
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         <LocaleProvider>
           <ThemeProvider>
             <ToastProvider>
@@ -65,7 +66,7 @@ export default function RootLayout({
               <CommandPalette />
               <OnboardingWizardHost />
               <GlobalScrollEffects>
-                <main id="page-shell" style={{ background: 'var(--bg)', paddingTop: '52px', minHeight: '100vh', transition: 'background 0.3s ease' }}>
+                <main id="main-content" tabIndex={-1} className="page-shell">
                   <PageTransition>
                     {children}
                   </PageTransition>

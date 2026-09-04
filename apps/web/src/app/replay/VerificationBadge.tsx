@@ -101,9 +101,9 @@ export default function VerificationBadge({ fingerprint, currentComponents, runI
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-zinc-400 dark:text-zinc-500">
-                    <th className="text-left py-1">Component</th>
-                    <th className="text-left py-1">Value</th>
-                    {currentComponents && <th className="text-left py-1">Status</th>}
+                    <th scope="col" className="text-left py-1">Component</th>
+                    <th scope="col" className="text-left py-1">Value</th>
+                    {currentComponents && <th scope="col" className="text-left py-1">Status</th>}
                   </tr>
                 </thead>
                 <tbody>

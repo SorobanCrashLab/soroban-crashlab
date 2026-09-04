@@ -9,6 +9,7 @@ import {
   type Schedule,
   type ScheduledRun,
 } from "@/lib/cron";
+import { useDataTableKeyboardNav } from "../use-data-table-keyboard-nav";
 
 interface SchedulerPayload {
   schedules: Schedule[];
@@ -176,6 +177,13 @@ export default function SchedulesPage() {
     [history],
   );
 
+  const { getRowProps: getScheduleRowProps } = useDataTableKeyboardNav({
+    rowCount: schedules.length,
+  });
+  const { getRowProps: getHistoryRowProps } = useDataTableKeyboardNav({
+    rowCount: sortedHistory.length,
+  });
+
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-6xl">
@@ -242,11 +250,11 @@ export default function SchedulesPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
-                      <th className="px-4 py-3">Name</th>
-                      <th className="px-4 py-3">Schedule</th>
-                      <th className="px-4 py-3">Next run (UTC)</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
+                      <th scope="col" className="px-4 py-3">Name</th>
+                      <th scope="col" className="px-4 py-3">Schedule</th>
+                      <th scope="col" className="px-4 py-3">Next run (UTC)</th>
+                      <th scope="col" className="px-4 py-3">Status</th>
+                      <th scope="col" className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -260,14 +268,16 @@ export default function SchedulesPage() {
                         </td>
                       </tr>
                     )}
-                    {schedules.map((schedule) => {
+                    {schedules.map((schedule, index) => {
                       const nextRun = schedule.enabled
                         ? nextRunForSchedule(schedule, now)
                         : null;
                       return (
                         <tr
                           key={schedule.id}
+                          {...getScheduleRowProps(index)}
                           className="border-b border-zinc-100 dark:border-zinc-800 last:border-0"
+                          aria-label={`Schedule ${schedule.name}, ${schedule.enabled ? "enabled" : "paused"}`}
                         >
                           <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
                             {schedule.name}
@@ -339,11 +349,11 @@ export default function SchedulesPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
-                      <th className="px-4 py-3">Run</th>
-                      <th className="px-4 py-3">Schedule</th>
-                      <th className="px-4 py-3">Scheduled for (UTC)</th>
-                      <th className="px-4 py-3">Executed (UTC)</th>
-                      <th className="px-4 py-3">Tags</th>
+                      <th scope="col" className="px-4 py-3">Run</th>
+                      <th scope="col" className="px-4 py-3">Schedule</th>
+                      <th scope="col" className="px-4 py-3">Scheduled for (UTC)</th>
+                      <th scope="col" className="px-4 py-3">Executed (UTC)</th>
+                      <th scope="col" className="px-4 py-3">Tags</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -358,10 +368,12 @@ export default function SchedulesPage() {
                         </td>
                       </tr>
                     )}
-                    {sortedHistory.map((run) => (
+                    {sortedHistory.map((run, index) => (
                       <tr
                         key={run.id}
+                        {...getHistoryRowProps(index)}
                         className="border-b border-zinc-100 dark:border-zinc-800 last:border-0"
+                        aria-label={`Scheduled run ${run.id} for ${run.scheduleName}`}
                       >
                         <td className="px-4 py-3 font-mono text-xs text-zinc-600 dark:text-zinc-400">
                           {run.id}
@@ -468,10 +480,11 @@ function ScheduleEditor({ initial, existing, onCancel, onSave }: ScheduleEditorP
           {initial ? "Edit schedule" : "New schedule"}
         </h2>
 
-        <label className="block mb-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label htmlFor="schedule-name" className="block mb-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Name
         </label>
         <input
+          id="schedule-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full mb-1 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-transparent text-sm"
@@ -483,13 +496,14 @@ function ScheduleEditor({ initial, existing, onCancel, onSave }: ScheduleEditorP
         )}
         {(!name.length || !nameError) && <div className="mb-3" />}
 
-        <label className="block mb-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label htmlFor="schedule-cron" className="block mb-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Cron expression{" "}
           <span className="font-normal text-zinc-500 dark:text-zinc-400">
             (minute hour day-of-month month day-of-week, UTC)
           </span>
         </label>
         <input
+          id="schedule-cron"
           value={cron}
           onChange={(e) => setCron(e.target.value)}
           className="w-full mb-1 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-transparent text-sm font-mono"

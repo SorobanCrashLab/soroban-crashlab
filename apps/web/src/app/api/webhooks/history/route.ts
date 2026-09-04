@@ -3,6 +3,7 @@ import { withRouteErrorHandling } from '../../../../lib/route-handler';
 import { MOCK_WEBHOOK_DELIVERY_HISTORY, WebhookDeliveryHistoryItem } from '../../../../fixtures/webhook-delivery-history';
 import { filterDeliveryItems, computeDeliveryStats, DeliveryStatusFilter } from '../../../webhook-retry-dashboard-utils';
 import { withFixtureCaching } from '@/lib/fixture-caching';
+import { sanitizeSearchParams } from '@/lib/sanitize';
 
 // In-memory store initialized with fixtures for runtime persistence during session
 let inMemoryHistory: WebhookDeliveryHistoryItem[] = [...MOCK_WEBHOOK_DELIVERY_HISTORY];
@@ -16,7 +17,7 @@ export function updateDeliveryHistoryStore(updatedItems: WebhookDeliveryHistoryI
 }
 
 export const GET = withRouteErrorHandling('GET /api/webhooks/history', async (request: NextRequest) => {
-  const { searchParams } = new URL(request.url);
+  const searchParams = sanitizeSearchParams(new URL(request.url).searchParams);
   const statusParam = (searchParams.get('status') || 'all') as DeliveryStatusFilter;
   const searchParam = searchParams.get('search') || '';
 

@@ -5,6 +5,7 @@ import { successResponse, createdResponse } from '@/lib/api-response-utils';
 import { getWebhookStore } from '@/lib/webhook-store';
 import { validateWebhookApiKey } from '@/lib/api-key-auth';
 import { WEBHOOK_DELIVERY_TIMEOUT_MS } from '@/lib/timeouts';
+import { sanitizeSearchParams } from '@/lib/sanitize';
 
 const VALID_PROTOCOLS = new Set(['http:', 'https:']);
 
@@ -161,7 +162,7 @@ export const DELETE = withRouteErrorHandling('DELETE /api/webhooks', async (requ
   const authError = validateWebhookApiKey(request);
   if (authError) return authError;
 
-  const { searchParams } = new URL(request.url);
+  const searchParams = sanitizeSearchParams(new URL(request.url).searchParams);
   const id = searchParams.get('id');
 
   if (!id || !id.trim()) {
@@ -184,7 +185,7 @@ export const PATCH = withRouteErrorHandling('PATCH /api/webhooks', async (reques
   const authError = validateWebhookApiKey(request);
   if (authError) return authError;
 
-  const { searchParams } = new URL(request.url);
+  const searchParams = sanitizeSearchParams(new URL(request.url).searchParams);
   const id = searchParams.get('id');
 
   if (!id || !id.trim()) {

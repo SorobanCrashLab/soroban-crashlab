@@ -284,11 +284,11 @@ export function ResourceFeeInsightPanel({
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-[0.16em] text-zinc-500">
-                  <th className="pb-2 pr-4">Contract</th>
-                  <th className="pb-2 pr-4">Method</th>
-                  <th className="pb-2 pr-4">Runs</th>
-                  <th className="pb-2 pr-4">Max Fee</th>
-                  <th className="pb-2">Sample Run</th>
+                  <th scope="col" className="pb-2 pr-4">Contract</th>
+                  <th scope="col" className="pb-2 pr-4">Method</th>
+                  <th scope="col" className="pb-2 pr-4">Runs</th>
+                  <th scope="col" className="pb-2 pr-4">Max Fee</th>
+                  <th scope="col" className="pb-2">Sample Run</th>
                 </tr>
               </thead>
               <tbody>

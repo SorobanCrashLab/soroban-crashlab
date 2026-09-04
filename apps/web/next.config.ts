@@ -4,6 +4,14 @@ import path from "path";
 const nextConfig: NextConfig = {
   reactCompiler: true,
   output: "standalone",
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
+    ],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+  },
   turbopack: {
     root: path.resolve(__dirname, "../../"),
   },

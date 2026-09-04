@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useState, useCallback } from 'react';
+import Image from 'next/image';
 import { FuzzingRun, RunIssueLink } from './types';
 import { validateIssueUrl, getIssueTypeFromUrl, getIssueFaviconUrl, addIssueLink, removeIssueLink } from './run-issue-utils';
 import { parseLinearIssueUrl } from '@/lib/integrations/linear-issues';
@@ -35,13 +36,13 @@ function IssueLinkCard({ issue }: { issue: RunIssueLink }) {
         <div className="flex items-center gap-2 mb-1">
           <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-white border border-gray-200 overflow-hidden" aria-hidden="true">
             {faviconUrl && !faviconFailed ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={faviconUrl}
                 alt=""
+                width={16}
+                height={16}
+                unoptimized
                 className="w-4 h-4"
-                loading="lazy"
-                referrerPolicy="no-referrer"
                 onError={() => setFaviconFailed(true)}
               />
             ) : (

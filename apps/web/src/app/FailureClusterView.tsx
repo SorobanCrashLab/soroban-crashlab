@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { buildFailureClusters, describeFailureCluster } from './failureClusters';
 import { FuzzingRun } from './types';
+import { sanitizeSearchParams } from '../lib/sanitize';
+import { buildGitHubIssueUrl } from './failure-cluster-github-export-utils';
 
 interface FailureClusterViewProps {
   runs: FuzzingRun[];
@@ -18,7 +20,7 @@ const severityBadgeClasses = {
 } as const;
 
 const _buildRepresentativeHref = (pathname: string, queryString: string, runId: string): string => {
-  const params = new URLSearchParams(queryString);
+  const params = sanitizeSearchParams(new URLSearchParams(queryString));
   params.set('run', runId);
   const nextQuery = params.toString();
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
@@ -93,12 +95,22 @@ export default function FailureClusterView({ runs, pathname: _pathname, queryStr
                   )}
                 </div>
 
-                <Link
-                  href={`/runs/${cluster.representativeRunId}`}
-                  className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                >
-                  Open sample {cluster.representativeRunId}
-                </Link>
+                <div className="flex flex-col gap-2">
+                  <Link
+                    href={`/runs/${cluster.representativeRunId}`}
+                    className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  >
+                    Open sample {cluster.representativeRunId}
+                  </Link>
+                  <a
+                    href={buildGitHubIssueUrl(cluster, representative ?? undefined)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  >
+                    Export to GitHub
+                  </a>
+                </div>
               </div>
 
               <p className="text-xs text-zinc-500 dark:text-zinc-400">

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { logger } from '@/lib/logger';
 import { successResponse } from '@/lib/api-response-utils';
 import { API_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
+import { sanitizeSearchParams } from '@/lib/sanitize';
 
 interface NotificationFeedItem {
   id: string;
@@ -64,7 +65,8 @@ function buildEmptyFeed(): NotificationFeedResponse {
 
 async function fetchNotificationsFeed(request: NextRequest, feedUrl: string): Promise<NotificationFeedResponse> {
   const target = new URL(feedUrl, request.nextUrl.origin);
-  for (const [key, value] of request.nextUrl.searchParams.entries()) {
+  const sanitized = sanitizeSearchParams(request.nextUrl.searchParams);
+  for (const [key, value] of sanitized.entries()) {
     target.searchParams.set(key, value);
   }
 
@@ -100,7 +102,7 @@ async function fetchNotificationsFeed(request: NextRequest, feedUrl: string): Pr
 }
 
 export async function GET(request: NextRequest) {
-  if (isFalsyToggle(request.nextUrl.searchParams.get('enabled'))) {
+  if (isFalsyToggle(sanitizeSearchParams(request.nextUrl.searchParams).get('enabled'))) {
     return successResponse(buildEmptyFeed(), { total: 0 });
   }
 
