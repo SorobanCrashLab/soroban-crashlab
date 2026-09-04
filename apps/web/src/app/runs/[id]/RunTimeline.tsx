@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { RunStatus } from '../../types';
+import { isTerminalStatus } from '../../../lib/run-status';
 
 interface RunTimelineProps {
     status: RunStatus;
@@ -114,7 +115,7 @@ export default function RunTimeline({
                 <div className="hidden md:block absolute top-6 left-12 right-12 h-1 bg-zinc-100 dark:bg-zinc-900 rounded-full" aria-hidden="true">
                     <div
                         className="h-full bg-blue-600 rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(37,99,235,0.4)]"
-                        style={{ width: status === 'completed' || status === 'failed' || status === 'cancelled' ? '100%' : (status === 'running' ? '50%' : '0%') }}
+                        style={{ width: isTerminalStatus(status) ? '100%' : '50%' }}
                     />
                 </div>
 
@@ -122,7 +123,7 @@ export default function RunTimeline({
                 <div className="md:hidden absolute left-6 top-8 bottom-8 w-1 bg-zinc-100 dark:bg-zinc-900 rounded-full" aria-hidden="true">
                     <div
                         className="w-full bg-blue-600 rounded-full transition-all duration-1000 ease-out"
-                        style={{ height: status === 'completed' || status === 'failed' || status === 'cancelled' ? '100%' : (status === 'running' ? '50%' : '0%') }}
+                        style={{ height: isTerminalStatus(status) ? '100%' : '50%' }}
                     />
                 </div>
 

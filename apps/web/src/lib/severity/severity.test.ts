@@ -293,7 +293,7 @@ describe('performance benchmark', () => {
         batchScoreClusters(clusters, clusters);
         const elapsed = performance.now() - start;
         
-        console.log(\`Scored 5000 clusters in \${elapsed.toFixed(2)}ms\`);
+        console.log(`Scored 5000 clusters in ${elapsed.toFixed(2)}ms`);
         expect(elapsed).toBeLessThan(200);
     });
 });

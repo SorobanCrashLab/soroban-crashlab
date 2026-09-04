@@ -100,7 +100,8 @@ describe('api-client', () => {
       const { fetchRuns } = await loadModule();
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
-      await expect(fetchRuns()).rejects.toThrow('Failed to fetch');
+      // Network failures are wrapped in NetworkError by the dedup layer
+      await expect(fetchRuns()).rejects.toThrow('Network error');
     });
 
     it('propagates a malformed JSON body', async () => {
@@ -111,6 +112,7 @@ describe('api-client', () => {
         json: () => Promise.reject(new SyntaxError('Unexpected token <')),
       } as unknown as Response);
 
+      // SyntaxError from JSON parsing is NOT a fetch rejection, propagates as-is
       await expect(fetchRuns()).rejects.toThrow('Unexpected token <');
     });
 
@@ -119,7 +121,9 @@ describe('api-client', () => {
       fetchMock.mockRejectedValueOnce(new Error('network down'));
       fetchMock.mockResolvedValueOnce(jsonResponse({ runs: [], total: 0 }));
 
-      await expect(fetchRuns()).rejects.toThrow('network down');
+      // With DEFAULT_FETCH_POLICY (maxAttempts=2), the first dedup call internally
+      // retries and succeeds on attempt 2 — unlike the old no-retry behaviour
+      // where two independent calls were needed.
       await expect(fetchRuns()).resolves.toEqual({ runs: [], total: 0 });
     });
   });
@@ -199,7 +203,7 @@ describe('api-client', () => {
       const { fetchRun } = await loadModule();
       fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
-      await expect(fetchRun('run-1')).rejects.toThrow('Failed to fetch');
+      await expect(fetchRun('run-1')).rejects.toThrow('Network error');
     });
 
     it('accepts an empty id without dropping the path segment', async () => {
@@ -208,6 +212,32 @@ describe('api-client', () => {
 
       await expect(fetchRun('')).resolves.toBeNull();
       expect(requestedUrl(fetchMock)).toBe('/api/runs/');
+    });
+  });
+
+  describe('fetchLatestOnly', () => {
+    it('automatically aborts older requests when called again', async () => {
+      const { fetchLatestOnly } = await loadModule();
+
+      const mockFetcher = vi.fn((query: string, signal: AbortSignal) => {
+        return new Promise<string>((resolve, reject) => {
+          const timer = setTimeout(() => resolve(`result:${query}`), 50);
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        });
+      });
+
+      const latestFetcher = fetchLatestOnly(mockFetcher);
+
+      const promise1 = latestFetcher('query-1');
+      const promise2 = latestFetcher('query-2');
+
+      await expect(promise1).rejects.toThrow('The operation was aborted');
+      await expect(promise2).resolves.toBe('result:query-2');
     });
   });
 

@@ -206,7 +206,7 @@ const RunIssueLinkPage: React.FC<RunIssueLinkPageProps> = ({
           setResolveError(json?.error ?? 'Could not look up this Linear issue automatically.');
           return;
         }
-        issue = json?.issue as { title?: string } | undefined;
+        issue = json?.data?.issue as { title?: string } | undefined;
       }
 
       if (issue?.title) {

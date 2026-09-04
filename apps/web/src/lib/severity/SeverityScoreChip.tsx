@@ -3,7 +3,6 @@
  * Displays composite score with factor breakdown bars.
  */
 
-import { ScoredCluster, SeverityMismatch, compareSeverity } from './index';
 
 export interface SeverityScoreChipProps {
     scored: {
@@ -81,7 +80,7 @@ export default function SeverityScoreChip({
             {/* Manual severity selector (if provided) */}
             {manualSeverity && (
                 <div className="ml-2 flex items-center gap-1">
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Manual:</span>
+                    <span className="text-xs text-muted">Manual:</span>
                     <select
                         value={manualSeverity}
                         onChange={(e) => onManualChange?.(e.target.value as 'low' | 'medium' | 'high' | 'critical')}
@@ -114,7 +113,7 @@ export default function SeverityScoreChip({
 
             {showPopover && (
                 <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl p-4 animate-fade-in">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex-between mb-3">
                         <h4 className="font-semibold text-zinc-900 dark:text-zinc-100">
                             Factor Breakdown
                         </h4>
@@ -146,7 +145,7 @@ export default function SeverityScoreChip({
                                         }}
                                     />
                                 </div>
-                                <div className="flex justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                                <div className="flex justify-between text-xs text-muted">
                                     <span>Raw: {factor.value}%</span>
                                     <span>Weight: {SEVERITY_WEIGHTS[factor.key as keyof typeof SEVERITY_WEIGHTS] * 100}%</span>
                                 </div>

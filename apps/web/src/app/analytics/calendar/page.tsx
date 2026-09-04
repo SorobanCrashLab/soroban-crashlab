@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { FuzzingRun } from '../../types';
-import { fetchRuns } from '../../../lib/api-client';
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { FuzzingRun } from "../../types";
+import { fetchRuns } from "../../../lib/api-client";
+import { localDateKey } from "./date-utils";
 
 type DayData = {
   date: string;
@@ -12,21 +13,39 @@ type DayData = {
   areas: Set<string>;
 };
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 function getColorClass(count: number, maxCount: number): string {
-  if (count === 0) return 'bg-zinc-100 dark:bg-zinc-800';
+  if (count === 0) return "bg-zinc-100 dark:bg-zinc-800";
   const ratio = count / maxCount;
-  if (ratio <= 0.25) return 'bg-blue-200 dark:bg-blue-900';
-  if (ratio <= 0.5) return 'bg-blue-400 dark:bg-blue-700';
-  if (ratio <= 0.75) return 'bg-blue-600 dark:bg-blue-500';
-  return 'bg-blue-800 dark:bg-blue-400';
+  if (ratio <= 0.25) return "bg-blue-200 dark:bg-blue-900";
+  if (ratio <= 0.5) return "bg-blue-400 dark:bg-blue-700";
+  if (ratio <= 0.75) return "bg-blue-600 dark:bg-blue-500";
+  return "bg-blue-800 dark:bg-blue-400";
 }
 
 function formatTooltipDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function buildCalendarData(runs: FuzzingRun[]): DayData[] {
@@ -35,13 +54,14 @@ function buildCalendarData(runs: FuzzingRun[]): DayData[] {
   for (const run of runs) {
     const ts = run.finishedAt || run.queuedAt || run.startedAt;
     if (!ts) continue;
-    const date = ts.slice(0, 10);
+    // Use local date key instead of UTC slice to fix timezone misalignment
+    const date = localDateKey(ts);
     if (!dayMap.has(date)) {
       dayMap.set(date, { date, count: 0, failed: 0, areas: new Set() });
     }
     const day = dayMap.get(date)!;
     day.count += 1;
-    if (run.status === 'failed') day.failed += 1;
+    if (run.status === "failed") day.failed += 1;
     day.areas.add(run.area);
   }
 
@@ -79,7 +99,10 @@ function generateCalendarWeeks(data: DayData[], months: number = 4) {
     const day = dayLookup.get(dateStr);
 
     if (current.getMonth() !== lastMonth) {
-      monthMarkers.push({ index: cellIndex, label: MONTH_LABELS[current.getMonth()] });
+      monthMarkers.push({
+        index: cellIndex,
+        label: MONTH_LABELS[current.getMonth()],
+      });
       lastMonth = current.getMonth();
     }
 
@@ -87,7 +110,7 @@ function generateCalendarWeeks(data: DayData[], months: number = 4) {
       date: dateStr,
       count: day?.count ?? 0,
       failed: day?.failed ?? 0,
-      areas: day ? Array.from(day.areas).join(', ') : '',
+      areas: day ? Array.from(day.areas).join(", ") : "",
     });
 
     if (current.getDay() === 6) {
@@ -106,7 +129,7 @@ function generateCalendarWeeks(data: DayData[], months: number = 4) {
         date: d.toISOString().slice(0, 10),
         count: 0,
         failed: 0,
-        areas: '',
+        areas: "",
       });
       current.setDate(current.getDate() + 1);
     }
@@ -118,9 +141,20 @@ function generateCalendarWeeks(data: DayData[], months: number = 4) {
 
 function generateMockCalendarRuns(): FuzzingRun[] {
   const runs: FuzzingRun[] = [];
-  const areas: Array<FuzzingRun['area']> = ['auth', 'state', 'budget', 'xdr'];
-  const severities: Array<FuzzingRun['severity']> = ['low', 'medium', 'high', 'critical'];
-  const statuses: Array<FuzzingRun['status']> = ['completed', 'failed', 'completed', 'completed', 'failed'];
+  const areas: Array<FuzzingRun["area"]> = ["auth", "state", "budget", "xdr"];
+  const severities: Array<FuzzingRun["severity"]> = [
+    "low",
+    "medium",
+    "high",
+    "critical",
+  ];
+  const statuses: Array<FuzzingRun["status"]> = [
+    "completed",
+    "failed",
+    "completed",
+    "completed",
+    "failed",
+  ];
 
   const today = new Date();
   let runId = 2000;
@@ -129,7 +163,8 @@ function generateMockCalendarRuns(): FuzzingRun[] {
     const d = new Date(today);
     d.setDate(d.getDate() - dayOffset);
 
-    const runsOnDay = Math.random() < 0.3 ? Math.floor(Math.random() * 5) + 1 : 0;
+    const runsOnDay =
+      Math.random() < 0.3 ? Math.floor(Math.random() * 5) + 1 : 0;
 
     for (let i = 0; i < runsOnDay; i++) {
       const areaIdx = Math.floor(Math.random() * areas.length);
@@ -156,13 +191,20 @@ function generateMockCalendarRuns(): FuzzingRun[] {
         minResourceFee: 400 + Math.floor(Math.random() * 2000),
         queuedAt: new Date(d.getTime() - 60_000).toISOString(),
         startedAt,
-        finishedAt: status === 'running' ? undefined : finishedAt,
-        crashDetail: status === 'failed' ? {
-          failureCategory: ['InvariantViolation', 'Panic', 'BudgetExceeded'][Math.floor(Math.random() * 3)],
-          signature: `sig:${['token', 'vault', 'router'][Math.floor(Math.random() * 3)]}:${['transfer', 'rebalance', 'swap'][Math.floor(Math.random() * 3)]}`,
-          payload: '{"mock": true}',
-          replayAction: 'cargo run --bin crash-replay -- --mock',
-        } : null,
+        finishedAt: status === "running" ? undefined : finishedAt,
+        crashDetail:
+          status === "failed"
+            ? {
+                failureCategory: [
+                  "InvariantViolation",
+                  "Panic",
+                  "BudgetExceeded",
+                ][Math.floor(Math.random() * 3)],
+                signature: `sig:${["token", "vault", "router"][Math.floor(Math.random() * 3)]}:${["transfer", "rebalance", "swap"][Math.floor(Math.random() * 3)]}`,
+                payload: '{"mock": true}',
+                replayAction: "cargo run --bin crash-replay -- --mock",
+              }
+            : null,
       });
     }
   }
@@ -172,7 +214,9 @@ function generateMockCalendarRuns(): FuzzingRun[] {
 
 export default function CalendarPage() {
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
-  const [dataState, setDataState] = useState<'loading' | 'error' | 'success'>('loading');
+  const [dataState, setDataState] = useState<"loading" | "error" | "success">(
+    "loading",
+  );
   const [hoveredDay, setHoveredDay] = useState<{
     date: string;
     count: number;
@@ -192,23 +236,30 @@ export default function CalendarPage() {
           } else {
             setRuns(generateMockCalendarRuns());
           }
-          setDataState('success');
+          setDataState("success");
         }
       })
       .catch(() => {
         if (!cancelled) {
           setRuns(generateMockCalendarRuns());
-          setDataState('success');
+          setDataState("success");
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const { calendarData, weeks, monthMarkers, maxCount } = useMemo(() => {
     const calendarData = buildCalendarData(runs);
     const maxCount = Math.max(1, ...calendarData.map((d) => d.count));
     const weeks = generateCalendarWeeks(calendarData, 4);
-    return { calendarData, weeks: weeks.weeks, monthMarkers: weeks.monthMarkers, maxCount };
+    return {
+      calendarData,
+      weeks: weeks.weeks,
+      monthMarkers: weeks.monthMarkers,
+      maxCount,
+    };
   }, [runs]);
 
   const stats = useMemo(() => {
@@ -217,12 +268,17 @@ export default function CalendarPage() {
       totalDays: activeDays.length,
       totalRuns: calendarData.reduce((s, d) => s + d.count, 0),
       totalFailed: calendarData.reduce((s, d) => s + d.failed, 0),
-      avgPerDay: calendarData.length > 0
-        ? (calendarData.reduce((s, d) => s + d.count, 0) / calendarData.length).toFixed(1)
-        : '0',
-      bestDay: activeDays.length > 0
-        ? activeDays.reduce((a, b) => (a.count > b.count ? a : b))
-        : null,
+      avgPerDay:
+        calendarData.length > 0
+          ? (
+              calendarData.reduce((s, d) => s + d.count, 0) /
+              calendarData.length
+            ).toFixed(1)
+          : "0",
+      bestDay:
+        activeDays.length > 0
+          ? activeDays.reduce((a, b) => (a.count > b.count ? a : b))
+          : null,
     };
   }, [calendarData]);
 
@@ -239,8 +295,18 @@ export default function CalendarPage() {
             href="/"
             className="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 mb-4 transition"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
             </svg>
             Back to Dashboard
           </Link>
@@ -248,54 +314,87 @@ export default function CalendarPage() {
             Run Heatmap Calendar
           </h1>
           <p className="text-zinc-600 dark:text-zinc-400 max-w-3xl">
-            Visualize run activity over time. Each cell represents a day, color-coded by the number of
-            fuzzing runs executed that day. Darker cells indicate higher run volume.
+            Visualize run activity over time. Each cell represents a day,
+            color-coded by the number of fuzzing runs executed that day. Darker
+            cells indicate higher run volume.
           </p>
         </div>
 
-        {dataState === 'loading' && (
-          <div role="status" aria-live="polite" className="card card-padding flex items-center justify-center py-16">
+        {dataState === "loading" && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="card card-padding flex items-center justify-center py-16"
+          >
             <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#0A66C2', borderTopColor: 'transparent' }} />
+              <div
+                className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+                style={{
+                  borderColor: "#0A66C2",
+                  borderTopColor: "transparent",
+                }}
+              />
               <span className="text-meta">Loading run data...</span>
             </div>
           </div>
         )}
 
-        {dataState === 'success' && (
+        {dataState === "success" && (
           <>
             <div className="mb-6 grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="card card-padding min-w-0 overflow-hidden">
-                <p className="stat-value text-lg sm:text-xl leading-tight break-all">{stats.totalRuns}</p>
-                <p className="text-meta wrap-break-word leading-snug">Total runs</p>
+                <p className="stat-value text-lg sm:text-xl leading-tight break-all">
+                  {stats.totalRuns}
+                </p>
+                <p className="text-meta wrap-break-word leading-snug">
+                  Total runs
+                </p>
               </div>
               <div className="card card-padding min-w-0 overflow-hidden">
-                <p className="stat-value text-lg sm:text-xl leading-tight break-all">{stats.totalDays}</p>
-                <p className="text-meta wrap-break-word leading-snug">Active days</p>
+                <p className="stat-value text-lg sm:text-xl leading-tight break-all">
+                  {stats.totalDays}
+                </p>
+                <p className="text-meta wrap-break-word leading-snug">
+                  Active days
+                </p>
               </div>
               <div className="card card-padding min-w-0 overflow-hidden">
-                <p className="stat-value text-lg sm:text-xl leading-tight break-all">{stats.totalFailed}</p>
-                <p className="text-meta wrap-break-word leading-snug">Failed runs</p>
+                <p className="stat-value text-lg sm:text-xl leading-tight break-all">
+                  {stats.totalFailed}
+                </p>
+                <p className="text-meta wrap-break-word leading-snug">
+                  Failed runs
+                </p>
               </div>
               <div className="card card-padding min-w-0 overflow-hidden">
-                <p className="stat-value text-lg sm:text-xl leading-tight break-all">{stats.avgPerDay}</p>
-                <p className="text-meta wrap-break-word leading-snug">Avg runs / day</p>
+                <p className="stat-value text-lg sm:text-xl leading-tight break-all">
+                  {stats.avgPerDay}
+                </p>
+                <p className="text-meta wrap-break-word leading-snug">
+                  Avg runs / day
+                </p>
               </div>
             </div>
 
             <div className="card card-padding overflow-x-auto">
               <div className="min-w-[720px]">
-                <div className="flex text-xs text-zinc-400 dark:text-zinc-500 mb-1 ml-8" style={{ gap: '0' }}>
+                <div
+                  className="flex text-xs text-zinc-400 dark:text-zinc-500 mb-1 ml-8"
+                  style={{ gap: "0" }}
+                >
                   {monthMarkers.map((m, i) => {
                     const markerPos = m.index;
                     const nextMarkerIdx = monthMarkers[i + 1];
                     const span = nextMarkerIdx
-                      ? (nextMarkerIdx.index - markerPos)
-                      : (weeks.reduce((s, w) => s + w.length, 0) - markerPos);
+                      ? nextMarkerIdx.index - markerPos
+                      : weeks.reduce((s, w) => s + w.length, 0) - markerPos;
                     return (
                       <div
                         key={m.label}
-                        style={{ width: `${span * 16}px`, minWidth: `${span * 16}px` }}
+                        style={{
+                          width: `${span * 16}px`,
+                          minWidth: `${span * 16}px`,
+                        }}
                         className="text-[11px] font-medium"
                       >
                         {m.label}
@@ -307,7 +406,10 @@ export default function CalendarPage() {
                 <div className="flex gap-[3px]">
                   <div className="flex flex-col gap-[3px] mr-1 pt-0">
                     {[1, 3, 5].map((d) => (
-                      <div key={d} className="h-[14px] text-[10px] text-zinc-400 dark:text-zinc-500 leading-[14px]">
+                      <div
+                        key={d}
+                        className="h-[14px] text-[10px] text-zinc-400 dark:text-zinc-500 leading-[14px]"
+                      >
                         {DAY_LABELS[d]}
                       </div>
                     ))}
@@ -324,11 +426,16 @@ export default function CalendarPage() {
                               else setHoveredDay(null);
                             }}
                             onMouseMove={(e) => {
-                              if (day.count > 0) setTooltipPos({ x: e.clientX, y: e.clientY });
+                              if (day.count > 0)
+                                setTooltipPos({ x: e.clientX, y: e.clientY });
                             }}
                             onMouseLeave={() => setHoveredDay(null)}
                             className={`w-[14px] h-[14px] rounded-sm cursor-pointer transition-colors ${getColorClass(day.count, maxCount)}`}
-                            title={day.count > 0 ? `${day.date}: ${day.count} runs` : day.date}
+                            title={
+                              day.count > 0
+                                ? `${day.date}: ${day.count} runs`
+                                : day.date
+                            }
                           />
                         ))}
                       </div>
@@ -354,10 +461,16 @@ export default function CalendarPage() {
                 className="fixed z-50 pointer-events-none bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-3 py-2 rounded-lg shadow-lg text-xs"
                 style={{ left: tooltipPos.x + 12, top: tooltipPos.y - 10 }}
               >
-                <p className="font-semibold">{formatTooltipDate(hoveredDay.date)}</p>
-                <p>{hoveredDay.count} run{hoveredDay.count !== 1 ? 's' : ''}</p>
+                <p className="font-semibold">
+                  {formatTooltipDate(hoveredDay.date)}
+                </p>
+                <p>
+                  {hoveredDay.count} run{hoveredDay.count !== 1 ? "s" : ""}
+                </p>
                 {hoveredDay.failed > 0 && (
-                  <p className="text-red-300 dark:text-red-600">{hoveredDay.failed} failed</p>
+                  <p className="text-red-300 dark:text-red-600">
+                    {hoveredDay.failed} failed
+                  </p>
                 )}
                 {hoveredDay.areas.length > 0 && (
                   <p>Areas: {hoveredDay.areas}</p>
@@ -374,7 +487,8 @@ export default function CalendarPage() {
                   <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                     {formatTooltipDate(stats.bestDay.date)}
                   </span>
-                  {' — '}{stats.bestDay.count} runs ({stats.bestDay.failed} failed)
+                  {" — "}
+                  {stats.bestDay.count} runs ({stats.bestDay.failed} failed)
                 </p>
               </div>
             )}

@@ -140,17 +140,18 @@ export default function IntegrateSentryIntegrationForCrashReporting() {
         }),
       });
 
-      const payload = await response.json().catch(() => ({}));
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
 
-      if (!response.ok || !payload.issue) {
-        throw new Error(payload.error || 'Could not create a Jira issue right now.');
+      if (!response.ok || !(payload.data as { issue?: unknown } | undefined)?.issue) {
+        throw new Error((payload.error as string) || 'Could not create a Jira issue right now.');
       }
 
+      const jiraIssue = (payload.data as { issue: { key: string; url: string } }).issue;
       setCreatedIssues((prev) => ({
         ...prev,
         [report.id]: {
-          key: payload.issue.key,
-          url: payload.issue.url,
+          key: jiraIssue.key,
+          url: jiraIssue.url,
         },
       }));
     } catch (error) {

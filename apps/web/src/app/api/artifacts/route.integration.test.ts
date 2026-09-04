@@ -38,10 +38,10 @@ describe('GET /api/artifacts', () => {
     const response = await GET(request);
 
     expect(response.status).toBe(200);
-    const json = (await response.json()) as Record<string, unknown>;
-    expect(json).toHaveProperty('artifacts');
-    expect(json).toHaveProperty('total', 2);
-    expect(Array.isArray(json.artifacts)).toBe(true);
+    const json = (await response.json()) as { data: Record<string, unknown> };
+    expect(json.data).toHaveProperty('artifacts');
+    expect(json.data).toHaveProperty('total', 2);
+    expect(Array.isArray(json.data.artifacts)).toBe(true);
   });
 
   it('returns empty list when no artifacts exist', async () => {
@@ -55,9 +55,9 @@ describe('GET /api/artifacts', () => {
     const response = await GET(request);
 
     expect(response.status).toBe(200);
-    const json = (await response.json()) as Record<string, unknown>;
-    expect(json.artifacts).toEqual([]);
-    expect(json.total).toBe(0);
+    const json = (await response.json()) as { data: Record<string, unknown> };
+    expect(json.data.artifacts).toEqual([]);
+    expect(json.data.total).toBe(0);
   });
 });
 

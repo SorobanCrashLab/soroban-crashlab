@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import type { FuzzingRun } from './types';
+import type { FuzzingRun, RunStatus } from './types';
+import { STATUS_META } from '../lib/run-status';
 import { dedupeRunsById } from './run-timeline-utils';
 
 const formatRelativeTime = (iso?: string): string => {
@@ -22,7 +23,7 @@ type RunStatusTimelineProps = {
   error?: string | null;
 };
 
-const STATUS_ICONS = {
+const STATUS_ICONS: Record<RunStatus, React.ReactElement> = {
   completed: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -43,13 +44,6 @@ const STATUS_ICONS = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
     </svg>
   ),
-};
-
-const STATUS_COLORS = {
-  completed: 'bg-emerald-500 text-white shadow-emerald-500/20',
-  failed: 'bg-rose-500 text-white shadow-rose-500/20',
-  running: 'bg-blue-500 text-white shadow-blue-500/20',
-  cancelled: 'bg-zinc-500 text-white shadow-zinc-500/20',
 };
 
 export default function RunActivityTimeline({ 
@@ -115,7 +109,7 @@ export default function RunActivityTimeline({
           {recentRuns.map((run) => (
             <div key={run.id} className="relative pl-14 group/item" tabIndex={0} role="listitem" aria-label={`Run ${run.id}: ${run.status}`}>
               {/* Timeline marker */}
-              <div className={`absolute left-0 top-2 h-12 w-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover/item:scale-110 group-hover/item:rotate-3 z-10 ${STATUS_COLORS[run.status]}`}>
+              <div className={`absolute left-0 top-2 h-12 w-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover/item:scale-110 group-hover/item:rotate-3 z-10 text-white ${STATUS_META[run.status].solidClass}`}>
                 {STATUS_ICONS[run.status]}
               </div>
 

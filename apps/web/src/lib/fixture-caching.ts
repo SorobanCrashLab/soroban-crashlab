@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 
 const CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=300';
@@ -16,9 +16,13 @@ export function computeETag(body: string): string {
  * Wrap a deterministic fixture response with Cache-Control and ETag headers.
  * Handles If-None-Match → 304 conditional requests.
  * Proxy-mode responses must bypass this entirely.
+ *
+ * Takes a plain `Request` rather than `NextRequest`: only the conditional
+ * header is read, and route handlers wrapped by `withRouteErrorHandling`
+ * receive the base type.
  */
 export function withFixtureCaching(
-  request: NextRequest,
+  request: Pick<Request, 'headers'>,
   data: unknown,
 ): NextResponse {
   const body = JSON.stringify(data);

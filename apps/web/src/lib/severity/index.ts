@@ -181,20 +181,12 @@ export function computeSeverityScore(
 
 /**
  * Batch scores multiple clusters efficiently.
- * Uses memoization for repeated allClusters reference.
  */
-let memoizedAllClusters: RunCluster[] | null = null;
-let memoizedNow: Date | null = null;
-
 export function batchScoreClusters(
     clusters: RunCluster[],
     allClusters: RunCluster[] = [],
     now: Date = new Date()
 ): ScoredCluster[] {
-    // Memoize allClusters reference for factor computations
-    memoizedAllClusters = allClusters;
-    memoizedNow = now;
-    
     return clusters.map(cluster => computeSeverityScore(cluster, allClusters, now));
 }
 
@@ -269,8 +261,6 @@ export function testMonotonicity(): { passed: boolean; violations: string[] } {
         memoryBytes: 1048576,
     };
 
-    const allClusters = [baseCluster];
-
     // Test 1: Higher count should not decrease score
     const higherCount = { ...baseCluster, count: 100 };
     const scoreBase = computeSeverityScore(baseCluster, [baseCluster]).score;
@@ -279,10 +269,8 @@ export function testMonotonicity(): { passed: boolean; violations: string[] } {
         violations.push(`Higher count (100 vs 10) scored lower: ${scoreHigherCount} < ${scoreBase}`);
     }
 
-    // Test 2: More areas should not decrease score
-    const moreAreas = { ...baseCluster, count: 10 };
-    // We can't easily test blastRadius without multiple clusters with same signature
-    // This is a limitation of the test setup
+    // Test 2: more areas should not decrease score — not exercised here,
+    // blastRadius needs several clusters sharing a signature.
 
     // Test 3: Newer firstSeen should not decrease score
     const newer = { ...baseCluster, firstSeen: '2024-12-01T00:00:00Z' };

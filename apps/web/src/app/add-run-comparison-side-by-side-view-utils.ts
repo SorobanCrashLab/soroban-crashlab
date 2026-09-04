@@ -47,15 +47,45 @@ const LOWER_IS_BETTER: SideBySideMetric[] = [
   "minResourceFee",
 ];
 
-export function computeSideBySideDelta(baseline: number, candidate: number): number {
-  if (baseline === 0) return 0;
-  return ((candidate - baseline) / baseline) * 100;
+export interface ComparisonRunOption {
+  run: FuzzingRun;
+  disabled: boolean;
+  label: string;
+}
+
+export function getComparisonRunOptions(
+  runs: FuzzingRun[],
+  selectedOtherId: string | null,
+): ComparisonRunOption[] {
+  return runs.map((run) => {
+    const disabled = Boolean(selectedOtherId && run.id === selectedOtherId);
+    const suffix = disabled ? " (already selected)" : "";
+    return {
+      run,
+      disabled,
+      label: `${run.id} — ${run.area} (${run.status})${suffix}`,
+    };
+  });
+}
+
+export function computeSideBySideDelta(
+  baseline: number,
+  candidate: number,
+  baselineId?: string,
+  candidateId?: string,
+): number | null {
+  if (baselineId && candidateId && baselineId === candidateId) return null;
+  if (baseline === 0) return null;
+  const delta = ((candidate - baseline) / baseline) * 100;
+  if (!Number.isFinite(delta)) return null;
+  return delta;
 }
 
 export function classifyDelta(
-  deltaPercent: number,
+  deltaPercent: number | null,
   metric?: SideBySideMetric,
-): "regression" | "improvement" | "stable" {
+): "regression" | "improvement" | "stable" | "neutral" {
+  if (deltaPercent === null) return "neutral";
   if (Math.abs(deltaPercent) < 10) return "stable";
   const lowerIsBetter = metric ? LOWER_IS_BETTER.includes(metric) : true;
   if (lowerIsBetter) {
@@ -89,11 +119,12 @@ export function formatSideBySideTags(run: FuzzingRun): string {
 }
 
 export function buildSideBySideRows(left: FuzzingRun, right: FuzzingRun): SideBySideRow[] {
+  if (left.id === right.id) return [];
   return SIDE_BY_SIDE_FIELDS.map((field) => {
     if (field.kind === "metric" && field.metric) {
       const leftNum = left[field.metric] as number;
       const rightNum = right[field.metric] as number;
-      const deltaPercent = computeSideBySideDelta(leftNum, rightNum);
+      const deltaPercent = computeSideBySideDelta(leftNum, rightNum, left.id, right.id);
       return {
         key: field.key,
         label: field.label,

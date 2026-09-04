@@ -3,7 +3,7 @@
  * Mutation-generated garbage binaries - parser must return clean typed errors, never throw.
  */
 
-import { parseContractWasm, MAX_MODULE_SIZE } from './index';
+import { parseContractWasm, MAX_MODULE_SIZE, proposeFuzzTargets } from './index';
 import { readULEB128, readSLEB128, readString, readBytes, readU32, readU64, readByte } from './binary-reader';
 
 describe('WASM binary reader primitives', () => {
@@ -267,7 +267,6 @@ describe('WASM module parser - hostile corpus', () => {
 
 describe('Fuzz target proposer', () => {
     it('generates descriptors for exported functions', () => {
-        const { proposeFuzzTargets } = require('./index');
         
         // Create a mock parsed contract
         const mockContract = {
@@ -294,7 +293,6 @@ describe('Fuzz target proposer', () => {
     });
 
     it('handles functions with no params', () => {
-        const { proposeFuzzTargets } = require('./index');
         
         const mockContract = {
             exportedFunctions: [
@@ -314,7 +312,6 @@ describe('Fuzz target proposer', () => {
     });
 
     it('handles all valtype codes', () => {
-        const { proposeFuzzTargets } = require('./index');
         
         const mockContract = {
             exportedFunctions: [

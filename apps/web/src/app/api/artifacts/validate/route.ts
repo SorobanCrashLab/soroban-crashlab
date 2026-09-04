@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { successResponse } from "@/lib/api-response-utils";
 
 /**
  * CaseBundle schema version constant.
@@ -245,7 +246,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (contentLength) {
     const size = parseInt(contentLength, 10);
     if (!isNaN(size) && size > 1024 * 1024) {
-      return NextResponse.json(
+      return successResponse(
         {
           valid: false,
           errors: ["Request body exceeds 1 MiB limit."],
@@ -260,7 +261,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
+    return successResponse(
       {
         valid: false,
         errors: ["Invalid JSON in request body."],
@@ -272,7 +273,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Expect { bundle: <CaseBundle> }
   if (!body || typeof body !== "object" || !("bundle" in body)) {
-    return NextResponse.json(
+    return successResponse(
       {
         valid: false,
         errors: ['Missing "bundle" field in request body.'],
@@ -286,5 +287,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const result = validateCaseBundle(bundle);
 
   const status = result.valid ? 200 : 422;
-  return NextResponse.json(result, { status });
+  return successResponse(result, { status });
 }

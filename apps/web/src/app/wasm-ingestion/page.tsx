@@ -10,7 +10,6 @@ import { parseContractWasmFile, proposeFuzzTargets, FuzzTargetDescriptor, Parsed
 import TargetProposer from './TargetProposer';
 
 export default function WasmIngestionPage() {
-    const [file, setFile] = useState<File | null>(null);
     const [parsed, setParsed] = useState<ParsedContract | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [descriptors, setDescriptors] = useState<FuzzTargetDescriptor[]>([]);
@@ -21,7 +20,6 @@ export default function WasmIngestionPage() {
         const selected = e.target.files?.[0];
         if (!selected) return;
 
-        setFile(selected);
         setError(null);
         setParsed(null);
         setDescriptors([]);

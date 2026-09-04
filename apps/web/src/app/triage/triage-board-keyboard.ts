@@ -22,7 +22,7 @@ export const ANNOUNCEMENTS = {
 } as const;
 
 export function createInitialState(focusedId: string | null = null): KeyboardBoardState {
-  return { focusedId, liftedId: null, origin: null, announcement: '"'"''"'"' };
+  return { focusedId, liftedId: null, origin: null, announcement: '' };
 }
 
 export function handleLift(state: KeyboardBoardState, cardId: string, pos: TriagePosition): KeyboardBoardState {
@@ -37,22 +37,23 @@ export function handleLift(state: KeyboardBoardState, cardId: string, pos: Triag
 
 export function handleMove(
   state: KeyboardBoardState,
-  direction: '"'"'up'"'"' | '"'"'down'"'"' | '"'"'left'"'"' | '"'"'right'"'"' | '"'"'home'"'"' | '"'"'end'"'"',
+  direction: 'up' | 'down' | 'left' | 'right' | 'home' | 'end',
   columns: string[],
-  columnSizes: Record<string, number>,
+  /** Reserved for per-column index clamping; the announcement is column-level. */
+  _columnSizes: Record<string, number>,
 ): KeyboardBoardState {
   if (!state.liftedId || !state.focusedId) return state;
   // Simplified: announcement for move target, actual DOM focus handled by component
   // Illegal moves remain no-ops (e.g., moving beyond bounds returns same state without announcement)
   const colIdx = columns.indexOf(state.origin?.col ?? columns[0]);
   if (colIdx === -1) return state;
-  let announcement = ANNOUNCEMENTS.move(columns[colIdx] ?? '"'"''"'"', 0);
-  if (direction === '"'"'left'"'"' && colIdx === 0) return state;
-  if (direction === '"'"'right'"'"' && colIdx === columns.length - 1) return state;
+  let announcement = ANNOUNCEMENTS.move(columns[colIdx] ?? '', 0);
+  if (direction === 'left' && colIdx === 0) return state;
+  if (direction === 'right' && colIdx === columns.length - 1) return state;
   // For demo, emit move announcement
-  if (direction === '"'"'left'"'"') announcement = ANNOUNCEMENTS.move(columns[colIdx - 1], 0);
-  if (direction === '"'"'right'"'"') announcement = ANNOUNCEMENTS.move(columns[colIdx + 1], 0);
-  if (direction === '"'"'home'"'"' || direction === '"'"'end'"'"') announcement = ANNOUNCEMENTS.move(columns[colIdx], 0);
+  if (direction === 'left') announcement = ANNOUNCEMENTS.move(columns[colIdx - 1], 0);
+  if (direction === 'right') announcement = ANNOUNCEMENTS.move(columns[colIdx + 1], 0);
+  if (direction === 'home' || direction === 'end') announcement = ANNOUNCEMENTS.move(columns[colIdx], 0);
   return { ...state, announcement };
 }
 

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   formatShortcutKeys,
   groupShortcutsByCategory,
-  isTypingContext,
   KEYBOARD_SHORTCUT_CHEATSHEET,
   resolveGoNavigationShortcut,
   SHORTCUT_CATEGORY_LABELS,
@@ -13,6 +12,7 @@ import {
   shouldToggleCheatsheet,
   type GoKeyPendingState,
 } from './keyboard-shortcut-cheatsheet-utils';
+import { isEditableTarget } from '../lib/is-editable-target';
 
 /**
  * Global keyboard shortcut cheatsheet modal.
@@ -45,7 +45,7 @@ export default function AddKeyboardShortcutCheatsheetModal() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const typing = isTypingContext(document.activeElement);
+      const typing = isEditableTarget(event.target);
 
       if (shouldToggleCheatsheet(event, typing)) {
         event.preventDefault();

@@ -3,7 +3,6 @@
  * Provides bidirectional navigation between log scrubber and sequence diagram.
  */
 
-import { ContractCallStep } from '../app/types';
 
 export interface LogEntry {
     id: string;

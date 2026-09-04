@@ -16,6 +16,91 @@ export interface PrometheusAdapterOptions {
   fetchImpl?: typeof fetch;
 }
 
+/** Maximum length of a label value before defensive truncation. */
+export const MAX_LABEL_VALUE_LENGTH = 200;
+
+/** Sentinel appended to truncated values so they are never mistaken for full ones. */
+export const TRUNCATION_MARKER = "...[truncated]";
+
+/**
+ * Statically allow-listed label NAMES emitted to Prometheus. Label names may
+ * only come from this fixed set; anything else is dropped with a warning so
+ * arbitrary input can never influence metric identity.
+ */
+export const ALLOWED_LABEL_NAMES = new Set([
+  "run_id",
+  "run_name",
+  "campaign",
+  "area",
+  "severity",
+  "status",
+  "instance",
+  "job",
+  "queue",
+]);
+
+/**
+ * Escape a label value per the Prometheus text exposition data model:
+ * backslash `\` -> `\\`, double quote `"` -> `\"`, and newline -> `\n`.
+ * Unescaped backslashes/quotes/newlines would cause pushgateway to reject the
+ * whole scrape batch with a 400, silencing ALL metrics, not just the offender.
+ */
+export function escapeLabelValue(value: string): string {
+  // Order matters: backslash must be escaped first so the escape sequences we
+  // insert for quote/newline are not themselves re-escaped.
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t");
+}
+
+/**
+ * Truncate a label value to MAX_LABEL_VALUE_LENGTH characters, appending a
+ * marker suffix so down-stream consumers can tell it was truncated.
+ */
+export function truncateLabelValue(value: string): string {
+  if (value.length <= MAX_LABEL_VALUE_LENGTH) {
+    return value;
+  }
+  const keep = MAX_LABEL_VALUE_LENGTH - TRUNCATION_MARKER.length;
+  return value.slice(0, keep) + TRUNCATION_MARKER;
+}
+
+/**
+ * Fully sanitize a label value: escape Prometheus metacharacters, then
+ * defensively truncate well beyond typical limits.
+ */
+export function sanitizeLabelValue(value: string): string {
+  return truncateLabelValue(escapeLabelValue(value));
+}
+
+/**
+ * Validate a label NAME against the static whitelist. Returns true when the
+ * name is safe to emit; otherwise warnings and skips (returns null from the
+ * builder) so arbitrary labels can never produce invalid exposition.
+ */
+export function isAllowedLabelName(name: string): boolean {
+  return ALLOWED_LABEL_NAMES.has(name);
+}
+
+/**
+ * Emit a single `name="value"` label pair from a whitelisted name. Returns the
+ * serialized label or null when the label name is not allow-listed or the
+ * value is empty.
+ */
+export function serializeLabel(name: string, value: string): string | null {
+  if (!isAllowedLabelName(name)) {
+    console.warn(`[prometheus-adapter] skipping disallowed label name "${name}"`);
+    return null;
+  }
+  if (value.length === 0) {
+    return null;
+  }
+  return `${name}="${sanitizeLabelValue(value)}"`;
+}
+
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }

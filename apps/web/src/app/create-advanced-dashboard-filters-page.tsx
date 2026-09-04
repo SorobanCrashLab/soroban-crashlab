@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useState, useCallback } from 'react';
 import { RunStatus, RunArea, RunSeverity } from './types';
+import { RUN_STATUSES } from '../lib/run-status';
 
 export interface DashboardFilters {
   status: RunStatus[];
@@ -232,7 +233,7 @@ const AdvancedDashboardFilters: React.FC<AdvancedDashboardFiltersProps> = ({
                 Status
               </legend>
               <div className="space-y-2" role="group" aria-label="Filter by run status">
-                {(['running', 'completed', 'failed', 'cancelled'] as RunStatus[]).map(status => (
+                {RUN_STATUSES.map(status => (
                   <label key={status} className="flex items-center cursor-pointer">
                     <input
                       type="checkbox"

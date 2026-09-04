@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { isTypingContext } from '../app/keyboard-shortcut-cheatsheet-utils';
+import { isEditableTarget } from '../lib/is-editable-target';
 import { commandRegistry, type ScoredEntry } from '../lib/command-palette/registry';
 import { highlightSegments } from '../lib/command-palette/matcher';
 import { addRecent, getRecents } from '../lib/command-palette/recents';
@@ -59,32 +59,32 @@ export default function CommandPalette() {
     };
   }, [navigate, toggleTheme, toggleMaintainerMode, exportCurrentView]);
 
-  const runSearch = useMemo(
-    () =>
-      debounce(
-        (value: string, currentRecentIds: string[]) => {
-          abortRef.current?.abort();
-          const controller = new AbortController();
-          abortRef.current = controller;
-          commandRegistry
-            .search(value, { signal: controller.signal, recentIds: currentRecentIds })
-            .then((next) => {
-              if (controller.signal.aborted) return;
-              setResults(next);
-              setActiveIndex(0);
-            })
-            .catch(() => {});
-        },
-        { delay: SEARCH_DEBOUNCE_MS },
-      ),
-    [],
-  );
-
+  // The debouncer is built inside the effect rather than memoised across
+  // renders: it reads `abortRef` and a render-phase `useMemo` that touches a
+  // ref is rejected by the React Compiler. Behaviour is unchanged — each
+  // keystroke replaces the pending call, which is what the debounce did.
   useEffect(() => {
     if (!isOpen) return;
+
+    const runSearch = debounce(
+      (value: string, currentRecentIds: string[]) => {
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+        commandRegistry
+          .search(value, { signal: controller.signal, recentIds: currentRecentIds })
+          .then((next) => {
+            if (controller.signal.aborted) return;
+            setResults(next);
+            setActiveIndex(0);
+          })
+          .catch(() => {});
+      },
+      { delay: SEARCH_DEBOUNCE_MS },
+    );
+
     runSearch(query, recentIds);
     return () => runSearch.cancel();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runSearch is stable; recentIds/query drive re-search
   }, [isOpen, query, recentIds]);
 
   const openPalette = useCallback(() => {
@@ -137,7 +137,7 @@ export default function CommandPalette() {
         return;
       }
 
-      if (isTypingContext(document.activeElement) && document.activeElement !== inputRef.current) {
+      if (isEditableTarget(event.target) && event.target !== inputRef.current) {
         return;
       }
     };
@@ -238,7 +238,7 @@ export default function CommandPalette() {
           className="max-h-80 overflow-y-auto p-2"
         >
           {results.length === 0 && (
-            <li className="px-3 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
+            <li className="px-3 py-6 text-center text-sm text-muted">
               No matching commands.
             </li>
           )}

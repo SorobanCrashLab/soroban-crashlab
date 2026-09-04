@@ -1,5 +1,5 @@
-import * as assert from '"'"'node:assert/strict'"'"';
-import { getColumnCountForWidth, clampLayoutForTier, CONTAINER_TIERS } from '"'"'./widget-grid'"'"';
+import * as assert from 'node:assert/strict';
+import { getColumnCountForWidth, clampLayoutForTier, CONTAINER_TIERS } from './widget-grid';
 
 function testTierMapping(): void {
   assert.equal(getColumnCountForWidth(0), 1);
@@ -16,9 +16,9 @@ function testTierMapping(): void {
 
 function testClampSixToThree(): void {
   const sixColLayout = [
-    { id: '"'"'w1'"'"', position: { x: 5, y: 0 } },
-    { id: '"'"'w2'"'"', position: { x: 2, y: 1 } },
-    { id: '"'"'w3'"'"', position: { x: 0, y: 0 } },
+    { id: 'w1', position: { x: 5, y: 0 } },
+    { id: 'w2', position: { x: 2, y: 1 } },
+    { id: 'w3', position: { x: 0, y: 0 } },
   ];
   const clamped = clampLayoutForTier(sixColLayout, 3);
   assert.equal(clamped[0].position.x, 2); // max x for 3 cols = 2
@@ -35,4 +35,4 @@ function testMirrorBreakpointsIdentical(): void {
 testTierMapping();
 testClampSixToThree();
 testMirrorBreakpointsIdentical();
-console.log('"'"'widget-grid.test.ts: all assertions passed'"'"');
+console.log('widget-grid.test.ts: all assertions passed');

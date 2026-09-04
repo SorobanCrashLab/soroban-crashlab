@@ -44,11 +44,37 @@ const FILTER_OPS: Record<ChartFilter['op'], (val: unknown, target: string | numb
 
 const ROW_CAP = 5000;
 
+/** Pure fee validator — no chart imports. */
+function isValidFeeValue(fee: unknown): boolean {
+  return typeof fee === 'number' && Number.isFinite(fee) && !Number.isNaN(fee) && fee >= 0;
+}
+
+export interface FeeSanitizeResult {
+  clean: FuzzingRun[];
+  dropped: { count: number; ids: string[] };
+}
+
+export function sanitizeFeeSeriesForChart(runs: FuzzingRun[]): FeeSanitizeResult {
+  const clean: FuzzingRun[] = [];
+  const ids: string[] = [];
+  for (const run of runs) {
+    if (!isValidFeeValue(run.minResourceFee)) {
+      ids.push(run.id);
+      continue;
+    }
+    clean.push(run);
+  }
+  return { clean, dropped: { count: ids.length, ids } };
+}
+
+/** Y-axis domain clamped at zero for fee metrics. */
+export const FEE_Y_DOMAIN: readonly [number, string] = [0, 'auto'] as const;
+
 export function applyFilters(runs: FuzzingRun[], filters?: ChartFilter[]): FuzzingRun[] {
   if (!filters || filters.length === 0) return runs;
   return runs.filter((run) =>
     filters.every((filter) => {
-      const fieldValue = (run as Record<string, unknown>)[filter.field];
+      const fieldValue = (run as unknown as Record<string, unknown>)[filter.field];
       if (fieldValue === undefined) return false;
       return FILTER_OPS[filter.op](fieldValue, filter.value as string | number);
     }),
@@ -58,14 +84,24 @@ export function applyFilters(runs: FuzzingRun[], filters?: ChartFilter[]): Fuzzi
 export function compileChartConfig(
   config: ChartConfig,
   runs: FuzzingRun[],
-): { data: ChartDataPoint[]; metricLabels: Record<string, string>; rowCapHit: boolean } {
+): { data: ChartDataPoint[]; metricLabels: Record<string, string>; rowCapHit: boolean; feeDropped?: { count: number; ids: string[] } } {
   const filtered = applyFilters(runs, config.filters).slice(0, ROW_CAP);
   const rowCapHit = runs.length > ROW_CAP;
+  // Sanitize fee series at ingestion: exclude malformed fee rows from any chart that includes the fee metric.
+  let feeDropped: { count: number; ids: string[] } | undefined;
+  let chartRuns = filtered;
+  if (config.metrics.includes('minResourceFee')) {
+    const sanitized = sanitizeFeeSeriesForChart(filtered);
+    chartRuns = sanitized.clean;
+    feeDropped = sanitized.dropped;
+  }
 
   if (config.dimension) {
-    return compileWithDimension(filtered, config, rowCapHit);
+    const result = compileWithDimension(chartRuns, config, rowCapHit);
+    return { ...result, feeDropped };
   }
-  return compileAggregated(filtered, config, rowCapHit);
+  const result = compileAggregated(chartRuns, config, rowCapHit);
+  return { ...result, feeDropped };
 }
 
 function compileAggregated(

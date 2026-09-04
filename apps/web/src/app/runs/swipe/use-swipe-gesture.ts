@@ -18,6 +18,7 @@ export interface SwipeGestureState {
 interface PointerRecord {
   id: number;
   startX: number;
+  startY: number;
   startTime: number;
   currentX: number;
   currentY: number;
@@ -52,6 +53,7 @@ export function useSwipeGesture({ onSwipeLeft, onSwipeRight, enabled = true }: U
       pointerRef.current = {
         id: e.pointerId,
         startX: e.clientX,
+        startY: e.clientY,
         startTime: Date.now(),
         currentX: e.clientX,
         currentY: e.clientY,

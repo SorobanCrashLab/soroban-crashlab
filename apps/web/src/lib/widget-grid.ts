@@ -44,6 +44,6 @@ export function clampLayoutForTier<T extends { position: { x: number; y: number 
 }
 
 export function isContainerQuerySupported(): boolean {
-  if (typeof CSS === '"'"'undefined'"'"' || typeof CSS.supports !== '"'"'function'"'"') return false;
-  return CSS.supports('"'"'container-type'"'"', '"'"'inline-size'"'"');
+  if (typeof CSS === 'undefined' || typeof CSS.supports !== 'function') return false;
+  return CSS.supports('container-type', 'inline-size');
 }

@@ -1,0 +1,30 @@
+{
+  "id": "run-rich-corpus-001",
+  "status": "completed",
+  "area": "auth",
+  "severity": "medium",
+  "duration": 3600000,
+  "seedCount": 5000000,
+  "crashDetail": null,
+  "cpuInstructions": 154890234,
+  "memoryBytes": 48920194,
+  "minResourceFee": 120,
+  "corpusStats": [
+    { "ts": 1700000000000, "corpusSize": 12, "execsPerSec": 1450, "coveragePct": 3.2 },
+    { "ts": 1700000010000, "corpusSize": 25, "execsPerSec": 1890, "coveragePct": 5.8 },
+    { "ts": 1700000020000, "corpusSize": 48, "execsPerSec": 2100, "coveragePct": 8.4 },
+    { "ts": 1700000030000, "corpusSize": 95, "execsPerSec": 2450, "coveragePct": 12.1 },
+    { "ts": 1700000040000, "corpusSize": 160, "execsPerSec": 3100, "coveragePct": 18.7 },
+    { "ts": 1700000050000, "corpusSize": 240, "execsPerSec": 3600, "coveragePct": 24.3 },
+    { "ts": 1700000060000, "corpusSize": 350, "execsPerSec": 4100, "coveragePct": 31.9 },
+    { "ts": 1700000070000, "corpusSize": 480, "execsPerSec": 4500, "coveragePct": 42.1 },
+    { "ts": 1700000080000, "corpusSize": 620, "execsPerSec": 4200, "coveragePct": 51.5 },
+    { "ts": 1700000090000, "corpusSize": 780, "execsPerSec": 3900, "coveragePct": 60.2 },
+    { "ts": 1700000100000, "corpusSize": 950, "execsPerSec": 4300, "coveragePct": 67.8 },
+    { "ts": 1700000110000, "corpusSize": 1150, "execsPerSec": 4700, "coveragePct": 74.2 },
+    { "ts": 1700000120000, "corpusSize": 1380, "execsPerSec": 4600, "coveragePct": 79.5 },
+    { "ts": 1700000130000, "corpusSize": 1620, "execsPerSec": 4800, "coveragePct": 83.1 },
+    { "ts": 1700000140000, "corpusSize": 1890, "execsPerSec": 4900, "coveragePct": 86.4 },
+    { "ts": 1700000150000, "corpusSize": 2150, "execsPerSec": 4750, "coveragePct": 88.9 }
+  ]
+}

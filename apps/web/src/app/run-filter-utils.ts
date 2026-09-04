@@ -165,6 +165,15 @@ export function filterByCrash(runs: FuzzingRun[], hasCrash: boolean | null): Fuz
   return runs.filter((r) => (hasCrash ? r.crashDetail !== null : r.crashDetail === null));
 }
 
+export function filterByDateRange(runs: FuzzingRun[], startDate: string, endDate: string): FuzzingRun[] {
+  if (!startDate && !endDate) return runs;
+  const start = startDate ? new Date(startDate).getTime() : -Infinity;
+  const end = endDate ? new Date(endDate).getTime() + 86399999 : Infinity;
+  return runs.filter((run) => {
+    const runTime = new Date(run.queuedAt ?? run.startedAt ?? '').getTime();
+    return runTime >= start && runTime <= end;
+  });
+}
 
 export function applyRunFilters(runs: FuzzingRun[], filters: RunFilters): FuzzingRun[] {
   return filterByCrash(

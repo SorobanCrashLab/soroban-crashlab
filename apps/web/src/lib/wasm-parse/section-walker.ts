@@ -215,7 +215,7 @@ export function parseTypeSection(data: Uint8Array): FuncType[] {
 
     for (let i = 0; i < count; i++) {
         if (offset >= data.length) break;
-        const form = data[offset++]; // should be 0x60 (func type)
+        offset++; // form byte, always 0x60 (func type)
         
         // Read params
         let paramCount = 0;

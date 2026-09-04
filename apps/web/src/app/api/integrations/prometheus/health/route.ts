@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { successResponse } from '@/lib/api-response-utils';
 import { logger } from '@/lib/logger';
 
 /**
@@ -18,23 +18,20 @@ export async function GET() {
     const isHealthy = true; // Simulated health check
 
     if (!isHealthy) {
-      return NextResponse.json(
+      return successResponse(
         { status: 'unhealthy', error: 'Metrics exporter is currently unavailable.' },
         { status: 503 }
       );
     }
 
-    return NextResponse.json(
-      {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
-      },
-      { status: 200 }
-    );
+    return successResponse({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0'
+    });
   } catch (error) {
     logger.error('GET /api/integrations/prometheus/health failed', { error });
-    return NextResponse.json(
+    return successResponse(
       { status: 'error', message: 'An unexpected error occurred.' },
       { status: 500 }
     );

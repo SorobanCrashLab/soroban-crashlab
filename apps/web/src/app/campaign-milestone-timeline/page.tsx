@@ -1,12 +1,5 @@
-'use client';
+import CampaignMilestoneTimelinePage from '../../components/campaign-milestone-timeline/campaign-milestone-timeline-page';
 
-import CampaignMilestoneTimelineVisualizer from "../add-campaign-milestone-timeline-visualizer";
-import { mockMilestoneEvents } from "../campaign-milestone-mock-data";
-
-export default function CampaignMilestoneTimelinePage() {
-  return (
-    <div className="container mx-auto p-4">
-      <CampaignMilestoneTimelineVisualizer events={mockMilestoneEvents} />
-    </div>
-  );
+export default function Page() {
+  return <ComparisonMilestoneTimelinePage />;
 }

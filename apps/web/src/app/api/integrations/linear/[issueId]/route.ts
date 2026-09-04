@@ -5,7 +5,7 @@
  * Returns 404 if the issue is not found or API key is not configured.
  */
 
-import { NextResponse } from 'next/server';
+import { successResponse } from '@/lib/api-response-utils';
 import { withRouteErrorHandling, jsonError } from '@/lib/route-handler';
 import { createLinearIssuesAdapter } from '@/lib/integrations/linear-issues';
 
@@ -29,7 +29,7 @@ export const GET = withRouteErrorHandling(
       return jsonError('Issue not found or Linear not configured', 404);
     }
 
-    return NextResponse.json({ issue });
+    return successResponse({ issue });
   },
   'Failed to fetch Linear issue',
 );

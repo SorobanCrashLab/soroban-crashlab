@@ -77,7 +77,8 @@ export function validateChartConfig(raw: unknown): { ok: true; config: ChartConf
   }
 
   const errors: ChartValidationError[] = result.error.issues.map((issue) => ({
-    path: issue.path,
+    // Zod indexes array elements numerically; the error shape is string-only.
+    path: issue.path.map(String),
     message: issue.message,
   }));
   return { ok: false, errors };
@@ -103,7 +104,7 @@ export function loadCustomCharts(storage: Pick<Storage, 'getItem'> = globalThis.
 
 export function saveCustomChart(
   config: ChartConfig,
-  storage: Pick<Storage, 'setItem'> = globalThis.localStorage,
+  storage: Pick<Storage, 'getItem' | 'setItem'> = globalThis.localStorage,
 ): SavedCustomChart {
   const charts = loadCustomCharts(storage);
   const entry: SavedCustomChart = {

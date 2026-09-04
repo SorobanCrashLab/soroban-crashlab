@@ -63,7 +63,7 @@ export function createPagerDutyAdapter(options: PagerDutyAdapterOptions = {}) {
           throw new Error(`Failed to load config: ${response.statusText}`);
         }
 
-        return await response.json();
+        return ((await response.json()) as { data: PagerDutyConfig | null }).data ?? null;
       } catch (error) {
         console.error('Error loading PagerDuty config:', error);
         throw error;
@@ -119,8 +119,8 @@ export function createPagerDutyAdapter(options: PagerDutyAdapterOptions = {}) {
           };
         }
 
-        const result = await response.json();
-        return { success: result.success ?? true };
+        const result = (await response.json()) as { data?: { success?: boolean } };
+        return { success: result.data?.success ?? true };
       } catch (error) {
         console.error('Error testing PagerDuty connection:', error);
         return {
@@ -154,7 +154,7 @@ export function createPagerDutyAdapter(options: PagerDutyAdapterOptions = {}) {
           };
         }
 
-        return await response.json();
+        return ((await response.json()) as { data: TriggerAlertResult }).data;
       } catch (error) {
         console.error('Error triggering PagerDuty alert:', error);
         return {
@@ -180,8 +180,8 @@ export function createPagerDutyAdapter(options: PagerDutyAdapterOptions = {}) {
           throw new Error(`Failed to fetch alerts: ${response.statusText}`);
         }
 
-        const data = (await response.json()) as PagerDutyAlertsResponse;
-        return data.alerts ?? [];
+        const json = (await response.json()) as { data?: PagerDutyAlertsResponse };
+        return json.data?.alerts ?? [];
       } catch (error) {
         console.error('Error fetching PagerDuty alerts:', error);
         throw error;

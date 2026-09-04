@@ -29,5 +29,5 @@ export const GET = withRouteErrorHandling('GET /api/webhooks/history', async (re
     stats,
     total: filtered.length,
   };
-  return withFixtureCaching(request, data);
+  return withFixtureCaching(request, { data });
 });

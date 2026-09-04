@@ -18,6 +18,40 @@ function makeRun(overrides: Partial<FuzzingRun> = {}): FuzzingRun {
   };
 }
 
+/**
+ * Simple CSV parser for round-trip verification.
+ * Parses a CSV line respecting RFC-4180 quoting rules.
+ */
+function parseCSVLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        // Escaped quote
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        // Toggle quote mode
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // Field separator
+      fields.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  fields.push(current);
+  return fields;
+}
+
 const runAssertions = () => {
   // No visibleColumns supplied -> every known column is exported.
   assert.deepEqual(resolveCsvColumns(undefined), ALL_CSV_COLUMNS);
@@ -49,5 +83,62 @@ const runAssertions = () => {
   assert.equal(fullHeaderLine.split(',').length, ALL_CSV_COLUMNS.length);
 };
 
+/**
+ * Hostile CSV data test: verify round-trip parsing for adversarial inputs.
+ * Tests that fields containing commas, quotes, and newlines are escaped
+ * correctly and can be parsed back to their original values.
+ */
+const hostileDataAssertions = () => {
+  // Test case 1: Field with comma
+  const runWithComma = makeRun({ id: 'run, with, commas' });
+  const csvWithComma = buildRunsCsv([runWithComma], ['id', 'status']);
+  const [, dataComma] = csvWithComma.split('\n');
+  const fieldsComma = parseCSVLine(dataComma);
+  assert.equal(fieldsComma[0], 'run, with, commas', 'comma in field should round-trip');
+  assert.equal(fieldsComma[1], 'completed', 'status field should remain intact');
+
+  // Test case 2: Field with double quotes
+  const runWithQuotes = makeRun({ area: 'error: "auth failure"' as any });
+  const csvWithQuotes = buildRunsCsv([runWithQuotes], ['area', 'status']);
+  const [, dataQuotes] = csvWithQuotes.split('\n');
+  const fieldsQuotes = parseCSVLine(dataQuotes);
+  assert.equal(fieldsQuotes[0], 'error: "auth failure"', 'quotes in field should round-trip');
+
+  // Test case 3: Field with newline
+  const runWithNewline = makeRun({ status: 'failed\nwith details' as any });
+  const csvWithNewline = buildRunsCsv([runWithNewline], ['id', 'status']);
+  // With newline in data, we need to parse the entire CSV (not just split by \n)
+  // For this simple test, we verify the CSV is well-formed by checking quote escaping
+  assert.ok(csvWithNewline.includes('"failed\nwith details"'), 'newline should be quoted');
+
+  // Test case 4: Complex hostile case - all three together
+  const complexPayload = 'Error: "invalid", context\nline 2\nline 3';
+  const runComplex = makeRun({ area: complexPayload as any });
+  const csvComplex = buildRunsCsv([runComplex], ['area']);
+  // Don't split on \n since the data itself contains newlines
+  // Just parse the CSV directly
+  // The first line is the header, the second should have the complex payload (now quoted)
+  assert.ok(
+    csvComplex.includes('"Error: ""invalid"", context\nline 2\nline 3"'),
+    'complex payload should be properly escaped and quoted'
+  );
+
+  // Test case 5: Multiple runs with hostile data
+  const runs = [
+    makeRun({ id: 'run-1' }),
+    makeRun({ id: 'run-2, dangerous', status: 'failed\nwith reason' as any }),
+    makeRun({ id: 'quote"test', severity: 'critical' }),
+  ];
+  const csvMultiple = buildRunsCsv(runs, ['id', 'status', 'severity']);
+  // Verify the CSV contains properly escaped values
+  assert.ok(csvMultiple.includes('"run-2, dangerous"'), 'comma in id should be quoted');
+  assert.ok(
+    csvMultiple.includes('"failed\nwith reason"'),
+    'newline in status should be quoted'
+  );
+  assert.ok(csvMultiple.includes('"quote""test"'), 'quote in id should be doubled and quoted');
+};
+
 runAssertions();
+hostileDataAssertions();
 console.log('export-run-csv-utils.test.ts: all assertions passed');

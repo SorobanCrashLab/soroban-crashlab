@@ -11,6 +11,17 @@ export function initSentryClient(): void {
     Sentry.init({
       dsn,
       tracesSampleRate: 1.0,
+      beforeSend(event) {
+        const isMockData = sessionStorage.getItem('crashlab:mock-data') === 'true';
+        if (!event.tags) event.tags = {};
+        event.tags.environment = isMockData ? 'mock-data' : 'production';
+        if (event.request) {
+          delete event.request.url;
+          delete event.request.query_string;
+          delete event.request.headers;
+        }
+        return event;
+      },
     });
   }
 }

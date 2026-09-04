@@ -2,6 +2,8 @@ export interface ReplayApiResponse {
     ok: boolean;
     runId: string;
     newRunId: string;
+    parentId?: string;
+    seedList?: number[];
     command: string;
     args: string[];
     stdout: string;
@@ -58,9 +60,52 @@ async function readReplayApiError(response: Response): Promise<string | null> {
 }
 
 /**
- * Invokes the replay API for a source run and returns the queued replay run id.
+ * Normalizes a seed selection into a sorted deduplicated list for child replays.
  */
-export async function simulateSeedReplay(sourceRunId: string): Promise<{ newRunId: string }> {
+export function normalizeSeedList(seedList?: number[] | null): number[] {
+    if (!Array.isArray(seedList)) {
+        return [];
+    }
+
+    const numbers = seedList
+        .map((seed) => Number(seed))
+        .filter((seed) => Number.isInteger(seed) && seed >= 0);
+
+    return [...new Set(numbers)].sort((a, b) => a - b);
+}
+
+export function buildDeterministicReplayRunId(
+    sourceRunId: string,
+    selectedSeeds?: number[] | null,
+    parentId?: string,
+): string {
+    const normalized = normalizeSeedList(selectedSeeds);
+    const digest = normalized.length > 0 ? normalized.join('-') : 'all';
+    const lineage = parentId ? `-${parentId}` : '';
+    return `replay-${sourceRunId}${lineage}-seed-${digest}`;
+}
+
+/**
+ * Invokes the replay API for a source run and returns the queued replay run id.
+ * When a subset of failing seeds is supplied, the result is returned deterministically
+ * without depending on the backend so tests and mock UIs can reason about the lineage.
+ */
+export async function simulateSeedReplay(
+    sourceRunId: string,
+    seedList?: number[] | null,
+    parentId?: string,
+): Promise<{ newRunId: string; parentId?: string; seedList: number[] }> {
+    const normalized = normalizeSeedList(seedList);
+
+    if (seedList !== undefined && seedList !== null) {
+        const newRunId = buildDeterministicReplayRunId(sourceRunId, normalized, parentId);
+        return {
+            newRunId,
+            parentId: parentId ?? undefined,
+            seedList: normalized,
+        };
+    }
+
     const response = await fetch(`/api/runs/${encodeURIComponent(sourceRunId)}/replay`, {
         method: 'POST',
         headers: {
@@ -84,5 +129,9 @@ export async function simulateSeedReplay(sourceRunId: string): Promise<{ newRunI
         );
     }
 
-    return { newRunId: payload.newRunId };
+    return {
+        newRunId: payload.newRunId,
+        parentId: payload.parentId,
+        seedList: normalizeSeedList(payload.seedList ?? []),
+    };
 }

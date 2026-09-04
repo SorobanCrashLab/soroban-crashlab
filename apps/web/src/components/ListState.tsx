@@ -1,10 +1,23 @@
 import React from 'react';
 import { GenericPageSkeleton } from './LoadingSkeleton';
+import { EmptyState } from './EmptyState';
+import { EmptyStateIllustrationVariant } from './EmptyStateIllustration';
+
+export type EmptyStateType = EmptyStateIllustrationVariant;
 
 export type ListStateProps =
   | { state: 'loading'; skeleton?: React.ReactNode }
   | { state: 'error'; message?: React.ReactNode; onRetry?: () => void }
-  | { state: 'empty'; message?: React.ReactNode; action?: React.ReactNode }
+  | {
+      state: 'empty';
+      type?: EmptyStateType;
+      title?: React.ReactNode;
+      message?: React.ReactNode;
+      description?: React.ReactNode;
+      illustration?: React.ReactNode;
+      action?: React.ReactNode;
+      className?: string;
+    }
   | { state: 'success'; children: React.ReactNode };
 
 export function ListState(props: ListStateProps) {
@@ -33,10 +46,16 @@ export function ListState(props: ListStateProps) {
       );
     case 'empty':
       return (
-        <div className="card card-padding text-center py-16 fade-in border border-zinc-200 dark:border-zinc-800">
-          {/* TODO(Issue #1209): Integrate empty-state illustrations here */}
-          <p className="text-meta">{props.message || 'No items found.'}</p>
-          {props.action && <div className="mt-4">{props.action}</div>}
+        <div className="fade-in">
+          <EmptyState
+            type={props.type ?? 'generic'}
+            title={props.title}
+            message={props.message}
+            description={props.description}
+            illustration={props.illustration}
+            action={props.action}
+            className={props.className}
+          />
         </div>
       );
     case 'success':

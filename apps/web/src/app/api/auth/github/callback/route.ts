@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response-utils';
 
 const STATE_COOKIE_NAME = 'github_oauth_state';
 
@@ -24,10 +25,7 @@ export async function GET(request: NextRequest) {
 
   if (!code) {
     return clearCookie(
-      NextResponse.json(
-        { error: 'Missing "code" parameter from GitHub callback.' },
-        { status: 400 }
-      )
+      errorResponse('Missing "code" parameter from GitHub callback.', 400)
     );
   }
 
@@ -35,20 +33,14 @@ export async function GET(request: NextRequest) {
   if (!state || !storedState) {
     logger.warn('GET /api/auth/github/callback: missing state parameter (possible CSRF)');
     return clearCookie(
-      NextResponse.json(
-        { error: 'Missing OAuth state parameter. The login flow may have expired or been tampered with.' },
-        { status: 403 }
-      )
+      errorResponse('Missing OAuth state parameter. The login flow may have expired or been tampered with.', 403)
     );
   }
 
   if (state !== storedState) {
     logger.warn('GET /api/auth/github/callback: state mismatch (possible CSRF attack)');
     return clearCookie(
-      NextResponse.json(
-        { error: 'OAuth state mismatch. The request may have been tampered with.' },
-        { status: 403 }
-      )
+      errorResponse('OAuth state mismatch. The request may have been tampered with.', 403)
     );
   }
 
@@ -75,10 +67,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error('GET /api/auth/github/callback failed', { error });
     return clearCookie(
-      NextResponse.json(
-        { error: 'An internal error occurred while processing the GitHub authentication.' },
-        { status: 500 }
-      )
+      errorResponse('An internal error occurred while processing the GitHub authentication.', 500)
     );
   }
 }

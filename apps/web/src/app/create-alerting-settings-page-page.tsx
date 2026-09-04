@@ -17,7 +17,9 @@ import {
   type AlertCategory,
   type AlertingSettingsSnapshot,
   type AlertingTabId,
+  type DryRunEvaluation,
 } from './alerting-settings-page-utils';
+import { evaluateRules } from './alerting-evaluator';
 
 const ALERTING_API_URL = '/api/settings/alerting';
 
@@ -145,6 +147,9 @@ export default function AlertingSettingsPage({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [dryRunResults, setDryRunResults] = useState<DryRunEvaluation[] | null>(null);
+  const [isDryRunning, setIsDryRunning] = useState(false);
+  const [dryRunError, setDryRunError] = useState<string | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const tabButtonRefs = useRef<Partial<Record<AlertingTabId, HTMLButtonElement | null>>>(
     {},
@@ -172,7 +177,7 @@ export default function AlertingSettingsPage({
     fetch(ALERTING_API_URL)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<AlertingSettingsSnapshot>;
+        return res.json().then((json) => (json as { data: AlertingSettingsSnapshot }).data);
       })
       .then(applySnapshot)
       .catch(() => {
@@ -186,7 +191,7 @@ export default function AlertingSettingsPage({
     fetch(ALERTING_API_URL)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<AlertingSettingsSnapshot>;
+        return res.json().then((json) => (json as { data: AlertingSettingsSnapshot }).data);
       })
       .then(applySnapshot)
       .catch(() => {
@@ -287,7 +292,7 @@ export default function AlertingSettingsPage({
     })
       .then((res) => {
         if (!res.ok) return res.json().then((e: { error?: string }) => { throw new Error(e.error ?? `HTTP ${res.status}`); });
-        return res.json() as Promise<AlertingSettingsSnapshot>;
+        return res.json().then((json) => (json as { data: AlertingSettingsSnapshot }).data);
       })
       .then((saved) => {
         applySnapshot(saved);
@@ -309,7 +314,7 @@ export default function AlertingSettingsPage({
     })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<AlertingSettingsSnapshot>;
+        return res.json().then((json) => (json as { data: AlertingSettingsSnapshot }).data);
       })
       .then((saved) => {
         applySnapshot(saved);
@@ -321,6 +326,43 @@ export default function AlertingSettingsPage({
         setErrorMessage('Unable to reset alerting settings.');
       });
   }, [applySnapshot]);
+
+  const handleDryRun = useCallback(() => {
+    if (!settings) return;
+
+    setIsDryRunning(true);
+    setDryRunError(null);
+    setDryRunResults(null);
+
+    // Simulate async evaluation with a brief delay for UX feedback
+    setTimeout(() => {
+      try {
+        const referenceTime = new Date();
+        const allRules = settings.alertRules;
+
+        // Build synthetic runs from recent history entries as evaluation context
+        const syntheticRuns = settings.history.map((entry, index) => ({
+          id: `dry-run-history-${index}`,
+          status: (entry.outcome === 'triggered' ? 'failed' : 'completed') as import('./types').RunStatus,
+          area: 'auth' as import('./types').RunArea,
+          severity: 'medium' as import('./types').RunSeverity,
+          duration: 1000 + index * 500,
+          seedCount: 100 + index * 10,
+          crashDetail: null,
+          cpuInstructions: 50000 + index * 5000,
+          memoryBytes: 1024 * 1024 + index * 256 * 1024,
+          minResourceFee: 100 + index * 10,
+        }));
+
+        const results = evaluateRules(allRules, syntheticRuns, referenceTime);
+        setDryRunResults(results);
+      } catch {
+        setDryRunError('Dry-run evaluation failed. Please try again.');
+      } finally {
+        setIsDryRunning(false);
+      }
+    }, 300);
+  }, [settings]);
 
   if (loadState === 'loading') {
     return <LoadingSkeleton />;
@@ -855,6 +897,88 @@ export default function AlertingSettingsPage({
                 </table>
               </div>
             )}
+
+            {/* Dry-run evaluation panel */}
+            <div className="mt-8">
+              <div className="mb-4 max-w-2xl">
+                <h3 className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
+                  Evaluate rules against history
+                </h3>
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  Run a dry-run evaluation to see which rules would trigger based
+                  on current rule configuration and recent history context.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleDryRun}
+                disabled={isDryRunning}
+                className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              >
+                {isDryRunning ? 'Evaluating...' : 'Run dry-run evaluation'}
+              </button>
+
+              {dryRunError && (
+                <div className="mt-3">
+                  <InlineStatus tone="error">{dryRunError}</InlineStatus>
+                </div>
+              )}
+
+              {dryRunResults !== null && dryRunResults.length > 0 && (
+                <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                  <table className="w-full border-collapse text-sm">
+                    <thead className="bg-zinc-100 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Rule</th>
+                        <th className="px-4 py-3 font-semibold">Outcome</th>
+                        <th className="px-4 py-3 font-semibold">Condition</th>
+                        <th className="px-4 py-3 font-semibold">Value</th>
+                        <th className="px-4 py-3 font-semibold">Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
+                      {dryRunResults.map((result) => (
+                        <tr key={result.ruleId}>
+                          <td className="px-4 py-3 font-medium text-zinc-950 dark:text-zinc-50">
+                            {result.ruleName}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                result.outcome === 'would-trigger'
+                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+                                  : result.outcome === 'cooldown-blocked'
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                    : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                              }`}
+                            >
+                              {result.outcome}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                            {result.matchedCondition}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                            {result.matchedValue.toFixed(2)} / {result.threshold}{' '}
+                            {result.unit}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                            {result.detail}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {dryRunResults !== null && dryRunResults.length === 0 && (
+                <div className="mt-4 rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-8 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
+                  No rules to evaluate. Add or enable alert rules first.
+                </div>
+              )}
+            </div>
           </div>
         )}
 

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FuzzingRun } from './types';
+import { RUN_STATUSES } from '../lib/run-status';
 import { formatDurationCompact } from './utils/format';
 
 /* ── Types ─────────────────────────────────────────────────────────── */
@@ -26,7 +27,7 @@ export interface SavedQuery {
 const STORAGE_KEY = 'crashlab-saved-queries';
 
 const FIELD_OPTIONS = [
-  { value: 'status', label: 'Status', type: 'select', options: ['running', 'completed', 'failed', 'cancelled'] },
+  { value: 'status', label: 'Status', type: 'select', options: [...RUN_STATUSES] },
   { value: 'area', label: 'Area', type: 'select', options: ['auth', 'state', 'budget', 'xdr'] },
   { value: 'severity', label: 'Severity', type: 'select', options: ['low', 'medium', 'high', 'critical'] },
   { value: 'duration', label: 'Duration (ms)', type: 'number' },

@@ -6,6 +6,7 @@ import type { ChartConfig } from './chart-builder-dsl';
 import { validateChartConfig } from './chart-builder-dsl';
 import {
   compileChartConfig,
+  FEE_Y_DOMAIN,
 } from './chart-transform-compiler';
 import {
   BarChart,
@@ -69,6 +70,11 @@ export default function ChartPreview({ config, runs }: ChartPreviewProps) {
   }
 
   const { type, metrics } = validation.config;
+  const isFeeMetric = metrics.includes('minResourceFee');
+  const feeYDomain = isFeeMetric ? FEE_Y_DOMAIN : undefined;
+  const feeDropped = compiled.feeDropped;
+  const feeCaption = feeDropped && feeDropped.count > 0 ? `${feeDropped.count} malformed fee ${feeDropped.count === 1 ? 'row' : 'rows'} hidden` : null;
+  const feeTooltip = feeDropped?.ids.join(', ') ?? '';
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-700 p-4">
@@ -82,13 +88,23 @@ export default function ChartPreview({ config, runs }: ChartPreviewProps) {
         {compiled.data.length} data point{compiled.data.length !== 1 ? 's' : ''}
       </div>
 
+      {feeCaption && (
+        <figcaption className="mb-3 text-xs text-amber-700 dark:text-amber-300" title={feeTooltip}>
+          {feeCaption}
+          <span className="ml-1 font-normal" title={feeTooltip}>
+            ({feeDropped!.ids.slice(0, 6).join(', ')}
+            {feeDropped!.ids.length > 6 ? ` +${feeDropped!.ids.length - 6} more` : ''})
+          </span>
+        </figcaption>
+      )}
+
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           {type === 'bar' ? (
             <BarChart data={compiled.data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} domain={feeYDomain} allowDecimals={false} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#1f2937',
@@ -107,7 +123,7 @@ export default function ChartPreview({ config, runs }: ChartPreviewProps) {
             <LineChart data={compiled.data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} domain={feeYDomain} allowDecimals={false} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#1f2937',
@@ -134,7 +150,7 @@ export default function ChartPreview({ config, runs }: ChartPreviewProps) {
             <ScatterChart>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey={metrics.length >= 2 ? 'x' : metrics[0]} type="number" name={metrics[0]} tick={{ fontSize: 12 }} />
-              <YAxis dataKey={metrics.length >= 2 ? 'y' : (metrics[1] ?? metrics[0])} type="number" name={metrics[1] ?? metrics[0]} tick={{ fontSize: 12 }} />
+              <YAxis dataKey={metrics.length >= 2 ? 'y' : (metrics[1] ?? metrics[0])} type="number" name={metrics[1] ?? metrics[0]} tick={{ fontSize: 12 }} domain={feeYDomain} allowDecimals={false} />
               <Tooltip
                 cursor={{ strokeDasharray: '3 3' }}
                 contentStyle={{

@@ -21,7 +21,7 @@ import {
 } from "./triage-board-utils";
 import {
   createInitialState,
-  handleLift,
+  handleLift as liftCard,
   handleDrop,
   handleCancel,
   handleMove,
@@ -48,7 +48,7 @@ async function fetchIssuesForRuns(
       const res = await fetch(`/api/runs/${run.id}/issues`);
       if (!res.ok) return;
       const data = await res.json();
-      issueMap.set(run.id, (data.issues ?? []) as RunIssueLink[]);
+      issueMap.set(run.id, (data.data?.issues ?? []) as RunIssueLink[]);
     }),
   );
 
@@ -367,18 +367,17 @@ export default function TriageBoardPage() {
   const allVisibleRuns = visibleColumns.flatMap((c) => getColumnRuns(runs, c));
   const firstBoardId = allVisibleRuns[0]?.id ?? null;
 
-  // Sync roving tabindex initial focus to first card when data loads
-  useEffect(() => {
-    if (firstBoardId && !kbState.focusedId) {
-      setKbState(createInitialState(firstBoardId));
-    }
-  }, [firstBoardId, kbState.focusedId]);
+  // Until a card has been focused, the roving tabindex points at the first
+  // card in the board. Derived during render rather than synced through an
+  // effect: setting state from an effect body triggers a cascading render.
+  const kbStateForBoard: KeyboardBoardState =
+    kbState.focusedId || !firstBoardId ? kbState : { ...kbState, focusedId: firstBoardId };
 
   const handleLift = (id: string, pos: { col: string; index: number }) => {
     setKbState((prev) => {
       if (prev.liftedId === id) return handleDrop(prev, pos.col);
       if (prev.liftedId) return handleDrop(prev, pos.col);
-      return handleLift(prev, id, pos);
+      return liftCard(prev, id, pos);
     });
   };
 
@@ -520,7 +519,7 @@ export default function TriageBoardPage() {
               key={col.id}
               col={col}
               runs={getColumnRuns(runs, col)}
-              kbState={kbState}
+              kbState={kbStateForBoard}
               onLift={handleLift}
               onKeyNav={handleKeyNav}
               firstBoardId={firstBoardId}

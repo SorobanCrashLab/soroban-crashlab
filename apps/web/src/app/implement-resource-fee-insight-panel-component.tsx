@@ -5,8 +5,10 @@ import { FuzzingRun } from "./types";
 import {
   RESOURCE_THRESHOLDS,
   classifyResourceLevel,
+  formatMalformedFeeCaption,
   groupRunsByContractCall,
   isExpensiveRun,
+  sanitizeFeeSeries,
 } from "./resource-fee-utils";
 
 export type ResourceFeeInsightDataState = "loading" | "error" | "success";
@@ -101,8 +103,29 @@ export function ResourceFeeInsightPanel({
   errorMessage,
   onRunClick,
 }: ResourceFeeInsightProps) {
-  const metrics = useMemo(() => computeResourceMetrics(runs), [runs]);
-  const contractCalls = useMemo(() => groupRunsByContractCall(runs), [runs]);
+  const feeSanitization = useMemo(() => sanitizeFeeSeries(runs), [runs]);
+  const caption = formatMalformedFeeCaption(feeSanitization.dropped.count);
+  const feeSanitizationTooltip = feeSanitization.dropped.ids.join(", ");
+  const metrics = useMemo(() => {
+    // Fee metrics are sanitized (dropped negatives/non-numbers) so charts/tables never
+    // plot impossible values; CPU/memory use the full dataset.
+    if (feeSanitization.dropped.count === 0) return computeResourceMetrics(runs);
+    if (feeSanitization.clean.length === 0) {
+      const base = computeResourceMetrics(runs);
+      return { ...base, avgFee: 0, maxFee: 0 };
+    }
+    const cleanMetrics = computeResourceMetrics(feeSanitization.clean);
+    const fullMetrics = computeResourceMetrics(runs);
+    return {
+      ...fullMetrics,
+      avgFee: cleanMetrics.avgFee,
+      maxFee: cleanMetrics.maxFee,
+    };
+  }, [runs, feeSanitization]);
+  const contractCalls = useMemo(
+    () => groupRunsByContractCall(feeSanitization.clean),
+    [feeSanitization.clean],
+  );
 
   if (dataState === "loading") {
     return (
@@ -257,6 +280,20 @@ export function ResourceFeeInsightPanel({
           </div>
         </div>
       </div>
+
+      {caption && (
+        <figcaption
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200"
+          title={feeSanitizationTooltip}
+          aria-label={`${caption}: ${feeSanitizationTooltip}`}
+        >
+          {caption}
+          <span className="ml-1 font-normal text-amber-700 dark:text-amber-300" title={feeSanitizationTooltip}>
+            ({feeSanitization.dropped.ids.slice(0, 6).join(", ")}
+            {feeSanitization.dropped.ids.length > 6 ? ` +${feeSanitization.dropped.ids.length - 6} more` : ""})
+          </span>
+        </figcaption>
+      )}
 
       {contractCalls.length > 0 && (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 dark:border-zinc-800 dark:bg-zinc-900/30">

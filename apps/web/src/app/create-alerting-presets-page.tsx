@@ -210,7 +210,7 @@ export default function AlertingPresetsPage() {
   useEffect(() => {
     fetch(ALERTING_API_URL)
       .then((r) => r.json())
-      .then((data) => setSnapshot(data as AlertingSettingsSnapshot))
+      .then((data) => setSnapshot((data as { data: AlertingSettingsSnapshot }).data))
       .catch(() => setSnapshot(createDefaultAlertingSettingsSnapshot()));
   }, []);
 

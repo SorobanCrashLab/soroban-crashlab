@@ -168,7 +168,7 @@ export default function OperationProgressIndicator({
     >
       {/* Label row */}
       <div
-        className="flex items-center justify-between gap-2 mb-1.5"
+        className="flex-between gap-2 mb-1.5"
         aria-live="polite"
         aria-atomic="true"
       >
@@ -234,7 +234,7 @@ export default function OperationProgressIndicator({
         {/* Percentage badge — only when determinate and running */}
         {isDeterminate && status === 'running' && (
           <span
-            className="flex-shrink-0 text-[10px] font-bold tabular-nums text-zinc-500 dark:text-zinc-400"
+            className="flex-shrink-0 text-[10px] font-bold tabular-nums text-muted"
             aria-hidden="true"
           >
             {Math.round(percentage)}%

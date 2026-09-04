@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { testSentryConnection } from '@/lib/integrations/sentry-store';
+import { errorResponse, successResponse } from '@/lib/api-response-utils';
 
 /**
  * POST /api/sentry/test-connection
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
+    return errorResponse('Request body must be valid JSON.', 400);
   }
 
   if (
@@ -19,9 +20,9 @@ export async function POST(request: NextRequest) {
     body === null ||
     typeof (body as Record<string, unknown>).dsn !== 'string'
   ) {
-    return NextResponse.json({ error: 'Field "dsn" must be a string.' }, { status: 400 });
+    return errorResponse('Field "dsn" must be a string.', 400);
   }
 
   const result = testSentryConnection((body as { dsn: string }).dsn);
-  return NextResponse.json(result, { status: result.success ? 200 : 422 });
+  return successResponse(result, { status: result.success ? 200 : 422 });
 }

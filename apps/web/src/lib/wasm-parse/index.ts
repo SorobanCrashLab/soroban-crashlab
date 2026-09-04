@@ -2,7 +2,7 @@
  * WASM module parser - main entry point for parsing contract WASM.
  */
 
-import { WasmModule, WasmSection, parseModuleHeader, walkSections, parseExportSection, parseTypeSection, parseNameSection, ExportEntry, FuncType, NameMap, SectionId } from './section-walker';
+import { WasmModule, parseModuleHeader, walkSections, parseExportSection, parseTypeSection, parseNameSection, ExportEntry, FuncType, NameMap } from './section-walker';
 
 export interface ParsedContract {
     module: WasmModule;
@@ -68,8 +68,6 @@ export function parseContractWasm(buffer: Uint8Array): ParsedContract {
         .filter(exp => exp.kind === 0) // only functions
         .map(exp => {
             const funcType = types[exp.index] || { params: [], results: [] };
-            const customName = nameMap.functionNames.get(exp.index);
-            
             // Generate heuristic parameter names based on types
             const paramNames = funcType.params.map((t, idx) => {
                 if (nameMap.functionNames.has(exp.index + idx)) {

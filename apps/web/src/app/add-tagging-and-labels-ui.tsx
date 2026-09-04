@@ -92,8 +92,8 @@ export default function AddTaggingAndLabelsUi({
           try {
             const res = await fetch(`/api/runs/${encodeURIComponent(run.id)}/tags`);
             if (!res.ok) return [run.id, run.tags ?? []] as const;
-            const data = (await res.json()) as { tags?: string[] };
-            return [run.id, data.tags ?? run.tags ?? []] as const;
+            const data = (await res.json()) as { data?: { tags?: string[] } };
+            return [run.id, data.data?.tags ?? run.tags ?? []] as const;
           } catch {
             return [run.id, run.tags ?? []] as const;
           }
@@ -171,13 +171,13 @@ export default function AddTaggingAndLabelsUi({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tag: normalized }),
       });
-      const data = (await res.json()) as { tags?: string[]; error?: string };
+      const data = (await res.json()) as { data?: { tags?: string[] }; error?: string };
       if (!res.ok) {
         throw new Error(data.error ?? 'Failed to save tag');
       }
       setPersistedTags((current) => ({
         ...current,
-        [selectedRun.id]: data.tags ?? [],
+        [selectedRun.id]: data.data?.tags ?? [],
       }));
       setDraftLabel('');
     } catch (error) {
@@ -196,13 +196,13 @@ export default function AddTaggingAndLabelsUi({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tag: label }),
       });
-      const data = (await res.json()) as { tags?: string[]; error?: string };
+      const data = (await res.json()) as { data?: { tags?: string[] }; error?: string };
       if (!res.ok) {
         throw new Error(data.error ?? 'Failed to remove tag');
       }
       setPersistedTags((current) => ({
         ...current,
-        [runId]: data.tags ?? [],
+        [runId]: data.data?.tags ?? [],
       }));
       if (activeTag === label) {
         setActiveLabel('all');

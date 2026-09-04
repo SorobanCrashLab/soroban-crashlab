@@ -13,9 +13,15 @@ function looksLikeProse(value) {
   const trimmed = value.trim();
   if (trimmed.length < 2) return false;
   if (!/[A-Za-z]/.test(trimmed)) return false;
-  // Skip CSS class lists, URLs, identifiers, single tokens without a space
-  // that read like class names or paths — heuristic precision guard.
-  if (/^[a-z0-9-_./:#]+$/i.test(trimmed) && !trimmed.includes(' ')) return false;
+  // Skip CSS class lists, URLs, identifiers — single tokens without a space
+  // that read like class names or paths. The separator/lowercase condition
+  // keeps sentence-cased words with trailing punctuation ("Saving...") on the
+  // prose side: those are user-visible copy, not identifiers.
+  const looksLikeIdentifier =
+    /^[a-z0-9-_./:#]+$/i.test(trimmed) &&
+    !trimmed.includes(' ') &&
+    (/[-_/:#]/.test(trimmed) || trimmed === trimmed.toLowerCase());
+  if (looksLikeIdentifier) return false;
   return true;
 }
 

@@ -161,24 +161,64 @@ export const loadChannelPreferences = (): NotificationPreference[] => {
   }
 };
 
+export function validateQuietHoursTime(time: string): boolean {
+  if (!time || typeof time !== 'string') return false;
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(time.trim());
+}
+
+export function parseQuietHoursMinutes(time: string): number | null {
+  if (!validateQuietHoursTime(time)) return null;
+  const [h, m] = time.trim().split(':').map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Canonical wrap-aware quiet hours evaluator.
+ * Boundary minute inclusivity:
+ * - Start minute is INCLUSIVE (nowMinutes >= startMinutes).
+ * - End minute is EXCLUSIVE (nowMinutes < endMinutes).
+ */
+export function isQuietHoursActive(
+  start: string,
+  end: string,
+  now: Date = new Date(),
+): boolean {
+  const startMinutes = parseQuietHoursMinutes(start);
+  const endMinutes = parseQuietHoursMinutes(end);
+  if (startMinutes === null || endMinutes === null) return false;
+  if (startMinutes === endMinutes) return false;
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  if (startMinutes < endMinutes) {
+    // Normal window (e.g. 08:00 - 17:00)
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  }
+  // Wraparound window (e.g. 22:00 - 08:00 or 08:00 - 02:00)
+  return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+}
+
+export function getQuietHoursPreviewText(start: string, end: string): string {
+  const startM = parseQuietHoursMinutes(start);
+  const endM = parseQuietHoursMinutes(end);
+  if (startM === null || endM === null) {
+    return 'Invalid time format. Use HH:MM.';
+  }
+  if (startM === endM) {
+    return 'Quiet hours start and end times cannot be identical.';
+  }
+  if (startM < endM) {
+    return `Quiet hours active daily from ${start} to ${end}.`;
+  }
+  return `Quiet hours active overnight from ${start} until ${end} the next day (wraparound window).`;
+}
+
 export function isInQuietHours(
   prefs: NotificationPreferences,
   now: Date = new Date(),
 ): boolean {
   if (!prefs.quietHoursEnabled) return false;
-
-  const [startH, startM] = prefs.quietHoursStart.split(':').map(Number);
-  const [endH, endM] = prefs.quietHoursEnd.split(':').map(Number);
-  const startMinutes = startH * 60 + startM;
-  const endMinutes = endH * 60 + endM;
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-  if (startMinutes === endMinutes) return false;
-  if (startMinutes < endMinutes) {
-    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
-  }
-  // Window wraps past midnight (e.g. 22:00 - 08:00).
-  return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+  return isQuietHoursActive(prefs.quietHoursStart, prefs.quietHoursEnd, now);
 }
 
 export function filterByPreferences(
@@ -220,6 +260,14 @@ export function setDigestFrequency(
 export function validatePreferences(prefs: NotificationPreferences): string | null {
   if (!prefs.enabledTypes.length) {
     return 'At least one notification type must be enabled.';
+  }
+  if (prefs.quietHoursEnabled) {
+    if (!validateQuietHoursTime(prefs.quietHoursStart) || !validateQuietHoursTime(prefs.quietHoursEnd)) {
+      return 'Quiet hours start and end must be valid HH:MM times.';
+    }
+    if (prefs.quietHoursStart === prefs.quietHoursEnd) {
+      return 'Quiet hours start and end times cannot be identical.';
+    }
   }
   return null;
 }

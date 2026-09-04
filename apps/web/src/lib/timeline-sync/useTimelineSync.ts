@@ -4,7 +4,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { TimelineIndex, LogEntry, SequenceFrame, buildTimelineIndex, getCorrelatedFrame, getCorrelatedLogs, getAdjacentLog, getAdjacentFrame, isMappingAmbiguous, isFrameMappingAmbiguous } from './index';
+import { TimelineIndex, buildTimelineIndex, getCorrelatedFrame, getAdjacentLog, getAdjacentFrame, isMappingAmbiguous, isFrameMappingAmbiguous } from './index';
+import { isEditableTarget } from '../is-editable-target';
 
 export interface UseTimelineSyncOptions {
     epsilonMs?: number;
@@ -198,8 +199,7 @@ export function useTimelineSync(
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Only handle if we have a selection and not in an input
-            const target = e.target as HTMLElement;
-            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+            if (isEditableTarget(e.target)) {
                 return;
             }
 
@@ -248,7 +248,7 @@ export function useTimelineSync(
     const logAmbiguous = selectedLogId ? isMappingAmbiguous(index, selectedLogId) : false;
     const frameAmbiguous = selectedFrameId ? isFrameMappingAmbiguous(index, selectedFrameId) : false;
 
-    const state: typeof state & { logAmbiguous: boolean; frameAmbiguous: boolean } = {
+    const state: TimelineSyncState & { logAmbiguous: boolean; frameAmbiguous: boolean } = {
         selectedLogId,
         selectedFrameId,
         hoverLogId,
@@ -275,8 +275,6 @@ export function useTimelineSync(
 
     return [state, actions, index];
 }
-
-import { TimelineIndex } from './index';
 
 export interface UseTimelineSyncReturn {
     state: TimelineSyncState & { logAmbiguous: boolean; frameAmbiguous: boolean };

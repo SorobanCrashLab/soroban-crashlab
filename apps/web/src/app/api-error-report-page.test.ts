@@ -152,7 +152,7 @@ describe('API Error Report Page', () => {
 
     it('should format dates', () => {
       expect(content).toContain('formatDate');
-      expect(content).toMatch(/toLocaleString|toLocaleDateString/);
+      expect(content).toMatch(/absoluteShort|toLocaleString|toLocaleDateString/);
     });
 
     it('should display timestamps', () => {

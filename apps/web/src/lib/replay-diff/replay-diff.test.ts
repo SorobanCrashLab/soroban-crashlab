@@ -9,12 +9,10 @@ import {
     filterOperations, 
     summarizeOperations,
     createMockSnapshot,
-    DiffResult,
-    DiffOpType,
     MAX_DIFF_DEPTH,
 } from './index';
 
-import { RunSnapshot, LedgerStateChange } from '../app/types';
+import { LedgerStateChange } from '../../app/types';
 
 describe('checkComparability', () => {
     it('returns compatible for matching contract and schema', () => {
@@ -335,7 +333,7 @@ describe('performance', () => {
         const result = diffLedgerSnapshots(left, right);
         const elapsed = performance.now() - start;
 
-        console.log(\`Diffed 10k entries in \${elapsed.toFixed(2)}ms\`);
+        console.log(`Diffed 10k entries in ${elapsed.toFixed(2)}ms`);
         expect(elapsed).toBeLessThan(150);
         expect(result.operations.length).toBeGreaterThan(0);
     });

@@ -291,6 +291,28 @@ export default function ImplementRunWorkflowBoardPage58({ runs = [] }: Props) {
     setDragOverIndex(null);
   }, []);
 
+  // #1354: Pressing Escape mid-drag cancels the HTML5 drag at the browser
+  // level, but in some engines the `dragend` event never fires. That leaves
+  // the `dragSource`/`dragOverColumn`/`dragOverIndex` state set, so the drag
+  // ghost stays stuck, drop-target highlighting stays lit, and later clicks
+  // behave oddly. Listen for Escape as a cross-engine fallback to tear down
+  // any in-progress drag state when the native drag is cancelled.
+  useEffect(() => {
+    const resetIfActive = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setDragSource((prev) => {
+        if (prev) {
+          setDragOverColumn(null);
+          setDragOverIndex(null);
+          return null;
+        }
+        return prev;
+      });
+    };
+    window.addEventListener('keydown', resetIfActive);
+    return () => window.removeEventListener('keydown', resetIfActive);
+  }, []);
+
   /* ── Render ──────────────────────────────────────────────────────── */
 
   const totalRuns = runs.length;

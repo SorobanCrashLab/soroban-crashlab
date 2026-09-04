@@ -81,6 +81,12 @@ function toDosDateTime(date: Date): { time: number; date: number } {
     return { time, date: dosDate };
 }
 
+function sanitizeZipPath(path: string): string {
+    let sanitized = path.replace(/^[a-zA-Z]:/, '').replace(/^\/+/, '');
+    sanitized = sanitized.split('/').filter(part => part !== '' && part !== '.').join('/');
+    return sanitized || 'entry';
+}
+
 /**
  * Builds a ZIP archive from `entries`.
  *
@@ -96,12 +102,13 @@ export function createZipArchive(
 
     const seenPaths = new Set<string>();
     const prepared = entries.map((entry) => {
-        if (seenPaths.has(entry.path)) {
-            throw new Error(`Duplicate entry path in archive: ${entry.path}`);
+        const safePath = sanitizeZipPath(entry.path);
+        if (seenPaths.has(safePath)) {
+            throw new Error(`Duplicate entry path in archive: ${safePath}`);
         }
-        seenPaths.add(entry.path);
+        seenPaths.add(safePath);
 
-        const nameBytes = encoder.encode(entry.path);
+        const nameBytes = encoder.encode(safePath);
         const dataBytes = encoder.encode(entry.content);
         return { nameBytes, dataBytes, crc: crc32(dataBytes), offset: 0 };
     });

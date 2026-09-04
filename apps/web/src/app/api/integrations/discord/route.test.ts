@@ -81,8 +81,8 @@ describe('POST /api/integrations/discord', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.message).toContain('successfully');
+    expect(data.data.success).toBe(true);
+    expect(data.data.message).toContain('successfully');
   });
 
   it('returns 500 when Discord webhook fails', async () => {
@@ -129,6 +129,6 @@ describe('POST /api/integrations/discord', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
+    expect(data.data.success).toBe(true);
   });
 });

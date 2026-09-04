@@ -7,7 +7,7 @@ describe('/api/integrations/smtp/history', () => {
     const response = await GET();
     expect(response.status).toBe(200);
     const json = await response.json();
-    expect(json.history).toEqual([]);
+    expect(json.data.history).toEqual([]);
   });
 
   it('reflects recorded entries, most recent first', async () => {
@@ -30,6 +30,6 @@ describe('/api/integrations/smtp/history', () => {
 
     const response = await GET();
     const json = await response.json();
-    expect(json.history.map((e: { id: string }) => e.id)).toEqual(['2', '1']);
+    expect(json.data.history.map((e: { id: string }) => e.id)).toEqual(['2', '1']);
   });
 });

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { validateSmtpConfig, type SmtpConfig } from '@/lib/integrations/smtp-email';
 import { getStoredSmtpConfig, setStoredSmtpConfig } from '@/lib/integrations/smtp-store';
 
@@ -9,9 +10,9 @@ import { getStoredSmtpConfig, setStoredSmtpConfig } from '@/lib/integrations/smt
 export async function GET() {
   const config = getStoredSmtpConfig();
   if (!config) {
-    return NextResponse.json({ error: 'No SMTP configuration saved yet.' }, { status: 404 });
+    return errorResponse('No SMTP configuration saved yet.', 404);
   }
-  return NextResponse.json(config);
+  return successResponse(config);
 }
 
 /**
@@ -23,19 +24,19 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
+    return errorResponse('Request body must be valid JSON.', 400);
   }
 
   if (typeof body !== 'object' || body === null) {
-    return NextResponse.json({ error: 'Request body must be a JSON object.' }, { status: 400 });
+    return errorResponse('Request body must be a JSON object.', 400);
   }
 
   const candidate = body as SmtpConfig;
   const validationError = validateSmtpConfig(candidate);
   if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 422 });
+    return errorResponse(validationError, 422);
   }
 
   setStoredSmtpConfig(candidate);
-  return NextResponse.json(candidate, { status: 200 });
+  return successResponse(candidate);
 }

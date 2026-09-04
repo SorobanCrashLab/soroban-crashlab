@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { withRouteErrorHandling, jsonError, readJsonBody } from '@/lib/route-handler';
+import { successResponse } from '@/lib/api-response-utils';
 import { createJiraIssuesAdapter } from '@/lib/integrations/jira-issues';
 
 export const POST = withRouteErrorHandling(
@@ -33,7 +33,7 @@ export const POST = withRouteErrorHandling(
       return jsonError('Jira issue could not be created', 503);
     }
 
-    return NextResponse.json({ issue });
+    return successResponse({ issue });
   },
   'Failed to create Jira issue',
 );

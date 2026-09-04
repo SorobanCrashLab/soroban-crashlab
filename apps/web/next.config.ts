@@ -41,9 +41,10 @@ const nextConfig: NextConfig = {
             "default-src 'self'",
             // Next.js emits small inline bootstrapping scripts for hydration.
             "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: https:",
-            "font-src 'self' https://fonts.gstatic.com data:",
+            // Fonts are self-hosted via next/font — no Google origins needed.
+            "font-src 'self' data:",
             "connect-src 'self' https:",
             "frame-ancestors 'self'",
             "form-action 'self'",

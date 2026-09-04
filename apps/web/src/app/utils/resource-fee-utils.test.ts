@@ -15,6 +15,11 @@ import {
   compareResourceUsage,
   calculateResourceDelta,
   parseResourceFee,
+  sanitizeFeeSeries,
+  isValidFeeValue,
+  FEE_Y_DOMAIN,
+  getFeeYDomain,
+  formatMalformedFeeCaption,
   DEFAULT_THRESHOLDS,
   type ResourceUsage,
   type ResourceThresholds,
@@ -232,6 +237,101 @@ const runAssertions = (): void => {
   assert.equal(parseResourceFee('Fee: 2,500 stroops'), 2500);
   assert.equal(parseResourceFee('(3000)'), 3000);
   assert.equal(parseResourceFee('~1500~'), 1500);
+
+  // — sanitizeFeeSeries: pure fee sanitization ———————————————————
+  // helper: fee rows are { id, minResourceFee } — use FuzzingRun-like shape for the sanitizer
+  type FeeRow = { id: string; minResourceFee: unknown };
+  const row = (id: string, fee: unknown): FeeRow => ({ id, minResourceFee: fee });
+
+  // negative => dropped
+  {
+    const { clean, dropped } = sanitizeFeeSeries([row('run-neg', -5), row('run-ok', 100)]);
+    assert.equal(clean.length, 1);
+    assert.equal(clean[0].id, 'run-ok');
+    assert.equal(dropped.count, 1);
+    assert.deepEqual(dropped.ids, ['run-neg']);
+    assert.equal(isValidFeeValue(-5), false);
+  }
+
+  // NaN => dropped
+  {
+    const { clean, dropped } = sanitizeFeeSeries([row('run-nan', NaN), row('run-ok2', 200)]);
+    assert.equal(clean.length, 1);
+    assert.equal(dropped.count, 1);
+    assert.deepEqual(dropped.ids, ['run-nan']);
+    assert.equal(isValidFeeValue(NaN), false);
+  }
+
+  // Infinity / -Infinity => dropped
+  {
+    const { clean, dropped } = sanitizeFeeSeries([row('run-inf', Infinity), row('run-ninf', -Infinity), row('run-ok3', 300)]);
+    assert.equal(clean.length, 1);
+    assert.equal(dropped.count, 2);
+    assert.deepEqual(dropped.ids, ['run-inf', 'run-ninf']);
+    assert.equal(isValidFeeValue(Infinity), false);
+    assert.equal(isValidFeeValue(-Infinity), false);
+  }
+
+  // string-number => dropped
+  {
+    const { clean, dropped } = sanitizeFeeSeries([row('run-str', '100'), row('run-ok4', 400)]);
+    assert.equal(clean.length, 1);
+    assert.equal(dropped.count, 1);
+    assert.deepEqual(dropped.ids, ['run-str']);
+    assert.equal(isValidFeeValue('100'), false);
+  }
+
+  // huge-but-valid => kept (physically possible, just large)
+  {
+    const huge = 1_000_000_000;
+    const maxSafe = Number.MAX_SAFE_INTEGER;
+    const { clean, dropped } = sanitizeFeeSeries([row('run-huge', huge), row('run-max', maxSafe)]);
+    assert.equal(clean.length, 2);
+    assert.equal(dropped.count, 0);
+    assert.equal(isValidFeeValue(huge), true);
+    assert.equal(isValidFeeValue(maxSafe), true);
+  }
+
+  // zero boundary => kept
+  {
+    const { clean, dropped } = sanitizeFeeSeries([row('run-zero', 0)]);
+    assert.equal(clean.length, 1);
+    assert.equal(dropped.count, 0);
+    assert.equal(isValidFeeValue(0), true);
+  }
+
+  // multiple malformed classes and caption logic via dropped count
+  {
+    const rows = [
+      row('run-a', -10),
+      row('run-b', NaN),
+      row('run-c', null),
+      row('run-d', 500),
+    ];
+    const { clean, dropped } = sanitizeFeeSeries(rows);
+    assert.equal(clean.length, 1);
+    assert.equal(clean[0].id, 'run-d');
+    assert.equal(dropped.count, 3);
+    assert.deepEqual(dropped.ids, ['run-a', 'run-b', 'run-c']);
+    assert.equal(formatMalformedFeeCaption(dropped.count), '3 malformed fee rows hidden');
+    assert.equal(formatMalformedFeeCaption(1), '1 malformed fee row hidden');
+    assert.equal(formatMalformedFeeCaption(0), null);
+  }
+
+  // Y-axis never extends below zero for fee metrics
+  {
+    assert.deepEqual([...FEE_Y_DOMAIN], [0, 'auto']);
+    assert.deepEqual([...getFeeYDomain()], [0, 'auto']);
+    assert.equal(FEE_Y_DOMAIN[0], 0);
+  }
+
+  // does not mutate input
+  {
+    const rows = [row('run-orig', -1), row('run-keep', 10)];
+    const len = rows.length;
+    sanitizeFeeSeries(rows);
+    assert.equal(rows.length, len);
+  }
 };
 
 runAssertions();

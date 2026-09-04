@@ -4,6 +4,8 @@ import { logger } from '@/lib/logger';
 import { withRouteErrorHandling } from '@/lib/route-handler';
 import { sanitizeSearchParams } from '@/lib/sanitize';
 import { withFixtureCaching } from '@/lib/fixture-caching';
+import { API_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
+import { selectRunStorageDriver } from '@/lib/storage';
 
 export const GET = withRouteErrorHandling('GET /api/runs', async (request: Request) => {
   const { searchParams } = new URL(request.url);
@@ -22,7 +24,7 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
       );
       const fetchPromise = fetch(`${apiUrl}/api/runs${qs ? `?${qs}` : ''}`, {
         cache: 'no-store',
-        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+signal: AbortSignal.timeout(API_FETCH_TIMEOUT_MS),
       });
 
       const res = await Promise.race([fetchPromise, timeoutPromise]);
@@ -49,8 +51,11 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
     return errorResponse('Mock data disabled and no backend configured', status.serviceUnavailable);
   }
 
-  const { buildMockRuns } = await import('@/app/mockRuns');
-  const runs = buildMockRuns();
-  const data = { runs, total: runs.length };
-  return withFixtureCaching(request, data);
+  const driver = selectRunStorageDriver();
+  const { runs, total } = await driver.listRuns({
+    status: searchParams.get('status') as import('@/app/types').RunStatus | undefined,
+    limit: searchParams.has('limit') ? Number(searchParams.get('limit')) : undefined,
+  });
+  const data = { runs, total };
+  return withFixtureCaching(request, { data, total: data.total });
 });

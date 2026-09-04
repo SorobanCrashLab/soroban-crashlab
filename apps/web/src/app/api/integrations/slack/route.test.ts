@@ -104,8 +104,8 @@ describe("POST /api/integrations/slack", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.threaded).toBe(false);
+    expect(data.data.success).toBe(true);
+    expect(data.data.threaded).toBe(false);
 
     const [, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const sentBody = JSON.parse(init.body as string);
@@ -138,7 +138,7 @@ describe("POST /api/integrations/slack", () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.threaded).toBe(true);
+    expect(data.data.threaded).toBe(true);
 
     const [, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const sentBody = JSON.parse(init.body as string);

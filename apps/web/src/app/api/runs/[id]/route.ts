@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildMockRuns } from '@/app/mockRuns';
 import type { FuzzingRun } from '@/app/types';
 import { withRouteErrorHandling } from '@/lib/route-handler';
-import { errorResponse, status } from '@/lib/api-response-utils';
 import { withFixtureCaching } from '@/lib/fixture-caching';
+import { API_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
+import { selectRunStorageDriver } from '@/lib/storage';
+import { codedErrorResponse } from '@/lib/error-codes';
 
-export function findRunById(id: string): FuzzingRun | undefined {
-  return buildMockRuns().find((r) => r.id === id);
+export async function findRunById(id: string): Promise<FuzzingRun | undefined> {
+  return (await selectRunStorageDriver().getRun(id)) ?? undefined;
 }
 
 export const GET = withRouteErrorHandling(
@@ -15,7 +16,7 @@ export const GET = withRouteErrorHandling(
     const { id } = await params;
 
     if (!id) {
-      return errorResponse('Run ID is required', status.badRequest);
+      return codedErrorResponse('RUN_ID_REQUIRED');
     }
 
     const runsApiUrl = process.env.RUNS_API_URL;
@@ -26,23 +27,23 @@ export const GET = withRouteErrorHandling(
         {
           headers: { Accept: 'application/json' },
           cache: 'no-store',
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.timeout(API_FETCH_TIMEOUT_MS),
         },
       );
       if (upstream.status === 404) {
-        return errorResponse('Run not found', status.notFound);
+        return codedErrorResponse('RUN_NOT_FOUND');
       }
       if (!upstream.ok) {
-        return errorResponse('Upstream error', status.badGateway);
+        return codedErrorResponse('RUN_UPSTREAM_ERROR');
       }
       const data = (await upstream.json()) as unknown;
-      return NextResponse.json(data, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } });
+      return NextResponse.json({ data }, { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } });
     }
 
-    const run = findRunById(id);
+    const run = await findRunById(id);
     if (!run) {
-      return errorResponse('Run not found', status.notFound);
+      return codedErrorResponse('RUN_NOT_FOUND');
     }
-    return withFixtureCaching(request, run);
+    return withFixtureCaching(request, { data: run });
   },
 );

@@ -2,13 +2,14 @@
  * Target proposer UI - editable descriptor cards for fuzz targets.
  */
 
+import { FuzzTargetDescriptor } from './index';
+
 export interface TargetProposerProps {
     descriptors: FuzzTargetDescriptor[];
     onUpdate: (descriptors: FuzzTargetDescriptor[]) => void;
     onCommit: (descriptors: FuzzTargetDescriptor[]) => void;
 }
 
-import { FuzzTargetDescriptor, ArgTemplate } from './index';
 
 export function createTargetProposerComponent(): string {
     return `
@@ -74,13 +75,13 @@ export default function TargetProposer({
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex-between">
                 <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
                     Fuzz Targets ({descriptors.length})
                 </h3>
                 <button
                     onClick={handleCommit}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm-medium hover:bg-blue-700 transition"
                 >
                     Commit Targets
                 </button>
@@ -88,7 +89,7 @@ export default function TargetProposer({
 
             {descriptors.map((target, tIdx) => (
                 <div key={tIdx} className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex-between">
                         <div className="flex items-center gap-3">
                             <span className="px-2 py-1 text-xs font-mono bg-zinc-100 dark:bg-zinc-800 rounded">
                                 {target.method}
@@ -99,7 +100,7 @@ export default function TargetProposer({
                         </div>
                         <button
                             onClick={() => setEditingIndex(editingIndex === tIdx ? null : tIdx)}
-                            className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                            className="text-sm text-muted hover:text-zinc-700 dark:hover:text-zinc-200"
                         >
                             {editingIndex === tIdx ? 'Done' : 'Edit'}
                         </button>
@@ -170,7 +171,7 @@ export default function TargetProposer({
                                     <span className="px-2 py-1 text-xs bg-zinc-100 dark:bg-zinc-800 rounded">
                                         {arg.type}
                                     </span>
-                                    <span className="text-zinc-500 dark:text-zinc-400 font-mono">
+                                    <span className="text-muted font-mono">
                                         = {arg.template}
                                     </span>
                                     {arg.isGuess && (
@@ -186,7 +187,7 @@ export default function TargetProposer({
             ))}
 
             {descriptors.length === 0 && (
-                <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+                <div className="text-center py-12 text-muted">
                     No exported functions found in WASM module
                 </div>
             )}

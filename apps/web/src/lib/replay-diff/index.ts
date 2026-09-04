@@ -3,8 +3,7 @@
  * Structured field-level before→after comparison with type-aware formatting.
  */
 
-import { LedgerStateChange, LedgerChangeType } from '../app/types';
-import { compareLedgerValues, LedgerFieldDiff, countFieldChanges, formatLedgerValue } from '../app/components/state-diff-utils';
+import { LedgerStateChange, LedgerChangeType } from '../../app/types';
 
 export interface RunSnapshot {
     runId: string;
@@ -108,7 +107,7 @@ function parseValue(raw: string | undefined): { value: unknown; type: string; pa
 
     try {
         const parsed = JSON.parse(raw);
-        let type = typeof parsed;
+        let type: string = typeof parsed;
         if (parsed === null) type = 'null';
         else if (Array.isArray(parsed)) type = 'array';
         else if (typeof parsed === 'object') type = 'object';
@@ -190,7 +189,7 @@ function diffObjects(
         const inAfter = Object.prototype.hasOwnProperty.call(after, key);
 
         if (!inBefore && inAfter) {
-            const { value, type, parseFailed: pf } = parseValue(JSON.stringify(after[key]));
+            const { parseFailed: pf } = parseValue(JSON.stringify(after[key]));
             fields.push({
                 key,
                 type: 'added',
@@ -199,7 +198,7 @@ function diffObjects(
             });
             if (pf) parseFailed = true;
         } else if (inBefore && !inAfter) {
-            const { value, type, parseFailed: pf } = parseValue(JSON.stringify(before[key]));
+            const { parseFailed: pf } = parseValue(JSON.stringify(before[key]));
             fields.push({
                 key,
                 type: 'removed',
@@ -237,7 +236,7 @@ function diffObjects(
                     });
                     if (nested.parseFailed) parseFailed = true;
                 } else {
-                    const { value, type, parseFailed: pf } = parseValue(afterStr);
+                    const { parseFailed: pf } = parseValue(afterStr);
                     fields.push({
                         key,
                         type: 'changed',
@@ -306,7 +305,7 @@ export function diffLedgerSnapshots(
 
         if (!leftEntry && rightEntry) {
             // Added
-            const { value: afterVal, type, parseFailed } = parseValue(rightEntry.after);
+            const { value: afterVal, parseFailed } = parseValue(rightEntry.after);
             operations.push({
                 type: 'added',
                 key: rightEntry.id,
@@ -320,7 +319,7 @@ export function diffLedgerSnapshots(
             added++;
         } else if (leftEntry && !rightEntry) {
             // Removed
-            const { value: beforeVal, type, parseFailed } = parseValue(leftEntry.before);
+            const { value: beforeVal, parseFailed } = parseValue(leftEntry.before);
             operations.push({
                 type: 'removed',
                 key: leftEntry.id,
@@ -334,9 +333,6 @@ export function diffLedgerSnapshots(
             removed++;
         } else if (leftEntry && rightEntry) {
             // Both exist - compare
-            const leftChangeType = leftEntry.changeType;
-            const rightChangeType = rightEntry.changeType;
-            
             const beforeParsed = parseValue(leftEntry.before);
             const afterParsed = parseValue(rightEntry.after);
 

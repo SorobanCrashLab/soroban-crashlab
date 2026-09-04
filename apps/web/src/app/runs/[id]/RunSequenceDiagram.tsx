@@ -11,17 +11,29 @@
  * unit-tested against the same code this component runs. Colours come from
  * the Navy Professional CSS variables, so both themes are covered without a
  * second palette.
+ *
+ * Recursive/cyclic call chains (#1360) are resolved to distinct call frames
+ * via `computeCallFrames`, so a contract re-entering itself (or a cycle like
+ * A -> B -> A) is labelled with its recursion instance (e.g. "mint #2")
+ * instead of being indistinguishable from its own earlier activation. Traces
+ * deep enough to need more than `MAX_INLINE_LANE_DEPTH` levels of indent
+ * scroll horizontally rather than compressing.
  */
 
 import React, { useMemo, useState } from 'react';
 import type { ContractCallStatus, ContractCallStep } from '../../types';
 import {
   CALL_STATUS_FILTERS,
+  computeCallFrames,
   countForCallFilter,
+  exceedsInlineLaneDepth,
   filterCallSteps,
   formatCallDuration,
+  formatLaneLabel,
+  getCallLanes,
   getCallParticipants,
   summarizeCallSequence,
+  type CallFrameAssignment,
   type CallStatusFilter,
 } from './run-sequence-diagram-utils';
 
@@ -76,6 +88,17 @@ export default function RunSequenceDiagram({
   const summary = useMemo(() => summarizeCallSequence(steps), [steps]);
   const visibleSteps = useMemo(() => filterCallSteps(steps, filter), [steps, filter]);
   const participants = useMemo(() => getCallParticipants(steps), [steps]);
+
+  // Frame identity has to be derived from the *full* trace, not the filtered
+  // view: a recursive call's instance number depends on which of its
+  // ancestors are still open on the call stack, and filtering can hide those
+  // ancestors without changing what depth actually happened.
+  const frameByStepId = useMemo(() => {
+    const frames = computeCallFrames(steps);
+    return new Map<string, CallFrameAssignment>(frames.map((frame) => [frame.step.id, frame]));
+  }, [steps]);
+  const lanes = useMemo(() => getCallLanes(steps), [steps]);
+  const needsHorizontalScroll = useMemo(() => exceedsInlineLaneDepth(lanes), [lanes]);
 
   if (error) {
     return (
@@ -146,35 +169,59 @@ export default function RunSequenceDiagram({
           hint={`This run has no ${filter} calls. Choose a different outcome above.`}
         />
       ) : (
-        <ol className="space-y-2">
-          {visibleSteps.map((step) => (
-            <li
-              key={step.id}
-              className="rounded-xl border p-3 flex flex-wrap items-center gap-2"
-              style={{
-                borderColor: 'var(--border-color)',
-                background: 'var(--surface)',
-                marginLeft: `${step.depth * 1.5}rem`,
-              }}
-            >
-              <span className="code-text" style={{ color: 'var(--text-secondary)' }}>
-                #{step.sequence}
-              </span>
-              <span className="code-text font-semibold" style={{ color: 'var(--text-primary)' }}>
-                {step.caller}
-              </span>
-              <span style={{ color: 'var(--text-secondary)' }}>→</span>
-              <span className="code-text font-semibold" style={{ color: 'var(--text-primary)' }}>
-                {step.callee}
-              </span>
-              <span className="code-text" style={{ color: 'var(--text-secondary)' }}>
-                .{step.method}()
-              </span>
-              <StatusBadge status={step.status} />
-              <span className="text-meta ml-auto">{formatCallDuration(step.durationMs)}</span>
-            </li>
-          ))}
-        </ol>
+        // Deep recursive traces get real horizontal room to breathe instead of
+        // compressing each level's indent into illegibility; shallow traces
+        // (the common case) render exactly as before.
+        <div style={needsHorizontalScroll ? { overflowX: 'auto' } : undefined}>
+          <ol
+            className="space-y-2"
+            style={needsHorizontalScroll ? { minWidth: `${(summary.maxDepth + 4) * 1.5}rem` } : undefined}
+          >
+            {visibleSteps.map((step) => {
+              const frame = frameByStepId.get(step.id);
+              const calleeInstance = frame?.calleeLane.instance ?? 1;
+              const isRecursiveFrame = calleeInstance > 1;
+              const callerLabel = frame ? formatLaneLabel(frame.callerLane.name, frame.callerLane.instance) : step.caller;
+              const calleeLabel = frame ? formatLaneLabel(frame.calleeLane.name, frame.calleeLane.instance) : step.callee;
+
+              return (
+                <li
+                  key={step.id}
+                  className="rounded-xl border p-3 flex flex-wrap items-center gap-2"
+                  style={{
+                    borderColor: 'var(--border-color)',
+                    background: 'var(--surface)',
+                    marginLeft: `${step.depth * 1.5}rem`,
+                    // Each recursion level gets a slightly hotter accent so
+                    // adjacent recursive edges read as distinct steps rather
+                    // than one smeared line; non-recursive calls keep the
+                    // plain border they always had.
+                    borderLeftWidth: isRecursiveFrame ? '3px' : undefined,
+                    borderLeftColor: isRecursiveFrame
+                      ? `hsl(${210 + ((calleeInstance - 1) * 35) % 150}, 70%, 45%)`
+                      : undefined,
+                  }}
+                >
+                  <span className="code-text" style={{ color: 'var(--text-secondary)' }}>
+                    #{step.sequence}
+                  </span>
+                  <span className="code-text font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {callerLabel}
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)' }}>→</span>
+                  <span className="code-text font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {calleeLabel}
+                  </span>
+                  <span className="code-text" style={{ color: 'var(--text-secondary)' }}>
+                    .{step.method}()
+                  </span>
+                  <StatusBadge status={step.status} />
+                  <span className="text-meta ml-auto">{formatCallDuration(step.durationMs)}</span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
       )}
     </div>
   );

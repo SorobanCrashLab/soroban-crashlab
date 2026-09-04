@@ -23,11 +23,13 @@ import {
   type ToastTimerState,
 } from './toast-utils';
 
+import { toUserMessage } from '../lib/api-error-mapper';
+
 interface ToastContextValue {
   /** Show a toast. Returns its id so callers can dismiss it programmatically. */
   notify: (input: ToastInput) => string;
   /** Convenience helper for the common API-error case. */
-  notifyError: (message: string) => string;
+  notifyError: (error: unknown) => string;
   /** Convenience helper for the common success case. */
   notifySuccess: (message: string) => string;
   dismiss: (id: string) => void;
@@ -102,7 +104,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 
   const notifyError = useCallback(
-    (message: string) => notify({ message, variant: 'error' }),
+    (error: unknown) => {
+      console.error(error);
+      const userMsg = toUserMessage(error);
+      return notify({ message: userMsg, variant: 'error' });
+    },
     [notify],
   );
 
