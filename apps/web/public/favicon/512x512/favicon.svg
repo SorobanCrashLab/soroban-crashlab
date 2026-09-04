@@ -1,10 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
   <defs>
-    <linearGradient id="navyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0A66C2;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#004182;stop-opacity:1" />
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A66C2"/>
+      <stop offset="100%" stop-color="#063A6B"/>
+    </linearGradient>
+    <linearGradient id="flask" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E8F0FA"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="36" fill="url(#navyGradient)"/>
-  <text font-family="Source Sans 3, system-ui, -apple-system, sans-serif" font-weight="bold" font-size="216" fill="white" x="50%" y="50%" text-anchor="middle" dominant-baseline="central">◈</text>
+  <rect width="192" height="192" rx="36" fill="url(#bg)"/>
+  <path d="M96 26 L155 50 L155 109 C155 140 129 163 96 173 C63 163 37 140 37 109 L37 50 Z" fill="white"/>
+  <path d="M96 26 L155 50 L155 66 L96 42 L37 66 L37 50 Z" fill="#0A66C2" opacity="0.06"/>
+  <rect x="74" y="66" width="44" height="11" rx="3.5" fill="white" stroke="#0A66C2" stroke-width="3.4"/>
+  <path d="M78 77 H114 V132 C114 142.5 105.8 151 96 151 C86.2 151 78 142.5 78 132 Z" fill="url(#flask)" stroke="#0A66C2" stroke-width="3.4" stroke-linejoin="round"/>
+  <path d="M82.5 118.5 H109.5 V132 C109.5 139.8 103.3 145.5 96 145.5 C88.7 145.5 82.5 139.8 82.5 132 Z" fill="#0A66C2" opacity="0.09"/>
+  <circle cx="89" cy="129" r="3.6" fill="#0A66C2"/>
+  <circle cx="101.5" cy="123" r="2.6" fill="#0A66C2" opacity="0.72"/>
+  <circle cx="107" cy="133" r="1.9" fill="#0A66C2" opacity="0.5"/>
+  <g transform="translate(96 91) scale(1.08)">
+    <path d="M0 -11.5 L3.35 -3.4 L11.5 -3.4 L5.2 1.7 L7 10.2 L0 5.1 L-7 10.2 L-5.2 1.7 L-11.5 -3.4 L-3.35 -3.4 Z" fill="#0A66C2"/>
+  </g>
+  <path d="M97 142 L92.2 148.6 L98.4 152.4 L94.6 159.2" stroke="#CC1016" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="96" cy="162.5" r="1.6" fill="#CC1016" opacity="0.95"/>
 </svg>

@@ -6,6 +6,7 @@ import { useTheme } from './ThemeProvider';
 import { useEffect, useRef, useState } from 'react';
 import { useMaintainerMode } from '../app/useMaintainerMode';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { LogoMark } from './Logo';
 
 const allNavItems = [
   { href: '/', label: 'Dashboard', icon: '◉' },
@@ -92,12 +93,7 @@ export default function NavBar() {
         }}
       >
         <Link href="/" className="tablet-brand flex items-center gap-2 mr-4 shrink-0">
-          <div
-            className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center"
-            style={{ background: '#0A66C2' }}
-          >
-            <span className="text-white font-bold text-xs sm:text-sm">SC</span>
-          </div>
+          <LogoMark size={32} />
           <span
             className="tablet-brand-name font-bold text-base sm:text-lg hidden xs:inline"
             style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}
@@ -112,6 +108,7 @@ export default function NavBar() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch
               className="top-nav-link shrink-0"
               aria-label={item.label}
               title={item.label}
@@ -131,6 +128,7 @@ export default function NavBar() {
           <Link
             id="navbar-search-link"
             href="/runs/query"
+            prefetch
             className="tablet-search hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-decoration-none"
             aria-label="Search runs"
             title="Search runs"
@@ -194,9 +192,7 @@ export default function NavBar() {
       <div ref={drawerRef} className={`drawer ${drawerOpen ? 'open' : ''}`}>
         <div className="drawer-header">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#0A66C2' }}>
-              <span className="text-white font-bold text-xs">SC</span>
-            </div>
+            <LogoMark size={28} />
             <span className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>CrashLab</span>
           </div>
           <button
@@ -216,6 +212,7 @@ export default function NavBar() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch
               className={`drawer-item ${isActive(item.href) ? 'active' : ''}`}
               onClick={() => setDrawerOpen(false)}
             >

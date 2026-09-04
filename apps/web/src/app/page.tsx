@@ -28,6 +28,10 @@ const AddTaggingAndLabelsUi = dynamic(
   { ssr: false }
 );
 import { runMatchesTagFilter } from "./run-tags-utils";
+import { CoverflowCarousel } from "../components/scroll-effects/CoverflowCarousel";
+import { StickyStack } from "../components/scroll-effects/StickyStack";
+import { ScaleFade } from "../components/scroll-effects/ScaleFade";
+import { TextReveal } from "../components/scroll-effects/TextReveal";
 import { FuzzingRun } from "./types";
 import { useDataTableKeyboardNav } from "./use-data-table-keyboard-nav";
 
@@ -130,15 +134,38 @@ function DashboardContent() {
   return (
     <div className="container-full page-padding fade-in">
       <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} pullDistance={pullDistance} />
-      <PageHeader
-        title="Dashboard"
-        description="Fuzzing campaign overview"
-        actions={
-          <Link href="/runs" className="btn-primary text-xs sm:text-sm px-3 sm:px-6 h-9 sm:h-10">
-            View All Runs
+      <TextReveal as="div">
+        <PageHeader
+          title="Dashboard"
+          description="Fuzzing campaign overview"
+          actions={
+            <Link href="/runs" prefetch className="btn-primary text-xs sm:text-sm px-3 sm:px-6 h-9 sm:h-10">
+              View All Runs
+            </Link>
+          }
+        />
+      </TextReveal>
+
+      <div className="mt-4">
+        <CoverflowCarousel>
+          <Link href="/runs" prefetch className="card card-padding min-w-[220px] card-interactive block">
+            <h4 className="font-semibold text-sm">Runs</h4>
+            <p className="text-meta text-xs mt-1">Browse all fuzzing runs</p>
           </Link>
-        }
-      />
+          <Link href="/analytics" prefetch className="card card-padding min-w-[220px] card-interactive block">
+            <h4 className="font-semibold text-sm">Analytics</h4>
+            <p className="text-meta text-xs mt-1">Clusters, heatmaps, trends</p>
+          </Link>
+          <Link href="/triage" prefetch className="card card-padding min-w-[220px] card-interactive block">
+            <h4 className="font-semibold text-sm">Triage</h4>
+            <p className="text-meta text-xs mt-1">Kanban board for crashes</p>
+          </Link>
+          <Link href="/logs" prefetch className="card card-padding min-w-[220px] card-interactive block">
+            <h4 className="font-semibold text-sm">Logs</h4>
+            <p className="text-meta text-xs mt-1">Stream and filter logs</p>
+          </Link>
+        </CoverflowCarousel>
+      </div>
 
       {dataState === "success" && (
         <PageSection className="mb-6">
@@ -204,6 +231,7 @@ function DashboardContent() {
 
       {dataState === "success" && (
         <>
+          <StickyStack offsetStep={14}>
           {getVisibleDashboardSections(layout).map((section) => {
             const sectionContent: Record<DashboardSectionId, ReactNode> = {
               stats: (
@@ -215,7 +243,9 @@ function DashboardContent() {
                       { label: "Running", value: filteredRuns.filter((r) => r.status === "running").length },
                       { label: "Critical", value: filteredRuns.filter((r) => r.severity === "critical").length },
                     ].map((stat) => (
-                      <StatCard key={stat.label} label={stat.label} value={stat.value} />
+                      <ScaleFade key={stat.label}>
+                        <StatCard label={stat.label} value={stat.value} />
+                      </ScaleFade>
                     ))}
                   </div>
                 </PageSection>
@@ -236,7 +266,7 @@ function DashboardContent() {
                   </PageSection>
                   <PageSection
                     title="Recent Runs"
-                    actions={<Link href="/runs" className="link text-xs sm:text-sm">View all</Link>}
+                    actions={<Link href="/runs" prefetch className="link text-xs sm:text-sm">View all</Link>}
                   >
                     <div className="card table-responsive">
                       <table className="data-table">
@@ -289,33 +319,35 @@ function DashboardContent() {
                 <PageSection className="card card-padding">
                   <h3 className="font-semibold text-sm mb-3">Quick Actions</h3>
                   <div className="flex flex-col gap-2">
-                    <Link href="/runs" className="link">Browse all runs</Link>
-                    <Link href="/analytics" className="link">Open analytics</Link>
+                    <Link href="/runs" prefetch className="link">Browse all runs</Link>
+                    <Link href="/analytics" prefetch className="link">Open analytics</Link>
                   </div>
                 </PageSection>
               ),
             };
             return <div key={section.id}>{sectionContent[section.id]}</div>;
           })}
-          <PageSection>
-            <RunHealthScoreWidget runs={filteredRuns} dataState={dataState} />
-          </PageSection>
+          </StickyStack>
+          <ScaleFade>
+            <PageSection>
+              <RunHealthScoreWidget runs={filteredRuns} dataState={dataState} />
+            </PageSection>
 
-          <PageSection>
-            <ResourceFeeInsightPanel runs={filteredRuns} dataState={dataState} />
-          </PageSection>
+            <PageSection>
+              <ResourceFeeInsightPanel runs={filteredRuns} dataState={dataState} />
+            </PageSection>
 
-          <PageSection>
-            <AddTaggingAndLabelsUi
-              runs={filteredRuns}
-              activeTag={activeTag}
-              onActiveTagChange={setActiveTag}
-            />
-          </PageSection>
+            <PageSection>
+              <AddTaggingAndLabelsUi
+                runs={filteredRuns}
+                activeTag={activeTag}
+                onActiveTagChange={setActiveTag}
+              />
+            </PageSection>
 
           <PageSection
             title="Recent Runs"
-            actions={<Link href="/runs" className="link text-xs sm:text-sm">View all</Link>}
+            actions={<Link href="/runs" prefetch className="link text-xs sm:text-sm">View all</Link>}
           >
             <div className="card table-responsive">
                 <table
@@ -364,6 +396,7 @@ function DashboardContent() {
                 </table>
               </div>
           </PageSection>
+          </ScaleFade>
         </>
       )}
     </div>

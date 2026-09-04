@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../../"),
   },
+  experimental: {
+    optimizePackageImports: ['recharts', 'react-markdown', 'remark-gfm'],
+    viewTransition: true,
+  },
   headers: async () => [
     {
       source: "/:path*",

@@ -9,8 +9,7 @@ import AddKeyboardShortcutCheatsheetModal from "./add-keyboard-shortcut-cheatshe
 import OnboardingWizardHost from "./OnboardingWizardHost";
 import CommandPalette from "../components/CommandPalette";
 import PageTransition from "../components/PageTransition";
-import Script from "next/script";
-
+import { GlobalScrollEffects } from "../components/scroll-effects/GlobalScrollEffects";
 export const metadata: Metadata = {
   title: "Soroban CrashLab | Smart Contract Fuzzing Platform",
   description:
@@ -55,7 +54,6 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="CrashLab" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <Script src="/theme-script.js" strategy="beforeInteractive" />
       </head>
       <body className="antialiased min-h-screen">
         <LocaleProvider>
@@ -65,11 +63,13 @@ export default function RootLayout({
               <AddKeyboardShortcutCheatsheetModal />
               <CommandPalette />
               <OnboardingWizardHost />
-              <main id="page-shell" style={{ background: 'var(--bg)', paddingTop: '52px', minHeight: '100vh', transition: 'background 0.3s ease' }}>
-                <PageTransition>
-                  {children}
-                </PageTransition>
-              </main>
+              <GlobalScrollEffects>
+                <main id="page-shell" style={{ background: 'var(--bg)', paddingTop: '52px', minHeight: '100vh', transition: 'background 0.3s ease' }}>
+                  <PageTransition>
+                    {children}
+                  </PageTransition>
+                </main>
+              </GlobalScrollEffects>
             </ToastProvider>
           </ThemeProvider>
         </LocaleProvider>

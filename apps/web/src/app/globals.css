@@ -594,53 +594,77 @@ html.theme-ready body {
   animation: fadeIn 0.2s ease-out;
 }
 
-/* ===== CSS View Transitions ===== */
+/* ===== CSS View Transitions — snappy, 60fps ===== */
 @view-transition {
   navigation: auto;
 }
 
 ::view-transition-old(root) {
-  animation: 120ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out;
+  animation: 80ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out;
 }
 
 ::view-transition-new(root) {
-  animation: 180ms cubic-bezier(0, 0, 0.2, 1) 40ms both vt-fade-in;
+  animation: 120ms cubic-bezier(0, 0, 0.2, 1) both vt-fade-in;
 }
 
 @keyframes vt-fade-out {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
 }
 
 @keyframes vt-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .page-transition-container {
   view-transition-name: page-content;
   will-change: transform, opacity;
+  content-visibility: auto;
 }
 
 ::view-transition-old(page-content) {
-  animation: 120ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out;
+  animation: 80ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out;
 }
 
 ::view-transition-new(page-content) {
-  animation: 180ms cubic-bezier(0, 0, 0.2, 1) 40ms both vt-fade-in;
+  animation: 120ms cubic-bezier(0, 0, 0.2, 1) both vt-fade-in;
 }
+
+/* ===== Scroll-Driven Effects — shared base ===== */
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+
+/* Coverflow — horizontal scroll linked 3D */
+.coverflow-track { scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+.coverflow-track::-webkit-scrollbar { height: 4px; }
+.coverflow-track::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 9999px; }
+
+/* Sticky Stack — vertical piling */
+.sticky-stack-card { contain: layout style; }
+
+/* Parallax — background vs foreground depth */
+[data-parallax] { transform: translateZ(0); backface-visibility: hidden; }
+
+/* Scale & Fade — view-timeline where supported, JS fallback otherwise */
+@supports (animation-timeline: view()) {
+  .scale-fade-auto {
+    animation: scale-fade-view linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 50%;
+  }
+  @keyframes scale-fade-view {
+    from { opacity: 0; transform: scale(0.88) translateY(12px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+}
+
+/* Text Reveal — clip-path driven */
+.text-reveal { contain: layout paint; }
+.text-reveal-clip { clip-path: inset(0 0 0 0); }
+
+/* Navigation speed — instant feedback */
+a, button { -webkit-tap-highlight-color: transparent; }
+.top-nav-link, .drawer-item { transition: color 0.1s, background 0.1s, border-color 0.1s; }
 
 @keyframes parallax-drift {
   0% { transform: translateY(0); }
