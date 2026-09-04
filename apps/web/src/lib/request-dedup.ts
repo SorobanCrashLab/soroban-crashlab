@@ -235,6 +235,9 @@ async function fetchAttempt<T>(
     // Re-throw HttpError as-is (already typed).
     if (err instanceof HttpError) throw err;
 
+    // Syntax errors from malformed JSON propagate directly (not network errors).
+    if (err instanceof SyntaxError) throw err;
+
     // Classify abort origin: if our controller fired the abort, it's a timeout.
     if (
       err instanceof Error &&
@@ -243,6 +246,9 @@ async function fetchAttempt<T>(
     ) {
       throw new TimeoutError(url, policy.timeoutMs);
     }
+
+    // Caller-initiated abort propagates directly and should not be retried.
+    if (callerSignal?.aborted) throw err;
 
     // Anything else from fetch() is a network-level failure.
     throw new NetworkError(url, err);

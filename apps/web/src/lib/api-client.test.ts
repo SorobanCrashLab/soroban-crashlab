@@ -126,6 +126,74 @@ describe('api-client', () => {
       // where two independent calls were needed.
       await expect(fetchRuns()).resolves.toEqual({ runs: [], total: 0 });
     });
+
+    it('appends cursor to the request URL when provided', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+      const cursor = 'eyJzb3J0S2V5IjoiMjAyNiIsImlkIjoicnVuLTEifQ';
+
+      await fetchRuns({ cursor });
+
+      // URLSearchParams encodes '=' padding as '%3D'; just verify the key is present
+      expect(requestedUrl(fetchMock)).toContain('cursor=');
+    });
+
+    it('appends limit to the request URL when provided', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+
+      await fetchRuns({ limit: 5 });
+
+      expect(requestedUrl(fetchMock)).toContain('limit=5');
+    });
+
+    it('appends both cursor and limit to the URL when both provided', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+      const cursor = 'eyJzb3J0S2V5IjoiMjAyNiIsImlkIjoicnVuLTIifQ';
+
+      await fetchRuns({ cursor, limit: 10 });
+
+      const url = requestedUrl(fetchMock);
+      expect(url).toContain('cursor=');
+      expect(url).toContain('limit=10');
+    });
+
+    it('forwards abort signal when called with options + signal', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+      const controller = new AbortController();
+
+      await fetchRuns({ limit: 5 }, controller.signal);
+
+      const forwarded = (fetchMock.mock.calls[0][1] as RequestInit).signal as AbortSignal;
+      expect(forwarded.aborted).toBe(false);
+      controller.abort();
+      expect(forwarded.aborted).toBe(true);
+    });
+
+    it('passes through nextCursor and hasMore from the response', async () => {
+      const { fetchRuns } = await loadModule();
+      const nextCursor = 'eyJzb3J0S2V5IjoiMjAyNiIsImlkIjoicnVuLTMifQ==';
+      fetchMock.mockResolvedValue(
+        jsonResponse({ runs: [makeRun()], total: 50, nextCursor, hasMore: true }),
+      );
+
+      const result = await fetchRuns({ limit: 1 });
+
+      expect(result.nextCursor).toBe(nextCursor);
+      expect(result.hasMore).toBe(true);
+      expect(result.total).toBe(50);
+    });
+
+    it('omits cursor from URL when cursor is null', async () => {
+      const { fetchRuns } = await loadModule();
+      fetchMock.mockResolvedValue(jsonResponse({ runs: [], total: 0 }));
+
+      await fetchRuns({ cursor: null });
+
+      expect(requestedUrl(fetchMock)).not.toContain('cursor=');
+    });
   });
 
   describe('fetchRun', () => {
