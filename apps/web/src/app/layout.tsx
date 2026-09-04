@@ -28,12 +28,13 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -66,7 +67,7 @@ export default function RootLayout({
               <CommandPalette />
               <OnboardingWizardHost />
               <GlobalScrollEffects>
-                <main id="main-content" tabIndex={-1} className="page-shell">
+                <main id="page-shell" className="pt-[56px] lg:pt-[68px]" style={{ background: 'var(--bg)', minHeight: '100vh', transition: 'background 0.3s ease' }}>
                   <PageTransition>
                     {children}
                   </PageTransition>

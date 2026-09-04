@@ -84,65 +84,73 @@ export default function NavBar() {
   return (
     <>
       <header
-        className="tablet-header fixed top-0 left-0 right-0 z-50 h-[52px] flex items-center px-3 sm:px-4 border-b"
+        className="tablet-header fixed top-0 left-0 right-0 z-50 h-[56px] lg:h-[68px] flex items-center px-4 lg:px-8 border-b shadow-sm"
         style={{
-          background: 'var(--nav-bg)',
+          background: scrolled ? 'var(--nav-bg)' : 'var(--nav-bg)',
           borderColor: 'var(--border-color)',
-          backdropFilter: scrolled ? 'blur(12px)' : 'none',
-          transition: 'background 0.3s ease, border-color 0.3s ease, backdrop-filter 0.3s ease',
+          backdropFilter: scrolled ? 'blur(16px) saturate(1.2)' : 'blur(8px)',
+          WebkitBackdropFilter: scrolled ? 'blur(16px) saturate(1.2)' : 'blur(8px)',
+          transition: 'background 0.3s ease, border-color 0.3s ease, backdrop-filter 0.3s ease, box-shadow 0.3s ease',
+          boxShadow: scrolled ? '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)' : 'none',
         }}
       >
-        <Link href="/" className="tablet-brand flex items-center gap-2 mr-4 shrink-0">
-          <LogoMark size={32} />
+        <Link href="/" className="tablet-brand flex items-center gap-3 lg:gap-3.5 mr-6 lg:mr-10 shrink-0 group">
+          <span className="hidden lg:block">
+            <LogoMark size={40} />
+          </span>
+          <span className="lg:hidden">
+            <LogoMark size={32} />
+          </span>
           <span
-            className="tablet-brand-name font-bold text-base sm:text-lg hidden xs:inline"
-            style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}
+            className="tablet-brand-name font-extrabold text-lg lg:text-[22px] hidden xs:inline tracking-tight group-hover:opacity-90 transition-opacity"
+            style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}
           >
             CrashLab
           </span>
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center h-full gap-1 flex-1 overflow-x-auto">
+        {/* Desktop nav — premium spacing */}
+        <nav className="hidden md:flex items-center h-full gap-1 lg:gap-2 flex-1 overflow-x-auto">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               prefetch
-              className="top-nav-link shrink-0"
+              className="top-nav-link shrink-0 lg:px-3"
               aria-label={item.label}
               title={item.label}
               style={{
                 color: isActive(item.href) ? 'var(--text-primary)' : 'var(--text-secondary)',
                 borderBottomColor: isActive(item.href) ? 'var(--text-primary)' : 'transparent',
+                fontSize: '11px',
               }}
             >
-              <span className="top-nav-icon text-sm">{item.icon}</span>
-              <span className="tablet-nav-label text-[10px] font-medium">{item.label}</span>
+              <span className="top-nav-icon text-sm lg:text-[15px]">{item.icon}</span>
+              <span className="tablet-nav-label text-[10px] lg:text-[11px] font-medium tracking-wide">{item.label}</span>
             </Link>
           ))}
         </nav>
 
-        <div className="tablet-actions flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
+        <div className="tablet-actions flex items-center gap-2 sm:gap-3 lg:gap-4 shrink-0 ml-auto">
           {/* Search - hidden on small mobile */}
           <Link
             id="navbar-search-link"
             href="/runs/query"
             prefetch
-            className="tablet-search hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-decoration-none"
+            className="tablet-search hidden sm:flex items-center gap-2 px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-decoration-none"
             aria-label="Search runs"
             title="Search runs"
             style={{ background: mounted ? (theme === 'dark' ? '#1a1a1a' : '#EEF3F8') : 'var(--hover-bg)', cursor: 'pointer' }}
           >
-            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>🔍</span>
-            <span className="tablet-search-label text-xs" style={{ color: 'var(--text-secondary)' }}>Search runs...</span>
+            <span className="text-xs lg:text-sm" style={{ color: 'var(--text-secondary)' }}>🔍</span>
+            <span className="tablet-search-label text-xs lg:text-sm" style={{ color: 'var(--text-secondary)' }}>Search runs...</span>
           </Link>
 
           {/* Theme toggle */}
           {mounted && (
             <button
               onClick={toggle}
-              className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-all"
+              className="flex items-center justify-center w-8 h-8 lg:w-9 lg:h-9 rounded-xl transition-all"
               style={{
                 background: theme === 'dark' ? '#1a1a1a' : '#F4F2EE',
                 color: theme === 'dark' ? '#e0e0e0' : '#191919',
