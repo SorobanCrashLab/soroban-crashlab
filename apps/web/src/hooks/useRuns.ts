@@ -10,6 +10,8 @@ export interface UseRunsOptions {
   revalidateOnVisibility?: boolean;
   initialData?: FuzzingRun[];
   pollInterval?: number;
+  staleTime?: number;
+  cacheTime?: number;
 }
 
 export interface UseRunsResult {
@@ -17,11 +19,38 @@ export interface UseRunsResult {
   total: number;
   dataState: 'loading' | 'success' | 'error';
   isLoading: boolean;
+  isValidating: boolean;
   isSuccess: boolean;
   isError: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
+  mutate: (data?: FuzzingRun[]) => void;
   setRuns: React.Dispatch<React.SetStateAction<FuzzingRun[]>>;
+}
+
+type CacheEntry = {
+  runs: FuzzingRun[];
+  total: number;
+  timestamp: number;
+};
+
+const CACHE_KEY = '__runs_cache__';
+const DEFAULT_STALE_TIME = 30_000;
+const DEFAULT_CACHE_TIME = 5 * 60_000;
+
+const runsCache = new Map<string, CacheEntry>();
+
+function getCached(): CacheEntry | undefined {
+  return runsCache.get(CACHE_KEY);
+}
+
+function setCached(runs: FuzzingRun[], total: number): void {
+  runsCache.set(CACHE_KEY, { runs, total, timestamp: Date.now() });
+}
+
+function isStale(entry: CacheEntry | undefined, staleTime: number): boolean {
+  if (!entry) return true;
+  return Date.now() - entry.timestamp > staleTime;
 }
 
 export function useRuns(options: UseRunsOptions = {}): UseRunsResult {
@@ -31,13 +60,22 @@ export function useRuns(options: UseRunsOptions = {}): UseRunsResult {
     revalidateOnVisibility = true,
     initialData = [],
     pollInterval,
+    staleTime = DEFAULT_STALE_TIME,
+    cacheTime = DEFAULT_CACHE_TIME,
   } = options;
 
-  const [runs, setRuns] = useState<FuzzingRun[]>(initialData);
-  const [total, setTotal] = useState<number>(initialData.length);
+  const cached = getCached();
+  // eslint-disable-next-line react-hooks/purity
+  const hasCache = Boolean(cached && Date.now() - cached.timestamp < cacheTime);
+  const initialRuns = initialData.length > 0 ? initialData : hasCache ? cached!.runs : [];
+  const initialTotal = initialData.length > 0 ? initialData.length : hasCache ? cached!.total : 0;
+
+  const [runs, setRuns] = useState<FuzzingRun[]>(initialRuns);
+  const [total, setTotal] = useState<number>(initialTotal);
   const [dataState, setDataState] = useState<'loading' | 'success' | 'error'>(
-    initialData.length > 0 ? 'success' : 'loading'
+    initialRuns.length > 0 ? 'success' : 'loading'
   );
+  const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [fetchCount, setFetchCount] = useState(0);
 
@@ -51,20 +89,35 @@ export function useRuns(options: UseRunsOptions = {}): UseRunsResult {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    setDataState('loading');
+    const cachedEntry = getCached();
+    const hasStaleCache = Boolean(cachedEntry);
+    if (hasStaleCache) {
+      setIsValidating(true);
+    } else {
+      setDataState('loading');
+    }
     setError(null);
 
     try {
       const data = await fetchRuns(controller.signal);
       if (!controller.signal.aborted) {
-        setRuns(data.runs ?? []);
-        setTotal(data.total ?? (data.runs ?? []).length);
+        const nextRuns = data.runs ?? [];
+        const nextTotal = data.total ?? nextRuns.length;
+        setRuns(nextRuns);
+        setTotal(nextTotal);
+        setCached(nextRuns, nextTotal);
         setDataState('success');
       }
     } catch (err: unknown) {
       if (!controller.signal.aborted && (err as Error)?.name !== 'AbortError') {
-        setError(err instanceof Error ? err : new Error(String(err)));
-        setDataState('error');
+        if (!hasStaleCache) {
+          setError(err instanceof Error ? err : new Error(String(err)));
+          setDataState('error');
+        }
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setIsValidating(false);
       }
     }
   }, []);
@@ -75,6 +128,11 @@ export function useRuns(options: UseRunsOptions = {}): UseRunsResult {
 
   useEffect(() => {
     if (!autoFetch) return;
+    const cachedEntry = getCached();
+    const shouldRevalidate = fetchCount > 0 || isStale(cachedEntry, staleTime);
+    if (!shouldRevalidate && cachedEntry) {
+      return;
+    }
     // Initial fetch on mount / refetch. loadData() sets state after the async
     // request settles; calling it from the effect is the intended fetch-on-
     // mount pattern here, so the set-state-in-effect lint rule is waived.
@@ -86,7 +144,7 @@ export function useRuns(options: UseRunsOptions = {}): UseRunsResult {
         abortControllerRef.current.abort();
       }
     };
-  }, [autoFetch, fetchCount, loadData]);
+  }, [autoFetch, fetchCount, loadData, staleTime]);
 
   useEffect(() => {
     if (!revalidateOnVisibility && !revalidateOnFocus) return;
@@ -130,17 +188,44 @@ export function useRuns(options: UseRunsOptions = {}): UseRunsResult {
     return () => clearInterval(timer);
   }, [pollInterval, loadData]);
 
+  const mutate = useCallback((data?: FuzzingRun[]) => {
+    if (data) {
+      setRuns(data);
+      setTotal(data.length);
+      setCached(data, data.length);
+      setDataState('success');
+    } else {
+      void loadData();
+    }
+  }, [loadData]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const entry = getCached();
+      if (entry && Date.now() - entry.timestamp > cacheTime) {
+        runsCache.delete(CACHE_KEY);
+      }
+    }, cacheTime);
+    return () => clearInterval(interval);
+  }, [cacheTime]);
+
   return {
     runs,
     total,
     dataState,
-    isLoading: dataState === 'loading',
+    isLoading: dataState === 'loading' && !isValidating,
+    isValidating,
     isSuccess: dataState === 'success',
     isError: dataState === 'error',
     error,
     refetch,
+    mutate,
     setRuns,
   };
+}
+
+export function clearRunsCache(): void {
+  runsCache.delete(CACHE_KEY);
 }
 
 export default useRuns;

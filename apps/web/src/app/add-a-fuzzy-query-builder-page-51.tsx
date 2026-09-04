@@ -421,12 +421,12 @@ export default function AddAFuzzyQueryBuilderPage51({ runs = [] }: Props) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                      <th className="text-left py-2 px-3 font-medium">ID</th>
-                      <th className="text-left py-2 px-3 font-medium">Status</th>
-                      <th className="text-left py-2 px-3 font-medium">Area</th>
-                      <th className="text-left py-2 px-3 font-medium">Severity</th>
-                      <th className="text-left py-2 px-3 font-medium">Duration</th>
-                      <th className="text-left py-2 px-3 font-medium">Seeds</th>
+                      <th scope="col" className="text-left py-2 px-3 font-medium">ID</th>
+                      <th scope="col" className="text-left py-2 px-3 font-medium">Status</th>
+                      <th scope="col" className="text-left py-2 px-3 font-medium">Area</th>
+                      <th scope="col" className="text-left py-2 px-3 font-medium">Severity</th>
+                      <th scope="col" className="text-left py-2 px-3 font-medium">Duration</th>
+                      <th scope="col" className="text-left py-2 px-3 font-medium">Seeds</th>
                     </tr>
                   </thead>
                   <tbody>

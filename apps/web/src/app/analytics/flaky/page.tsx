@@ -8,6 +8,7 @@ import {
   MIN_REPLAYS,
   type FlakinessTier,
 } from './flaky-classification';
+import { useDataTableKeyboardNav } from '../../use-data-table-keyboard-nav';
 
 interface FlakySignature {
   signature: string;
@@ -45,6 +46,9 @@ export default function FlakyAnalyticsPage() {
   const runs = buildMockRuns();
   const summary = buildFlakySummary(runs);
   const leadingSignature = summary.signatures[0];
+  const { getRowProps } = useDataTableKeyboardNav({
+    rowCount: summary.signatures.length,
+  });
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
@@ -117,20 +121,20 @@ export default function FlakyAnalyticsPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
+              <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800" aria-label="Flaky signature breakdown">
                 <thead className="bg-zinc-100/80 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
                   <tr>
-                    <th className="px-5 py-3">Signature</th>
-                    <th className="px-5 py-3">Area</th>
-                    <th className="px-5 py-3">Tier</th>
-                    <th className="px-5 py-3">Occurrences</th>
-                    <th className="px-5 py-3">Seed spread</th>
-                    <th className="px-5 py-3">Score</th>
+                    <th scope="col" className="px-5 py-3">Signature</th>
+                    <th scope="col" className="px-5 py-3">Area</th>
+                    <th scope="col" className="px-5 py-3">Tier</th>
+                    <th scope="col" className="px-5 py-3">Occurrences</th>
+                    <th scope="col" className="px-5 py-3">Seed spread</th>
+                    <th scope="col" className="px-5 py-3">Score</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
-                  {summary.signatures.map((signature) => (
-                    <tr key={signature.signature}>
+                  {summary.signatures.map((signature, index) => (
+                    <tr key={signature.signature} {...getRowProps(index)} aria-label={`Flaky signature ${signature.category} with ${signature.occurrences} occurrences`}>
                       <td className="max-w-sm px-5 py-4">
                         <div className="font-medium text-zinc-950 dark:text-zinc-50">
                           {signature.category}
@@ -168,6 +172,9 @@ export default function FlakyAnalyticsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="sr-only" aria-live="polite" aria-atomic="true">
+              {summary.signatures.length} flaky signatures, {summary.flakyRuns} flaky runs out of {summary.totalRuns} total
             </div>
           </section>
 

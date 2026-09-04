@@ -334,13 +334,13 @@ export default function WebhookRetryDashboardComponent() {
             <table className="data-table w-full text-left border-collapse">
               <thead>
                 <tr className="bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Delivery ID & Event</th>
-                  <th className="py-3 px-4">Endpoint URL</th>
-                  <th className="py-3 px-4">HTTP Status</th>
-                  <th className="py-3 px-4">Attempts</th>
-                  <th className="py-3 px-4">Timestamp</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th scope="col" className="py-3 px-4">Status</th>
+                  <th scope="col" className="py-3 px-4">Delivery ID & Event</th>
+                  <th scope="col" className="py-3 px-4">Endpoint URL</th>
+                  <th scope="col" className="py-3 px-4">HTTP Status</th>
+                  <th scope="col" className="py-3 px-4">Attempts</th>
+                  <th scope="col" className="py-3 px-4">Timestamp</th>
+                  <th scope="col" className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-sm">

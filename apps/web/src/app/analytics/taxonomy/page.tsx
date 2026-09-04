@@ -26,7 +26,7 @@ type DataState = 'loading' | 'success' | 'error';
 
 const SEVERITY_COLORS: Record<RunSeverity, string> = {
     critical: '#CC1016',
-    high: '#C37D16',
+    high: '#946210',
     medium: '#0A66C2',
     low: '#057642',
 };

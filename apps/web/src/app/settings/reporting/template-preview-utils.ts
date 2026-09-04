@@ -1,3 +1,5 @@
+import { slugify } from '../../utils/string';
+
 /**
  * Pure helpers backing the Markdown preview for reporting templates (#1118).
  *
@@ -210,9 +212,6 @@ export function cyclePreviewMode(mode: PreviewMode): PreviewMode {
 
 /** Filename used when an author downloads a template as a `.md` file. */
 export function buildTemplateFilename(name: string): string {
-    const slug = name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
+    const slug = slugify(name);
     return `${slug || 'template'}.md`;
 }

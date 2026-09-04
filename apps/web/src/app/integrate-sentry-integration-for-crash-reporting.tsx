@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 
 import { createSentryAdapter } from "@/lib/integrations/sentry-adapter";
 import type { SentryConfig, CrashReport } from "./integrate-sentry-integration-for-crash-reporting-utils";
+import { absoluteShort } from "./utils/datetime";
 
 /**
  * Issue #248: Integrate Sentry integration for crash reporting
@@ -118,10 +119,7 @@ export default function IntegrateSentryIntegrationForCrashReporting() {
     }
   };
 
-  const formatTimestamp = (iso: string) => {
-    const date = new Date(iso);
-    return date.toLocaleString();
-  };
+  const formatTimestamp = (iso: string) => absoluteShort(iso);
 
   const handleCreateJiraIssue = async (report: CrashReport) => {
     setCreatingIssueId(report.id);
@@ -382,8 +380,7 @@ export default function IntegrateSentryIntegrationForCrashReporting() {
               recentReports.map((report) => (
                 <div
                   key={report.id}
-                  className="p-6 rounded-[2rem] border border-[var(--border-color)] bg-[var(--surface)] shadow-[var(--card-shadow)] transition hover:shadow-[var(--card-shadow-hover)]"
-                  style={{ color: 'var(--text-primary)' }}
+                  className="p-6 rounded-[2rem] border border-[var(--border-color)] bg-[var(--surface)] shadow-[var(--card-shadow)] transition hover:shadow-[var(--card-shadow-hover)] text-[var(--text-primary)]"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
@@ -417,9 +414,9 @@ export default function IntegrateSentryIntegrationForCrashReporting() {
                   </div>
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="text-xs text-[var(--text-secondary)]">
                       Event ID:{" "}
-                      <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
+                      <span className="font-mono text-[var(--text-primary)]">
                         {report.sentryEventId}
                       </span>
                     </div>
@@ -429,8 +426,7 @@ export default function IntegrateSentryIntegrationForCrashReporting() {
                           href={createdIssues[report.id].url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs font-semibold rounded-full border border-[var(--border-color)] px-3 py-1 transition"
-                          style={{ color: 'var(--text-primary)', background: 'var(--highlight-bg)' }}
+                          className="text-xs font-semibold rounded-full border border-[var(--border-color)] px-3 py-1 transition text-[var(--text-primary)] bg-[var(--highlight-bg)]"
                         >
                           Jira • {createdIssues[report.id].key}
                         </a>
@@ -439,8 +435,7 @@ export default function IntegrateSentryIntegrationForCrashReporting() {
                           type="button"
                           onClick={() => void handleCreateJiraIssue(report)}
                           disabled={creatingIssueId === report.id}
-                          className="rounded-full border border-[var(--border-color)] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                          style={{ color: 'var(--text-primary)', background: 'var(--surface)' }}
+                          className="rounded-full border border-[var(--border-color)] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 text-[var(--text-primary)] bg-[var(--surface)]"
                         >
                           {creatingIssueId === report.id ? 'Creating…' : 'Create Jira issue'}
                         </button>
@@ -449,8 +444,7 @@ export default function IntegrateSentryIntegrationForCrashReporting() {
                         href={`https://sentry.io/events/${report.sentryEventId}/`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs font-bold transition"
-                        style={{ color: 'var(--color-primary)' }}
+                        className="text-xs font-bold transition text-[#0A66C2]"
                       >
                         View in Sentry →
                       </a>

@@ -34,6 +34,7 @@ import { ScaleFade } from "../components/scroll-effects/ScaleFade";
 import { TextReveal } from "../components/scroll-effects/TextReveal";
 import { FuzzingRun } from "./types";
 import { useDataTableKeyboardNav } from "./use-data-table-keyboard-nav";
+import { sanitizeSearchParams } from "../lib/sanitize";
 
 const makeSuggestedLabels = (run: FuzzingRun): string[] => [
   run.area,
@@ -53,8 +54,9 @@ function DashboardContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const activeTag = searchParams.get("filter_tag") ?? "all";
-  const rawPage = parseInt(searchParams.get("page") ?? "1", 10);
+  const sanitizedParams = sanitizeSearchParams(searchParams);
+  const activeTag = sanitizedParams.get("filter_tag") ?? "all";
+  const rawPage = parseInt(sanitizedParams.get("page") ?? "1", 10);
   const currentPage = isNaN(rawPage) ? 1 : rawPage;
 
 
@@ -180,17 +182,17 @@ function DashboardContent() {
 
       {dataState === "success" && (
         <div className="card table-responsive">
-          <table className="data-table">
+          <table className="data-table" aria-label="Recent fuzzing runs overview">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Status</th>
-                <th>Area</th>
+                <th scope="col">ID</th>
+                <th scope="col">Status</th>
+                <th scope="col">Area</th>
               </tr>
             </thead>
             <tbody>
-              {recentRuns.map((run) => (
-                <tr key={run.id}>
+              {recentRuns.map((run, index) => (
+                <tr key={run.id} {...getRowProps(index)} aria-label={`Fuzzing run ${run.id}, status ${run.status}`} onClick={() => router.push(`/runs/${run.id}`)} className="cursor-pointer">
                   <td className="code-text text-meta">{run.id}</td>
                   <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
                   <td>{run.area}</td>
@@ -209,6 +211,7 @@ function DashboardContent() {
             </div>
             <button
               onClick={() => refetch()}
+              aria-label="Retry loading dashboard data"
               className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow transition"
               style={{ backgroundColor: "#CC1016" }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#a50d12")}
@@ -269,13 +272,13 @@ function DashboardContent() {
                     actions={<Link href="/runs" prefetch className="link text-xs sm:text-sm">View all</Link>}
                   >
                     <div className="card table-responsive">
-                      <table className="data-table">
+                      <table className="data-table" aria-label="Recent fuzzing runs">
                         <thead>
                           <tr>
-                            <th>ID</th>
-                            <th>Status</th>
-                            <th>Area</th>
-                            <th>Tags</th>
+                            <th scope="col">ID</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Area</th>
+                            <th scope="col">Tags</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -293,8 +296,8 @@ function DashboardContent() {
                               </td>
                             </tr>
                           ) : (
-                            recentRuns.map((run) => (
-                              <tr key={run.id}>
+                            recentRuns.map((run, index) => (
+                              <tr key={run.id} {...getRowProps(index)} className="cursor-pointer" onClick={() => router.push(`/runs/${run.id}`)} aria-label={`Fuzzing run ${run.id}, status ${run.status}`}>
                                 <td className="code-text text-meta">{run.id}</td>
                                 <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
                                 <td>{run.area}</td>
@@ -397,8 +400,14 @@ function DashboardContent() {
               </div>
           </PageSection>
           </ScaleFade>
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {dataState === "success" ? `${filteredRuns.length} runs filtered, ${recentRuns.length} shown on page ${clampedPage} of ${totalPages}` : dataState === "loading" ? "Loading dashboard" : dataState === "error" ? "Failed to load dashboard" : ""}
+          </div>
         </>
       )}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {dataState === "success" && `${filteredRuns.length} fuzzing runs available`}
+      </div>
     </div>
   );
 }

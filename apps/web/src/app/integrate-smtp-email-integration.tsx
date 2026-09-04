@@ -548,7 +548,7 @@ export default function IntegrateSmtpEmailIntegration() {
               <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
                 <tr>
                   {["Recipient", "Subject", "Status", "Sent At", "Message ID"].map((heading) => (
-                    <th
+                    <th scope="col"
                       key={heading}
                       className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400"
                     >

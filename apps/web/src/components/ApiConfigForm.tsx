@@ -232,13 +232,13 @@ export default function ApiConfigForm() {
         <div
           className="card card-padding flex items-start gap-3"
           style={{
-            borderLeft: `3px solid ${isConfigured ? '#057642' : '#C37D16'}`,
+            borderLeft: `3px solid ${isConfigured ? '#057642' : '#946210'}`,
           }}
         >
           <div
             className="w-2 h-2 rounded-full mt-1 flex-shrink-0"
             style={{
-              background: isConfigured ? '#057642' : '#C37D16',
+              background: isConfigured ? '#057642' : '#946210',
             }}
           />
 
@@ -270,7 +270,7 @@ export default function ApiConfigForm() {
             id="api-config-draft-restored"
             className="text-xs"
             role="status"
-            style={{ color: '#C37D16' }}
+            style={{ color: '#946210' }}
           >
             Unsaved changes were restored. Save the configuration to apply them.
           </p>

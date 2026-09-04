@@ -862,11 +862,11 @@ export default function AlertingSettingsPage({
                 <table className="w-full border-collapse text-sm">
                   <thead className="bg-zinc-100 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
                     <tr>
-                      <th className="px-4 py-3 font-semibold">Time</th>
-                      <th className="px-4 py-3 font-semibold">Rule</th>
-                      <th className="px-4 py-3 font-semibold">Outcome</th>
-                      <th className="px-4 py-3 font-semibold">Channel</th>
-                      <th className="px-4 py-3 font-semibold">Detail</th>
+                      <th scope="col" className="px-4 py-3 font-semibold">Time</th>
+                      <th scope="col" className="px-4 py-3 font-semibold">Rule</th>
+                      <th scope="col" className="px-4 py-3 font-semibold">Outcome</th>
+                      <th scope="col" className="px-4 py-3 font-semibold">Channel</th>
+                      <th scope="col" className="px-4 py-3 font-semibold">Detail</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">
@@ -930,11 +930,11 @@ export default function AlertingSettingsPage({
                   <table className="w-full border-collapse text-sm">
                     <thead className="bg-zinc-100 text-left text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
                       <tr>
-                        <th className="px-4 py-3 font-semibold">Rule</th>
-                        <th className="px-4 py-3 font-semibold">Outcome</th>
-                        <th className="px-4 py-3 font-semibold">Condition</th>
-                        <th className="px-4 py-3 font-semibold">Value</th>
-                        <th className="px-4 py-3 font-semibold">Detail</th>
+                        <th scope="col" className="px-4 py-3 font-semibold">Rule</th>
+                        <th scope="col" className="px-4 py-3 font-semibold">Outcome</th>
+                        <th scope="col" className="px-4 py-3 font-semibold">Condition</th>
+                        <th scope="col" className="px-4 py-3 font-semibold">Value</th>
+                        <th scope="col" className="px-4 py-3 font-semibold">Detail</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 bg-white dark:divide-zinc-800 dark:bg-zinc-950">

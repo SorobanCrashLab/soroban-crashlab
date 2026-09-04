@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { successResponse } from '@/lib/api-response-utils';
 import { createGithubActionsAdapter } from '@/lib/integrations/github-actions';
 import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
+import { sanitizeSearchParams } from '@/lib/sanitize';
 
 const repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
@@ -25,7 +26,8 @@ function tokenUnavailableResponse() {
 export const GET = withRouteErrorHandling(
   'GET /api/integrations/github-actions',
   async (request: NextRequest) => {
-    const repository = getRepositoryParts(request.nextUrl.searchParams.get('repository'));
+    const sanitized = sanitizeSearchParams(request.nextUrl.searchParams);
+    const repository = getRepositoryParts(sanitized.get('repository'));
     if (!repository) return jsonError('repository must be in the form owner/repository.', 400);
 
     const token = getGithubToken();

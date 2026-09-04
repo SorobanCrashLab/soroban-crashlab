@@ -179,12 +179,12 @@ export default function DeadLetterQueueComponent() {
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
             <tr>
-              <th className="px-4 py-3">Endpoint</th>
-              <th className="px-4 py-3">Event</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Dead-lettered</th>
-              <th className="px-4 py-3">Attempts</th>
-              <th className="px-4 py-3" />
+              <th scope="col" className="px-4 py-3">Endpoint</th>
+              <th scope="col" className="px-4 py-3">Event</th>
+              <th scope="col" className="px-4 py-3">Status</th>
+              <th scope="col" className="px-4 py-3">Dead-lettered</th>
+              <th scope="col" className="px-4 py-3">Attempts</th>
+              <th scope="col" className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>

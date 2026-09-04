@@ -19,11 +19,14 @@ import { NextRequest } from 'next/server';
 import { parseGithubIssueUrl, createGithubIssuesAdapter } from '@/lib/integrations/github-issues';
 import { successResponse } from '@/lib/api-response-utils';
 import { jsonError, withRouteErrorHandling } from '@/lib/route-handler';
+import { sanitizeSearchParams, sanitizeUrl } from '@/lib/sanitize';
 
 export const GET = withRouteErrorHandling(
   'GET /api/integrations/github-issue',
   async (request: NextRequest) => {
-    const url = request.nextUrl.searchParams.get('url');
+    const sanitized = sanitizeSearchParams(request.nextUrl.searchParams);
+    const rawUrl = sanitized.get('url');
+    const url = rawUrl ? sanitizeUrl(rawUrl) : null;
 
     if (!url) {
       return jsonError('Query parameter "url" is required.', 400);

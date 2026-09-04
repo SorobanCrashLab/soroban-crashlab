@@ -22,10 +22,10 @@ export function DashboardSkeleton({ rows = 8 }: { rows?: number }) {
         <table className="data-table">
           <thead>
             <tr>
-              <th><div className="h-4 w-16 bg-zinc-200 dark:bg-zinc-800 rounded" /></th>
-              <th><div className="h-4 w-12 bg-zinc-200 dark:bg-zinc-800 rounded" /></th>
-              <th><div className="h-4 w-10 bg-zinc-200 dark:bg-zinc-800 rounded" /></th>
-              <th><div className="h-4 w-16 bg-zinc-200 dark:bg-zinc-800 rounded" /></th>
+              <th scope="col"><div className="h-4 w-16 bg-zinc-200 dark:bg-zinc-800 rounded" /></th>
+              <th scope="col"><div className="h-4 w-12 bg-zinc-200 dark:bg-zinc-800 rounded" /></th>
+              <th scope="col"><div className="h-4 w-10 bg-zinc-200 dark:bg-zinc-800 rounded" /></th>
+              <th scope="col"><div className="h-4 w-16 bg-zinc-200 dark:bg-zinc-800 rounded" /></th>
             </tr>
           </thead>
           <tbody>
@@ -174,7 +174,7 @@ export function GenericPageSkeleton({
             <thead>
               <tr>
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <th key={i}><div className="skeleton h-4 w-16" /></th>
+                  <th scope="col" key={i}><div className="skeleton h-4 w-16" /></th>
                 ))}
               </tr>
             </thead>

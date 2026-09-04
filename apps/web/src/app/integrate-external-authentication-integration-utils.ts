@@ -1,4 +1,5 @@
 import type { SorobanAuthMode } from '../types';
+import { absoluteShort } from './utils/datetime';
 
 // Re-exported from the shared contract-types module (../types) for backward
 // compatibility — single source of truth lives in src/types/contracts.ts.
@@ -45,7 +46,7 @@ export function formatVerified(iso?: string): string {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
-    return `Verified ${d.toLocaleString()}`;
+    return `Verified ${absoluteShort(iso)}`;
   } catch {
     return '';
   }

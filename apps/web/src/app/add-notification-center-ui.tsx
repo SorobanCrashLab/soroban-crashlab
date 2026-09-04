@@ -19,6 +19,7 @@ import {
 } from './notification-read-state-utils';
 import { api, type NotificationFeedItem } from '../lib/api-client';
 import { NOTIFICATION_POLL_INTERVAL_MS } from '../lib/timeouts';
+import { relative } from './utils/datetime';
 
 export type { NotificationType, NotificationPriority };
 
@@ -240,18 +241,7 @@ export default function NotificationCenter({ className = '' }: NotificationCente
     }
   };
 
-  const formatTimestamp = (timestamp: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - timestamp.getTime();
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
-  };
+  const formatTimestamp = (timestamp: Date) => relative(timestamp);
 
   return (
     <div className={`relative ${className}`}>

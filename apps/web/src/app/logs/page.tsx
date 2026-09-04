@@ -302,11 +302,7 @@ export default function LogViewerPage() {
         >
           {/* Status bar */}
           <div
-            className="px-4 py-2"
-            style={{
-              background: "var(--bg)",
-              borderBottom: "1px solid var(--border-color)",
-            }}
+            className="px-4 py-2 bg-[var(--bg)] border-b border-[var(--border-color)]"
           >
             <span className="text-meta">
               Showing {visible.length} of {entries.length} entries
@@ -316,8 +312,7 @@ export default function LogViewerPage() {
           {/* Log table */}
           <div
             ref={scrollContainerRef}
-            className="table-responsive"
-            style={{ maxHeight: "60vh", overflowY: "auto" }}
+            className="table-responsive max-h-[60vh] overflow-y-auto"
           >
             <table
               className="data-table w-full text-xs sm:text-sm font-mono"
@@ -358,8 +353,7 @@ export default function LogViewerPage() {
                       <LogSeverityBadge level={entry.level} />
                     </td>
                     <td
-                      className="hidden sm:table-cell"
-                      style={{ color: "#0A66C2" }}
+                      className="hidden sm:table-cell text-[#0A66C2]"
                     >
                       {entry.source}
                     </td>

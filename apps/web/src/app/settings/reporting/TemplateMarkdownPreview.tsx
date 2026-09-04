@@ -283,7 +283,7 @@ export default function TemplateMarkdownPreview({
             </div>
 
             {unknownTokens.length > 0 && (
-                <p className="text-xs" style={{ color: '#C37D16' }}>
+                <p className="text-xs" style={{ color: '#946210' }}>
                     Unrecognised placeholder{unknownTokens.length > 1 ? 's' : ''}:{' '}
                     {unknownTokens.map((token) => `{{${token}}}`).join(', ')}. These stay
                     unsubstituted in the preview.

@@ -86,12 +86,12 @@ export default function RunHistoryTable({
                 <table className="w-full text-left border-collapse" aria-label="Fuzzing run history">
                     <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
-                            {effectiveColumns.includes('id') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Run ID</th>}
-                            {effectiveColumns.includes('status') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Status</th>}
-                            {effectiveColumns.includes('duration') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Duration</th>}
-                            {effectiveColumns.includes('seedCount') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Seed Count</th>}
-                            {onReplayRun && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Actions</th>}
-                            {effectiveColumns.includes('report') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Report</th>}
+                            {effectiveColumns.includes('id') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Run ID</th>}
+                            {effectiveColumns.includes('status') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Status</th>}
+                            {effectiveColumns.includes('duration') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Duration</th>}
+                            {effectiveColumns.includes('seedCount') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Seed Count</th>}
+                            {onReplayRun && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Actions</th>}
+                            {effectiveColumns.includes('report') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Report</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">

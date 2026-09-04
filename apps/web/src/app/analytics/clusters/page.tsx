@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import type { FuzzingRun } from '../../types';
 import { LoadingSpinner } from '../../../components/LoadingSkeleton';
+import { sanitizeSearchParams } from '../../../lib/sanitize';
 
 const FailureClusterView = dynamic(() => import('../../FailureClusterView'), {
   loading: () => <LoadingSpinner />,
@@ -20,7 +21,7 @@ function ClustersContent() {
   const [dataState, setDataState] = useState<'loading' | 'error' | 'success'>('loading');
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const queryString = searchParams.toString();
+  const queryString = sanitizeSearchParams(searchParams).toString();
 
   useEffect(() => {
     let cancelled = false;

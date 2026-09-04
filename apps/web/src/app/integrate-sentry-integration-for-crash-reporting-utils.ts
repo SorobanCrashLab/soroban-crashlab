@@ -1,3 +1,5 @@
+import { absoluteShort } from './utils/datetime';
+
 /**
  * Issue #248 – Integrate: Sentry integration for crash reporting
  *
@@ -112,7 +114,7 @@ export function formatTimestamp(iso: string): string {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
-    return d.toLocaleString();
+    return absoluteShort(iso);
   } catch {
     return iso;
   }

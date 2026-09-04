@@ -156,12 +156,12 @@ export default function AuditLogViewer() {
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
             <tr>
-              <th className="px-4 py-3">#</th>
-              <th className="px-4 py-3">When</th>
-              <th className="px-4 py-3">Actor</th>
-              <th className="px-4 py-3">Action</th>
-              <th className="px-4 py-3">Target</th>
-              <th className="px-4 py-3">Metadata</th>
+              <th scope="col" className="px-4 py-3">#</th>
+              <th scope="col" className="px-4 py-3">When</th>
+              <th scope="col" className="px-4 py-3">Actor</th>
+              <th scope="col" className="px-4 py-3">Action</th>
+              <th scope="col" className="px-4 py-3">Target</th>
+              <th scope="col" className="px-4 py-3">Metadata</th>
             </tr>
           </thead>
           <tbody>

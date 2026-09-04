@@ -17,6 +17,47 @@
   outline-color: #5AA7F0;
 }
 
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  z-index: 100;
+  padding: 8px 16px;
+  background: #0A66C2;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 0;
+  top: 0;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  outline: 2px solid #FFFFFF;
+  outline-offset: -2px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 @theme {
   /*
    * Typography tokens. `--font-source-sans` / `--font-jetbrains-mono` are
@@ -150,6 +191,29 @@ html.theme-ready body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg);
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg);
+}
+
+html {
+  scrollbar-color: var(--border-color) var(--bg);
+  color-scheme: light dark;
 }
 
 .heading-hero {
@@ -1318,6 +1382,13 @@ nav, header, .nav-bar {
 
 .dark .surface-soft {
   background-color: #18181b;
+}
+
+.page-shell {
+  background: var(--bg);
+  padding-top: 52px;
+  min-height: 100vh;
+  transition: background 0.3s ease;
 }
 
 @layer utilities {

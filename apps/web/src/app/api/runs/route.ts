@@ -12,11 +12,11 @@ const DEFAULT_PAGE_LIMIT = 20;
 
 export const GET = withRouteErrorHandling('GET /api/runs', async (request: Request) => {
   const { searchParams } = new URL(request.url);
+  const sanitizedSearchParams = sanitizeSearchParams(searchParams);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
   if (apiUrl) {
     try {
-      const sanitizedSearchParams = sanitizeSearchParams(searchParams);
       const qs = sanitizedSearchParams.toString();
 
       // Race the upstream fetch against a 10-second timeout so tests that
@@ -55,14 +55,14 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
   }
 
   const driver = selectRunStorageDriver();
-  const rawStatus = searchParams.get('status') as import('@/app/types').RunStatus | undefined;
+  const rawStatus = sanitizedSearchParams.get('status') as import('@/app/types').RunStatus | undefined;
   const { runs: allRuns } = await driver.listRuns({
     status: rawStatus,
   });
 
   // Parse keyset pagination parameters from the query string.
   // A legacy offset cursor is detected and reset gracefully to page 1.
-  const rawCursor = searchParams.get('cursor') ?? '';
+  const rawCursor = sanitizedSearchParams.get('cursor') ?? '';
   const cursor = rawCursor && !isLegacyOrInvalidCursor(rawCursor) ? rawCursor : undefined;
   const legacyCursorDetected = rawCursor && isLegacyOrInvalidCursor(rawCursor);
 
@@ -72,7 +72,7 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
     });
   }
 
-  const limitParam = parseInt(searchParams.get('limit') ?? '', 10);
+  const limitParam = parseInt(sanitizedSearchParams.get('limit') ?? '', 10);
   const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : DEFAULT_PAGE_LIMIT;
 
   const { items, total, nextCursor, hasMore } = paginateKeyset(allRuns, {

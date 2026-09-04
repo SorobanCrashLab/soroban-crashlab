@@ -1,9 +1,9 @@
 {
   "framework": "nextjs",
-  "buildCommand": "pnpm run build",
-  "outputDirectory": ".next",
+  "buildCommand": "cd apps/web && pnpm install --frozen-lockfile && pnpm run build",
+  "outputDirectory": "apps/web/.next",
   "installCommand": "pnpm install --frozen-lockfile",
-  "devCommand": "pnpm run dev",
+  "devCommand": "cd apps/web && pnpm run dev",
   "git": {
     "deploymentEnabled": {
       "main": true
@@ -29,10 +29,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "src/app/api/**/*.ts": {
-      "maxDuration": 10
-    }
-  }
+  ]
 }

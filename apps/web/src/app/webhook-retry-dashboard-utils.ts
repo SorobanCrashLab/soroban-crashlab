@@ -1,4 +1,5 @@
 import { WebhookDeliveryHistoryItem } from '../fixtures/webhook-delivery-history';
+import { absoluteShort } from './utils/datetime';
 
 export type { WebhookDeliveryHistoryItem };
 
@@ -157,14 +158,7 @@ export function getStatusBadgeClass(status: 'delivered' | 'failed' | 'queued'): 
 export function formatTimestamp(isoString?: string): string {
   if (!isoString) return 'N/A';
   try {
-    const date = new Date(isoString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
+    return absoluteShort(isoString);
   } catch {
     return isoString;
   }

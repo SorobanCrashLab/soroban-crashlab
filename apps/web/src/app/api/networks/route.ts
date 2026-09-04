@@ -9,13 +9,10 @@ import { getStore, setStore } from "./_store";
 import { createdResponse } from '@/lib/api-response-utils';
 import { jsonError, readJsonBody, withRouteErrorHandling } from "@/lib/route-handler";
 import { withFixtureCaching } from '@/lib/fixture-caching';
+import { slugify as baseSlugify } from "@/app/utils/string";
 
 function slugify(name: string, existingNetworks: NetworkConfig[]): string {
-  const base = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const base = baseSlugify(name);
   const builtInIds = ["mainnet", "testnet", "futurenet"];
   const existingIds = new Set(existingNetworks.map((n) => n.id));
 

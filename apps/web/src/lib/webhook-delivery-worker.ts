@@ -1,5 +1,37 @@
 import { WebhookStore } from './webhook-store';
 import { createDlqEntry, type DlqAttemptNote, type DlqEntry } from './webhook-dlq';
+import { createHmac } from 'node:crypto';
+
+export type HmacKeyRing = {
+  current: string;
+  previous?: string;
+};
+
+export function createHmacSignature(payload: string, secret: string): string {
+  return `sha256=${createHmac('sha256', secret).update(payload).digest('hex')}`;
+}
+
+export function verifyHmacSignature(payload: string, signature: string, secrets: string[]): boolean {
+  for (const secret of secrets) {
+    const expected = createHmacSignature(payload, secret);
+    if (signature.length === expected.length) {
+      let match = true;
+      for (let i = 0; i < signature.length; i++) {
+        if (signature[i] !== expected[i]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return true;
+    }
+  }
+  return false;
+}
+
+export function verifyHmacWithKeyRing(payload: string, signature: string, ring: HmacKeyRing): boolean {
+  const secrets = [ring.current, ...(ring.previous ? [ring.previous] : [])];
+  return verifyHmacSignature(payload, signature, secrets);
+}
 
 export type WebhookDeliveryStatus = 'queued' | 'delivered' | 'failed';
 
@@ -45,6 +77,8 @@ export interface WebhookDeliveryWorkerOptions {
    * full error timeline so the dead-letter queue can replay it later.
    */
   onDeadLetter?: (entry: DlqEntry) => void;
+  hmacSecrets?: string[];
+  hmacKeyRing?: HmacKeyRing;
 }
 
 import { WEBHOOK_DELIVERY_TIMEOUT_MS, WEBHOOK_DELIVERY_RETRY_BASE_MS } from './timeouts';
@@ -52,6 +86,8 @@ import { WEBHOOK_DELIVERY_TIMEOUT_MS, WEBHOOK_DELIVERY_RETRY_BASE_MS } from './t
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 export class FetchWebhookDeliveryAdapter implements WebhookDeliveryAdapter {
+  constructor(private readonly hmacSecret?: string) {}
+
   async deliver(request: WebhookDeliveryRequest): Promise<{
     ok: boolean;
     statusCode?: number;
@@ -64,14 +100,21 @@ export class FetchWebhookDeliveryAdapter implements WebhookDeliveryAdapter {
     );
 
     try {
+      const payload = JSON.stringify(request.payload);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Webhook-Event': request.eventType,
+      };
+      if (this.hmacSecret) {
+        headers['X-Webhook-Signature'] = createHmacSignature(payload, this.hmacSecret);
+      }
+      if (request.headers) {
+        Object.assign(headers, request.headers);
+      }
       const response = await fetch(request.url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Webhook-Event': request.eventType,
-          ...request.headers,
-        },
-        body: JSON.stringify(request.payload),
+        headers,
+        body: payload,
         signal: controller.signal,
       });
 
@@ -101,12 +144,20 @@ export class WebhookDeliveryWorker {
   private readonly delay: (ms: number) => Promise<void>;
   private readonly onAttempt?: (attempt: WebhookDeliveryAttempt) => void;
   private readonly onDeadLetter?: (entry: DlqEntry) => void;
+  private readonly hmacSecrets: string[];
   private readonly queue: WebhookDeliveryRequest[] = [];
   private active = false;
   private draining: Promise<void> | null = null;
 
   constructor(options: WebhookDeliveryWorkerOptions = {}) {
-    this.adapter = options.adapter ?? new FetchWebhookDeliveryAdapter();
+    const ringSecrets = options.hmacKeyRing ? [options.hmacKeyRing.current, ...(options.hmacKeyRing.previous ? [options.hmacKeyRing.previous] : [])] : [];
+    const secrets = options.hmacSecrets ?? ringSecrets;
+    this.hmacSecrets = secrets;
+    if (!options.adapter && secrets.length > 0) {
+      this.adapter = new FetchWebhookDeliveryAdapter(secrets[0]);
+    } else {
+      this.adapter = options.adapter ?? new FetchWebhookDeliveryAdapter(secrets[0]);
+    }
     this.store = options.store ?? null;
     this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.retryBaseMs = options.retryBaseMs ?? WEBHOOK_DELIVERY_RETRY_BASE_MS;
@@ -117,6 +168,20 @@ export class WebhookDeliveryWorker {
       ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.onAttempt = options.onAttempt;
     this.onDeadLetter = options.onDeadLetter;
+  }
+
+  getHmacSecrets(): string[] {
+    return [...this.hmacSecrets];
+  }
+
+  signPayload(payload: unknown): string | null {
+    if (this.hmacSecrets.length === 0) return null;
+    return createHmacSignature(JSON.stringify(payload), this.hmacSecrets[0]);
+  }
+
+  verifyPayload(payload: unknown, signature: string): boolean {
+    if (this.hmacSecrets.length === 0) return false;
+    return verifyHmacSignature(JSON.stringify(payload), signature, this.hmacSecrets);
   }
 
   enqueue(request: WebhookDeliveryRequest): void {
