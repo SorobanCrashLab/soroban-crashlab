@@ -43,12 +43,9 @@ jobs:
         run: pnpm run build
         working-directory: apps/web
 
-      # Fails (non-zero exit) when a route group exceeds its budget and posts a
-      # PR comment naming the offending group + its size delta versus the limit.
+      # Fails (non-zero exit) when a route group exceeds its budget and prints
+      # the offending group + its size delta versus the limit.
       - name: Run Size-Limit and fail on budget breach
-        uses: andresz1/size-limit-action@v1.7.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          directory: apps/web
-          # fail_on_exceed: true is the action default; explicit for clarity.
-          fail_on_exceed: true
+        run: pnpm run size
+        working-directory: apps/web
+

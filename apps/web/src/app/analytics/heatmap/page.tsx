@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   MetricKey,
   SelectedCell,
@@ -11,9 +12,6 @@ import {
   formatDelta,
   getCellId,
 } from '../../add-heatmap-interactions';
-import { BackLink } from '../../../components/BackLink';
-import { HeatmapLegend } from '../../../components/heatmap/HeatmapLegend';
-import { HeatmapSummaryStats } from '../../../components/heatmap/HeatmapSummaryStats';
 
 export default function HeatmapPage() {
   const [metric, setMetric] = useState<MetricKey>('runtimeDelta');
@@ -68,7 +66,15 @@ export default function HeatmapPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <BackLink href="/">Back to Dashboard</BackLink>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 mb-4 transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Dashboard
+          </Link>
           <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
             Run Performance Heatmap
           </h1>
@@ -80,7 +86,32 @@ export default function HeatmapPage() {
         </div>
 
         {/* Summary Stats */}
-        <HeatmapSummaryStats summary={summary} />
+        <div className="mb-6 grid grid-cols-2 gap-3 rounded-2xl border border-orange-200 bg-orange-50/80 p-4 text-sm dark:border-orange-900/60 dark:bg-orange-950/20 md:grid-cols-4">
+          <div>
+            <div className="font-semibold text-orange-950 dark:text-orange-100">
+              {summary.total}
+            </div>
+            <div className="text-orange-800 dark:text-orange-300">Total cells</div>
+          </div>
+          <div>
+            <div className="font-semibold text-orange-950 dark:text-orange-100">
+              {summary.regressions}
+            </div>
+            <div className="text-orange-800 dark:text-orange-300">Regressions above +5%</div>
+          </div>
+          <div>
+            <div className="font-semibold text-orange-950 dark:text-orange-100">
+              {summary.severe}
+            </div>
+            <div className="text-orange-800 dark:text-orange-300">Severe regressions</div>
+          </div>
+          <div>
+            <div className="font-semibold text-orange-950 dark:text-orange-100">
+              {summary.improvements}
+            </div>
+            <div className="text-orange-800 dark:text-orange-300">Improvements</div>
+          </div>
+        </div>
 
         {/* Metric Toggle */}
         <div
@@ -231,7 +262,21 @@ export default function HeatmapPage() {
             </div>
 
             {/* Legend */}
-            <HeatmapLegend items={LEGEND_ITEMS} />
+            <div className="mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+              <h4 className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-3 uppercase tracking-wider">
+                Performance Legend
+              </h4>
+              <div className="flex flex-wrap gap-3 text-xs">
+                {LEGEND_ITEMS.map((item) => (
+                  <div key={item.key} className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded border ${item.className}`} />
+                    <span className="text-zinc-700 dark:text-zinc-300">
+                      {item.label} ({item.range})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </figure>
 
           {/* Detail Sidebar */}

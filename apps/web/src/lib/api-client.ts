@@ -1,5 +1,4 @@
 import {
-  FuzzingRun,
   CrashEvent,
   SignatureFrequency,
   CrashTrendPoint,
@@ -8,6 +7,12 @@ import {
 } from '../app/types';
 import { dedupedFetchJson, HttpError } from './request-dedup';
 import { API_BASE } from './api-base';
+import type {
+  RunsListResponse,
+  RunDetailResponse,
+  WebhookHistoryResponse,
+  WebhookDeliveryItem,
+} from './schemas/runs';
 
 export class ApiError extends Error {
   status: number;
@@ -92,8 +97,23 @@ export const api = {
     // GETs are deduped: several routes (dashboard, runs list, trends, triage,
     // analytics) independently fetch /api/runs on mount, so concurrent calls
     // share one in-flight request instead of issuing duplicate network calls.
-    list: (signal?: AbortSignal) =>
-      dedupedFetchJson<RunsListResponse>(apiUrl('/runs'), signal),
+    list: (
+      optionsOrSignal?: FetchRunsOptions | AbortSignal,
+      signal?: AbortSignal,
+    ) => {
+      const opts: FetchRunsOptions =
+        optionsOrSignal instanceof AbortSignal ? {} : (optionsOrSignal ?? {});
+      const resolvedSignal =
+        optionsOrSignal instanceof AbortSignal ? optionsOrSignal : signal;
+      const qs = new URLSearchParams();
+      if (opts.cursor) qs.set('cursor', opts.cursor);
+      if (opts.limit != null) qs.set('limit', String(opts.limit));
+      const path = qs.toString() ? `/runs?${qs.toString()}` : '/runs';
+      return dedupedFetchJson<RunsListResponse>(
+        apiUrl(path),
+        resolvedSignal,
+      );
+    },
     get: (id: string, signal?: AbortSignal) =>
       dedupedFetchJson<RunDetailResponse>(apiUrl(`/runs/${encodeURIComponent(id)}`), signal),
     issues: {
@@ -206,8 +226,29 @@ export const api = {
   },
 };
 
-export async function fetchRuns(signal?: AbortSignal): Promise<RunsListResponse> {
-  return api.runs.list(signal);
+export interface FetchRunsOptions {
+  /** Opaque keyset cursor from a previous response's `nextCursor` field. */
+  cursor?: string | null;
+  /** Maximum number of runs to return (default: server-side default). */
+  limit?: number;
+}
+
+/**
+ * Fetches paginated runs from the API.
+ *
+ * Supports two calling conventions for backward compatibility:
+ *   - `fetchRuns(signal?)` – original signature; no pagination options.
+ *   - `fetchRuns(options, signal?)` – new keyset-pagination signature.
+ */
+export async function fetchRuns(
+  optionsOrSignal?: FetchRunsOptions | AbortSignal | null,
+  signal?: AbortSignal,
+): Promise<RunsListResponse> {
+  const opts: FetchRunsOptions =
+    optionsOrSignal instanceof AbortSignal ? {} : (optionsOrSignal ?? {});
+  const resolvedSignal =
+    optionsOrSignal instanceof AbortSignal ? optionsOrSignal : signal;
+  return api.runs.list(opts, resolvedSignal);
 }
 
 /**

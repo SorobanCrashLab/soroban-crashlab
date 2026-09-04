@@ -1,49 +1,70 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import {
+  ErrorBoundaryState,
+  initialErrorState,
+  errorStateFromError,
+  resetErrorState,
+  haveResetKeysChanged,
+} from './error-boundary-utils';
 
-interface Props {
+export interface ErrorBoundaryProps {
   children: ReactNode;
-  fallback?: ReactNode;
+  fallback?: ReactNode | ((error: Error, reset: () => void) => ReactNode);
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  onReset?: () => void;
   onRetry?: () => void;
+  resetKeys?: readonly unknown[];
 }
 
-interface State {
-  hasError: boolean;
-  error?: Error;
-}
-
-class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
+    this.state = initialErrorState;
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return errorStateFromError(error);
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error', error, errorInfo);
+    this.props.onError?.(error, errorInfo);
   }
 
-  handleRetry = () => {
-    this.setState({ hasError: false, error: undefined });
-    if (this.props.onRetry) {
-      this.props.onRetry();
+  componentDidUpdate(prevProps: ErrorBoundaryProps) {
+    if (this.state.hasError && haveResetKeysChanged(prevProps.resetKeys, this.props.resetKeys)) {
+      this.reset();
     }
+  }
+
+  reset = () => {
+    this.setState(resetErrorState());
+    this.props.onReset?.();
+    this.props.onRetry?.();
   };
 
-  render() {
-    if (this.state.hasError) {
+  render(): ReactNode {
+    const { hasError, error } = this.state;
+    const { children, fallback } = this.props;
+
+    if (hasError && error) {
+      if (typeof fallback === 'function') {
+        return fallback(error, this.reset);
+      }
+      if (fallback !== undefined) {
+        return fallback;
+      }
       return (
         <div>
-          <h1>Something went wrong.</h1>
-          <button onClick={this.handleRetry}>Try again</button>
+          <h2>Something went wrong</h2>
+          {error.message && <p>{error.message}</p>}
+          <button onClick={this.reset}>Retry</button>
         </div>
       );
     }
 
-    return this.props.children;
+    return children;
   }
 }
 
+export { ErrorBoundary };
 export default ErrorBoundary;

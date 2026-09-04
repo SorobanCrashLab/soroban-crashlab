@@ -49,6 +49,7 @@ describe('dedupedFetchJson', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   describe('happy path', () => {
@@ -416,7 +417,7 @@ describe('dedupedFetchJson', () => {
 
       await dedupedFetchJson('/api/runs');
 
-      expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+      expect(setTimeoutSpy).toHaveBeenCalledTimes(2);
       expect(unref).toHaveBeenCalledTimes(1);
       setTimeoutSpy.mockRestore();
     });
@@ -518,8 +519,15 @@ describe('typed error taxonomy (#1383)', () => {
     vi.useFakeTimers();
     const { dedupedFetchJson, TimeoutError, NO_RETRY_FETCH_POLICY } = await loadModule();
 
-    // fetch never resolves — simulates a hung connection
-    fetchMock.mockReturnValue(new Promise(() => {}));
+    // fetch simulates a hung connection that aborts when the deadline signal fires
+    fetchMock.mockImplementation(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError')),
+          );
+        }),
+    );
 
     const pending = dedupedFetchJson('/api/slow', undefined, {
       ...NO_RETRY_FETCH_POLICY,
@@ -631,7 +639,7 @@ describe('multi-caller fan-out on failure (#1383)', () => {
   });
 
   it('broadcasts one rejection to all concurrent awaiters simultaneously', async () => {
-    const { dedupedFetchJson, NO_RETRY_FETCH_POLICY } = await loadModule();
+    const { dedupedFetchJson, NO_RETRY_FETCH_POLICY, NetworkError } = await loadModule();
 
     const gate = deferred<Response>();
     fetchMock.mockReturnValue(gate.promise);
@@ -654,9 +662,12 @@ describe('multi-caller fan-out on failure (#1383)', () => {
     expect(r2.status).toBe('rejected');
     expect(r3.status).toBe('rejected');
 
-    if (r1.status === 'rejected') expect(r1.reason).toBe(boom);
-    if (r2.status === 'rejected') expect(r2.reason).toBe(boom);
-    if (r3.status === 'rejected') expect(r3.reason).toBe(boom);
+    if (r1.status === 'rejected') {
+      expect(r1.reason).toBeInstanceOf(NetworkError);
+      expect((r1.reason as InstanceType<typeof NetworkError>).cause).toBe(boom);
+    }
+    if (r2.status === 'rejected') expect(r2.reason).toBe(r1.reason);
+    if (r3.status === 'rejected') expect(r3.reason).toBe(r1.reason);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
