@@ -43,10 +43,10 @@ function elementTreeContainsText(
   if (!React.isValidElement(el)) return false;
 
   // If the element type is a function component, expand it first.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let node: React.ReactElement = el as any;
   while (typeof node.type === 'function') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const expanded = (node.type as any)(node.props);
     if (!React.isValidElement(expanded)) {
       return elementTreeContainsText(expanded, text);
@@ -55,7 +55,7 @@ function elementTreeContainsText(
   }
 
   // Access props via any cast to avoid strict React type issues.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const props = node.props as any;
   if (props?.children) {
     const kids: React.ReactNode[] = Array.isArray(props.children)
@@ -80,10 +80,10 @@ function findElementByClass(
   if (!React.isValidElement(el)) return null;
 
   // If the element type is a function component, expand it first.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let node: React.ReactElement = el as any;
   while (typeof node.type === 'function') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const expanded = (node.type as any)(node.props);
     if (!React.isValidElement(expanded)) {
       return expanded != null ? null : null; // primitive or null
@@ -92,7 +92,7 @@ function findElementByClass(
   }
 
   // Access props via any cast to avoid strict React type issues.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const props = node.props as any;
   if (props?.className === className) return node;
 

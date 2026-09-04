@@ -11,7 +11,7 @@
  * route file, so the user always sees a consistent initial dataset.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 const g = globalThis as Record<string, any>;
 
 function getOrCreateMap<V>(key: string): Map<string, V> {

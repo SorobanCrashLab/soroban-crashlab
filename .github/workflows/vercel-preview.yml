@@ -4,11 +4,20 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: vercel-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   vercel-preview:
     name: Deploy Vercel Preview
     runs-on: ubuntu-latest
-    if: ${{ secrets.VERCEL_TOKEN != '' }}
+    timeout-minutes: 15
+    if: ${{ secrets.VERCEL_TOKEN != '' && github.event_name == 'pull_request' }}
     
     steps:
       - name: Checkout Code

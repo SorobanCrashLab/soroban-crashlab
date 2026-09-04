@@ -62,7 +62,7 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
                             {children}
                         </li>
                     ),
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                     
                     code: ({ inline, className, children, ...props }: any) => {
                         return !inline ? (
                             <pre className="bg-zinc-950 dark:bg-black p-4 rounded-lg overflow-x-auto my-4 border border-zinc-800 shadow-lg">
