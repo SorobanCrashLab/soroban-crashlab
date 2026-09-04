@@ -46,7 +46,8 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{
           __html: `\n            try {\n              var t = localStorage.getItem('crashlab:theme');\n              var d = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);\n              document.documentElement.classList.toggle('dark', d);\n            } catch(e) {}\n            document.documentElement.classList.add('theme-ready');\n          ` }} />
-        <link rel="icon" href="/favicon/192x192/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/favicon/192x192/favicon.svg" type="image/svg+xml" sizes="192x192" />
         <link rel="apple-touch-icon" href="/favicon/180x180/favicon.svg" />
         <meta name="theme-color" content="#0A66C2" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#0c0c0c" media="(prefers-color-scheme: dark)" />
