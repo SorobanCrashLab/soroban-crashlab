@@ -109,14 +109,14 @@
     "test:flaky-classification": "npx tsc src/app/analytics/flaky/flaky-classification.ts src/app/analytics/flaky/flaky-classification.test.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop && node build/test-tmp/app/analytics/flaky/flaky-classification.test.js"
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.62.0",
+    "@sentry/nextjs": "^10.74.0",
     "@uploadthing/react": "^7.3.3",
     "@upstash/redis": "^1.38.4",
     "@vercel/kv": "^3.0.0",
-    "next": "16.1.6",
+    "next": "16.3.4",
     "nodemailer": "^6.10.1",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
@@ -124,7 +124,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@playwright/test": "1.61.1",
+    "@playwright/test": "1.63.0",
     "@size-limit/file": "^13.0.3",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/jest": "^30.0.0",
@@ -135,7 +135,7 @@
     "@vitest/coverage-istanbul": "^2.1.8",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.3.4",
     "size-limit": "^11.2.0",
     "tailwindcss": "^4",
     "typescript": "^5.9.3",
