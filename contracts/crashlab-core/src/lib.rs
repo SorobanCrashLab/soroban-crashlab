@@ -30,7 +30,7 @@ pub use cors::{
 pub use health::{
     FailureMetrics, HealthMonitor, HealthStatus, HealthSummary, QueueMetrics, ThroughputMetrics,
 };
-pub use prng::{PrngMutator, SeededPrng};
+pub use prng::{PrngMutator, RandomizeMutator, SeededPrng};
 pub use reproducer::{
     FlakyDetector, ReproReport, filter_ci_pack, shrink_bundle_payload,
     shrink_seed_preserving_signature,
@@ -283,11 +283,46 @@ impl CaseBundle {
 
 pub fn mutate_seed(seed: &CaseSeed) -> CaseSeed {
     let mut rng = SeededPrng::new(seed.id);
-    let payload = seed.payload.iter().map(|b| b ^ rng.next_byte()).collect();
+    let len = seed.payload.len();
+
+    if len == 0 {
+        return CaseSeed {
+            id: seed.id,
+            payload: vec![rng.next_byte()],
+        };
+    }
+
+    let mut payload = seed.payload.clone();
+    if len == 1 {
+        payload[0] = rng.next_byte();
+        return CaseSeed {
+            id: seed.id,
+            payload,
+        };
+    }
+
+    let preserve_index = (rng.next_u64() as usize) % len;
+    let mutate_count = (len / 2).max(1).min(len - 1);
+    let mut candidates: Vec<usize> = (0..len).filter(|&idx| idx != preserve_index).collect();
+
+    for _ in 0..mutate_count {
+        let idx = (rng.next_u64() as usize) % candidates.len();
+        let position = candidates.remove(idx);
+        payload[position] = rng.next_byte();
+    }
 
     CaseSeed {
         id: seed.id,
         payload,
+    }
+}
+
+pub fn randomize_seed(seed: &CaseSeed) -> CaseSeed {
+    let mut rng = SeededPrng::new(seed.id);
+    let len = seed.payload.len().max(1);
+    CaseSeed {
+        id: seed.id,
+        payload: rng.mutation_stream(len),
     }
 }
 
