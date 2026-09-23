@@ -10,31 +10,31 @@ const STEPS = [
     number: "01",
     title: "Point it at your contract",
     body: "Drop in a WASM file or paste a Stellar contract ID. CrashLab reads the exported functions and figures out what to break. No config needed to get started.",
-    accent: "#111111",
+    accent: "var(--text-primary)",
   },
   {
     number: "02",
     title: "Set up the fuzz campaign",
     body: "Pick which functions to stress, set mutation depth, resource limits, and how long to run. Or just hit start and let it figure things out on its own.",
-    accent: "#111111",
+    accent: "var(--text-primary)",
   },
   {
     number: "03",
     title: "It mutates, executes, watches",
     body: "The fuzzer generates thousands of mutated inputs, sends them to your contract on a local or testnet Stellar node, and watches for panics, out of bounds reads, and resource overflows.",
-    accent: "#111111",
+    accent: "var(--text-primary)",
   },
   {
     number: "04",
     title: "Triage what broke",
     body: "Crashes cluster by signature. The board groups identical failures together, shows the exact call sequence that triggered each one, and links to the ledger changes.",
-    accent: "#333333",
+    accent: "var(--text-secondary)",
   },
   {
     number: "05",
     title: "Ship the fix with proof",
     body: "Export a reproduction snippet, open a GitHub issue straight from the dashboard, or feed the failure into CI. Every crash comes with a replayable proof.",
-    accent: "#444444",
+    accent: "var(--text-secondary)",
   },
 ];
 
@@ -102,8 +102,8 @@ function StepCard({ step, index }: { step: (typeof STEPS)[number]; index: number
         <div className="flex gap-4 sm:gap-6">
           <div className="flex flex-col items-center shrink-0">
             <div
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-white shrink-0"
-              style={{ fontFamily: 'var(--font-odometer)', backgroundColor: step.accent }}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0"
+              style={{ fontFamily: 'var(--font-odometer)', backgroundColor: step.accent, color: 'var(--bg)' }}
             >
               {step.number}
             </div>
@@ -141,7 +141,7 @@ function FeatureCard({ feature, index }: { feature: (typeof FEATURES)[number]; i
         <div className="rounded-xl p-6 h-full" style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border-color)" }}>
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
-            style={{ backgroundColor: "var(--highlight-bg)", color: "#111111" }}
+            style={{ backgroundColor: "var(--highlight-bg)", color: "var(--text-primary)" }}
           >
             {feature.icon}
           </div>
@@ -221,8 +221,8 @@ export default function LandingPage() {
               <Link
                 href="/dashboard"
                 prefetch
-                className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full text-sm font-bold text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
-                style={{ backgroundColor: "#111111" }}
+                className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full text-sm font-bold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
+                style={{ backgroundColor: "var(--text-primary)", color: "var(--bg)" }}
               >
                 <svg
                   className="w-4 h-4"
@@ -286,7 +286,7 @@ export default function LandingPage() {
           <div className="text-center mb-14">
             <p
               className="text-xs font-bold tracking-widest uppercase mb-3"
-              style={{ color: "#111111" }}
+              style={{ color: "var(--text-primary)" }}
             >
               How it works
             </p>
@@ -318,7 +318,7 @@ export default function LandingPage() {
             <div className="text-center mb-14">
               <p
                 className="text-xs font-bold tracking-widest uppercase mb-3"
-                style={{ color: "#111111" }}
+                style={{ color: "var(--text-primary)" }}
               >
                 Features
               </p>
@@ -347,7 +347,7 @@ export default function LandingPage() {
           <div className="text-center mb-10">
             <p
               className="text-xs font-bold tracking-widest uppercase mb-3"
-              style={{ color: "#333333" }}
+              style={{ color: "var(--text-primary)" }}
             >
               Why this matters
             </p>
@@ -417,8 +417,8 @@ export default function LandingPage() {
           <Link
             href="/dashboard"
             prefetch
-            className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full text-sm font-bold text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
-            style={{ backgroundColor: "#111111" }}
+            className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full text-sm font-bold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
+            style={{ backgroundColor: "var(--text-primary)", color: "var(--bg)" }}
           >
             <svg
               className="w-4 h-4"
@@ -461,7 +461,7 @@ export default function LandingPage() {
               <span className="flex items-center gap-1.5">
                 <span
                   className="w-2 h-2 rounded-full inline-block"
-                  style={{ backgroundColor: "#444444" }}
+                  style={{ backgroundColor: "var(--text-primary)" }}
                 />
                 Stellar Testnet
               </span>
@@ -473,7 +473,7 @@ export default function LandingPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:underline"
-                style={{ color: "#111111" }}
+                style={{ color: "var(--text-primary)" }}
               >
                 GitHub
               </a>
