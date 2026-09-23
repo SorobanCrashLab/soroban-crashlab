@@ -36,6 +36,7 @@ import {
   type CallFrameAssignment,
   type CallStatusFilter,
 } from './run-sequence-diagram-utils';
+import { EmptyState } from '../../../components/EmptyState';
 
 interface RunSequenceDiagramProps {
   steps: ContractCallStep[];
@@ -61,20 +62,6 @@ function StatusBadge({ status }: { status: ContractCallStatus }) {
     >
       {status.toUpperCase()}
     </span>
-  );
-}
-
-function EmptyState({ title, hint }: { title: string; hint: string }) {
-  return (
-    <div
-      className="rounded-xl border border-dashed p-8 text-center"
-      style={{ borderColor: 'var(--border-color)', background: 'var(--bg)' }}
-    >
-      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-        {title}
-      </p>
-      <p className="text-meta mt-1">{hint}</p>
-    </div>
   );
 }
 
@@ -130,8 +117,10 @@ export default function RunSequenceDiagram({
   if (summary.total === 0) {
     return (
       <EmptyState
+        type="generic"
         title="No contract calls recorded"
-        hint="Runs still in flight have not committed a final call trace yet. The sequence appears once the run finishes."
+        description="Runs still in flight have not committed a final call trace yet. The sequence appears once the run finishes."
+        compact
       />
     );
   }
@@ -165,8 +154,10 @@ export default function RunSequenceDiagram({
 
       {visibleSteps.length === 0 ? (
         <EmptyState
+          type="generic"
           title="No calls match this filter"
-          hint={`This run has no ${filter} calls. Choose a different outcome above.`}
+          description={`This run has no ${filter} calls. Choose a different outcome above.`}
+          compact
         />
       ) : (
         // Deep recursive traces get real horizontal room to breathe instead of
