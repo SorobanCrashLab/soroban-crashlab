@@ -18,7 +18,7 @@ export default function RunDetailAutoRefresh({ runId, initialStatus }: RunDetail
   const [status, setStatus] = useState<RunStatus>(initialStatus);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useRunStream(runId, (envelope) => {
-    if (envelope.event.type === 'RUN_STATUS') {
+    if (envelope.event.type === 'RUN_STATUS' || envelope.event.type === 'STATIC') {
       setStatus(envelope.event.status);
       router.refresh();
     }

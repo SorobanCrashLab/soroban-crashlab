@@ -1,12 +1,24 @@
 import type { Artifact, RunStatus } from '@/app/types';
 import type { LogEntry } from '@/app/log-viewer-utils';
 
-export type RunStreamEventType = 'RUN_STATUS' | 'LOG_APPEND' | 'ARTIFACT_ADDED' | 'HEARTBEAT';
+export type RunStreamEventType =
+  | 'RUN_STATUS'
+  | 'LOG_APPEND'
+  | 'ARTIFACT_ADDED'
+  | 'HEARTBEAT'
+  | 'STATIC';
 
 export interface RunStatusEvent {
   type: 'RUN_STATUS';
   status: RunStatus;
   metrics?: { seedCount?: number; duration?: number };
+}
+
+export interface StaticRunEvent {
+  type: 'STATIC';
+  status: RunStatus;
+  metrics: { seedCount: number; duration: number };
+  reason: 'terminal';
 }
 
 export interface LogAppendEvent {
@@ -24,7 +36,12 @@ export interface HeartbeatEvent {
   at: string;
 }
 
-export type RunStreamPayload = RunStatusEvent | LogAppendEvent | ArtifactAddedEvent | HeartbeatEvent;
+export type RunStreamPayload =
+  | RunStatusEvent
+  | LogAppendEvent
+  | ArtifactAddedEvent
+  | HeartbeatEvent
+  | StaticRunEvent;
 
 export interface RunStreamEnvelope<T extends RunStreamPayload = RunStreamPayload> {
   seq: number;

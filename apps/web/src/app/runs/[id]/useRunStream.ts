@@ -5,7 +5,7 @@ import type { RunStreamEnvelope, RunStreamPayload } from '@/lib/run-stream';
 
 const INITIAL_RECONNECT_MS = 500;
 const MAX_RECONNECT_MS = 10_000;
-const EVENT_TYPES = ['RUN_STATUS', 'LOG_APPEND', 'ARTIFACT_ADDED', 'HEARTBEAT'] as const;
+const EVENT_TYPES = ['RUN_STATUS', 'LOG_APPEND', 'ARTIFACT_ADDED', 'HEARTBEAT', 'STATIC'] as const;
 
 export interface RunStreamState {
   connected: boolean;
@@ -45,6 +45,12 @@ export function useRunStream(runId: string, onEvent?: (event: RunStreamEnvelope)
           lastSeqRef.current = envelope.seq;
           setState({ connected: true, lastSeq: envelope.seq, lastEvent: envelope });
           onEventRef.current?.(envelope);
+          if (envelope.event.type === 'STATIC') {
+            source.onerror = null;
+            source.close();
+            eventSourceRef.current = null;
+            setState((current) => ({ ...current, connected: false }));
+          }
         } catch {
           // Ignore malformed events and keep the stream alive.
         }
