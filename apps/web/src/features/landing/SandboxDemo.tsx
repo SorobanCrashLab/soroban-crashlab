@@ -33,6 +33,7 @@ export default function SandboxDemo() {
 
   useEffect(() => {
     if (prefersReducedMotion()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- apply reduced-motion preference once on mount
       setFrameIndex(SANDBOX_FRAMES.length - 1);
       setPlaying(false);
     }

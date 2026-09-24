@@ -1,7 +1,7 @@
 /**
  * lib/openapi/registry — single source of truth for the API surface (#1670).
  *
- * Each route handler under app/api/**/route.ts gets one entry here.
+ * Each route handler under app/api/**\/route.ts gets one entry here.
  * The contract test gains a spec-drift check: any handler without a registry
  * entry fails CI, and openapi.json is committed so PRs show a spec delta.
  */
