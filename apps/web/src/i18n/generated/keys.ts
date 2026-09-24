@@ -41,6 +41,11 @@ export const MESSAGE_KEYS = [
   'notifications.types.success',
   'notifications.types.title',
   'notifications.types.warning',
+  'landing.sandbox.body',
+  'landing.sandbox.eyebrow',
+  'landing.sandbox.pause',
+  'landing.sandbox.play',
+  'landing.sandbox.title',
 ] as const;
 
 export type MessageKey = (typeof MESSAGE_KEYS)[number];

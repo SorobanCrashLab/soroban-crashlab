@@ -26,6 +26,28 @@ import { defineJsonStorage, defineStringStorage } from './local-storage';
 // Key matches THEME_STORAGE_KEY in theme-provider-utils.ts
 export const themeStore = defineStringStorage('crashlab:theme');
 
+// ── Accessibility preferences (#1668) ────────────────────────────────────────
+export interface AccessibilityPrefs {
+  motion: 'system' | 'reduced' | 'full';
+  textScale: 100 | 112 | 125 | 150;
+  contrast: 'standard' | 'high';
+}
+
+export const accessibilityPrefsStore = defineJsonStorage<AccessibilityPrefs>(
+  'crashlab:accessibility-prefs:v1',
+);
+
+// ── Triage swimlane layout (#1667) ───────────────────────────────────────────
+export interface TriageSwimlaneStored {
+  groupBy: 'status' | 'severity' | 'area';
+  order: string[];
+  collapsed: Record<string, boolean>;
+}
+
+export const triageSwimlaneStore = defineJsonStorage<TriageSwimlaneStored>(
+  'crashlab:triage-swimlane:v1',
+);
+
 // ── Column visibility / order (exemplar 2) ────────────────────────────────────
 export const columnSettingsStore = defineJsonStorage<string[]>(
   'crashlab:column-settings:v1',

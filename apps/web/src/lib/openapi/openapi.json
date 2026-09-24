@@ -1,0 +1,80 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Soroban CrashLab API",
+    "version": "1.0.0",
+    "description": "Machine-readable contract. Success envelope { data, total? }; errors { error, code?, fieldErrors? }. Auth: Authorization: Bearer <token> with scopes read/write (scl_live_*). Pagination: cursor + limit (keyset)."
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/api/health": { "get": { "summary": "Service health check", "tags": ["ops"] } },
+    "/api/health/metrics": { "get": { "summary": "Scrape endpoint metrics", "tags": ["ops"] } },
+    "/api/runs": {
+      "get": { "summary": "List fuzzing runs (keyset paginated)", "tags": ["runs"] },
+      "post": { "summary": "Create a fuzzing run", "tags": ["runs"] }
+    },
+    "/api/runs/{id}": {
+      "get": { "summary": "Get a single run", "tags": ["runs"] },
+      "delete": { "summary": "Delete a run (maintainer)", "tags": ["runs"] }
+    },
+    "/api/runs/{id}/annotations": {
+      "get": { "summary": "List run annotations", "tags": ["runs"] },
+      "post": { "summary": "Add a run annotation", "tags": ["runs"] }
+    },
+    "/api/runs/{id}/issues": {
+      "get": { "summary": "List issues linked to a run", "tags": ["runs"] },
+      "post": { "summary": "Link an issue to a run", "tags": ["runs"] }
+    },
+    "/api/runs/{id}/tags": {
+      "get": { "summary": "List run tags", "tags": ["runs"] },
+      "post": { "summary": "Add tags to a run", "tags": ["runs"] }
+    },
+    "/api/runs/{id}/replay": { "post": { "summary": "Replay a crashed run (maintainer)", "tags": ["runs"] } },
+    "/api/runs/{id}/replay-history": { "get": { "summary": "Replay history for a run", "tags": ["runs"] } },
+    "/api/runs/{id}/stream": { "get": { "summary": "Stream run progress (SSE)", "tags": ["runs"] } },
+    "/api/artifacts": {
+      "get": { "summary": "List artifacts", "tags": ["artifacts"] },
+      "post": { "summary": "Upload an artifact bundle", "tags": ["artifacts"] }
+    },
+    "/api/artifacts/{id}": { "get": { "summary": "Get an artifact", "tags": ["artifacts"] } },
+    "/api/artifacts/validate": { "post": { "summary": "Validate an artifact bundle", "tags": ["artifacts"] } },
+    "/api/campaigns": {
+      "get": { "summary": "List fuzz campaigns", "tags": ["campaigns"] },
+      "post": { "summary": "Create a fuzz campaign", "tags": ["campaigns"] }
+    },
+    "/api/schedules": {
+      "get": { "summary": "List schedules", "tags": ["schedules"] },
+      "post": { "summary": "Create a schedule", "tags": ["schedules"] }
+    },
+    "/api/schedules/{id}": { "get": { "summary": "Get a schedule", "tags": ["schedules"] } },
+    "/api/schedules/tick": { "post": { "summary": "Advance due schedules", "tags": ["schedules"] } },
+    "/api/webhooks": {
+      "get": { "summary": "List webhooks", "tags": ["webhooks"] },
+      "post": { "summary": "Create a webhook", "tags": ["webhooks"] }
+    },
+    "/api/webhooks/history": { "get": { "summary": "Webhook delivery history", "tags": ["webhooks"] } },
+    "/api/webhooks/retry": { "post": { "summary": "Retry a webhook delivery", "tags": ["webhooks"] } },
+    "/api/notifications": { "get": { "summary": "List notifications", "tags": ["notifications"] } },
+    "/api/networks": { "get": { "summary": "List Stellar networks", "tags": ["networks"] } },
+    "/api/networks/{id}": { "get": { "summary": "Get a network", "tags": ["networks"] } },
+    "/api/networks/active": { "get": { "summary": "Active network", "tags": ["networks"] } },
+    "/api/settings/tokens": { "get": { "summary": "List API tokens", "tags": ["settings"] } },
+    "/api/settings/tokens/{id}/revoke": { "post": { "summary": "Revoke an API token", "tags": ["settings"] } },
+    "/api/settings/tokens/{id}/rotate": { "post": { "summary": "Rotate an API token", "tags": ["settings"] } },
+    "/api/settings/alerting": { "get": { "summary": "Get alerting config", "tags": ["settings"] } },
+    "/api/auth/github/login": { "get": { "summary": "Start GitHub OAuth", "tags": ["auth"] } },
+    "/api/auth/github/callback": { "get": { "summary": "GitHub OAuth callback", "tags": ["auth"] } },
+    "/api/openapi": { "get": { "summary": "This OpenAPI document", "tags": ["ops"] } }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "API token (scl_live_*) or scrape token." }
+    },
+    "schemas": {
+      "SuccessEnvelope": { "type": "object", "required": ["data"], "properties": { "data": {}, "total": { "type": "number" } } },
+      "ErrorEnvelope": { "type": "object", "required": ["error"], "properties": { "error": { "type": "string" } } },
+      "CodedErrorEnvelope": { "type": "object", "required": ["error", "code"], "properties": { "error": { "type": "string" }, "code": { "type": "string" } } }
+    }
+  }
+}

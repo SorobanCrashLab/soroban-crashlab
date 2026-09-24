@@ -9,6 +9,20 @@ import { RUN_STATUSES, isTerminalStatus } from '../lib/run-status';
 
 export type BulkActionType = 'cancel' | 'retry' | 'delete' | 'export' | 'tag' | 'assign';
 
+export interface BulkTagPayload {
+  tags: string[];
+}
+
+export interface BulkAssignPayload {
+  assignee: string;
+}
+
+export interface BulkUndoSnapshot {
+  runs: FuzzingRun[];
+  selectedRunIds: string[];
+  takenAt: string;
+}
+
 const RETRYABLE_STATUSES: RunStatus[] = ['failed', 'cancelled'];
 /** Any run that has stopped changing state can be deleted. */
 const DELETABLE_STATUSES: RunStatus[] = RUN_STATUSES.filter(isTerminalStatus);
@@ -58,6 +72,56 @@ export function getSelectedRuns(
 }
 
 /**
+ * Range-select helper for shift-click (#1667). Returns the inclusive slice of
+ * orderedIds between anchorId and focusId (either direction).
+ */
+export function selectRange(
+  orderedIds: string[],
+  anchorId: string | null,
+  focusId: string,
+): string[] {
+  if (!anchorId) return [focusId];
+  const from = orderedIds.indexOf(anchorId);
+  const to = orderedIds.indexOf(focusId);
+  if (from === -1 || to === -1) return [focusId];
+  const [lo, hi] = from <= to ? [from, to] : [to, from];
+  return orderedIds.slice(lo, hi + 1);
+}
+
+/**
+ * Select-all-in-lane helper (#1667). Adds every lane id to the selection;
+ * clears just the lane when it is already fully selected.
+ */
+export function selectAllInLane(
+  selectedRunIds: Set<string>,
+  laneRunIds: string[],
+): Set<string> {
+  const allSelected =
+    laneRunIds.length > 0 && laneRunIds.every((id) => selectedRunIds.has(id));
+  const next = new Set(selectedRunIds);
+  if (allSelected) {
+    for (const id of laneRunIds) next.delete(id);
+  } else {
+    for (const id of laneRunIds) next.add(id);
+  }
+  return next;
+}
+
+/**
+ * Snapshot runs + selection for undo toast rollback.
+ */
+export function createUndoSnapshot(
+  runs: FuzzingRun[],
+  selectedRunIds: Set<string>,
+): BulkUndoSnapshot {
+  return { runs: runs.map((r) => ({ ...r })), selectedRunIds: [...selectedRunIds], takenAt: new Date().toISOString() };
+}
+
+export function restoreUndoSnapshot(snapshot: BulkUndoSnapshot): { runs: FuzzingRun[]; selectedRunIds: Set<string> } {
+  return { runs: snapshot.runs.map((r) => ({ ...r })), selectedRunIds: new Set(snapshot.selectedRunIds) };
+}
+
+/**
  * Determines whether a bulk action can be performed on the selected runs.
  */
 export function canPerformBulkAction(
@@ -92,6 +156,7 @@ export function applyBulkActionToRuns(
   runs: FuzzingRun[],
   action: BulkActionType,
   runIds: string[],
+  data?: BulkTagPayload | BulkAssignPayload | Record<string, unknown>,
 ): FuzzingRun[] {
   switch (action) {
     case 'delete':
@@ -104,6 +169,32 @@ export function applyBulkActionToRuns(
       return runs.map((run) =>
         runIds.includes(run.id) ? { ...run, status: 'running' } : run,
       );
+    case 'tag': {
+      const raw = (data as BulkTagPayload | Record<string, unknown> | undefined);
+      const tags = Array.isArray((raw as BulkTagPayload)?.tags)
+        ? (raw as BulkTagPayload).tags
+        : typeof (raw as Record<string, unknown> | undefined)?.tags === 'string'
+          ? String((raw as Record<string, unknown>).tags).split(',').map((t) => t.trim()).filter(Boolean)
+          : [];
+      if (tags.length === 0) return runs;
+      return runs.map((run) =>
+        runIds.includes(run.id)
+          ? { ...run, tags: [...new Set([...(run.tags ?? []), ...tags])] }
+          : run,
+      );
+    }
+    case 'assign': {
+      const assignee =
+        typeof (data as BulkAssignPayload | undefined)?.assignee === 'string'
+          ? (data as BulkAssignPayload).assignee
+          : typeof (data as Record<string, unknown> | undefined)?.assignee === 'string'
+            ? String((data as Record<string, unknown>).assignee)
+            : '';
+      if (!assignee) return runs;
+      return runs.map((run) =>
+        runIds.includes(run.id) ? { ...run, annotations: [...(run.annotations ?? []), `assigned:${assignee}`] } : run,
+      );
+    }
     default:
       return runs;
   }

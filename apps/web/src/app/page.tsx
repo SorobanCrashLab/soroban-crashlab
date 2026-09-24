@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { LogoMark } from "../components/Logo";
 import { ScrollReveal } from "../components/scroll-effects/ScrollReveal";
 import { ScrollBeam, BeamChild } from "../components/scroll-effects/ScrollBeam";
+
+const SandboxDemo = dynamic(() => import("../features/landing/SandboxDemo"), { ssr: false });
 
 const STEPS = [
   {
@@ -308,6 +311,31 @@ export default function LandingPage() {
             <StepCard key={step.number} step={step} index={i} />
           ))}
         </div>
+      </section>
+
+      {/* ── Sandbox Demo (below the fold, lazy-mounted) ── */}
+      <section className="max-w-3xl mx-auto px-6 sm:px-8 py-20 sm:py-28" aria-label="Sandbox demo">
+        <ScrollReveal>
+          <div className="text-center mb-10">
+            <p
+              className="text-xs font-bold tracking-widest uppercase mb-3"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Live sandbox
+            </p>
+            <h2
+              className="text-2xl sm:text-3xl md:text-4xl tracking-tight"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: "var(--text-primary)" }}
+            >
+              Watch a fuzzing run find a real crash.
+            </h2>
+          </div>
+        </ScrollReveal>
+        <ScrollReveal delay={100}>
+          <BeamChild>
+            <SandboxDemo />
+          </BeamChild>
+        </ScrollReveal>
       </section>
 
       {/* ── Features ─────────────────────────────────── */}

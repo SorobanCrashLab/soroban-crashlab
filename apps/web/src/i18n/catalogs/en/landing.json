@@ -1,0 +1,9 @@
+{
+  "sandbox": {
+    "eyebrow": "Live sandbox",
+    "title": "Watch a fuzzing run find a real crash",
+    "body": "Canned fixture replay — no backend or account. Mutations stream in, a crash signature appears, and a reproducer snippet is generated.",
+    "play": "Play demo",
+    "pause": "Pause demo"
+  }
+}

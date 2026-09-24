@@ -9,7 +9,7 @@
  * live issue data fetched from the /api/runs/[id]/issues endpoint.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FuzzingRun, RunIssueLink } from "../types";
 import { fetchRuns as fetchRunsFromApi } from "../../lib/api-client";
 import {
@@ -28,6 +28,15 @@ import {
   getRovingTabIndex,
   type KeyboardBoardState,
 } from "./triage-board-keyboard";
+import BulkActionsForRuns from "../add-bulk-actions-for-runs";
+import { getSelectedRuns } from "../runs-bulk-actions-utils";
+import { useTriageSelection } from "./use-triage-selection";
+import {
+  DEFAULT_SWIMLANE_CONFIG,
+  parseSwimlaneConfig,
+} from "./triage-swimlane-layout";
+import { triageSwimlaneStore } from "../../lib/storage-registry";
+import { toUserMessage } from "../../lib/api-error-mapper";
 
 // ---------------------------------------------------------------------------
 // Data fetching
@@ -326,6 +335,7 @@ export default function TriageBoardPage() {
   const [dataState, setDataState] = useState<PageDataState>("loading");
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
   const [activeFilter, setActiveFilter] = useState<TriageFilter>("all");
+  const [swimlane, setSwimlane] = useState(DEFAULT_SWIMLANE_CONFIG);
   const filterButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
@@ -344,6 +354,24 @@ export default function TriageBoardPage() {
       cancelled = true;
     };
   }, []);
+
+  // #1667: hydrate persisted swimlane layout once; persist on change.
+  useEffect(() => {
+    try {
+      const stored = triageSwimlaneStore.get();
+      if (stored) setSwimlane(parseSwimlaneConfig(stored));
+    } catch {
+      /* keep defaults */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      triageSwimlaneStore.set(swimlane);
+    } catch {
+      /* storage quota / private mode — layout simply won't persist */
+    }
+  }, [swimlane]);
 
   const handleRetry = () => {
     setDataState("loading");
@@ -366,6 +394,9 @@ export default function TriageBoardPage() {
   const [kbState, setKbState] = useState<KeyboardBoardState>(createInitialState(null));
   const allVisibleRuns = visibleColumns.flatMap((c) => getColumnRuns(runs, c));
   const firstBoardId = allVisibleRuns[0]?.id ?? null;
+  const orderedIds = useMemo(() => allVisibleRuns.map((r) => r.id), [runs, activeFilter]);
+  const selection = useTriageSelection(orderedIds);
+  const selectedRuns = getSelectedRuns(runs, selection.selectedRunIds);
 
   // Until a card has been focused, the roving tabindex points at the first
   // card in the board. Derived during render rather than synced through an
@@ -505,6 +536,44 @@ export default function TriageBoardPage() {
               );
             })}
           </div>
+
+          {/* #1667: bulk toolbar with confirm + undo; optimistic with rollback */}
+          {selectedRuns.length > 0 && (
+            <BulkActionsForRuns
+              selectedRuns={selectedRuns}
+              onClearSelection={selection.clearSelection}
+              onAction={(action, ids, data) => {
+                try {
+                  const next = selection.applyOptimistic(runs, action, ids, data as Record<string, unknown>);
+                  setRuns(next);
+                  if (action !== 'export') selection.clearSelection();
+                } catch (err) {
+                  selection.setNotice(toUserMessage(err, 'Bulk action failed. Changes were rolled back.'));
+                }
+              }}
+            />
+          )}
+          {selection.notice && (
+            <div role="status" className="card card-padding mb-4 text-sm flex items-center justify-between">
+              <span>{selection.notice}</span>
+              <button type="button" className="btn-ghost text-xs" onClick={() => selection.setNotice(null)}>Dismiss</button>
+            </div>
+          )}
+          {selection.undoSnapshot && (
+            <div role="status" className="card card-padding mb-4 text-sm flex items-center justify-between">
+              <span>Bulk action applied.</span>
+              <button
+                type="button"
+                className="btn-outline text-xs"
+                onClick={() => {
+                  const restored = selection.undo();
+                  if (restored) setRuns(restored);
+                }}
+              >
+                Undo
+              </button>
+            </div>
+          )}
 
           {/* #1405: aria-live announcements (assertive for drop/cancel, polite for lift/move) */}
           <div aria-live={kbState.liftedId ? 'polite' : 'polite'} aria-atomic="true" className="sr-only" role="status">

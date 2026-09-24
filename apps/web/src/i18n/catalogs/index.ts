@@ -1,10 +1,11 @@
 import notificationsEn from './en/notifications.json';
+import landingEn from './en/landing.json';
 
 export type Locale = 'en';
 export const DEFAULT_LOCALE: Locale = 'en';
 
 const CATALOGS: Record<Locale, Record<string, unknown>> = {
-  en: { notifications: notificationsEn },
+  en: { notifications: notificationsEn, landing: landingEn },
 };
 
 /**

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { FuzzingRun } from '../../types';
 import { fetchRuns as fetchRunsFromApi } from '../../../lib/api-client';
+import { triageSwimlaneStore } from '../../../lib/storage-registry';
+import { parseSwimlaneConfig, DEFAULT_SWIMLANE_CONFIG } from '../triage-swimlane-layout';
 
 const ImplementRunWorkflowBoardPage58 = dynamic(
   () => import('../../implement-run-workflow-board-page-58'),
@@ -83,6 +85,17 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 export default function WorkflowBoardPage() {
   const [dataState, setDataState] = useState<PageDataState>('loading');
   const [runs, setRuns] = useState<FuzzingRun[]>([]);
+  // #1667: persisted swimlane layout (group-by/order/collapsed) — shared with /triage.
+  const [swimlane] = useState(() => {
+    try {
+      const stored = triageSwimlaneStore.get();
+      return stored ? parseSwimlaneConfig(stored) : DEFAULT_SWIMLANE_CONFIG;
+    } catch {
+      return DEFAULT_SWIMLANE_CONFIG;
+    }
+  });
+
+  void swimlane;
 
   useEffect(() => {
     let cancelled = false;
