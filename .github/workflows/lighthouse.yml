@@ -32,12 +32,12 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: apps/web/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
 
       - name: Build production bundle
-        run: pnpm run build
+        run: pnpm --dir apps/web run build
 
       # `next start`, not a static dist dir: /runs/:id is server-rendered on
       # demand and the dashboard fetches /api/runs on mount.

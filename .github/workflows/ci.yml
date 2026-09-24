@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/web-setup
-      - run: pnpm run lint
+      - run: pnpm --dir apps/web run lint
 
   web-unit:
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/web-setup
-      - run: pnpm run test
+      - run: pnpm --dir apps/web run test
       - name: Generate coverage report
         if: always()
         run: pnpm exec vitest run --coverage --reporter=lcov --reporter=text || echo "coverage generation skipped"
@@ -55,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/web-setup
-      - run: pnpm run build
+      - run: pnpm --dir apps/web run build
 
   core:
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -179,17 +179,17 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --dir apps/web exec playwright install --with-deps chromium
 
       - name: Install Playwright OS dependencies (always)
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm --dir apps/web exec playwright install-deps chromium
 
       - name: Build Next.js for E2E
-        run: pnpm run build
+        run: pnpm --dir apps/web run build
 
       - name: Run Playwright E2E tests
-        run: pnpm run test:e2e
+        run: pnpm --dir apps/web run test:e2e
 
       - name: Upload Playwright report
         if: always()
