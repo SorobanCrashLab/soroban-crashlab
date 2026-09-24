@@ -32,7 +32,6 @@ describe('Security Policy and Disclosure Path', () => {
   const readmePath = path.join(repoRoot, 'README.md');
   const contributingPath = path.join(repoRoot, 'CONTRIBUTING.md');
   const maintainerPlaybookPath = path.join(repoRoot, 'MAINTAINER_WAVE_PLAYBOOK.md');
-  const prDescriptionPath = path.join(repoRoot, 'PR_DESCRIPTION.md');
 
   describe('SECURITY.md file existence and structure', () => {
     it('should have a SECURITY.md file in .github directory', () => {
@@ -227,17 +226,6 @@ describe('Security Policy and Disclosure Path', () => {
       
       const todoMatches = content.match(/\bTODO\b|\bTBD\b/g);
       expect(todoMatches).toBeNull();
-    });
-  });
-
-  describe('Validation commands', () => {
-    it('should document validation commands in PR description', () => {
-      const content = fs.readFileSync(prDescriptionPath, 'utf-8');
-      
-      // Should reference the grep command for TODO/TBD checking
-      expect(content).toMatch(/grep.*TODO.*TBD|rg.*TODO.*TBD/i);
-      expect(content).toContain('npm run test:policy');
-      expect(content).toContain('Closes #');
     });
   });
 

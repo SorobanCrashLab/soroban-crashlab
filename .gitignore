@@ -23,3 +23,9 @@ issue.md
 AGENTS.md
 GEMINI.md
 skills-lock.json
+
+# Automation artifacts
+*_PR_DESCRIPTION*.md
+IMPLEMENTATION_SUMMARY*.md
+tmp_*
+*_output.txt
