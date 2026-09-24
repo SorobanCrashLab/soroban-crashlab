@@ -18,6 +18,8 @@
 import { parseCron } from './parser';
 import { nextRun } from './next-run';
 import { SCHEDULED_RUN_TAG, type Schedule, type ScheduledRun } from './schedule-store';
+import { pruneNotificationEvents } from '../storage/notification-store';
+import { getWebhookStore } from '../webhook-store';
 
 export interface TickInput {
   schedules: readonly Schedule[];
@@ -101,9 +103,14 @@ export function evaluateTick(input: TickInput): TickOutcome {
     return { ...schedule, lastRunAt: lastTickIso };
   });
 
+  // Enforce retention TTL for notification events and webhook delivery history
+  pruneNotificationEvents();
+  getWebhookStore().pruneDeliveryLog();
+
   return {
     schedules,
     history: [...input.history, ...created],
     created,
   };
 }
+

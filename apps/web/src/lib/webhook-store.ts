@@ -134,6 +134,36 @@ export class WebhookStore {
     this.saveDeliveryLog();
   }
 
+  pruneDeliveryLog(params?: { ttlDays?: number; maxBatchSize?: number; nowMs?: number }): { prunedCount: number } {
+    const ttlDays = params?.ttlDays ?? parseInt(process.env.WEBHOOK_HISTORY_RETENTION_DAYS ?? '30', 10);
+    if (ttlDays <= 0) {
+      return { prunedCount: 0 };
+    }
+
+    const nowMs = params?.nowMs ?? Date.now();
+    const cutoffMs = nowMs - ttlDays * 24 * 60 * 60 * 1000;
+    const maxBatchSize = params?.maxBatchSize ?? 1000;
+
+    let prunedCount = 0;
+    const newLog: DeliveryLogEntry[] = [];
+
+    for (const entry of this.deliveryLog) {
+      const entryTime = entry.timestamp ? new Date(entry.timestamp).getTime() : 0;
+      if (entryTime > 0 && entryTime < cutoffMs && prunedCount < maxBatchSize) {
+        prunedCount++;
+      } else {
+        newLog.push(entry);
+      }
+    }
+
+    if (prunedCount > 0) {
+      this.deliveryLog = newLog;
+      this.saveDeliveryLog();
+    }
+
+    return { prunedCount };
+  }
+
   // ─── Dead-letter queue operations ─────────────────────────────────────
   //
   // Terminal delivery failures land here (#1427). Write-through like the rest

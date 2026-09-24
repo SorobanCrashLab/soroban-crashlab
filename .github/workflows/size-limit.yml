@@ -13,14 +13,18 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: size-limit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  pull-requests: write
-  checks: write
+  contents: read
 
 jobs:
   size-limit:
     name: Check per-route-group bundle budgets
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

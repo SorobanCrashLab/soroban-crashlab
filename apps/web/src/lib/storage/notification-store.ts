@@ -143,8 +143,39 @@ export function listDigestEmails(userId: string, limit = 50): DigestEmail[] {
     .slice(0, limit);
 }
 
+export function pruneNotificationEvents(params?: {
+  ttlDays?: number;
+  maxBatchSize?: number;
+  nowMs?: number;
+}): { prunedCount: number } {
+  const ttlDays = params?.ttlDays ?? parseInt(process.env.NOTIFICATION_RETENTION_DAYS ?? '90', 10);
+  if (ttlDays <= 0) {
+    return { prunedCount: 0 };
+  }
+
+  const nowMs = params?.nowMs ?? Date.now();
+  const cutoffMs = nowMs - ttlDays * 24 * 60 * 60 * 1000;
+  const maxBatchSize = params?.maxBatchSize ?? 1000;
+
+  let prunedCount = 0;
+  const newStore: NotificationEvent[] = [];
+
+  for (const event of notificationStore) {
+    const eventTime = new Date(event.createdAt).getTime();
+    if (eventTime < cutoffMs && prunedCount < maxBatchSize) {
+      prunedCount++;
+    } else {
+      newStore.push(event);
+    }
+  }
+
+  notificationStore = newStore;
+  return { prunedCount };
+}
+
 export function resetNotificationStore(): void {
   notificationStore = [];
   preferenceStore.clear();
   digestStore = [];
 }
+
