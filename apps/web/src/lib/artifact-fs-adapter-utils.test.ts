@@ -1,8 +1,9 @@
 /**
- * Unit tests for artifact-fs-adapter.ts
- * 
- * Validates artifact file system operations including validation,
- * path generation, filtering, and security checks.
+ * Unit tests for the artifact record utilities merged into
+ * src/lib/artifact-fs-adapter.ts (originally app/utils/artifact-fs-adapter.ts).
+ *
+ * Validates artifact record validation, id generation, path building,
+ * filtering, grouping, and security checks.
  */
 
 import * as assert from 'node:assert/strict';
@@ -19,12 +20,12 @@ import {
   calculateTotalSize,
   findArtifactById,
   isSafeArtifactPath,
-  type ArtifactMetadata,
+  type ArtifactRecord,
 } from './artifact-fs-adapter';
 
-const runAssertions = (): void => {
+const runAssertions = async (): Promise<void> => {
   // Test validateArtifactMetadata - happy path
-  const validMetadata: ArtifactMetadata = {
+  const validMetadata: ArtifactRecord = {
     id: 'artifact-001',
     runId: 'run-123',
     type: 'crash',
@@ -44,24 +45,24 @@ const runAssertions = (): void => {
 
   const result3 = validateArtifactMetadata({});
   assert.equal(result3.valid, false);
-  assert.ok(result3.errors.some(e => e.includes('id')));
-  assert.ok(result3.errors.some(e => e.includes('runId')));
-  assert.ok(result3.errors.some(e => e.includes('type')));
+  assert.ok(result3.errors.some((e) => e.includes('id')));
+  assert.ok(result3.errors.some((e) => e.includes('runId')));
+  assert.ok(result3.errors.some((e) => e.includes('type')));
 
   const invalidType = { ...validMetadata, type: 'invalid' };
   const result4 = validateArtifactMetadata(invalidType);
   assert.equal(result4.valid, false);
-  assert.ok(result4.errors.some(e => e.includes('type')));
+  assert.ok(result4.errors.some((e) => e.includes('type')));
 
   const negativeSize = { ...validMetadata, size: -100 };
   const result5 = validateArtifactMetadata(negativeSize);
   assert.equal(result5.valid, false);
-  assert.ok(result5.errors.some(e => e.includes('size')));
+  assert.ok(result5.errors.some((e) => e.includes('size')));
 
   const invalidTimestamp = { ...validMetadata, timestamp: -1 };
   const result6 = validateArtifactMetadata(invalidTimestamp);
   assert.equal(result6.valid, false);
-  assert.ok(result6.errors.some(e => e.includes('timestamp')));
+  assert.ok(result6.errors.some((e) => e.includes('timestamp')));
 
   // Test all valid types
   const validTypes = ['crash', 'seed', 'trace', 'coverage'];
@@ -81,6 +82,7 @@ const runAssertions = (): void => {
 
   // Different calls should generate different IDs (due to timestamp)
   const id1 = generateArtifactId('run-1', 'crash');
+  await new Promise((resolve) => setTimeout(resolve, 2));
   const id2 = generateArtifactId('run-1', 'crash');
   assert.notEqual(id1, id2);
 
@@ -150,7 +152,7 @@ const runAssertions = (): void => {
   assert.equal(validateArtifactSize(0, 0), true);
 
   // Test filterArtifactsByType - happy path
-  const artifacts: ArtifactMetadata[] = [
+  const artifacts: ArtifactRecord[] = [
     { ...validMetadata, id: 'a1', type: 'crash' },
     { ...validMetadata, id: 'a2', type: 'seed' },
     { ...validMetadata, id: 'a3', type: 'crash' },
@@ -159,7 +161,7 @@ const runAssertions = (): void => {
 
   const crashes = filterArtifactsByType(artifacts, 'crash');
   assert.equal(crashes.length, 2);
-  assert.ok(crashes.every(a => a.type === 'crash'));
+  assert.ok(crashes.every((a) => a.type === 'crash'));
 
   const seeds = filterArtifactsByType(artifacts, 'seed');
   assert.equal(seeds.length, 1);
@@ -169,7 +171,7 @@ const runAssertions = (): void => {
   assert.equal(coverage.length, 0);
 
   // Test sortArtifactsByTime - happy path
-  const unsorted: ArtifactMetadata[] = [
+  const unsorted: ArtifactRecord[] = [
     { ...validMetadata, id: 'a1', timestamp: 300 },
     { ...validMetadata, id: 'a2', timestamp: 100 },
     { ...validMetadata, id: 'a3', timestamp: 200 },
@@ -191,7 +193,7 @@ const runAssertions = (): void => {
   assert.equal(sortArtifactsByTime(single).length, 1);
 
   // Test groupArtifactsByRun - happy path
-  const multiRunArtifacts: ArtifactMetadata[] = [
+  const multiRunArtifacts: ArtifactRecord[] = [
     { ...validMetadata, id: 'a1', runId: 'run-1' },
     { ...validMetadata, id: 'a2', runId: 'run-2' },
     { ...validMetadata, id: 'a3', runId: 'run-1' },
@@ -206,14 +208,14 @@ const runAssertions = (): void => {
   assert.equal(grouped.get('run-3')?.length, 1);
 
   const run1Artifacts = grouped.get('run-1') ?? [];
-  assert.ok(run1Artifacts.every(a => a.runId === 'run-1'));
+  assert.ok(run1Artifacts.every((a) => a.runId === 'run-1'));
 
   // Edge case: empty array
   const emptyGroups = groupArtifactsByRun([]);
   assert.equal(emptyGroups.size, 0);
 
   // Test calculateTotalSize - happy path
-  const sizedArtifacts: ArtifactMetadata[] = [
+  const sizedArtifacts: ArtifactRecord[] = [
     { ...validMetadata, id: 'a1', size: 1000 },
     { ...validMetadata, id: 'a2', size: 2000 },
     { ...validMetadata, id: 'a3', size: 3000 },
@@ -227,7 +229,7 @@ const runAssertions = (): void => {
   assert.equal(calculateTotalSize([{ ...validMetadata, size: 0 }]), 0);
 
   // Test findArtifactById - happy path
-  const searchArtifacts: ArtifactMetadata[] = [
+  const searchArtifacts: ArtifactRecord[] = [
     { ...validMetadata, id: 'artifact-1' },
     { ...validMetadata, id: 'artifact-2' },
     { ...validMetadata, id: 'artifact-3' },
@@ -266,5 +268,8 @@ const runAssertions = (): void => {
   assert.equal(isSafeArtifactPath('artifacts/'), true);
 };
 
-runAssertions();
-console.log('artifact-fs-adapter.test.ts: all assertions passed');
+runAssertions().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+console.log('artifact-fs-adapter utils: all assertions passed');

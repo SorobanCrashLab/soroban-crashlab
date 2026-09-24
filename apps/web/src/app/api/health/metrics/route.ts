@@ -1,6 +1,8 @@
 import { createPrometheusMetricsExportDependencies } from "../../../../lib/integrations/prometheus-adapter";
 import { PROMETHEUS_FETCH_TIMEOUT_MS } from "../../../../lib/timeouts";
 import { successResponse } from "../../../../lib/api-response-utils";
+import { NextRequest } from "next/server";
+import { validateMetricsScrapeAuth } from "../../../../lib/api-key-auth";
 
 /**
  * GET /api/health/metrics
@@ -9,8 +11,18 @@ import { successResponse } from "../../../../lib/api-response-utils";
  * This route provides a real health check for the metrics system
  * using the Prometheus adapter to query the exporter health endpoint.
  * It replaces the mock implementation with actual health verification.
+ *
+ * Access is gated behind the `CRASHLAB_METRICS_SCRAPE_TOKEN` environment
+ * variable: when set, callers must present `Authorization: Bearer <token>`
+ * (used by elastic/container health checks and external scrapers). When the
+ * token is not configured the route stays open for backward compatibility.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = validateMetricsScrapeAuth(request);
+  if (authError) {
+    return authError;
+  }
+
   try {
     // Use environment variables or default configuration
     const prometheusEndpoint =

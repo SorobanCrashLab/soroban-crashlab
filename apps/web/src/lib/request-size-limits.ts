@@ -12,6 +12,26 @@ const DEFAULT_CONFIG: RequestSizeLimitConfig = {
   maxFormDataSize: parseInt(process.env.MAX_FORM_DATA_SIZE || '104857600', 10), // 100MB
 };
 
+/**
+ * Standard 413 payload emitted by every route that enforces body size limits so
+ * clients can rely on a uniform `code` when surfacing "payload too large" errors.
+ */
+export function standardSizeLimitResponse(
+  message: string,
+  limitBytes?: number,
+  actualBytes?: number,
+): NextResponse {
+  return NextResponse.json(
+    {
+      error: message,
+      code: 'PAYLOAD_TOO_LARGE',
+      ...(typeof limitBytes === 'number' ? { limit: limitBytes } : {}),
+      ...(typeof actualBytes === 'number' ? { actual: actualBytes } : {}),
+    },
+    { status: 413 },
+  );
+}
+
 export function checkRequestSize(
   request: Request,
   config: RequestSizeLimitConfig = DEFAULT_CONFIG,
@@ -23,27 +43,41 @@ export function checkRequestSize(
   }
 
   const size = parseInt(contentLength, 10);
+  if (isNaN(size)) {
+    return null;
+  }
+
   const contentType = request.headers.get('content-type') || '';
 
-  if (size > (config.maxBodySize || DEFAULT_CONFIG.maxBodySize!)) {
-    return NextResponse.json(
-      { error: `Request body exceeds maximum allowed size of ${config.maxBodySize} bytes` },
-      { status: 413 },
+  const maxBody = config.maxBodySize ?? DEFAULT_CONFIG.maxBodySize!;
+  if (size > maxBody) {
+    return standardSizeLimitResponse(
+      `Request body exceeds maximum allowed size of ${maxBody} bytes`,
+      maxBody,
+      size,
     );
   }
 
-  if (contentType.includes('application/json') && size > (config.maxJsonSize || DEFAULT_CONFIG.maxJsonSize!)) {
-    return NextResponse.json(
-      { error: `JSON payload exceeds maximum allowed size of ${config.maxJsonSize} bytes` },
-      { status: 413 },
-    );
+  if (contentType.includes('application/json')) {
+    const maxJson = config.maxJsonSize ?? DEFAULT_CONFIG.maxJsonSize!;
+    if (size > maxJson) {
+      return standardSizeLimitResponse(
+        `JSON payload exceeds maximum allowed size of ${maxJson} bytes`,
+        maxJson,
+        size,
+      );
+    }
   }
 
-  if (contentType.includes('multipart/form-data') && size > (config.maxFormDataSize || DEFAULT_CONFIG.maxFormDataSize!)) {
-    return NextResponse.json(
-      { error: `Form data exceeds maximum allowed size of ${config.maxFormDataSize} bytes` },
-      { status: 413 },
-    );
+  if (contentType.includes('multipart/form-data')) {
+    const maxFormData = config.maxFormDataSize ?? DEFAULT_CONFIG.maxFormDataSize!;
+    if (size > maxFormData) {
+      return standardSizeLimitResponse(
+        `Form data exceeds maximum allowed size of ${maxFormData} bytes`,
+        maxFormData,
+        size,
+      );
+    }
   }
 
   return null;

@@ -58,6 +58,56 @@ export function timingSafeStringEqual(a: string, b: string): boolean {
  * Returns undefined when authentication passes (or is unconfigured), or a
  * NextResponse with status 401 when it fails.
  */
+/**
+ * Reads the configured metrics scrape token from the environment.
+ * The token guards the Prometheus metrics/health endpoints so they can only
+ * be scraped by an authorized breaker, not by anyone who can reach the host.
+ * Returns undefined when the env var is not set or is empty.
+ */
+export function getMetricsScrapeToken(): string | undefined {
+  const token = process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
+  return token && token.trim().length > 0 ? token.trim() : undefined;
+}
+
+/**
+ * Validates the `Authorization: Bearer <token>` header on the request against
+ * the configured `CRASHLAB_METRICS_SCRAPE_TOKEN` environment variable.
+ *
+ * - When no scrape token is configured the request is allowed through so
+ *   existing deployments without the env var are unaffected.
+ * - When a scrape token IS configured the caller must supply a matching
+ *   Bearer token; mismatches or absent headers are rejected with 401.
+ *
+ * Returns undefined when authentication passes (or is unconfigured), or a
+ * NextResponse with status 401 when it fails.
+ */
+export function validateMetricsScrapeAuth(request: NextRequest): NextResponse | undefined {
+  const configuredToken = getMetricsScrapeToken();
+
+  // No token configured — authentication is not enforced.
+  if (configuredToken === undefined) {
+    return undefined;
+  }
+
+  const token = extractBearerToken(request);
+  if (token === undefined) {
+    return NextResponse.json(
+      { error: 'Authentication required. Provide a valid Authorization: Bearer <token> header.' },
+      { status: 401 },
+    );
+  }
+
+  if (!timingSafeStringEqual(token, configuredToken)) {
+    return NextResponse.json(
+      { error: 'Invalid scrape token.' },
+      { status: 401 },
+    );
+  }
+
+  // Authentication passed.
+  return undefined;
+}
+
 export function validateWebhookApiKey(request: NextRequest): NextResponse | undefined {
   const configuredKey = getConfiguredApiKey();
 

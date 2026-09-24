@@ -7,6 +7,7 @@
  */
 
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
+import { checkRequestSize } from '@/lib/request-size-limits';
 import type { PagerDutyConfig } from '../../../../integrate-pagerduty-alert-integration-utils';
 
 // Module-level in-memory store (same pattern as other lightweight integrations).
@@ -20,6 +21,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
   try {
     const body = (await request.json()) as PagerDutyConfig;
 

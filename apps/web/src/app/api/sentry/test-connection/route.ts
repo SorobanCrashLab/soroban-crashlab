@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { checkRequestSize } from '@/lib/request-size-limits';
 import { testSentryConnection } from '@/lib/integrations/sentry-store';
 import { errorResponse, successResponse } from '@/lib/api-response-utils';
 
@@ -8,6 +9,11 @@ import { errorResponse, successResponse } from '@/lib/api-response-utils';
  * Body: { dsn: string }
  */
 export async function POST(request: NextRequest) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
   let body: unknown;
   try {
     body = await request.json();

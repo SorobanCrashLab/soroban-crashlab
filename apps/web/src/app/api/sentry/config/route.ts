@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { checkRequestSize } from '@/lib/request-size-limits';
 import {
   validateSentryConfig,
   type SentryConfig,
@@ -24,6 +25,11 @@ export async function GET() {
  * Validates and persists a Sentry configuration. Body: SentryConfig JSON.
  */
 export async function POST(request: NextRequest) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
   let body: unknown;
   try {
     body = await request.json();

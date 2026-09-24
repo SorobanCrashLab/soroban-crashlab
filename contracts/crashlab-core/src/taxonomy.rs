@@ -6,16 +6,18 @@ use std::collections::HashMap;
 ///
 /// ## Category descriptions
 ///
-/// | Variant          | Failure domain                                              |
-/// |------------------|-------------------------------------------------------------|
-/// | `Auth`           | Missing or invalid authorization entry                      |
-/// | `Budget`         | CPU or memory execution budget exceeded                     |
-/// | `State`          | Ledger entry absent, wrong type, or version conflict        |
-/// | `Xdr`            | XDR encoding / decoding error — malformed or out-of-range  |
-/// | `InvalidEnumTag` | Enum-like payload carried an unsupported discriminant tag   |
-/// | `EmptyInput`     | Seed payload was empty; no execution was attempted          |
-/// | `OversizedInput` | Seed payload exceeded the maximum allowable size            |
-/// | `Unknown`        | Raw failure did not match any known category                |
+/// | Variant            | Failure domain                                              |
+/// |--------------------|-------------------------------------------------------------|
+/// | `Auth`             | Missing or invalid authorization entry                      |
+/// | `Budget`           | CPU or memory execution budget exceeded                     |
+/// | `State`            | Ledger entry absent, wrong type, or version conflict        |
+/// | `Xdr`              | XDR encoding / decoding error — malformed or out-of-range  |
+/// | `InvalidEnumTag`   | Enum-like payload carried an unsupported discriminant tag   |
+/// | `EmptyInput`       | Seed payload was empty; no execution was attempted          |
+/// | `OversizedInput`   | Seed payload exceeded the maximum allowable size            |
+/// | `Unknown`          | Raw failure did not match any known category                |
+/// | `Timeout`          | Simulation attempt exceeded the configured timeout          |
+/// | `InternalPanic`    | Internal simulation worker thread panicked                  |
 ///
 /// Classifications produced by [`classify_failure`] are deterministic:
 /// the same seed always maps to the same `FailureClass`.
@@ -39,6 +41,9 @@ pub enum FailureClass {
     Unknown,
     /// Simulation attempt exceeded the configured timeout threshold.
     Timeout,
+    /// Internal simulation worker thread panicked.
+    /// This is distinct from timeout - the worker crashed internally.
+    InternalPanic,
 }
 
 impl FailureClass {
@@ -57,11 +62,12 @@ impl FailureClass {
             FailureClass::OversizedInput => "oversized-input",
             FailureClass::Unknown => "unknown",
             FailureClass::Timeout => "timeout",
+            FailureClass::InternalPanic => "internal-panic",
         }
     }
 
     /// All variants in declaration order, useful for iteration and reporting.
-    pub const ALL: [FailureClass; 9] = [
+    pub const ALL: [FailureClass; 10] = [
         FailureClass::Auth,
         FailureClass::Budget,
         FailureClass::State,
@@ -71,6 +77,7 @@ impl FailureClass {
         FailureClass::OversizedInput,
         FailureClass::Unknown,
         FailureClass::Timeout,
+        FailureClass::InternalPanic,
     ];
 
     /// Parses a persisted category label into a stable failure class.
@@ -84,6 +91,8 @@ impl FailureClass {
             "empty-input" => Some(FailureClass::EmptyInput),
             "oversized-input" => Some(FailureClass::OversizedInput),
             "unknown" => Some(FailureClass::Unknown),
+            "timeout" => Some(FailureClass::Timeout),
+            "internal-panic" => Some(FailureClass::InternalPanic),
             _ => None,
         }
     }
