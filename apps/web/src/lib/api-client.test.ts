@@ -16,11 +16,17 @@ async function loadModule(): Promise<ApiClientModule> {
 function makeRun(overrides: Partial<FuzzingRun> = {}): FuzzingRun {
   return {
     id: 'run-1',
-    contractName: 'token',
     status: 'completed',
-    startedAt: '2026-01-01T00:00:00.000Z',
+    area: 'auth',
+    severity: 'low',
+    duration: 1_000,
+    seedCount: 1,
+    crashDetail: null,
+    cpuInstructions: 0,
+    memoryBytes: 0,
+    minResourceFee: 0,
     ...overrides,
-  } as FuzzingRun;
+  };
 }
 
 function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {}): Response {
@@ -280,6 +286,62 @@ describe('api-client', () => {
 
       await expect(fetchRun('')).resolves.toBeNull();
       expect(requestedUrl(fetchMock)).toBe('/api/runs/');
+    });
+  });
+
+  describe('runtime response validation', () => {
+    it('throws SchemaError with route and Zod issues for a malformed run payload', async () => {
+      const { fetchRuns, SchemaError } = await loadModule();
+      fetchMock.mockResolvedValue(
+        jsonResponse({ runs: [makeRun({ status: 'unknown' as FuzzingRun['status'] })], total: 1 }),
+      );
+
+      await expect(fetchRuns()).rejects.toBeInstanceOf(SchemaError);
+      await expect(fetchRuns()).rejects.toMatchObject({
+        name: 'SchemaError',
+        route: '/api/runs',
+      });
+    });
+
+    it('validates analytics envelopes and preserves their payload', async () => {
+      const { api } = await loadModule();
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          data: {
+            events: [
+              {
+                signature: 'sig-1',
+                date: '2026-01-01',
+                area: 'auth',
+                severity: 'high',
+              },
+            ],
+          },
+        }),
+      );
+
+      await expect(api.analytics.events()).resolves.toEqual({
+        events: [
+          {
+            signature: 'sig-1',
+            date: '2026-01-01',
+            area: 'auth',
+            severity: 'high',
+          },
+        ],
+      });
+    });
+
+    it('rejects malformed integration records at the boundary', async () => {
+      const { api } = await loadModule();
+      fetchMock.mockResolvedValue(
+        jsonResponse({ integrations: [{ id: 'sentry', enabled: 'yes' }] }),
+      );
+
+      await expect(api.integrations.list()).rejects.toMatchObject({
+        name: 'SchemaError',
+        route: '/api/integrations',
+      });
     });
   });
 

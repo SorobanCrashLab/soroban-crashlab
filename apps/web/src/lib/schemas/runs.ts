@@ -40,11 +40,32 @@ export const ArtifactSchema = z.object({
   name: z.string(),
   type: ArtifactTypeSchema,
   size: z.number(),
+  createdAt: z.string().optional(),
   updatedAt: z.string(),
   runId: z.string().optional(),
   content_hash: z.string().optional(),
   contentType: z.enum(['json', 'text', 'hex', 'unknown']).optional(),
-});
+}).passthrough();
+
+export const ReplayFingerprintSchema = z.object({
+  composite: z.string(),
+  components: z.object({
+    seedSet: z.string(),
+    contractWasmHash: z.string(),
+    engineVersion: z.string(),
+    networkConfigHash: z.string(),
+  }).passthrough(),
+  stampedAt: z.string(),
+}).passthrough();
+
+export const CorpusStatPointSchema = z.object({
+  ts: z.number(),
+  corpusSize: z.number(),
+  edgesFound: z.number(),
+  totalEdges: z.number(),
+  execsPerSec: z.number(),
+  coveragePct: z.number(),
+}).passthrough();
 
 export const FuzzingRunSchema = z.object({
   id: z.string(),
@@ -66,7 +87,9 @@ export const FuzzingRunSchema = z.object({
   annotations: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
   artifacts: z.array(ArtifactSchema).optional(),
-});
+  replayFingerprint: ReplayFingerprintSchema.optional(),
+  corpusStats: z.array(CorpusStatPointSchema).optional(),
+}).passthrough();
 
 // ---------------------------------------------------------------------------
 // GET /api/runs — request query params + response
@@ -99,6 +122,40 @@ export type RunsListResponse = z.infer<typeof RunsListResponseSchema>;
 export const RunDetailResponseSchema = FuzzingRunSchema;
 
 export type RunDetailResponse = z.infer<typeof RunDetailResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Analytics response schemas
+// ---------------------------------------------------------------------------
+
+export const CrashEventSchema = z.object({
+  signature: z.string(),
+  date: z.string(),
+  area: RunAreaSchema,
+  severity: RunSeveritySchema,
+}).passthrough();
+
+export const SignatureFrequencySchema = z.object({
+  signature: z.string(),
+  totalCount: z.number(),
+  area: RunAreaSchema,
+  severity: RunSeveritySchema,
+}).passthrough();
+
+export const CrashTrendPointSchema = z
+  .object({ date: z.string() })
+  .catchall(z.union([z.string(), z.number()]));
+
+export const AnalyticsTrendsResponseSchema = z.object({
+  trends: z.array(CrashTrendPointSchema),
+  signatures: z.array(SignatureFrequencySchema),
+}).passthrough();
+
+export const AnalyticsEventsResponseSchema = z.object({
+  events: z.array(CrashEventSchema),
+}).passthrough();
+
+export type AnalyticsTrendsResponse = z.infer<typeof AnalyticsTrendsResponseSchema>;
+export type AnalyticsEventsResponse = z.infer<typeof AnalyticsEventsResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // GET /api/webhooks/history — request query params + response

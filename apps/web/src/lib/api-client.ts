@@ -1,18 +1,31 @@
-import {
-  CrashEvent,
-  SignatureFrequency,
-  CrashTrendPoint,
-  RunIssueLink,
-  CampaignConfig,
-} from '../app/types';
+import type { RunIssueLink, CampaignConfig } from '../app/types';
 import { dedupedFetchJson, HttpError } from './request-dedup';
 import { API_BASE } from './api-base';
-import type {
-  RunsListResponse,
-  RunDetailResponse,
-  WebhookHistoryResponse,
-  WebhookDeliveryItem,
+import { logger } from './logger';
+import { z } from 'zod';
+import type { ZodIssue, ZodTypeAny } from 'zod';
+import {
+  RunDetailResponseSchema,
+  RunsListResponseSchema,
+  type RunDetailResponse,
+  type RunsListResponse,
 } from './schemas/runs';
+import {
+  AnalyticsEventsResponseSchema,
+  AnalyticsTrendsResponseSchema,
+  ArtifactsResponseSchema,
+  CampaignResponseSchema,
+  IntegrationsResponseSchema,
+  NotificationsResponseSchema,
+  RemoveArtifactResponseSchema,
+  RunAnnotationsResponseSchema,
+  RunIssuesResponseSchema,
+  RunTagsResponseSchema,
+  WebhookHistoryResponseSchema,
+  WebhooksResponseSchema,
+} from './schemas/api';
+
+export type { ArtifactMetadata, NotificationFeedItem } from './schemas/api';
 
 export class ApiError extends Error {
   status: number;
@@ -26,28 +39,63 @@ export class ApiError extends Error {
   }
 }
 
+export class SchemaError extends Error {
+  readonly route: string;
+  readonly issues: readonly ZodIssue[];
+
+  constructor(route: string, issues: readonly ZodIssue[]) {
+    const firstIssue = issues[0];
+    const issuePath = firstIssue?.path.length ? firstIssue.path.join('.') : '<root>';
+    super(`Invalid API response from ${route} at ${issuePath}: ${firstIssue?.message ?? 'unknown validation error'}`);
+    this.name = 'SchemaError';
+    this.route = route;
+    this.issues = issues;
+  }
+}
+
 function apiUrl(path: string): string {
   return `${API_BASE}/api${path}`;
 }
 
-function unwrapApiPayload<T>(json: unknown): T {
-  if (json && typeof json === 'object' && 'data' in json) {
-    const envelope = json as { data: unknown; total?: number };
+function unwrapApiPayload<S extends ZodTypeAny>(
+  json: unknown,
+  route: string,
+  schema: S,
+): z.output<S> {
+  let payload = json;
+
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    const envelope = payload as { data: unknown; total?: unknown };
+    payload = envelope.data;
+
     if (
-      envelope.data &&
-      typeof envelope.data === 'object' &&
-      !Array.isArray(envelope.data) &&
       envelope.total !== undefined &&
-      !('total' in (envelope.data as object))
+      payload !== null &&
+      typeof payload === 'object' &&
+      !Array.isArray(payload) &&
+      !('total' in payload)
     ) {
-      return { ...(envelope.data as object), total: envelope.total } as T;
+      payload = { ...payload, total: envelope.total };
     }
-    return envelope.data as T;
   }
-  return json as T;
+
+  const result = schema.safeParse(payload);
+  if (!result.success) {
+    logger.error('API response schema validation failed', {
+      route,
+      issues: result.error.issues,
+    });
+    throw new SchemaError(route, result.error.issues);
+  }
+
+  return result.data;
 }
 
-async function apiFetch<T>(path: string, options?: RequestInit & { signal?: AbortSignal }): Promise<T> {
+async function apiFetch<S extends ZodTypeAny>(
+  path: string,
+  schema: S,
+  options?: RequestInit & { signal?: AbortSignal },
+): Promise<z.output<S>> {
   const res = await fetch(apiUrl(path), {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
@@ -71,25 +119,9 @@ async function apiFetch<T>(path: string, options?: RequestInit & { signal?: Abor
     throw new ApiError(res.status, message);
   }
   if (res.status === 204) {
-    return undefined as T;
+    return unwrapApiPayload(undefined, apiUrl(path), schema);
   }
-  return unwrapApiPayload<T>(await res.json());
-}
-
-export interface ArtifactMetadata {
-  id: string;
-  name: string;
-  createdAt: string;
-  sizeBytes: number;
-}
-
-export interface NotificationFeedItem {
-  id: string;
-  title: string;
-  message: string;
-  severity: 'info' | 'success' | 'warning' | 'error';
-  createdAt: string;
-  read: boolean;
+  return unwrapApiPayload(await res.json(), apiUrl(path), schema);
 }
 
 export const api = {
@@ -109,43 +141,49 @@ export const api = {
       if (opts.cursor) qs.set('cursor', opts.cursor);
       if (opts.limit != null) qs.set('limit', String(opts.limit));
       const path = qs.toString() ? `/runs?${qs.toString()}` : '/runs';
-      return dedupedFetchJson<RunsListResponse>(
-        apiUrl(path),
-        resolvedSignal,
+      return dedupedFetchJson<unknown>(apiUrl(path), resolvedSignal).then((payload) =>
+        unwrapApiPayload(payload, apiUrl(path), RunsListResponseSchema),
       );
     },
-    get: (id: string, signal?: AbortSignal) =>
-      dedupedFetchJson<RunDetailResponse>(apiUrl(`/runs/${encodeURIComponent(id)}`), signal),
+    get: (id: string, signal?: AbortSignal) => {
+      const path = `/runs/${encodeURIComponent(id)}`;
+      return dedupedFetchJson<unknown>(apiUrl(path), signal).then((payload) =>
+        unwrapApiPayload(payload, apiUrl(path), RunDetailResponseSchema),
+      );
+    },
     issues: {
       list: (runId: string, signal?: AbortSignal) =>
-        apiFetch<{ runId: string; issues: RunIssueLink[] }>(
+        apiFetch(
           `/runs/${encodeURIComponent(runId)}/issues`,
+          RunIssuesResponseSchema,
           { signal },
         ),
       add: (runId: string, link: RunIssueLink, signal?: AbortSignal) =>
-        apiFetch<{ runId: string; issues: RunIssueLink[] }>(
+        apiFetch(
           `/runs/${encodeURIComponent(runId)}/issues`,
+          RunIssuesResponseSchema,
           { method: 'POST', body: JSON.stringify(link), signal },
         ),
       remove: (runId: string, href: string, signal?: AbortSignal) =>
-        apiFetch<{ runId: string; issues: RunIssueLink[] }>(
+        apiFetch(
           `/runs/${encodeURIComponent(runId)}/issues`,
+          RunIssuesResponseSchema,
           { method: 'DELETE', body: JSON.stringify({ href }), signal },
         ),
     },
     tags: {
       list: (runId: string, signal?: AbortSignal) =>
-        apiFetch<{ runId: string; tags: string[] }>(`/runs/${encodeURIComponent(runId)}/tags`, {
+        apiFetch(`/runs/${encodeURIComponent(runId)}/tags`, RunTagsResponseSchema, {
           signal,
         }),
       add: (runId: string, tag: string, signal?: AbortSignal) =>
-        apiFetch<{ runId: string; tags: string[] }>(`/runs/${encodeURIComponent(runId)}/tags`, {
+        apiFetch(`/runs/${encodeURIComponent(runId)}/tags`, RunTagsResponseSchema, {
           method: 'POST',
           body: JSON.stringify({ tag }),
           signal,
         }),
       remove: (runId: string, tag: string, signal?: AbortSignal) =>
-        apiFetch<{ runId: string; tags: string[] }>(`/runs/${encodeURIComponent(runId)}/tags`, {
+        apiFetch(`/runs/${encodeURIComponent(runId)}/tags`, RunTagsResponseSchema, {
           method: 'DELETE',
           body: JSON.stringify({ tag }),
           signal,
@@ -153,33 +191,34 @@ export const api = {
     },
     annotations: {
       list: (runId: string, signal?: AbortSignal) =>
-        apiFetch<{ runId: string; annotations: string[] }>(
+        apiFetch(
           `/runs/${encodeURIComponent(runId)}/annotations`,
+          RunAnnotationsResponseSchema,
           { signal },
         ),
       add: (runId: string, text: string, signal?: AbortSignal) =>
-        apiFetch<{ runId: string; annotations: string[] }>(
+        apiFetch(
           `/runs/${encodeURIComponent(runId)}/annotations`,
+          RunAnnotationsResponseSchema,
           { method: 'POST', body: JSON.stringify({ text }), signal },
         ),
       remove: (runId: string, index: number, signal?: AbortSignal) =>
-        apiFetch<{ runId: string; annotations: string[] }>(
+        apiFetch(
           `/runs/${encodeURIComponent(runId)}/annotations`,
+          RunAnnotationsResponseSchema,
           { method: 'DELETE', body: JSON.stringify({ index }), signal },
         ),
     },
   },
   analytics: {
     trends: (signal?: AbortSignal) =>
-      apiFetch<{ trends: CrashTrendPoint[]; signatures: SignatureFrequency[] }>('/runs/trends', {
-        signal,
-      }),
+      apiFetch('/runs/trends', AnalyticsTrendsResponseSchema, { signal }),
     events: (signal?: AbortSignal) =>
-      apiFetch<{ events: CrashEvent[] }>('/runs/events', { signal }),
+      apiFetch('/runs/events', AnalyticsEventsResponseSchema, { signal }),
   },
   artifacts: {
     list: (signal?: AbortSignal) =>
-      apiFetch<{ artifacts: ArtifactMetadata[]; total: number }>('/artifacts', {
+      apiFetch('/artifacts', ArtifactsResponseSchema, {
         cache: 'no-store',
         signal,
       }),
@@ -195,14 +234,14 @@ export const api = {
       return res.blob();
     },
     remove: (id: string, signal?: AbortSignal) =>
-      apiFetch<{ success: boolean; message: string }>(`/artifacts/${encodeURIComponent(id)}`, {
+      apiFetch(`/artifacts/${encodeURIComponent(id)}`, RemoveArtifactResponseSchema, {
         method: 'DELETE',
         signal,
       }),
   },
   campaigns: {
     create: (config: CampaignConfig, signal?: AbortSignal) =>
-      apiFetch<{ campaign: Record<string, unknown> }>('/campaigns', {
+      apiFetch('/campaigns', CampaignResponseSchema, {
         method: 'POST',
         body: JSON.stringify(config),
         signal,
@@ -210,19 +249,17 @@ export const api = {
   },
   notifications: {
     list: (signal?: AbortSignal) =>
-      apiFetch<{ notifications: NotificationFeedItem[]; total: number }>('/notifications', {
-        signal,
-      }),
+      apiFetch('/notifications', NotificationsResponseSchema, { signal }),
   },
   webhooks: {
     list: (signal?: AbortSignal) =>
-      apiFetch<{ webhooks: WebhookDeliveryItem[] }>('/webhooks', { signal }),
+      apiFetch('/webhooks', WebhooksResponseSchema, { signal }),
     history: (signal?: AbortSignal) =>
-      apiFetch<WebhookHistoryResponse>('/webhooks/history', { signal }),
+      apiFetch('/webhooks/history', WebhookHistoryResponseSchema, { signal }),
   },
   integrations: {
     list: (signal?: AbortSignal) =>
-      apiFetch<{ integrations: unknown[] }>('/integrations', { signal }),
+      apiFetch('/integrations', IntegrationsResponseSchema, { signal }),
   },
 };
 
