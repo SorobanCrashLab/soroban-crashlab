@@ -293,8 +293,19 @@ mod tests {
     #[test]
     fn groups_by_category_sorts_by_category_then_count() {
         let mut idx = CrashIndex::new();
-        // Force two different categories by using empty (empty-input) and normal payloads.
-        idx.insert(bundle(1, vec![])); // empty-input
+        // `to_bundle` mutates the seed, so build a genuine empty-input bundle
+        // by hand to force the empty-input category.
+        let empty_seed = CaseSeed {
+            id: 1,
+            payload: vec![],
+        };
+        idx.insert(CaseBundle {
+            seed: empty_seed.clone(),
+            signature: crate::classify(&empty_seed),
+            environment: None,
+            failure_payload: Vec::new(),
+            rpc_envelope: None,
+        }); // empty-input
         idx.insert(bundle(2, vec![0x01])); // normal payload
         idx.insert(bundle(3, vec![0x01])); // normal payload (count=2)
 

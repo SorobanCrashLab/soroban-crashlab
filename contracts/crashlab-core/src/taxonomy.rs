@@ -329,9 +329,10 @@ mod tests {
     }
 
     #[test]
-    fn all_contains_nine_variants() {
-        assert_eq!(FailureClass::ALL.len(), 9);
+    fn all_contains_ten_variants() {
+        assert_eq!(FailureClass::ALL.len(), 10);
         assert!(FailureClass::ALL.contains(&FailureClass::Unknown));
+        assert!(FailureClass::ALL.contains(&FailureClass::InternalPanic));
     }
 
     #[test]

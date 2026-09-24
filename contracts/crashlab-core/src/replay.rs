@@ -182,6 +182,11 @@ mod tests {
         let bytes = save_case_bundle_json(&bundle).expect("serialize");
         let result = replay_seed_bundle_json(&bytes).expect("replay");
         assert!(result.matches);
-        assert_eq!(result.expected_class, FailureClass::State);
+        // `to_bundle` mutates the payload deterministically, so assert replay
+        // agrees with the *stored* (mutated) seed instead of assuming the
+        // original bytes still classify as State.
+        assert_eq!(result.expected_class, classify_failure(&bundle.seed));
+        assert_eq!(result.actual_class, classify_failure(&bundle.seed));
+        assert!(result.class_matches);
     }
 }

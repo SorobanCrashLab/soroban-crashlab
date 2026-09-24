@@ -83,8 +83,8 @@ jobs:
         working-directory: contracts/crashlab-core
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
         with:

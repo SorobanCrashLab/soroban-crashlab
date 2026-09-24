@@ -328,13 +328,16 @@ mod tests {
 
     #[test]
     fn roundtrip_with_empty_payload() {
+        // `to_bundle` mutates an empty seed into a single deterministic PRNG
+        // byte, so the round-trip invariant is payload fidelity, not a
+        // zero-length payload.
         let bundle = to_bundle(CaseSeed {
             id: 1,
             payload: vec![],
         });
         let compressed = compress_artifact(&bundle).expect("compress");
         let restored = decompress_artifact(&compressed).expect("decompress");
-        assert_eq!(restored.seed.payload.len(), 0);
+        assert_eq!(restored, bundle);
     }
 
     #[test]

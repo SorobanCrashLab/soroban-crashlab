@@ -363,6 +363,19 @@ mod tests {
     use super::*;
     use crate::{to_bundle, CaseSeed};
 
+    /// Builds a bundle whose seed payload is genuinely empty, bypassing the
+    /// deterministic mutation applied by [`to_bundle`].
+    fn empty_input_bundle(id: u64) -> CaseBundle {
+        let seed = CaseSeed { id, payload: vec![] };
+        CaseBundle {
+            seed: seed.clone(),
+            signature: crate::classify(&seed),
+            environment: None,
+            failure_payload: Vec::new(),
+            rpc_envelope: None,
+        }
+    }
+
     #[test]
     fn scenario_contains_all_required_fields() {
         let bundle = to_bundle(CaseSeed {
@@ -429,10 +442,7 @@ mod tests {
 
     #[test]
     fn empty_payload_exports_successfully() {
-        let bundle = to_bundle(CaseSeed {
-            id: 7,
-            payload: vec![],
-        });
+        let bundle = empty_input_bundle(7);
 
         let scenario = FailureScenario::from_bundle(&bundle, "contract");
 
@@ -636,10 +646,7 @@ mod tests {
 
     #[test]
     fn export_failing_seed_json_empty_payload_is_accepted() {
-        let bundle = to_bundle(CaseSeed {
-            id: 0,
-            payload: vec![],
-        });
+        let bundle = empty_input_bundle(0);
 
         let json = export_failing_seed_json(&bundle, "none").unwrap();
 
