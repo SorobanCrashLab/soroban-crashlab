@@ -55,6 +55,15 @@ import {
   console.log('✓ reset-config config has warning variant and correct labels');
 }
 
+{
+  const cfg = getConfirmDialogConfig('rotate-token');
+  assert.strictEqual(cfg.title, 'Rotate API Token');
+  assert.strictEqual(cfg.variant, 'warning');
+  assert.ok(cfg.message.includes('grace window'), 'rotation message should mention the grace window');
+  assert.strictEqual(cfg.confirmText, 'Rotate Token');
+  console.log('✓ rotate-token config has warning variant and grace-window message');
+}
+
 // ── requiresConfirmation ─────────────────────────────────────────────────────
 
 {
@@ -62,6 +71,8 @@ import {
   assert.strictEqual(requiresConfirmation('delete-run'), true);
   assert.strictEqual(requiresConfirmation('delete-runs'), true);
   assert.strictEqual(requiresConfirmation('reset-config'), true);
+  assert.strictEqual(requiresConfirmation('revoke-token'), true);
+  assert.strictEqual(requiresConfirmation('rotate-token'), true);
   console.log('✓ destructive actions require confirmation');
 }
 

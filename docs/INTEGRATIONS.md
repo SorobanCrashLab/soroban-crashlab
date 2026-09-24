@@ -83,6 +83,25 @@ Prometheus provides metrics collection and monitoring.
 **Files involved**
 - `apps/web/src/lib/integrations/prometheus-adapter.ts`
 - `apps/web/src/app/api/integrations/prometheus/health/route.ts`
+- `apps/web/src/app/api/health/metrics/route.ts`
+
+**Securing scrapes**
+Set `CRASHLAB_METRICS_SCRAPE_TOKEN` to require `Authorization: Bearer <token>` on
+`/api/health/metrics` and `/api/integrations/prometheus/health`. When configured,
+Prometheus must attach the header on every scrape:
+
+```yaml
+scrape_configs:
+  - job_name: crashlab-exporter
+    metrics_path: /api/integrations/prometheus/health
+    bearer_token: <CRASHLAB_METRICS_SCRAPE_TOKEN value>
+    static_configs:
+      - targets: [crashlab-web:3000]
+```
+
+Label names are restricted to a static allow-list and label values are escaped
+and length-capped (`apps/web/src/lib/integrations/prometheus-adapter.ts`), so
+attacker-controlled input can never inflate series cardinality.
 
 ---
 

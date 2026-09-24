@@ -17,7 +17,59 @@ pub use runner::{ContractRunner, RunnerError, RunnerCreationError, create_runner
 #[cfg(feature = "host-runner")]
 pub mod host_runner;
 
+#[cfg(feature = "rpc-runner")]
 pub mod rpc_runner;
+
+#[cfg(not(feature = "rpc-runner"))]
+mod rpc_runner_stub {
+    //! Stub module when rpc-runner feature is not enabled.
+    use crate::{CaseSeed, CrashSignature};
+    use crate::runner::RunnerError;
+
+    pub struct RpcContractRunner;
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum RpcConfigError {
+        FeatureNotEnabled,
+    }
+
+    impl std::fmt::Display for RpcConfigError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "rpc-runner feature not enabled")
+        }
+    }
+
+    impl std::error::Error for RpcConfigError {}
+
+    impl RpcContractRunner {
+        pub fn new(_rpc_url: impl Into<String>) -> Result<Self, RpcConfigError> {
+            Err(RpcConfigError::FeatureNotEnabled)
+        }
+
+        pub fn with_contract(
+            _rpc_url: impl Into<String>,
+            _contract_id: impl Into<String>,
+        ) -> Result<Self, RpcConfigError> {
+            Err(RpcConfigError::FeatureNotEnabled)
+        }
+
+        pub fn rpc_url(&self) -> &str {
+            ""
+        }
+
+        pub fn contract_id(&self) -> Option<&str> {
+            None
+        }
+    }
+
+    impl crate::runner::ContractRunner for RpcContractRunner {
+        fn run_seed(&mut self, _seed: &CaseSeed) -> Result<CrashSignature, RunnerError> {
+            Err(RunnerError::Misconfigured {
+                message: "rpc-runner feature not enabled".to_string(),
+            })
+        }
+    }
+}
 
 pub use auth_matrix::{
     AuthMode, MatrixReport, ModeResult, collect_mismatched, format_mismatch_summary, run_matrix,
@@ -32,7 +84,7 @@ pub use health::{
 };
 pub use prng::{PrngMutator, RandomizeMutator, SeededPrng};
 pub use reproducer::{
-    FlakyDetector, ReproReport, filter_ci_pack, shrink_bundle_payload,
+    FlakyDetector, ReproReport, StabilityVerdict, filter_ci_pack, shrink_bundle_payload,
     shrink_seed_preserving_signature,
 };
 pub use retry::{RetryConfig, SimulationError, execute_with_retry};
@@ -49,7 +101,11 @@ pub use suite_runner::{GroupSummary, GroupStats, SuiteRunnerConfig};
 #[cfg(feature = "host-runner")]
 pub use host_runner::HostContractRunner;
 
+#[cfg(feature = "rpc-runner")]
 pub use rpc_runner::{RpcContractRunner, RpcConfigError};
+
+#[cfg(not(feature = "rpc-runner"))]
+pub use rpc_runner_stub::{RpcContractRunner, RpcConfigError};
 
 pub mod seed_validator;
 pub use seed_validator::{SeedSchema, SeedValidationError, Validate};
@@ -174,7 +230,8 @@ pub mod simulation;
 pub use simulation::{
     RunMetadataError, SUPPORTED_RUN_METADATA_SCHEMAS,
     SimulationTimeoutConfig, load_run_metadata_json, run_simulation_with_timeout,
-    save_run_metadata_json, timeout_crash_signature,
+    save_run_metadata_json, timeout_crash_signature, panic_crash_signature,
+    MAX_CONCURRENT_SIMULATION_THREADS, active_simulation_thread_count,
 };
 
 pub mod container_stress;

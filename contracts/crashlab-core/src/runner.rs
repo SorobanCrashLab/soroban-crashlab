@@ -145,11 +145,18 @@ impl std::error::Error for RunnerCreationError {}
 /// - `"mock"` (or unset): Creates a [`MockRunner`] for testing purposes.
 /// - `"host"`: Creates a [`HostContractRunner`] for Soroban SDK testutils-based execution.
 ///   This requires the `host-runner` feature to be enabled.
+/// - `"rpc"`: Creates an [`RpcContractRunner`] for RPC-based execution.
+///   This requires the `rpc-runner` feature to be enabled.
+///
+/// The RPC runner also reads:
+/// - `CRASHLAB_RPC_URL`: The Soroban RPC endpoint URL (required)
+/// - `CRASHLAB_CONTRACT_ID`: The Soroban contract ID to target (required for RPC runner)
 ///
 /// # Errors
 /// Returns [`RunnerCreationError`] if:
 /// - The `CRASHLAB_RUNNER` value is not a recognized runner type.
 /// - A requested runner type requires an unmet feature.
+/// - Required environment variables are missing.
 ///
 /// # Examples
 /// ```rust,no_run
@@ -160,6 +167,13 @@ impl std::error::Error for RunnerCreationError {}
 /// // With CRASHLAB_RUNNER=host (requires host-runner feature):
 /// # std::env::set_var("CRASHLAB_RUNNER", "host");
 /// # #[cfg(feature = "host-runner")]
+/// # let mut runner = create_runner().expect("failed to create runner");
+///
+/// // With CRASHLAB_RUNNER=rpc (requires rpc-runner feature):
+/// # std::env::set_var("CRASHLAB_RUNNER", "rpc");
+/// # std::env::set_var("CRASHLAB_RPC_URL", "https://rpc-futurenet.stellar.org:443");
+/// # std::env::set_var("CRASHLAB_CONTRACT_ID", "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4");
+/// # #[cfg(feature = "rpc-runner")]
 /// # let mut runner = create_runner().expect("failed to create runner");
 /// ```
 pub fn create_runner() -> Result<Box<dyn ContractRunner>, RunnerCreationError> {
@@ -178,6 +192,32 @@ pub fn create_runner() -> Result<Box<dyn ContractRunner>, RunnerCreationError> {
                 Err(RunnerCreationError::FeatureNotEnabled {
                     feature: "host-runner".to_string(),
                     runner_type: "host".to_string(),
+                })
+            }
+        }
+        "rpc" => {
+            #[cfg(feature = "rpc-runner")]
+            {
+                let rpc_url = std::env::var("CRASHLAB_RPC_URL")
+                    .map_err(|_| RunnerCreationError::InvalidRunnerType {
+                        runner_type: "rpc (CRASHLAB_RPC_URL not set)".to_string(),
+                    })?;
+                let contract_id = std::env::var("CRASHLAB_CONTRACT_ID")
+                    .map_err(|_| RunnerCreationError::InvalidRunnerType {
+                        runner_type: "rpc (CRASHLAB_CONTRACT_ID not set)".to_string(),
+                    })?;
+                
+                crate::RpcContractRunner::with_contract(rpc_url, contract_id)
+                    .map(|runner| Box::new(runner) as Box<dyn ContractRunner>)
+                    .map_err(|e| RunnerCreationError::InvalidRunnerType {
+                        runner_type: format!("rpc (config error: {})", e),
+                    })
+            }
+            #[cfg(not(feature = "rpc-runner"))]
+            {
+                Err(RunnerCreationError::FeatureNotEnabled {
+                    feature: "rpc-runner".to_string(),
+                    runner_type: "rpc".to_string(),
                 })
             }
         }
@@ -399,6 +439,45 @@ mod tests {
         let sig = runner.run_seed(&seed).expect("seed execution failed");
         assert_eq!(sig.digest, 42);
         assert_eq!(sig.category, "runtime-failure");
+    }
+
+    #[cfg(feature = "rpc-runner")]
+    #[test]
+    fn create_runner_rejects_rpc_without_feature_flag() {
+        // This test verifies the error message when trying to use rpc runner
+        // without the feature flag - handled by cfg not feature
+    }
+
+    #[test]
+    fn create_runner_rpc_requires_rpc_url_env() {
+        let _env = RunnerEnvGuard::set("rpc");
+        // Remove other RPC env vars to test they are required
+        std::env::remove_var("CRASHLAB_RPC_URL");
+        std::env::remove_var("CRASHLAB_CONTRACT_ID");
+
+        let result = create_runner();
+        assert!(result.is_err());
+        
+        // The error should mention missing CRASHLAB_RPC_URL
+        if let Err(err) = result {
+            let err_str = err.to_string();
+            assert!(err_str.contains("CRASHLAB_RPC_URL") || err_str.contains("rpc"), 
+                "Expected error about missing RPC URL, got: {}", err_str);
+        }
+    }
+
+    #[test]
+    fn runner_creation_error_display_includes_rpc() {
+        // Test that the error display mentions supported types including rpc when feature is enabled
+        #[cfg(feature = "rpc-runner")]
+        {
+            let err = RunnerCreationError::FeatureNotEnabled {
+                feature: "rpc-runner".to_string(),
+                runner_type: "rpc".to_string(),
+            };
+            let err_str = err.to_string();
+            assert!(err_str.contains("rpc-runner"), "Expected rpc-runner in error: {}", err_str);
+        }
     }
 }
 

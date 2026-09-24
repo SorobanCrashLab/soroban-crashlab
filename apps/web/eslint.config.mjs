@@ -14,6 +14,18 @@ const eslintConfig = defineConfig([
       // Ban explicit `any` in lib and utility layers.
       // Component JSX excluded initially to keep scope shippable.
       "@typescript-eslint/no-explicit-any": "off",
+      // Architecture guard: artifact-fs behavior lives only under src/lib,
+      // so a divergent same-named utility module cannot reappear (issue
+      // #1606) and be imported by accident. Filesystem uniqueness is
+      // additionally enforced by src/lib/artifact-fs-adapter.audit.test.ts.
+      "no-restricted-imports": ["error", {
+        patterns: [
+          {
+            group: ["*/app/utils/artifact-fs-adapter*", "@/app/utils/artifact-fs-adapter*"],
+            message: "Artifact fs helpers live only in src/lib/artifact-fs-adapter.ts. Import from '@/lib/artifact-fs-adapter'.",
+          },
+        ],
+      }],
     },
   },
   {

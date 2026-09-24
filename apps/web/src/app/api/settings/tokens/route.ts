@@ -4,6 +4,7 @@ import {
   listApiTokens,
   ApiTokenScope,
 } from '../../../../lib/storage/api-token-store';
+import { checkRequestSize } from '../../../../lib/request-size-limits';
 import { errorResponse, createdResponse, successResponse } from '../../../../lib/api-response-utils';
 
 export async function GET() {
@@ -12,6 +13,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
   try {
     const body = await request.json();
     const { name, scope, expiresAt } = body;

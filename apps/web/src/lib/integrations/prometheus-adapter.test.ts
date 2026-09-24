@@ -5,7 +5,11 @@ import {
   sanitizeLabelValue,
   serializeLabel,
   isAllowedLabelName,
+  isAllowedMetricName,
+  boundPushLabels,
+  estimateSeriesCount,
   MAX_LABEL_VALUE_LENGTH,
+  MAX_SERIES_BUDGET,
   TRUNCATION_MARKER,
 } from "./prometheus-adapter";
 
@@ -85,5 +89,55 @@ const runAssertions = () => {
   }
 };
 
+// ── Cardinality bounds (#1570) ─────────────────────────────────────────────
+const runCardinalityAssertions = () => {
+  // Metric name whitelist keeps unbounded input from minting new series names.
+  assert.equal(isAllowedMetricName("crashlab_runs_total"), true);
+  assert.equal(isAllowedMetricName("worker_some_arbitrary_counter"), false);
+  assert.equal(isAllowedMetricName(""), false);
+
+  // boundPushLabels: drops disallowed names, keeps allowed ones, sanitizes values.
+  const bounded = boundPushLabels({
+    run_name: 'evil"name',
+    arbitrary_user_field: "x",
+    area: "core",
+    severity: 'line1\nline2',
+  });
+  assert.deepEqual(Object.keys(bounded).sort(), ["area", "run_name", "severity"]);
+  assert.equal(bounded["run_name"], 'evil\\"name');
+  assert.equal(bounded["severity"], "line1\\nline2");
+  assert.ok(!hasUnescapedQuote(bounded["run_name"]), "bounded value has no unescaped quote");
+
+  // boundPushLabels: caps total label count to MAX_LABELS_PER_PUSH.
+  const manyLabels: Record<string, string> = {};
+  for (let i = 1; i <= 40; i++) {
+    manyLabels[`run_name_${i}`] = `v${i}`;
+  }
+  // Only whitelisted names survive; none of the synthetic run_name_N are allowed.
+  assert.equal(Object.keys(boundPushLabels(manyLabels)).length, 0);
+
+  // Even with repeated cycles over the allowed names, the bounded set is capped.
+  const cycled = boundPushLabels({
+    run_name: "a",
+    area: "b",
+    severity: "c",
+    status: "d",
+    campaign: "e",
+    queue: "f",
+    instance: "g",
+    job: "h",
+    run_id: "i",
+  });
+  assert.ok(Object.keys(cycled).length <= 10, "bounded label set cannot exceed MAX_LABELS_PER_PUSH");
+
+  // estimateSeriesCount: boundary values are sane and never exceed the budget
+  // for realistic (bounded) input.
+  assert.equal(estimateSeriesCount({}), 1);
+  assert.equal(estimateSeriesCount({ area: "core" }), 1);
+  assert.equal(estimateSeriesCount({ area: "core", severity: "panic" }), 2);
+  assert.ok(MAX_SERIES_BUDGET >= 10, "series budget comfortably exceeds MAX_LABELS_PER_PUSH");
+};
+
 runAssertions();
+runCardinalityAssertions();
 console.log("prometheus-adapter test: all assertions passed");

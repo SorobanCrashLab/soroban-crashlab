@@ -3,9 +3,13 @@ import {
   createApiToken,
   resolveApiToken,
   revokeApiToken,
+  rotateApiToken,
   listApiTokens,
   hashApiToken,
+  timingSafeHashEqual,
   resetApiTokenStore,
+  DEFAULT_TOKEN_TTL_MS,
+  TOKEN_ROTATION_GRACE_MS,
 } from './api-token-store';
 import { validateScopedApiToken } from '../api-key-auth';
 import { NextRequest } from 'next/server';
@@ -139,5 +143,113 @@ describe('api-token-store & authentication', () => {
     });
     const revokedRes = validateScopedApiToken(reqRevoked);
     expect(revokedRes?.status).toBe(401);
+  });
+
+  it('applies the default 90-day expiry when no explicit expiry is supplied', () => {
+    const startMs = Date.now();
+    const { secret, token } = createApiToken({
+      name: 'Default Expiry Token',
+      scope: 'read',
+      nowMs: startMs,
+    });
+
+    expect(token.expiresAt).not.toBeNull();
+    const expiresMs = new Date(token.expiresAt!).getTime();
+    expect(expiresMs - startMs).toBe(DEFAULT_TOKEN_TTL_MS);
+
+    // Still valid before the default expiry boundary.
+    expect(
+      resolveApiToken(secret, startMs + DEFAULT_TOKEN_TTL_MS - 1).status,
+    ).toBe('valid');
+    // Expired exactly at the default boundary.
+    expect(resolveApiToken(secret, startMs + DEFAULT_TOKEN_TTL_MS).status).toBe('expired');
+  });
+
+  it('honors an explicit expiry over the default', () => {
+    const startMs = Date.now();
+    const explicit = new Date(startMs + 60_000).toISOString();
+    const { token } = createApiToken({
+      name: 'Explicit Expiry Token',
+      scope: 'read',
+      expiresAt: explicit,
+      nowMs: startMs,
+    });
+    expect(token.expiresAt).toBe(explicit);
+  });
+
+  it('rotates a token, minting a successor with a new secret', () => {
+    const startMs = Date.now();
+    const { secret: oldSecret, token: oldToken } = createApiToken({
+      name: 'Rotation Token',
+      scope: 'write',
+      nowMs: startMs,
+    });
+
+    const rotated = rotateApiToken(oldToken.id, startMs + 100);
+    expect(rotated).toBeDefined();
+    expect(rotated!.secret).not.toBe(oldSecret);
+    expect(rotated!.token.name).toBe('Rotation Token');
+    expect(rotated!.token.scope).toBe('write');
+    expect(rotated!.token.id).not.toBe(oldToken.id);
+    expect(rotated!.previousTokenId).toBe(oldToken.id);
+
+    // Two tokens now exist: the original (rotated) and the successor.
+    const tokens = listApiTokens();
+    expect(tokens.length).toBe(2);
+    expect(tokens.find((t) => t.id === oldToken.id)?.rotatedAt).toBeDefined();
+  });
+
+  it('keeps the rotated token valid within the grace window, then revokes it', () => {
+    const startMs = Date.now();
+    const { secret: oldSecret, token: oldToken } = createApiToken({
+      name: 'Grace Window Token',
+      scope: 'read',
+      nowMs: startMs,
+    });
+
+    const rotated = rotateApiToken(oldToken.id, startMs + 100);
+    expect(rotated).toBeDefined();
+
+    // Within the grace window the old token still resolves.
+    expect(
+      resolveApiToken(oldSecret, startMs + 100 + TOKEN_ROTATION_GRACE_MS - 1).status,
+    ).toBe('valid');
+
+    // Past the grace window the old token is revoked.
+    expect(
+      resolveApiToken(oldSecret, startMs + 100 + TOKEN_ROTATION_GRACE_MS + 1).status,
+    ).toBe('revoked');
+
+    // The successor token keeps working independently.
+    expect(resolveApiToken(rotated!.secret, startMs + 200).status).toBe('valid');
+  });
+
+  it('rotateApiToken returns undefined for an unknown id', () => {
+    expect(rotateApiToken('tok_nonexistent')).toBeUndefined();
+  });
+
+  it('timingSafeHashEqual compares hashes in constant time', () => {
+    const secret = 'scl_live_secret_abc';
+    const hashA = hashApiToken(secret);
+    const hashB = hashApiToken(secret);
+    expect(timingSafeHashEqual(hashA, hashB)).toBe(true);
+    expect(timingSafeHashEqual(hashA, hashApiToken('scl_live_other'))).toBe(false);
+    expect(timingSafeHashEqual(hashA, '')).toBe(false);
+    expect(timingSafeHashEqual('', hashA)).toBe(false);
+  });
+
+  it('resolveApiToken matches via constant-time hash comparison', () => {
+    const now = Date.now();
+    const { secret } = createApiToken({
+      name: 'Constant Time Token',
+      scope: 'read',
+      nowMs: now,
+    });
+
+    // Exact secret resolves valid.
+    expect(resolveApiToken(secret, now + 1).status).toBe('valid');
+    // A single-byte-off secret must NOT accidentally match a stored hash.
+    const nearMiss = secret.slice(0, -1) + (secret.endsWith('a') ? 'b' : 'a');
+    expect(resolveApiToken(nearMiss, now + 1).status).toBe('invalid');
   });
 });

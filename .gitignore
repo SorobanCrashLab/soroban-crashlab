@@ -2,6 +2,9 @@
 target/
 **/*.rs.bk
 
+# Soroban testutils runtime snapshots (written by the Env on drop unless disabled)
+test_snapshots/
+
 # Node / Next
 node_modules/
 apps/web/node_modules/

@@ -19,6 +19,9 @@ export default function ApiTokenManager() {
   const [revokeTargetId, setRevokeTargetId] = useState<string | null>(null);
   const [isRevoking, setIsRevoking] = useState(false);
 
+  const [rotateTargetId, setRotateTargetId] = useState<string | null>(null);
+  const [isRotating, setIsRotating] = useState(false);
+
   const fetchTokens = useCallback(async () => {
     try {
       setLoading(true);
@@ -93,6 +96,38 @@ export default function ApiTokenManager() {
     }
   };
 
+  const handleConfirmRotate = async () => {
+    if (!rotateTargetId) return;
+    setIsRotating(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/settings/tokens/${rotateTargetId}/rotate`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = typeof data.error === 'string' ? data.error : data.message || 'Failed to rotate token.';
+        setError(msg);
+      } else {
+        setCreatedSecret(data.data?.secret ?? null);
+        fetchTokens();
+      }
+    } catch {
+      setError('An unexpected error occurred while rotating token.');
+    } finally {
+      setIsRotating(false);
+      setRotateTargetId(null);
+    }
+  };
+
+  const copySecret = () => {
+    if (createdSecret) {
+      navigator.clipboard.writeText(createdSecret);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   const handleConfirmRevoke = async () => {
     if (!revokeTargetId) return;
     setIsRevoking(true);
@@ -111,16 +146,9 @@ export default function ApiTokenManager() {
     }
   };
 
-  const copySecret = () => {
-    if (createdSecret) {
-      navigator.clipboard.writeText(createdSecret);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
   const getTokenStatus = (token: ApiTokenPublic, referenceMs: number) => {
     if (token.revokedAt) return { label: 'Revoked', chipClass: 'bg-red-500/10 text-red-400 border-red-500/20' };
+    if (token.rotatedAt) return { label: 'Rotated', chipClass: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
     if (token.expiresAt && referenceMs > 0 && new Date(token.expiresAt).getTime() <= referenceMs) {
       return { label: 'Expired', chipClass: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
     }
@@ -258,6 +286,15 @@ export default function ApiTokenManager() {
                         {!token.revokedAt && (
                           <button
                             type="button"
+                            onClick={() => setRotateTargetId(token.id)}
+                            className="text-xs text-amber-400 hover:text-amber-300 font-medium mr-3"
+                          >
+                            Rotate
+                          </button>
+                        )}
+                        {!token.revokedAt && (
+                          <button
+                            type="button"
                             onClick={() => setRevokeTargetId(token.id)}
                             className="text-xs text-red-400 hover:text-red-300 font-medium"
                           >
@@ -287,6 +324,23 @@ export default function ApiTokenManager() {
             isLoading={isRevoking}
             onConfirm={handleConfirmRevoke}
             onCancel={() => setRevokeTargetId(null)}
+          />
+        );
+      })()}
+
+      {(() => {
+        const dialogConfig = getConfirmDialogConfig('rotate-token');
+        return (
+          <ConfirmDialog
+            isOpen={rotateTargetId !== null}
+            title={dialogConfig.title}
+            message={dialogConfig.message}
+            confirmText={dialogConfig.confirmText}
+            cancelText={dialogConfig.cancelText}
+            variant={dialogConfig.variant}
+            isLoading={isRotating}
+            onConfirm={handleConfirmRotate}
+            onCancel={() => setRotateTargetId(null)}
           />
         );
       })()}

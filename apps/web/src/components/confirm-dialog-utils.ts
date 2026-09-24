@@ -5,7 +5,7 @@
  * a DOM environment and reuse it across different trigger sites.
  */
 
-export type DestructiveAction = 'delete-run' | 'delete-runs' | 'reset-config' | 'revoke-token';
+export type DestructiveAction = 'delete-run' | 'delete-runs' | 'reset-config' | 'revoke-token' | 'rotate-token';
 
 export interface ConfirmDialogConfig {
   title: string;
@@ -66,6 +66,16 @@ export function getConfirmDialogConfig(
         cancelText: 'Cancel',
         variant: 'danger',
       };
+
+    case 'rotate-token':
+      return {
+        title: 'Rotate API Token',
+        message:
+          'A new secret will be issued. The current token stays valid for the grace window, then is revoked. Applications using the old secret must switch to the new one before it expires.',
+        confirmText: 'Rotate Token',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      };
   }
 }
 
@@ -74,7 +84,7 @@ export function getConfirmDialogConfig(
  * proceeding. Non-destructive actions (export, tag, assign) return false.
  */
 export function requiresConfirmation(action: string): boolean {
-  return action === 'delete' || action === 'delete-run' || action === 'delete-runs' || action === 'reset-config' || action === 'revoke-token';
+  return action === 'delete' || action === 'delete-run' || action === 'delete-runs' || action === 'reset-config' || action === 'revoke-token' || action === 'rotate-token';
 }
 
 /**

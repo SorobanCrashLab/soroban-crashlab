@@ -71,6 +71,25 @@ test.describe('Dark mode toggle', () => {
     await expect(page.locator('html')).toHaveClass(/dark/);
   });
 
+  test('uses theme-aware colors on the landing page in dark mode', async ({ page }) => {
+    await setThemePreference(page, 'dark');
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    const openAppLink = page.getByRole('link', { name: 'Open App' }).first();
+    await expect(openAppLink).toBeVisible();
+    await expect(openAppLink).toHaveCSS('background-color', 'rgb(230, 230, 230)');
+    await expect(openAppLink).toHaveCSS('color', 'rgb(12, 12, 12)');
+
+    const sectionLabel = page.getByText('How it works').first();
+    await expect(sectionLabel).toBeVisible();
+    await expect(sectionLabel).toHaveCSS('color', 'rgb(230, 230, 230)');
+
+    const footerGitHubLink = page.getByRole('link', { name: 'GitHub' }).first();
+    await expect(footerGitHubLink).toBeVisible();
+    await expect(footerGitHubLink).toHaveCSS('color', 'rgb(230, 230, 230)');
+  });
+
   test('handles corrupted localStorage theme preference gracefully', async ({ page }) => {
     await page.evaluate((key) => {
       localStorage.setItem(key, 'invalid_corrupted_theme');

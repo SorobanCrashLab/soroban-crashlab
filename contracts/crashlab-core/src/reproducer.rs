@@ -1,6 +1,31 @@
 use crate::retry::{execute_with_retry, RetryConfig, SimulationError};
 use crate::{CaseBundle, CaseSeed, CrashSignature};
 
+/// Verdict from stability analysis.
+///
+/// These represent the possible outcomes of running a case bundle through
+/// the flaky detector multiple times.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StabilityVerdict {
+    /// The case is stable - all (non-transient) runs produced the same result.
+    Stable,
+    /// The case is flaky - runs produced different results.
+    Flaky,
+    /// All runs failed with transient errors and retry budget was exhausted.
+    /// This indicates infrastructure issues rather than a real flaky case.
+    InconclusiveInfra,
+}
+
+impl std::fmt::Display for StabilityVerdict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StabilityVerdict::Stable => write!(f, "stable"),
+            StabilityVerdict::Flaky => write!(f, "flaky"),
+            StabilityVerdict::InconclusiveInfra => write!(f, "inconclusive-infra"),
+        }
+    }
+}
+
 /// Summary of stability analysis for a single [`CaseBundle`].
 ///
 /// A bundle is considered *stable* when its [`flake_rate`][Self::flake_rate]
@@ -18,7 +43,12 @@ pub struct ReproReport {
     ///
     /// `0.0` — perfectly deterministic; `1.0` — never reproduced.
     pub flake_rate: f64,
-    /// `true` when `flake_rate <= FlakyDetector::threshold`.
+    /// The stability verdict based on the analysis.
+    pub verdict: StabilityVerdict,
+    /// Number of transient errors that were absorbed through retries.
+    /// This helps distinguish infrastructure issues from genuine flakiness.
+    pub transient_retry_count: u32,
+    /// `true` when `flake_rate <= FlakyDetector::threshold` AND verdict is Stable.
     ///
     /// Only stable bundles should be included in a CI regression pack.
     pub is_stable: bool,
@@ -72,6 +102,10 @@ impl FlakyDetector {
     /// `bundle.signature`.  The resulting [`ReproReport`] captures the flake
     /// rate and stability verdict.
     ///
+    /// The `retry_config` parameter controls retry behavior for transient errors.
+    /// Use [`RetryConfig::default()`] for the default retry behavior, or pass
+    /// a custom config to adjust retry attempts and backoff.
+    ///
     /// # Errors
     ///
     /// Returns [`SimulationError`] if a run fails after all retry attempts or
@@ -79,29 +113,71 @@ impl FlakyDetector {
     pub fn check<F>(
         &self,
         bundle: &CaseBundle,
+        retry_config: &RetryConfig,
         mut reproducer: F,
     ) -> Result<ReproReport, SimulationError>
     where
         F: FnMut(&CaseSeed) -> Result<CrashSignature, SimulationError>,
     {
-        let config = RetryConfig::default();
         let mut stable_count = 0;
+        let mut transient_retry_count = 0;
+        let mut non_transient_outcomes = 0;
 
         for _ in 0..self.runs {
-            let signature = execute_with_retry(&config, None, || reproducer(&bundle.seed))?;
-            if signature == bundle.signature {
-                stable_count += 1;
+            let result = execute_with_retry(retry_config, None, || {
+                let sig = reproducer(&bundle.seed)?;
+                // Track whether we had to retry due to transient errors
+                Ok(sig)
+            });
+
+            match result {
+                Ok(signature) => {
+                    if signature == bundle.signature {
+                        stable_count += 1;
+                    }
+                    non_transient_outcomes += 1;
+                }
+                Err(SimulationError::Transient(_)) => {
+                    // All retries exhausted for this attempt
+                    // This counts as a transient failure
+                    transient_retry_count += 1;
+                }
+                Err(SimulationError::NonTransient(_)) => {
+                    // Non-transient error - this is a genuine failure
+                    non_transient_outcomes += 1;
+                }
             }
         }
 
         let flake_rate = (self.runs - stable_count) as f64 / self.runs as f64;
+
+        // Determine verdict based on outcomes
+        let verdict = if non_transient_outcomes == 0 && transient_retry_count > 0 {
+            // All attempts resulted in transient errors - inconclusive infra
+            StabilityVerdict::InconclusiveInfra
+        } else if flake_rate > 0.0 {
+            // Some runs diverged - genuinely flaky
+            StabilityVerdict::Flaky
+        } else {
+            // All runs matched - stable
+            StabilityVerdict::Stable
+        };
+
+        // is_stable only when verdict is Stable or (verdict is Flaky but within threshold)
+        let is_stable = match verdict {
+            StabilityVerdict::Stable => true,
+            StabilityVerdict::Flaky => flake_rate <= self.threshold,
+            StabilityVerdict::InconclusiveInfra => false,
+        };
 
         Ok(ReproReport {
             bundle: bundle.clone(),
             runs: self.runs,
             stable_count,
             flake_rate,
-            is_stable: flake_rate <= self.threshold,
+            verdict,
+            transient_retry_count,
+            is_stable,
         })
     }
 }
@@ -115,9 +191,12 @@ impl FlakyDetector {
 ///
 /// Returns [`SimulationError`] if any bundle fails evaluation after all retry
 /// attempts or if a non-transient error is encountered.
+///
+/// The `retry_config` parameter controls retry behavior for transient errors.
 pub fn filter_ci_pack<'a, F>(
     bundles: &'a [CaseBundle],
     detector: &FlakyDetector,
+    retry_config: &RetryConfig,
     mut reproducer: F,
 ) -> Result<Vec<&'a CaseBundle>, SimulationError>
 where
@@ -125,7 +204,7 @@ where
 {
     let mut stable_bundles = Vec::new();
     for bundle in bundles {
-        if detector.check(bundle, &mut reproducer)?.is_stable {
+        if detector.check(bundle, retry_config, &mut reproducer)?.is_stable {
             stable_bundles.push(bundle);
         }
     }
@@ -255,27 +334,31 @@ mod tests {
     fn perfectly_stable_reproducer_has_zero_flake_rate() {
         let bundle = make_bundle(1, vec![1, 2, 3]);
         let detector = FlakyDetector::new(10, 0.0);
+        let config = RetryConfig::default();
 
         let report = detector
-            .check(&bundle, |_| Ok(bundle.signature.clone()))
+            .check(&bundle, &config, |_| Ok(bundle.signature.clone()))
             .unwrap();
 
         assert_eq!(report.runs, 10);
         assert_eq!(report.stable_count, 10);
         assert_eq!(report.flake_rate, 0.0);
         assert!(report.is_stable);
+        assert_eq!(report.verdict, StabilityVerdict::Stable);
     }
 
     #[test]
     fn always_diverging_reproducer_has_full_flake_rate() {
         let bundle = make_bundle(2, vec![5, 6, 7]);
         let detector = FlakyDetector::new(8, 0.5);
+        let config = RetryConfig::default();
 
-        let report = detector.check(&bundle, |_| Ok(divergent_sig())).unwrap();
+        let report = detector.check(&bundle, &config, |_| Ok(divergent_sig())).unwrap();
 
         assert_eq!(report.stable_count, 0);
         assert_eq!(report.flake_rate, 1.0);
         assert!(!report.is_stable);
+        assert_eq!(report.verdict, StabilityVerdict::Flaky);
     }
 
     #[test]
@@ -283,9 +366,10 @@ mod tests {
         let bundle = make_bundle(3, vec![0xAA, 0xBB]);
         // Threshold of 0.6 so a 0.5 flake rate still passes.
         let detector = FlakyDetector::new(4, 0.6);
+        let config = RetryConfig::default();
         let counter = Cell::new(0u32);
 
-        let report = detector.check(&bundle, |_| {
+        let report = detector.check(&bundle, &config, |_| {
             let n = counter.get();
             counter.set(n + 1);
             // Even calls reproduce correctly; odd calls diverge → 2/4 stable.
@@ -306,10 +390,11 @@ mod tests {
         // 3 out of 10 runs diverge → flake_rate == 0.3 == threshold → stable.
         let bundle = make_bundle(4, vec![1]);
         let detector = FlakyDetector::new(10, 0.3);
+        let config = RetryConfig::default();
         let counter = Cell::new(0u32);
 
         let report = detector
-            .check(&bundle, |_| {
+            .check(&bundle, &config, |_| {
                 let n = counter.get();
                 counter.set(n + 1);
                 if n < 7 {
@@ -330,10 +415,11 @@ mod tests {
         // 4 out of 10 runs diverge → flake_rate == 0.4 > 0.2 threshold → unstable.
         let bundle = make_bundle(5, vec![2, 3]);
         let detector = FlakyDetector::new(10, 0.2);
+        let config = RetryConfig::default();
         let counter = Cell::new(0u32);
 
         let report = detector
-            .check(&bundle, |_| {
+            .check(&bundle, &config, |_| {
                 let n = counter.get();
                 counter.set(n + 1);
                 if n < 6 {
@@ -352,10 +438,11 @@ mod tests {
     fn check_retries_on_transient_error() {
         let bundle = make_bundle(6, vec![1]);
         let detector = FlakyDetector::new(2, 0.0);
+        let config = RetryConfig::default();
         let counter = Cell::new(0u32);
 
         let report = detector
-            .check(&bundle, |_| {
+            .check(&bundle, &config, |_| {
                 let n = counter.get();
                 counter.set(n + 1);
                 // Fail first two attempts of the first run
@@ -371,6 +458,29 @@ mod tests {
         assert_eq!(counter.get(), 4); // 1st run: 3 attempts (2 fail, 1 success), 2nd run: 1 attempt
     }
 
+    #[test]
+    fn all_transient_failures_yields_inconclusive_infra() {
+        let bundle = make_bundle(7, vec![1]);
+        let detector = FlakyDetector::new(3, 0.0);
+        // Use minimal retries so we can trigger all-transient scenario
+        let config = RetryConfig {
+            max_attempts: 1,
+            base_delay_ms: 1,
+            max_delay_ms: 10,
+            jitter_factor: 0.0,
+        };
+
+        let report = detector
+            .check(&bundle, &config, |_| {
+                Err(SimulationError::Transient("network error".to_string()))
+            })
+            .unwrap();
+
+        assert_eq!(report.verdict, StabilityVerdict::InconclusiveInfra);
+        assert!(!report.is_stable);
+        assert_eq!(report.transient_retry_count, 3);
+    }
+
     // ── filter_ci_pack ────────────────────────────────────────────────────────
 
     #[test]
@@ -383,8 +493,9 @@ mod tests {
 
         let bundles = vec![stable, flaky];
         let detector = FlakyDetector::new(5, 0.0);
+        let config = RetryConfig::default();
 
-        let pack = filter_ci_pack(&bundles, &detector, move |seed| {
+        let pack = filter_ci_pack(&bundles, &detector, &config, move |seed| {
             if seed.id == stable_id {
                 Ok(stable_sig.clone())
             } else {
@@ -408,8 +519,9 @@ mod tests {
 
         let bundles = vec![b1, b2];
         let detector = FlakyDetector::new(3, 0.0);
+        let config = RetryConfig::default();
 
-        let pack = filter_ci_pack(&bundles, &detector, move |seed| {
+        let pack = filter_ci_pack(&bundles, &detector, &config, move |seed| {
             if seed.id == id1 {
                 Ok(sig1.clone())
             } else {
@@ -427,8 +539,9 @@ mod tests {
         let b2 = make_bundle(31, vec![0xFE]);
         let bundles = vec![b1, b2];
         let detector = FlakyDetector::new(4, 0.0);
+        let config = RetryConfig::default();
 
-        let pack = filter_ci_pack(&bundles, &detector, |_| Ok(divergent_sig())).unwrap();
+        let pack = filter_ci_pack(&bundles, &detector, &config, |_| Ok(divergent_sig())).unwrap();
 
         assert!(pack.is_empty());
     }
