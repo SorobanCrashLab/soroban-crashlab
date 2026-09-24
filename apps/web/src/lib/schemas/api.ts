@@ -27,7 +27,7 @@ export const ArtifactMetadataSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string().optional(),
   sizeBytes: z.number(),
-}).passthrough();
+});
 
 export const ArtifactsResponseSchema = z.object({
   artifacts: z.array(ArtifactMetadataSchema),

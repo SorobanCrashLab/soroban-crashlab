@@ -1,18 +1,14 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractimpl,
-    symbol_short,
-    Address, Env,
+    contract, contractimpl, contracterror,
+    map, symbol_short,
+    Address, Env, Map,
 };
 
 /// Storage layout version. Version 2 stores each balance and allowance in a
 /// separate persistent entry. Deployments using version 1 require an explicit
 /// migration before calling this contract; no automatic migration is provided.
 pub const STORAGE_VERSION: u32 = 2;
-    contract, contractimpl, contracterror,
-    map, symbol_short,
-    Address, Env, Map,
-};
 
 /// Typed errors returned by every entrypoint.
 ///
