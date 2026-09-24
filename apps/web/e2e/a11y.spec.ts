@@ -47,7 +47,6 @@ test.describe('Landing page accessibility', () => {
     // All SVGs should have aria-hidden="true" since they're decorative
     for (const svg of svgs) {
       const ariaHidden = await svg.getAttribute('aria-hidden');
-      const focusable = await svg.getAttribute('focusable');
       
       // SVGs should either have aria-hidden="true" or be inside an aria-labelledby element
       // For this test, we verify that decorative icons have the correct attributes
