@@ -452,17 +452,34 @@ mod tests {
 
     #[test]
     fn thread_count_decremented_after_completion() {
+        // Tests in this binary run in parallel, so other simulation tests can
+        // transiently raise the global counter between our reads. Poll until
+        // the counter settles back to (or below) the baseline instead of
+        // asserting instantly; a leaked thread keeps it elevated and fails
+        // the assertion after the deadline.
         let initial_count = active_simulation_thread_count();
         let seed = CaseSeed {
             id: 103,
             payload: vec![7, 8, 9],
         };
         let cfg = SimulationTimeoutConfig::new(5000);
-        
+
         let _sig = run_simulation_with_timeout(&seed, &cfg, |s| classify(s));
-        
-        let after_count = active_simulation_thread_count();
-        assert_eq!(initial_count, after_count, "Thread count should return to initial value");
+
+        let deadline = std::time::Instant::now() + StdDuration::from_millis(2000);
+        loop {
+            if active_simulation_thread_count() <= initial_count {
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                break;
+            }
+            thread::sleep(StdDuration::from_millis(10));
+        }
+        assert!(
+            active_simulation_thread_count() <= initial_count,
+            "Thread count should return to the initial value (leaked simulation thread?)"
+        );
     }
 
     #[test]
