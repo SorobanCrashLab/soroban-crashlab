@@ -22,6 +22,22 @@ export const MAX_LABEL_VALUE_LENGTH = 200;
 /** Sentinel appended to truncated values so they are never mistaken for full ones. */
 export const TRUNCATION_MARKER = "...[truncated]";
 
+/** Statically allow-listed metric NAMES emitted to Prometheus. */
+export const ALLOWED_METRIC_NAMES = new Set([
+  "crashlab_runs_total",
+  "crashlab_runs_failed_total",
+  "crashlab_simulation_success_total",
+  "crashlab_simulation_failure_total",
+  "crashlab_execution_success_total",
+  "crashlab_execution_failure_total",
+]);
+
+/** Maximum number of label pairs a single push may carry. */
+export const MAX_LABELS_PER_PUSH = 10;
+
+/** Maximum distinct series a single push may imply before it is rejected. */
+export const MAX_SERIES_BUDGET = 100;
+
 /**
  * Statically allow-listed label NAMES emitted to Prometheus. Label names may
  * only come from this fixed set; anything else is dropped with a warning so
@@ -83,6 +99,43 @@ export function sanitizeLabelValue(value: string): string {
  */
 export function isAllowedLabelName(name: string): boolean {
   return ALLOWED_LABEL_NAMES.has(name);
+}
+
+/**
+ * Validate a metric NAME against the static whitelist so unbounded input can
+ * never mint new series identifiers and blow up cardinality.
+ */
+export function isAllowedMetricName(name: string): boolean {
+  return ALLOWED_METRIC_NAMES.has(name);
+}
+
+/**
+ * Bound a label set before emission: drop non-whitelisted names, truncate and
+ * escape every value, and cap the total number of label pairs. Keeps
+ * cardinality finite even when the caller passes attacker-controlled input.
+ */
+export function boundPushLabels(labels: Record<string, string>): Record<string, string> {
+  const bounded: Record<string, string> = {};
+  for (const [name, value] of Object.entries(labels)) {
+    if (Object.keys(bounded).length >= MAX_LABELS_PER_PUSH) {
+      break;
+    }
+    if (!isAllowedLabelName(name) || value.length === 0) {
+      continue;
+    }
+    bounded[name] = sanitizeLabelValue(value);
+  }
+  return bounded;
+}
+
+/**
+ * Approximate distinct-series cardinality implied by a label set. Series
+ * multiply with every label dimension; when no labels are present exactly one
+ * series is implied.
+ */
+export function estimateSeriesCount(labels: Record<string, string>): number {
+  const count = Object.keys(labels).length;
+  return count > 0 ? count : 1;
 }
 
 /**
@@ -159,6 +212,14 @@ export function createPrometheusMetricsExportDependencies(
     },
 
     async pushMetrics(config) {
+      const boundedLabels = boundPushLabels(config.labels);
+
+      // Reject pushes whose implied series exceed the cardinality budget
+      // instead of letting unbounded label input multiply series on the exporter.
+      if (estimateSeriesCount(boundedLabels) > MAX_SERIES_BUDGET) {
+        return { accepted: false, pushedSeries: 0 };
+      }
+
       const response = await fetchImpl(joinUrl(config.endpoint, options.pushPath), {
         method: 'POST',
         headers: {
@@ -171,7 +232,7 @@ export function createPrometheusMetricsExportDependencies(
           endpoint: config.endpoint,
           interval: config.interval,
           enabled: config.enabled,
-          labels: config.labels,
+          labels: boundedLabels,
         }),
       });
 

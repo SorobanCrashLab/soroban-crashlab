@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
+import { checkRequestSize } from '@/lib/request-size-limits';
 import { validateSmtpConfig, type SmtpConfig } from '@/lib/integrations/smtp-email';
 import { getStoredSmtpConfig, setStoredSmtpConfig } from '@/lib/integrations/smtp-store';
 
@@ -20,6 +21,11 @@ export async function GET() {
  * Validates and persists an SMTP configuration. Body: SmtpConfig JSON.
  */
 export async function POST(request: NextRequest) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
   let body: unknown;
   try {
     body = await request.json();

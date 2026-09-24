@@ -123,6 +123,7 @@ All error responses return a standardized JSON structure with an appropriate HTT
 | `GET` `PUT` | `/api/settings/alerting` | Read or replace alerting configuration snapshot |
 | `GET` `POST` | `/api/settings/tokens` | List API tokens or generate a new scoped token |
 | `POST` | `/api/settings/tokens/{id}/revoke` | Revoke an existing API token by ID |
+| `POST` | `/api/settings/tokens/{id}/rotate` | Rotate an API token, minting a successor and keeping the old secret valid for a grace window |
 
 ### Webhooks
 | Method | Path | Description |
@@ -696,7 +697,7 @@ Generate a new scoped API token. The full plaintext `secret` is returned **only 
 | --- | --- | --- | --- |
 | `name` | `string` | Yes | Non-empty descriptive name |
 | `scope` | `string` | No | Token scope: `"read"` or `"write"` (default: `"read"`) |
-| `expiresAt` | `string` | No | ISO 8601 expiry timestamp |
+| `expiresAt` | `string` | No | ISO 8601 expiry timestamp. When omitted, the token defaults to a 90-day lifetime (`CRASHLAB_API_TOKEN_TTL_DAYS`) |
 
 **Response** `201 Created`:
 
@@ -724,6 +725,38 @@ Generate a new scoped API token. The full plaintext `secret` is returned **only 
 Revoke an API token immediately, rendering it invalid for subsequent requests.
 
 **Response** `200 OK`: `{ "message": "Token revoked successfully." }`.
+
+**Errors:** `400 Bad Request` if ID missing, `404 Not Found` if token does not exist.
+
+---
+
+### `POST /api/settings/tokens/{id}/rotate`
+
+Rotate an API token: mint a successor token with a fresh secret (same name and
+scope) and keep the previous secret valid for the grace window
+(`CRASHLAB_API_TOKEN_ROTATION_GRACE_HOURS`, default 24 hours) so in-flight
+consumers can migrate without an outage. Once the grace window elapses the old
+token automatically becomes invalid.
+
+The successor's plaintext `secret` is returned **only once** and cannot be
+retrieved later.
+
+**Response** `200 OK`:
+
+```json
+{
+  "message": "Token rotated successfully. The previous token remains valid for the grace window, then is revoked. Store the new secret safely as it will not be shown again.",
+  "secret": "scl_live_0f7c92...",
+  "token": {
+    "id": "tok_103",
+    "name": "CI Runner Key",
+    "scope": "write",
+    "createdAt": "2026-08-30T13:00:00.000Z",
+    "expiresAt": "2026-09-28T13:00:00.000Z"
+  },
+  "previousTokenId": "tok_102"
+}
+```
 
 **Errors:** `400 Bad Request` if ID missing, `404 Not Found` if token does not exist.
 
@@ -942,6 +975,8 @@ Each dependency reports one of `ok`, `degraded`, `unavailable`, or `not_configur
 
 Performs an active health check against the Prometheus adapter using `PROMETHEUS_ENDPOINT`, `PROMETHEUS_HEALTH_PATH`, and `PROMETHEUS_TIMEOUT_MS`.
 
+**Auth:** When `CRASHLAB_METRICS_SCRAPE_TOKEN` is configured, callers must send `Authorization: Bearer <token>`; a missing or mismatched token is rejected with `401 { "error": "..." }`.
+
 **Response** `200 OK`:
 
 ```json
@@ -988,6 +1023,8 @@ Retrieve the notification feed. Configurable via `NOTIFICATIONS_FEED_URL` and `N
 ### `GET /api/integrations/prometheus/health`
 
 Lightweight probe used by internal health pollers and Prometheus scrape jobs to check exporter health.
+
+**Auth:** Same `CRASHLAB_METRICS_SCRAPE_TOKEN` bearer gate as `/api/health/metrics`.
 
 **Response** `200 OK`: `{ "status": "healthy", "timestamp": "...", "uptime": 1234 }`.
 

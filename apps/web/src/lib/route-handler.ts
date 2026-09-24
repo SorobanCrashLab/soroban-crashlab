@@ -45,14 +45,28 @@ function ensureRouteResponse(value: unknown, fallbackMessage: string): Response 
  * Wraps a route handler so any uncaught exception is logged and converted
  * into a consistent 500 { error } response instead of an unhandled
  * exception (which Next.js would otherwise render as an opaque HTML page).
+ *
+ * When `enforceSizeLimit` is true (default), requests whose `content-length`
+ * exceeds the configured limits are rejected with a standardized 413 before
+ * the handler runs, giving every wrapped route uniform body-size enforcement.
  */
 export function withRouteErrorHandling<Args extends unknown[]>(
   routeLabel: string,
   handler: (...args: Args) => Promise<Response>,
   fallbackMessage = 'An unexpected error occurred.',
+  enforceSizeLimit = true,
 ): (...args: Args) => Promise<Response> {
   return async (...args: Args) => {
     try {
+      if (enforceSizeLimit) {
+        const request = args[0];
+        if (request instanceof Request) {
+          const sizeError = checkRequestSize(request);
+          if (sizeError) {
+            return sizeError;
+          }
+        }
+      }
       const response = await handler(...args);
       return ensureRouteResponse(response, fallbackMessage);
     } catch (error) {

@@ -2,6 +2,14 @@ import crypto from 'node:crypto';
 
 export type ApiTokenScope = 'read' | 'write';
 
+/** Default lifetime (90 days) applied when no explicit expiry is supplied. */
+export const DEFAULT_TOKEN_TTL_MS =
+  (parseInt(process.env.CRASHLAB_API_TOKEN_TTL_DAYS || '90', 10) || 90) * 24 * 60 * 60 * 1000;
+
+/** Rotated tokens stay valid for this overlap window, then are revoked. */
+export const TOKEN_ROTATION_GRACE_MS =
+  (parseInt(process.env.CRASHLAB_API_TOKEN_ROTATION_GRACE_HOURS || '24', 10) || 24) * 60 * 60 * 1000;
+
 export interface ApiTokenRecord {
   id: string;
   name: string;
@@ -11,6 +19,7 @@ export interface ApiTokenRecord {
   expiresAt?: string | null;
   lastUsedAt?: string | null;
   revokedAt?: string | null;
+  rotatedAt?: string | null;
 }
 
 export interface ApiTokenPublic {
@@ -22,6 +31,7 @@ export interface ApiTokenPublic {
   expiresAt?: string | null;
   lastUsedAt?: string | null;
   revokedAt?: string | null;
+  rotatedAt?: string | null;
 }
 
 export type ResolveTokenResult =
@@ -29,6 +39,13 @@ export type ResolveTokenResult =
   | { status: 'expired'; token: ApiTokenRecord }
   | { status: 'revoked'; token: ApiTokenRecord }
   | { status: 'invalid'; token?: undefined };
+
+/** Result of rotating a token: the new secret plus the successor record. */
+export interface RotateTokenResult {
+  secret: string;
+  token: ApiTokenPublic;
+  previousTokenId: string;
+}
 
 // In-memory store backing server-side storage
 let tokensStore: ApiTokenRecord[] = [];
@@ -38,6 +55,22 @@ const LAST_USED_THROTTLE_MS = 60_000;
 
 export function hashApiToken(secret: string): string {
   return crypto.createHash('sha256').update(secret).digest('hex');
+}
+
+/**
+ * Constant-time equality over two opaque strings using padding so length
+ * differences do not short-circuit the comparison. Used when matching a
+ * presented secret's hash against stored hashes.
+ */
+export function timingSafeHashEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf-8');
+  const bufB = Buffer.from(b, 'utf-8');
+  const maxLen = Math.max(bufA.length, bufB.length);
+  const paddedA = Buffer.alloc(maxLen, 0);
+  const paddedB = Buffer.alloc(maxLen, 0);
+  bufA.copy(paddedA);
+  bufB.copy(paddedB);
+  return crypto.timingSafeEqual(paddedA, paddedB) && bufA.length === bufB.length;
 }
 
 export function maskTokenSecret(secret: string): string {
@@ -57,6 +90,7 @@ export function toPublicRecord(record: ApiTokenRecord): ApiTokenPublic {
     expiresAt: record.expiresAt,
     lastUsedAt: record.lastUsedAt,
     revokedAt: record.revokedAt,
+    rotatedAt: record.rotatedAt ?? null,
   };
 }
 
@@ -64,12 +98,18 @@ export function createApiToken(params: {
   name: string;
   scope: ApiTokenScope;
   expiresAt?: string | null;
+  nowMs?: number;
 }): { secret: string; token: ApiTokenPublic } {
   const secretBytes = crypto.randomBytes(24).toString('hex');
   const secret = `scl_live_${secretBytes}`;
   const sha256Hash = hashApiToken(secret);
   const id = `tok_${crypto.randomBytes(8).toString('hex')}`;
-  const createdAt = new Date().toISOString();
+  const nowMs = params.nowMs ?? Date.now();
+  const createdAt = new Date(nowMs).toISOString();
+
+  // When no explicit expiry is supplied, apply the default token lifetime so
+  // a leaked token cannot stay valid forever.
+  const expiresAt = params.expiresAt ?? new Date(nowMs + DEFAULT_TOKEN_TTL_MS).toISOString();
 
   const record: ApiTokenRecord = {
     id,
@@ -77,9 +117,10 @@ export function createApiToken(params: {
     sha256Hash,
     scope: params.scope,
     createdAt,
-    expiresAt: params.expiresAt || null,
+    expiresAt,
     lastUsedAt: null,
     revokedAt: null,
+    rotatedAt: null,
   };
 
   tokensStore.push(record);
@@ -93,6 +134,7 @@ export function createApiToken(params: {
     expiresAt: record.expiresAt,
     lastUsedAt: record.lastUsedAt,
     revokedAt: record.revokedAt,
+    rotatedAt: record.rotatedAt ?? null,
   };
 
   return { secret, token: publicRecord };
@@ -108,7 +150,36 @@ export function listApiTokens(): ApiTokenPublic[] {
     expiresAt: record.expiresAt,
     lastUsedAt: record.lastUsedAt,
     revokedAt: record.revokedAt,
+    rotatedAt: record.rotatedAt ?? null,
   }));
+}
+
+/**
+ * Rotates a token: mints a successor with a fresh secret (same name/scope),
+ * marks the old one as rotated, and keeps the old token valid for a grace
+ * overlap window so in-flight consumers can migrate without downtime.
+ *
+ * Returns the new secret + record, or undefined when the id is unknown.
+ */
+export function rotateApiToken(id: string, nowMs = Date.now()): RotateTokenResult | undefined {
+  const existing = tokensStore.find((t) => t.id === id);
+  if (!existing) {
+    return undefined;
+  }
+
+  // A revoked secret is dead and must not silently beget a successor unless
+  // the operator explicitly rotates it again later; block the no-op path.
+  const { secret, token } = createApiToken({
+    name: existing.name,
+    scope: existing.scope,
+    nowMs,
+  });
+
+  // Old token remains usable for the grace window, then resolveApiToken flips
+  // it to revoked automatically.
+  existing.rotatedAt = new Date(nowMs).toISOString();
+
+  return { secret, token, previousTokenId: existing.id };
 }
 
 export function revokeApiToken(id: string): boolean {
@@ -122,13 +193,21 @@ export function revokeApiToken(id: string): boolean {
 
 export function resolveApiToken(secret: string, nowMs = Date.now()): ResolveTokenResult {
   const hash = hashApiToken(secret);
-  const record = tokensStore.find((t) => t.sha256Hash === hash);
+  const record = tokensStore.find((t) => timingSafeHashEqual(t.sha256Hash, hash));
   if (!record) {
     return { status: 'invalid' };
   }
 
   if (record.revokedAt) {
     return { status: 'revoked', token: record };
+  }
+
+  // A rotated token is revoked once its grace overlap window has elapsed.
+  if (record.rotatedAt) {
+    const graceDeadline = new Date(record.rotatedAt).getTime() + TOKEN_ROTATION_GRACE_MS;
+    if (nowMs > graceDeadline) {
+      return { status: 'revoked', token: record };
+    }
   }
 
   if (record.expiresAt) {

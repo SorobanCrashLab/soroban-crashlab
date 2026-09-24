@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
+import { checkRequestSize } from '@/lib/request-size-limits';
 import {
   verifySmtpConnection,
   validateSmtpConfig,
@@ -12,6 +13,11 @@ import {
  * mail server, without sending an email. Body: SmtpConfig JSON.
  */
 export async function POST(request: NextRequest) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
   let body: unknown;
   try {
     body = await request.json();

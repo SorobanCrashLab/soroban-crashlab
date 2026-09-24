@@ -10,12 +10,18 @@
  */
 
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
+import { checkRequestSize } from '@/lib/request-size-limits';
 import { isIntegrationKeyReachable } from '../../../../integrate-pagerduty-alert-integration-utils';
 import { PAGERDUTY_FETCH_TIMEOUT_MS } from '../../../../../lib/timeouts';
 
 const PD_EVENTS_API_URL = 'https://events.pagerduty.com/v2/enqueue';
 
 export async function POST(request: Request) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
   try {
     const body = (await request.json()) as { integrationKey?: string };
     const integrationKey = (body.integrationKey ?? '').trim();

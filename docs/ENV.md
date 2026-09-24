@@ -54,6 +54,18 @@ The fuzzer runner executes case seeds against the smart contract under test. You
 - **Used by**: Webhook API routes (`apps/web/src/app/api/webhooks/route.ts`)
 - **Description**: When set, all `GET`, `POST`, `PATCH`, and `DELETE` requests to `/api/webhooks` must include an `Authorization: Bearer <key>` header that matches this value exactly. The comparison is performed using a timing-safe algorithm to prevent side-channel attacks. Requests with a missing or incorrect token are rejected with HTTP 401. When this variable is absent or empty, the endpoint is unauthenticated (existing behaviour is preserved for deployments that have not yet configured this variable).
 
+### `CRASHLAB_API_TOKEN_TTL_DAYS`
+- **Required**: No
+- **Default**: `90`
+- **Used by**: API token store (`apps/web/src/lib/storage/api-token-store.ts`)
+- **Description**: Default lifetime in days applied to scoped API tokens created via `/api/settings/tokens` when no explicit `expiresAt` is supplied. Tokens are stored as SHA-256 hashes only (plaintext secrets are shown once at creation and never persisted).
+
+### `CRASHLAB_API_TOKEN_ROTATION_GRACE_HOURS`
+- **Required**: No
+- **Default**: `24`
+- **Used by**: API token store (`apps/web/src/lib/storage/api-token-store.ts`)
+- **Description**: Overlap window in hours during which a rotated token's previous secret remains valid. After the grace window elapses, resolve calls treat the old secret as revoked.
+
 ---
 
 ## 4. Web Application Variables
@@ -92,6 +104,7 @@ These values are read only by Next.js server routes or middleware. Keep them out
 | `PROMETHEUS_ENDPOINT` | No | `http://localhost:9090` | Prometheus base URL for health metrics querying. |
 | `PROMETHEUS_HEALTH_PATH` | No | `/-/healthy` | Health path queried on the Prometheus endpoint. |
 | `PROMETHEUS_TIMEOUT_MS` | No | `5000` | Timeout in milliseconds for health queries. |
+| `CRASHLAB_METRICS_SCRAPE_TOKEN` | No | *(unset)* | Shared secret that must be presented as `Authorization: Bearer <token>` on `/api/health/metrics` and `/api/integrations/prometheus/health`. When unset, both probes remain open for backward compatibility; when set, missing/mismatched tokens are rejected with `401`. |
 
 ### Notifications Feed Configuration (`apps/web/src/app/api/notifications/route.ts`)
 | Variable | Required | Default | Description |

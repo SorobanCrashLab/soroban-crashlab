@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
+import { checkRequestSize } from '@/lib/request-size-limits';
 import { sendEmail, validateEmail } from '@/lib/integrations/smtp-email';
 import { getStoredSmtpConfig, recordEmailLogEntry } from '@/lib/integrations/smtp-store';
 
@@ -11,6 +12,11 @@ const TEST_SUBJECT = '[Test] SorobanCrashLab SMTP Integration';
  * configuration. Body: { to: string }
  */
 export async function POST(request: NextRequest) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
   let body: unknown;
   try {
     body = await request.json();

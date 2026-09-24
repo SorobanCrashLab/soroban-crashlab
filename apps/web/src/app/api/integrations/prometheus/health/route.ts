@@ -1,5 +1,7 @@
+import { NextRequest } from 'next/server';
 import { successResponse } from '@/lib/api-response-utils';
 import { logger } from '@/lib/logger';
+import { validateMetricsScrapeAuth } from '@/lib/api-key-auth';
 
 /**
  * GET /api/integrations/prometheus/health
@@ -7,8 +9,17 @@ import { logger } from '@/lib/logger';
  *
  * This route is used by the Prometheus poller or internal monitoring
  * to verify that the metrics exporter is operational.
+ *
+ * Access is gated behind `CRASHLAB_METRICS_SCRAPE_TOKEN` in the same way as
+ * `/api/health/metrics`: a configured token requires a matching
+ * `Authorization: Bearer <token>` header on every scrape/health request.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = validateMetricsScrapeAuth(request);
+  if (authError) {
+    return authError;
+  }
+
   try {
     // In a real implementation, we would check:
     // 1. Connection to the internal metrics store

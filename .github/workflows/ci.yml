@@ -72,6 +72,8 @@ jobs:
         with:
           workspaces: contracts/crashlab-core
       - run: cargo test --all-targets
+      - name: Test host-runner feature
+        run: cargo test --all-targets --features host-runner
 
   soroban-example:
     runs-on: blacksmith-4vcpu-ubuntu-2404

@@ -8,6 +8,7 @@
  */
 
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
+import { checkRequestSize } from '@/lib/request-size-limits';
 import type { GrafanaAnnotation } from '../../../../integrate-grafana-dashboard-annotation-api-utils';
 import { buildAnnotationPayload, joinGrafanaUrl } from '../../../../integrate-grafana-dashboard-annotation-api-utils';
 
@@ -46,6 +47,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
   try {
     const body = (await request.json()) as {
       runId?: string;
