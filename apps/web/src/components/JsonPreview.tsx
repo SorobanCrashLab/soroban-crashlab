@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { escapeHtml } from '../lib/sanitize';
 
 interface JsonPreviewProps {
   content: string;
@@ -27,38 +26,88 @@ const JsonPreview: React.FC<JsonPreviewProps> = ({
       <pre
         className="font-mono text-xs leading-relaxed p-4 surface-soft text-zinc-800 dark:text-zinc-200 whitespace-pre"
         style={{ background: 'var(--surface)', color: 'var(--text-primary)' }}
-        dangerouslySetInnerHTML={{ __html: highlighted }}
-      />
+      >
+        {highlighted}
+      </pre>
     </div>
   );
 };
 
 /**
- * Apply basic syntax highlighting to JSON text.
- * Uses regex to colorize keys, strings, numbers, booleans, and null values.
- * All HTML special characters are escaped before applying color spans to prevent XSS.
+ * Apply basic syntax highlighting to JSON text without turning payload data into HTML.
  */
-function highlightJson(json: string): string {
-  const escaped = escapeHtml(json);
+function highlightJson(json: string): React.ReactNode {
+  try {
+    JSON.parse(json);
+  } catch {
+    return json;
+  }
 
-  return escaped.replace(
-    /("(?:[^"\\]|\\.)*")\s*:/g, // keys
-    '<span style="color: #2563eb;">$1</span>:'
-  ).replace(
-    /:\s*("(?:[^"\\]|\\.)*")/g, // string values
-    ':<span style="color: #15803d;">$1</span>'
-  ).replace(
-    /:\s*(true|false)/g, // booleans
-    ':<span style="color: #9333ea;">$1</span>'
-  ).replace(
-    /:\s*(null)/g, // null
-    ':<span style="color: #dc2626;">$1</span>'
-  ).replace(
-    /(\b\d+\.?\d*(?:[eE][+-]?\d+)?\b)/g, // numbers (not inside strings)
-    (match) => {
-      return `<span style="color: #d97706;">${match}</span>`;
+  const tokens: React.ReactNode[] = [];
+  let index = 0;
+  let tokenIndex = 0;
+
+  while (index < json.length) {
+    const character = json[index];
+
+    if (character === '"') {
+      const start = index;
+      index += 1;
+      while (index < json.length) {
+        if (json[index] === '\\') {
+          index += 2;
+        } else if (json[index] === '"') {
+          index += 1;
+          break;
+        } else {
+          index += 1;
+        }
+      }
+
+      const value = json.slice(start, index);
+      let nextIndex = index;
+      while (/\s/.test(json[nextIndex] ?? '')) {
+        nextIndex += 1;
+      }
+      const type = json[nextIndex] === ':' ? 'key' : 'string';
+      tokens.push(
+        <span key={`${type}-${tokenIndex}`} style={{ color: type === 'key' ? '#2563eb' : '#15803d' }}>
+          {value}
+        </span>
+      );
+      tokenIndex += 1;
+      continue;
     }
-  );
+
+    const number = json.slice(index).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+    const literal = json.slice(index).match(/^(?:true|false|null)\b/);
+    if (number || literal) {
+      const value = number?.[0] ?? literal?.[0] ?? '';
+      const color = number ? '#d97706' : literal?.[0] === 'null' ? '#dc2626' : '#9333ea';
+      tokens.push(
+        <span key={`value-${tokenIndex}`} style={{ color }}>
+          {value}
+        </span>
+      );
+      tokenIndex += 1;
+      index += value.length;
+      continue;
+    }
+
+    const textStart = index;
+    index += 1;
+    while (
+      index < json.length &&
+      json[index] !== '"' &&
+      !/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.test(json.slice(index)) &&
+      !/^(?:true|false|null)\b/.test(json.slice(index))
+    ) {
+      index += 1;
+    }
+    tokens.push(json.slice(textStart, index));
+  }
+
+  return tokens;
 }
 
 export default JsonPreview;
