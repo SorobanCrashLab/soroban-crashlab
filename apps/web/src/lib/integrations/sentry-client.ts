@@ -1,5 +1,15 @@
 import * as Sentry from '@sentry/nextjs';
 
+function getSessionBooleanFlag(key: string): boolean {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    return window.sessionStorage.getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Initializes the Sentry client-side SDK.
  * Sentry will only be initialized if the NEXT_PUBLIC_SENTRY_DSN environment variable is provided.
@@ -12,7 +22,7 @@ export function initSentryClient(): void {
       dsn,
       tracesSampleRate: 1.0,
       beforeSend(event) {
-        const isMockData = sessionStorage.getItem('crashlab:mock-data') === 'true';
+        const isMockData = getSessionBooleanFlag('crashlab:mock-data');
         if (!event.tags) event.tags = {};
         event.tags.environment = isMockData ? 'mock-data' : 'production';
         if (event.request) {

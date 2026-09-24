@@ -58,4 +58,21 @@ describe('Sentry Client Integration', () => {
     sentryAdapter.captureMessage('test message', 'warning');
     expect(Sentry.captureMessage).toHaveBeenCalledWith('test message', 'warning');
   });
+
+  it('should ignore blocked sessionStorage access in beforeSend', () => {
+    process.env.NEXT_PUBLIC_SENTRY_DSN = 'https://mock-dsn@sentry.io/1';
+
+    Object.defineProperty(window, 'sessionStorage', {
+      configurable: true,
+      get() {
+        throw new Error('Blocked storage');
+      },
+    });
+
+    initSentryClient();
+    const sentryInit = vi.mocked(Sentry.init).mock.calls.at(-1)?.[0];
+
+    expect(() => sentryInit?.beforeSend?.({ tags: {} } as any)).not.toThrow();
+    expect(sentryInit?.beforeSend?.({ tags: {} } as any)).toMatchObject({ tags: { environment: 'production' } });
+  });
 });
