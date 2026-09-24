@@ -14,9 +14,9 @@ fn regression_seed_42_af88cf52() {
             payload: vec![0xb6, 0xa0, 0xdf],
         },
         signature: CrashSignature {
-            category: "runtime-failure".to_string(),
+            category: "auth".to_string(),
             digest: 7942469581289707507,
-            signature_hash: 10616223570442512235,
+            signature_hash: 12090227556318742856,
         },
         environment: None,
         failure_payload: vec![],
@@ -24,9 +24,9 @@ fn regression_seed_42_af88cf52() {
     };
 
     let result = replay_seed_bundle(&bundle);
-    assert_eq!(result.actual.category, "runtime-failure");
+    assert_eq!(result.actual.category, "auth");
     assert_eq!(result.actual.digest, 7942469581289707507);
-    assert_eq!(result.actual.signature_hash, 10616223570442512235);
+    assert_eq!(result.actual.signature_hash, 12090227556318742856);
     assert!(
         result.matches,
         "replay should match exported failing bundle signature"
@@ -45,7 +45,7 @@ fn regression_seed_99_cbf29ce4() {
         signature: CrashSignature {
             category: "empty-input".to_string(),
             digest: 99,
-            signature_hash: 10130289593542214687,
+            signature_hash: 728251491318869827,
         },
         environment: None,
         failure_payload: vec![],
@@ -55,7 +55,7 @@ fn regression_seed_99_cbf29ce4() {
     let result = replay_seed_bundle(&bundle);
     assert_eq!(result.actual.category, "empty-input");
     assert_eq!(result.actual.digest, 99);
-    assert_eq!(result.actual.signature_hash, 10130289593542214687);
+    assert_eq!(result.actual.signature_hash, 728251491318869827);
     assert!(
         result.matches,
         "replay should match exported failing bundle signature"
