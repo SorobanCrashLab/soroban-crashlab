@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRbacPermission } from '../../../../lib/rbac';
+import { checkRequestSize } from '../../../../lib/request-size-limits';
 import {
   setNotificationPreference,
   getNotificationPreference,
@@ -26,6 +27,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const rbacError = checkRbacPermission(request);
   if (rbacError) return rbacError;
+
+  const sizeError = checkRequestSize(request);
+  if (sizeError) return sizeError;
 
   try {
     const body = await request.json() as {

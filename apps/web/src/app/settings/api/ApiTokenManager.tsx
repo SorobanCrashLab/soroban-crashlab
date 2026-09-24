@@ -9,7 +9,7 @@ export default function ApiTokenManager() {
   const [tokens, setTokens] = useState<ApiTokenPublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
-  const [scope, setScope] = useState<ApiTokenScope>('read');
+  const [scopes, setScopes] = useState<ApiTokenScope[]>(['runs:read']);
   const [expiresAt, setExpiresAt] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
@@ -75,7 +75,7 @@ export default function ApiTokenManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
-          scope,
+          scopes,
           expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         }),
       });
@@ -214,11 +214,16 @@ export default function ApiTokenManager() {
             <select
               id="token-scope"
               className="input-field mt-1"
-              value={scope}
-              onChange={(e) => setScope(e.target.value as ApiTokenScope)}
+              value={scopes[0]}
+              onChange={(e) => setScopes([e.target.value as ApiTokenScope])}
             >
-              <option value="read">Read (Read-only access)</option>
-              <option value="write">Write (Full mutation access)</option>
+              <option value="webhook:read">Webhooks (read)</option>
+              <option value="webhook:write">Webhooks (write)</option>
+              <option value="runs:read">Runs (read)</option>
+              <option value="runs:write">Runs (write)</option>
+              <option value="settings:read">Settings (read)</option>
+              <option value="settings:write">Settings (write)</option>
+              <option value="*">Full access (*)</option>
             </select>
           </div>
           <div>
@@ -267,7 +272,7 @@ export default function ApiTokenManager() {
                       <td className="py-2.5 px-3 font-medium text-white">{token.name}</td>
                       <td className="py-2.5 px-3">
                         <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                          {token.scope}
+                          {token.scopes.join(', ')}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-slate-400">{token.prefixMasked}</td>

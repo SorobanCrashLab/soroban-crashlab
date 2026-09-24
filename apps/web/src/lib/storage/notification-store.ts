@@ -32,7 +32,7 @@ export interface DigestEmail {
 }
 
 let notificationStore: NotificationEvent[] = [];
-let preferenceStore: Map<string, NotificationPreference> = new Map();
+const preferenceStore: Map<string, NotificationPreference> = new Map();
 let digestStore: DigestEmail[] = [];
 
 export function createNotificationEvent(params: {
