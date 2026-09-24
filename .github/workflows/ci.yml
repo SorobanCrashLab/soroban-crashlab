@@ -74,6 +74,8 @@ jobs:
       - run: cargo test --all-targets
       - name: Test host-runner feature
         run: cargo test --all-targets --features host-runner
+      - name: Test regression harness crate
+        run: cargo test --manifest-path tests/regression_harness/Cargo.toml
 
   fuzz-smoke:
     runs-on: blacksmith-4vcpu-ubuntu-2404
