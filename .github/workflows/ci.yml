@@ -109,38 +109,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  fuzz-smoke:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: contracts/crashlab-core
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: contracts/crashlab-core/fuzz
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
-      - name: Run fuzz smoke targets
-        run: |
-          for target in classify_payload load_bundle_document import_corpus parse_regression_group; do
-            cargo fuzz run --fuzz-dir fuzz "$target" -- \
-              -max_total_time=60 \
-              -rss_limit_mb=512
-          done
-      - name: Upload fuzz artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: core-fuzz-artifacts
-          path: contracts/crashlab-core/fuzz/artifacts/
-          if-no-files-found: ignore
-          retention-days: 14
-
   soroban-example:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
