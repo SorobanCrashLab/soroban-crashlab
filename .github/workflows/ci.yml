@@ -13,8 +13,48 @@ permissions:
   contents: read
 
 jobs:
-  placeholder:
+  core:
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
     steps:
-      - run: echo "CI gates retired — only vercel-preview.yml remains active"
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/web-setup
+      - run: pnpm run lint
+      - run: pnpm run test
+      - run: pnpm run build
+
+  soroban-example:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: contracts/soroban-example
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/soroban-example
+      - name: Run tests
+        run: cargo test
+      - name: Build WASM
+        run: cargo build --release --target wasm32-unknown-unknown
+      - name: Build with upgrade feature
+        run: cargo build --release --target wasm32-unknown-unknown --features upgrade
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

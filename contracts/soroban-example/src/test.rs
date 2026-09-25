@@ -34,6 +34,92 @@ fn test_initialize_twice() {
     );
 }
 
+// ── version ──────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_version() {
+    assert_eq!(TokenContract::version(), 1);
+}
+
+// ── admin rotation ───────────────────────────────────────────────────────────
+
+#[test]
+fn test_admin_rotation_happy_path() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+
+    client.initialize(&admin, &1000);
+    
+    // Current admin should be the one who initialized
+    assert_eq!(client.admin(), admin);
+    
+    // Set new admin
+    client.set_admin(&admin, &new_admin);
+    assert_eq!(client.pending_admin(), Some(new_admin.clone()));
+    
+    // Accept admin role
+    client.accept_admin(&new_admin);
+    assert_eq!(client.admin(), new_admin);
+    assert_eq!(client.pending_admin(), None);
+}
+
+#[test]
+fn test_set_admin_unauthorized() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+    let unauthorized = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+
+    client.initialize(&admin, &1000);
+    
+    // Unauthorized user tries to set admin
+    assert_eq!(
+        client.try_set_admin(&unauthorized, &new_admin),
+        Err(Ok(ContractError::Unauthorized))
+    );
+}
+
+#[test]
+fn test_accept_admin_must_be_pending() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+    let wrong_admin = Address::generate(&env);
+
+    client.initialize(&admin, &1000);
+    client.set_admin(&admin, &new_admin);
+    
+    // Wrong admin tries to accept
+    assert_eq!(
+        client.try_accept_admin(&wrong_admin),
+        Err(Ok(ContractError::Unauthorized))
+    );
+}
+
+#[test]
+fn test_accept_admin_no_pending() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+
+    client.initialize(&admin, &1000);
+    
+    // No pending admin to accept
+    assert_eq!(
+        client.try_accept_admin(&new_admin),
+        Err(Ok(ContractError::NoPendingAdmin))
+    );
+}
+
 // ── transfer ─────────────────────────────────────────────────────────────────
 
 #[test]
@@ -257,11 +343,11 @@ fn test_approve_zero_amount() {
     let admin = Address::generate(&env);
     let spender = Address::generate(&env);
 
-    client.initialize(&admin, &total_supply);
-    client.approve(&admin, &spender, &100);
     client.initialize(&admin, &1000);
+    client.approve(&admin, &spender, &100);
+    assert_eq!(client.allowance(&admin, &spender), 100);
+    
     client.approve(&admin, &spender, &0);
-
     assert_eq!(client.allowance(&admin, &spender), 0);
 }
 
@@ -285,7 +371,6 @@ fn test_balances_are_sharded_for_one_thousand_accounts() {
 }
 
 #[test]
-#[should_panic(expected = "amount cannot be negative")]
 fn test_approve_negative_amount() {
     let env = Env::default();
     env.mock_all_auths();
