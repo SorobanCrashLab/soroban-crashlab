@@ -69,6 +69,8 @@ pub enum SchedulerError {
     InvalidWeightConfiguration,
     /// Referenced a mutator index or identifier that does not exist.
     MutatorNotFound,
+    /// Weight is NaN or infinite.
+    InvalidWeight,
 }
 
 impl std::fmt::Display for SchedulerError {
@@ -79,6 +81,7 @@ impl std::fmt::Display for SchedulerError {
                 write!(f, "invalid weight configuration: all weights are zero")
             }
             SchedulerError::MutatorNotFound => write!(f, "mutator not found"),
+            SchedulerError::InvalidWeight => write!(f, "invalid weight: NaN or infinite"),
         }
     }
 }
@@ -102,6 +105,9 @@ impl WeightedScheduler {
         let mut total_weight = 0.0;
 
         for (mutator, weight) in configs {
+            if !weight.is_finite() {
+                return Err(SchedulerError::InvalidWeight);
+            }
             let w = if weight < 0.0 { 0.0 } else { weight };
             mutators.push(mutator);
             weights.push(w);
@@ -165,6 +171,10 @@ impl WeightedScheduler {
     pub fn update_weight(&mut self, index: usize, new_weight: f64) -> Result<(), SchedulerError> {
         if index >= self.weights.len() {
             return Err(SchedulerError::MutatorNotFound);
+        }
+
+        if !new_weight.is_finite() {
+            return Err(SchedulerError::InvalidWeight);
         }
 
         let w = if new_weight < 0.0 { 0.0 } else { new_weight };
@@ -355,6 +365,35 @@ mod tests {
             result.err(),
             Some(SchedulerError::InvalidWeightConfiguration)
         );
+    }
+
+    #[test]
+    fn scheduler_errors_on_nan_weight() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![
+            (Box::new(MockMutator("a")), f64::NAN),
+            (Box::new(MockMutator("b")), 1.0),
+        ];
+        let result = WeightedScheduler::new(configs);
+        assert_eq!(result.err(), Some(SchedulerError::InvalidWeight));
+    }
+
+    #[test]
+    fn scheduler_errors_on_infinite_weight() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![
+            (Box::new(MockMutator("a")), f64::INFINITY),
+        ];
+        let result = WeightedScheduler::new(configs);
+        assert_eq!(result.err(), Some(SchedulerError::InvalidWeight));
+    }
+
+    #[test]
+    fn update_weight_errors_on_nan() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![
+            (Box::new(MockMutator("a")), 1.0),
+        ];
+        let mut scheduler = WeightedScheduler::new(configs).unwrap();
+        let result = scheduler.update_weight(0, f64::NAN);
+        assert_eq!(result.err(), Some(SchedulerError::InvalidWeight));
     }
 
     #[test]
