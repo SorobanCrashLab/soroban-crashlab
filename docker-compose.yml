@@ -24,7 +24,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "const t=process.env.CRASHLAB_METRICS_SCRAPE_TOKEN; require('http').get({hostname:'localhost',port:3000,path:'/api/health/metrics',headers:t?{Authorization:'Bearer '+t}:{}},r=>process.exit(r.statusCode===200?0:1))",
+          "const t=process.env.CRASHLAB_METRICS_SCRAPE_TOKEN; require('http').get({hostname:'localhost',port:3000,path:'/api/health/liveness',headers:t?{Authorization:'Bearer '+t}:{}},r=>process.exit(r.statusCode===200?0:1))",
         ]
       interval: 30s
       timeout: 10s
@@ -54,7 +54,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "const t=process.env.CRASHLAB_METRICS_SCRAPE_TOKEN; require('http').get({hostname:'localhost',port:3000,path:'/api/health/metrics',headers:t?{Authorization:'Bearer '+t}:{}},r=>process.exit(r.statusCode===200?0:1))",
+          "const t=process.env.CRASHLAB_METRICS_SCRAPE_TOKEN; require('http').get({hostname:'localhost',port:3000,path:'/api/health/liveness',headers:t?{Authorization:'Bearer '+t}:{}},r=>process.exit(r.statusCode===200?0:1))",
         ]
       interval: 30s
       timeout: 10s

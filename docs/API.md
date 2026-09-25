@@ -141,7 +141,8 @@ All error responses return a standardized JSON structure with an appropriate HTT
 ### Health & Monitoring
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/health` | Aggregate health check with per-dependency status |
+| `GET` | `/api/health` | Aggregate health check with per-dependency status (readiness) |
+| `GET` | `/api/health/liveness` | Lightweight process check with no external dependency calls |
 | `GET` | `/api/health/metrics` | Health check probe of metrics system via Prometheus adapter |
 | `GET` | `/api/notifications` | Fetch system notification feed |
 | `GET` | `/api/integrations/prometheus/health` | Lightweight Prometheus exporter health probe |
@@ -968,6 +969,23 @@ Each dependency reports one of `ok`, `degraded`, `unavailable`, or `not_configur
 - `unhealthy` — a critical dependency (the database, or a configured backend) is unavailable.
 
 **Errors:** `503 Service Unavailable` when the overall status is `unhealthy` (critical dependency down) or when the health check itself throws.
+
+---
+
+### `GET /api/health/liveness`
+
+Lightweight process check with no external dependency calls. Never touches external dependencies, databases, or third-party APIs. Used as a pure container liveness probe for Docker or Kubernetes restart policies.
+
+**Response** `200 OK`:
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-08-30T12:00:00.000Z",
+  "version": "1.0.0",
+  "type": "liveness"
+}
+```
 
 ---
 

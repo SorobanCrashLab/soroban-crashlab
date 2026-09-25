@@ -19,6 +19,7 @@ export interface DependencyCheckResult {
   latencyMs: number;
   message?: string;
   detail?: Record<string, unknown>;
+  checkedAt?: string;
 }
 
 export type OverallHealthStatus = 'healthy' | 'degraded' | 'unhealthy';
@@ -60,20 +61,92 @@ export const HEALTH_CHECK_VERSION = '1.0.0';
 const DEFAULT_PROMETHEUS_ENDPOINT = 'http://localhost:9090';
 const DEFAULT_PROMETHEUS_HEALTH_PATH = '/-/healthy';
 
+const CACHE_TTL_MS = 15000;
+const CHECK_TIMEOUT_MS = 5000;
+
 function isEnabled(value: string | undefined): boolean {
   return value === 'true' || value === '1';
 }
 
 function timedCheck(
   fn: () => Promise<Omit<DependencyCheckResult, 'latencyMs'>>,
+  timeoutMs = CHECK_TIMEOUT_MS,
 ): Promise<DependencyCheckResult> {
   const start = Date.now();
-  return fn().then((result) => ({ ...result, latencyMs: Date.now() - start }));
+  
+  const timeoutPromise = new Promise<Omit<DependencyCheckResult, 'latencyMs'>>((resolve) => {
+    setTimeout(() => {
+      resolve({
+        status: 'degraded',
+        message: 'Health check timed out',
+      });
+    }, timeoutMs);
+  });
+
+  return Promise.race([fn(), timeoutPromise]).then((result) => ({
+    ...result,
+    latencyMs: Date.now() - start,
+  }));
 }
 
-async function checkDatabase(
-  deps: HealthCheckDependencies,
-): Promise<DependencyCheckResult> {
+export function clearHealthCache() {
+  clearCheckDatabaseCache();
+  clearCheckMetricsCache();
+  clearCheckBackendCache();
+}
+
+function withCache(
+  checkFn: (deps: HealthCheckDependencies) => Promise<DependencyCheckResult>,
+  ttlMs = CACHE_TTL_MS,
+) {
+  let cache: { result: DependencyCheckResult; timestampMs: number } | null = null;
+  let inFlight: Promise<DependencyCheckResult> | null = null;
+
+  const fn = async (deps: HealthCheckDependencies): Promise<DependencyCheckResult> => {
+    const nowMs = deps.now().getTime();
+
+    if (cache && nowMs - cache.timestampMs < ttlMs) {
+      return cache.result;
+    }
+
+    if (!inFlight) {
+      inFlight = checkFn(deps)
+        .then((result) => {
+          cache = {
+            result: { ...result, checkedAt: deps.now().toISOString() },
+            timestampMs: deps.now().getTime(),
+          };
+          inFlight = null;
+          return cache.result;
+        })
+        .catch((error) => {
+          inFlight = null;
+          throw error;
+        });
+    }
+
+    if (cache) {
+      return {
+        ...cache.result,
+        status: 'degraded',
+        message: cache.result.message 
+          ? cache.result.message + ' (stale cache)' 
+          : 'Stale cache',
+      };
+    }
+
+    return inFlight;
+  };
+
+  fn.clear = () => {
+    cache = null;
+    inFlight = null;
+  };
+
+  return fn;
+}
+
+const checkDatabaseFn = withCache(async (deps: HealthCheckDependencies): Promise<DependencyCheckResult> => {
   return timedCheck(async () => {
     const db = deps.getDatabase();
     const config = db.getConfig();
@@ -94,11 +167,11 @@ async function checkDatabase(
       };
     }
   });
-}
+});
+const checkDatabase = (deps: HealthCheckDependencies) => checkDatabaseFn(deps);
+function clearCheckDatabaseCache() { checkDatabaseFn.clear(); }
 
-async function checkMetrics(
-  deps: HealthCheckDependencies,
-): Promise<DependencyCheckResult> {
+const checkMetricsFn = withCache(async (deps: HealthCheckDependencies): Promise<DependencyCheckResult> => {
   return timedCheck(async () => {
     const endpoint = deps.prometheusEndpoint || DEFAULT_PROMETHEUS_ENDPOINT;
     const healthPath =
@@ -143,11 +216,11 @@ async function checkMetrics(
       };
     }
   });
-}
+});
+const checkMetrics = (deps: HealthCheckDependencies) => checkMetricsFn(deps);
+function clearCheckMetricsCache() { checkMetricsFn.clear(); }
 
-async function checkBackend(
-  deps: HealthCheckDependencies,
-): Promise<DependencyCheckResult> {
+const checkBackendFn = withCache(async (deps: HealthCheckDependencies): Promise<DependencyCheckResult> => {
   const backendUrl = deps.backendUrl;
   if (!backendUrl) {
     return {
@@ -181,7 +254,9 @@ async function checkBackend(
       clearTimeout(timer);
     }
   });
-}
+});
+const checkBackend = (deps: HealthCheckDependencies) => checkBackendFn(deps);
+function clearCheckBackendCache() { checkBackendFn.clear(); }
 
 function checkConfigPresence(label: string, configured: boolean): DependencyCheckResult {
   if (configured) {
