@@ -24,7 +24,7 @@ mockito = "1.6"
 
 [features]
 default = []
-host-runner = ["soroban-sdk/testutils"]
+host-runner = ["dep:soroban-sdk", "soroban-sdk/testutils"]
 rpc-runner = ["dep:reqwest", "dep:tokio"]
 
 [[bin]]
