@@ -119,7 +119,7 @@
     "test:run-cluster-legend": "npx tsc src/app/run-cluster-legend.tsx src/app/run-cluster-legend.test.ts src/app/run-cluster-visualization-utils.ts src/app/failureClusters.ts src/app/types.ts src/lib/run-status.ts --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react && node build/test-tmp/app/run-cluster-legend.test.js"
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.62.0",
+    "@sentry/nextjs": "^10.75.2",
     "@uploadthing/react": "^7.3.3",
     "@upstash/redis": "^1.38.4",
     "@vercel/kv": "^3.0.0",
