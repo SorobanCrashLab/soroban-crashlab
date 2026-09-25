@@ -4,6 +4,10 @@
 
 Closes #
 
+> **PR title (required, checked by `lint-title`):**
+> `build: unify crates under a cargo workspace`
+> The subject must start with a lowercase letter and must not end with a period.
+
 ## Checklist
 
 - [ ] CI is green (all checks pass)
