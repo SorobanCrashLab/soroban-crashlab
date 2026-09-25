@@ -202,8 +202,65 @@ impl TokenContract {
         Ok(())
     }
 
-    /// Burn tokens (only admin).
+    /// Burn tokens from the holder's balance.
     pub fn burn(
+        env: Env,
+        from: Address,
+        amount: i128,
+    ) -> Result<(), ContractError> {
+        from.require_auth();
+
+        if amount <= 0 {
+            return Err(ContractError::InvalidAmount);
+        }
+
+        let mut balances: Map<Address, i128> = env
+            .storage()
+            .persistent()
+            .get(&symbol_short!("Bal"))
+            .ok_or(ContractError::NotInitialized)?;
+        let from_balance = balances.get(from.clone()).unwrap_or(0);
+        if from_balance < amount {
+            return Err(ContractError::InsufficientBalance);
+        }
+        Self::set_balance(&env, from.clone(), from_balance - amount);
+        balances.set(
+            from.clone(),
+            from_balance
+                .checked_sub(amount)
+                .ok_or(ContractError::Overflow)?,
+        );
+        env.storage()
+            .persistent()
+            .set(&symbol_short!("Bal"), &balances);
+
+        let total_supply: i128 = env
+            .storage()
+            .persistent()
+            .get(&symbol_short!("Supply"))
+            .ok_or(ContractError::NotInitialized)?;
+        let new_supply = total_supply
+            .checked_sub(amount)
+            .ok_or(ContractError::Overflow)?;
+        env.storage()
+            .persistent()
+            .set(&symbol_short!("Supply"), &new_supply);
+
+        env.events().publish(
+            (symbol_short!("burn"), from.clone(), from.clone()),
+            amount,
+        );
+
+        Ok(())
+    }
+
+    /// Burn tokens from any balance (only admin).
+    ///
+    /// Rationale: Admin-initiated supply contraction is a legitimate design for this
+    /// token, so we keep an explicitly named `admin_burn` operation. However, to
+    /// comply with Token Standard semantics and protect against key compromise,
+    /// the standard `burn` operation requires holder authorization.
+    pub fn admin_burn(
         env: Env,
         admin: Address,
         from: Address,
@@ -225,7 +282,6 @@ impl TokenContract {
             return Err(ContractError::InvalidAmount);
         }
 
-        let from_balance = Self::balance(env.clone(), from.clone());
         let mut balances: Map<Address, i128> = env
             .storage()
             .persistent()
@@ -235,9 +291,9 @@ impl TokenContract {
         if from_balance < amount {
             return Err(ContractError::InsufficientBalance);
         }
-        Self::set_balance(&env, from, from_balance - amount);
+        Self::set_balance(&env, from.clone(), from_balance - amount);
         balances.set(
-            from,
+            from.clone(),
             from_balance
                 .checked_sub(amount)
                 .ok_or(ContractError::Overflow)?,
@@ -257,6 +313,12 @@ impl TokenContract {
         env.storage()
             .persistent()
             .set(&symbol_short!("Supply"), &new_supply);
+
+        env.events().publish(
+            (symbol_short!("burn"), admin, from),
+            amount,
+        );
+
         Ok(())
     }
 
