@@ -12,7 +12,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { withRouteErrorHandling } from '@/lib/route-handler';
+import { createRouteHandler } from '@/lib/route-handler';
 import {
   createInMemoryTriageStore,
   handleInteractivityRequest,
@@ -28,8 +28,10 @@ function getTriageStore(): TriageStore {
   return store;
 }
 
-export const POST = withRouteErrorHandling(
-  'POST /api/integrations/slack/interactivity',
+export const POST = createRouteHandler(
+  {
+    label: 'POST /api/integrations/slack/interactivity',
+  },
   async (request: Request) => {
     // The raw body is what Slack signed; parsing it first would break the HMAC.
     const body = await request.text();
@@ -55,5 +57,5 @@ export const POST = withRouteErrorHandling(
       status: ack.status,
       headers: ack.reason ? { 'X-Slack-Reject-Reason': ack.reason } : undefined,
     });
-  },
+  }
 );

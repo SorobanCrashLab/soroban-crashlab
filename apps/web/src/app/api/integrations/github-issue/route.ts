@@ -18,13 +18,16 @@
 import { NextRequest } from 'next/server';
 import { parseGithubIssueUrl, createGithubIssuesAdapter } from '@/lib/integrations/github-issues';
 import { successResponse } from '@/lib/api-response-utils';
-import { jsonError, withRouteErrorHandling } from '@/lib/route-handler';
+import { jsonError, createRouteHandler } from '@/lib/route-handler';
 import { sanitizeSearchParams, sanitizeUrl } from '@/lib/sanitize';
 
-export const GET = withRouteErrorHandling(
-  'GET /api/integrations/github-issue',
-  async (request: NextRequest) => {
-    const sanitized = sanitizeSearchParams(request.nextUrl.searchParams);
+export const GET = createRouteHandler(
+  {
+    label: 'GET /api/integrations/github-issue',
+  },
+  async (request: Request) => {
+    const nextReq = request as NextRequest;
+    const sanitized = sanitizeSearchParams(nextReq.nextUrl.searchParams);
     const rawUrl = sanitized.get('url');
     const url = rawUrl ? sanitizeUrl(rawUrl) : null;
 
@@ -40,5 +43,6 @@ export const GET = withRouteErrorHandling(
     const adapter = createGithubIssuesAdapter();
     const issue = await adapter.resolveIssueLink(parsed.owner, parsed.repo, parsed.issueNumber);
     return successResponse({ issue });
-  },
+  }
 );
+

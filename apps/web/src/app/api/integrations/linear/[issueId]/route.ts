@@ -6,17 +6,16 @@
  */
 
 import { successResponse } from '@/lib/api-response-utils';
-import { withRouteErrorHandling, jsonError } from '@/lib/route-handler';
+import { createRouteHandler, jsonError } from '@/lib/route-handler';
 import { createLinearIssuesAdapter } from '@/lib/integrations/linear-issues';
 
-interface RouteContext {
-  params: Promise<{ issueId: string }>;
-}
-
-export const GET = withRouteErrorHandling(
-  'GET /api/integrations/linear/[issueId]',
-  async (_request: Request, context: RouteContext) => {
-    const { issueId } = await context.params;
+export const GET = createRouteHandler(
+  {
+    label: 'GET /api/integrations/linear/[issueId]',
+    fallbackMessage: 'Failed to fetch Linear issue',
+  },
+  async (_request, { params }) => {
+    const { issueId } = await params as { issueId: string };
 
     if (!issueId || issueId.trim() === '') {
       return jsonError('Issue ID is required', 400);
@@ -30,6 +29,6 @@ export const GET = withRouteErrorHandling(
     }
 
     return successResponse({ issue });
-  },
-  'Failed to fetch Linear issue',
+  }
 );
+
