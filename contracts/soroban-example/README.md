@@ -22,6 +22,20 @@ target/wasm32-unknown-unknown/release/soroban_example.wasm
 cargo test --all-targets
 ```
 
+## Size Budget
+
+Contract WASM size is tracked and enforced in CI to avoid deployment limit and fee regressions.
+
+- **Baseline**: 9,112 bytes
+- **Budget**: 11,000 bytes (~20% headroom over baseline)
+
+To check and enforce the budget locally:
+
+```bash
+cargo build --target wasm32-unknown-unknown --release
+./report-size.sh
+```
+
 ## Deploy targets
 
 The contract can be deployed to any Soroban-enabled network. The table below lists the available targets and the corresponding `soroban` CLI flags.
