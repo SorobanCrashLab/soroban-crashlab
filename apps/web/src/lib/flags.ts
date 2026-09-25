@@ -1,3 +1,5 @@
+import { safeStorageGet, safeStorageRemove, safeStorageSet } from './local-storage';
+
 export interface FeatureFlag {
   name: string;
   description: string;
@@ -21,25 +23,24 @@ export type FlagKey = keyof typeof FLAGS;
 
 const STORAGE_PREFIX = 'crashlab:flag:';
 
-function getUrlOverride(flag: FlagKey): boolean | null {
-  if (typeof window === 'undefined') return null;
-  const params = new URLSearchParams(window.location.search);
-  const val = params.get(`flag:${flag}`);
+function parseBoolean(val: string | null): boolean | null {
   if (val === 'true') return true;
   if (val === 'false') return false;
   return null;
 }
 
-function getLocalStorageOverride(flag: FlagKey): boolean | null {
+function getUrlOverride(flag: FlagKey): boolean | null {
   if (typeof window === 'undefined') return null;
   try {
-    const val = localStorage.getItem(STORAGE_PREFIX + flag);
-    if (val === 'true') return true;
-    if (val === 'false') return false;
+    return parseBoolean(new URLSearchParams(window.location.search).get(`flag:${flag}`));
   } catch {
-    // localStorage may be unavailable
+    return null;
   }
-  return null;
+}
+
+function getLocalStorageOverride(flag: FlagKey): boolean | null {
+  // Blocked/throwing storage falls back to the flag default.
+  return parseBoolean(safeStorageGet('localStorage', STORAGE_PREFIX + flag));
 }
 
 export function isEnabled(flag: FlagKey): boolean {
@@ -53,21 +54,11 @@ export function isEnabled(flag: FlagKey): boolean {
 }
 
 export function setFlag(flag: FlagKey, value: boolean): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_PREFIX + flag, String(value));
-  } catch {
-    // localStorage may be unavailable
-  }
+  safeStorageSet('localStorage', STORAGE_PREFIX + flag, String(value));
 }
 
 export function clearFlag(flag: FlagKey): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.removeItem(STORAGE_PREFIX + flag);
-  } catch {
-    // localStorage may be unavailable
-  }
+  safeStorageRemove('localStorage', STORAGE_PREFIX + flag);
 }
 
 export function getEnabledFlags(): FlagKey[] {

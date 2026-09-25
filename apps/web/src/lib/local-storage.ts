@@ -57,7 +57,76 @@ export interface StorageEntry<T> {
 // ── SSR guard ─────────────────────────────────────────────────────────────────
 
 function isClient(): boolean {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  return getWebStorage('localStorage') !== null;
+}
+
+// ── Raw Web Storage access ────────────────────────────────────────────────────
+
+export type WebStorageKind = 'localStorage' | 'sessionStorage';
+
+/**
+ * Resolve `window.localStorage` / `window.sessionStorage` without throwing.
+ *
+ * The property getter itself throws a SecurityError in Safari private mode,
+ * hardened enterprise browsers and when cookies/site data are blocked, so the
+ * access has to happen inside the try — a `typeof` check is not enough.
+ */
+export function getWebStorage(kind: WebStorageKind): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window[kind] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Read a raw value; returns null when storage is unavailable or throws. */
+export function safeStorageGet(kind: WebStorageKind, key: string): string | null {
+  const storage = getWebStorage(kind);
+  if (!storage) return null;
+  try {
+    return storage.getItem(key);
+  } catch (err) {
+    _onError(key, err);
+    return null;
+  }
+}
+
+/** Write a raw value; returns false when storage is unavailable or throws (quota). */
+export function safeStorageSet(kind: WebStorageKind, key: string, value: string): boolean {
+  const storage = getWebStorage(kind);
+  if (!storage) return false;
+  try {
+    storage.setItem(key, value);
+    return true;
+  } catch (err) {
+    _onError(key, err);
+    return false;
+  }
+}
+
+/** Remove a raw value; never throws. */
+export function safeStorageRemove(kind: WebStorageKind, key: string): void {
+  const storage = getWebStorage(kind);
+  if (!storage) return;
+  try {
+    storage.removeItem(key);
+  } catch (err) {
+    _onError(key, err);
+  }
+}
+
+/** sessionStorage read that never throws. */
+export function safeSessionGet(key: string): string | null {
+  return safeStorageGet('sessionStorage', key);
+}
+
+/**
+ * sessionStorage boolean flag ("true"), defaulting to false when absent,
+ * unreadable or blocked (e.g. `crashlab:mock-data`).
+ */
+export function safeSessionFlag(key: string): boolean {
+  return safeSessionGet(key) === 'true';
 }
 
 // ── defineStorage ─────────────────────────────────────────────────────────────

@@ -1,14 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
+import { safeSessionFlag } from '../local-storage';
 
-function getSessionBooleanFlag(key: string): boolean {
-  if (typeof window === 'undefined') return false;
-
-  try {
-    return window.sessionStorage.getItem(key) === 'true';
-  } catch {
-    return false;
-  }
-}
+export const MOCK_DATA_SESSION_KEY = 'crashlab:mock-data';
 
 /**
  * Initializes the Sentry client-side SDK.
@@ -22,7 +15,9 @@ export function initSentryClient(): void {
       dsn,
       tracesSampleRate: 1.0,
       beforeSend(event) {
-        const isMockData = getSessionBooleanFlag('crashlab:mock-data');
+        // Must never throw: a throw here drops the event and silences error
+        // reporting for exactly the restricted-storage users we can't debug.
+        const isMockData = safeSessionFlag(MOCK_DATA_SESSION_KEY);
         if (!event.tags) event.tags = {};
         event.tags.environment = isMockData ? 'mock-data' : 'production';
         if (event.request) {
