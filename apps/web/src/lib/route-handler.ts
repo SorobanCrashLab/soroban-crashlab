@@ -124,3 +124,88 @@ export function withSizeLimitAndLogging<Args extends unknown[]>(
     }
   };
 }
+
+import { z } from 'zod';
+
+export interface RouteConfig<BodySchema extends z.ZodTypeAny = z.ZodTypeAny> {
+  label: string;
+  bodySchema?: BodySchema;
+  sizeLimit?: RequestSizeLimitConfig | boolean;
+  rateLimitClass?: string;
+  fallbackMessage?: string;
+}
+
+export function createRouteHandler<
+  BodySchema extends z.ZodTypeAny = z.ZodNever,
+  Params = unknown
+>(
+  config: RouteConfig<BodySchema>,
+  handler: (
+    req: Request,
+    context: {
+      params: Promise<Params>;
+      body: z.infer<BodySchema>;
+    }
+  ) => Promise<Response>
+) {
+  return async (
+    request: Request,
+    context: { params?: Promise<Params> | Params }
+  ): Promise<Response> => {
+    const startTime = Date.now();
+    try {
+      if (config.sizeLimit !== false) {
+        const sizeConfig = typeof config.sizeLimit === 'object' ? config.sizeLimit : undefined;
+        const sizeCheckError = checkRequestSize(request, sizeConfig);
+        if (sizeCheckError) {
+          logger.info(`${config.label} rejected (size limit)`, {
+            status: 413,
+            duration_ms: Date.now() - startTime,
+            content_length: request.headers.get('content-length'),
+          });
+          return sizeCheckError;
+        }
+      }
+
+      let parsedBody: any = undefined;
+      if (config.bodySchema) {
+        const bodyResult = await readJsonBody(request);
+        if ('error' in bodyResult) return bodyResult.error as Response;
+        
+        const parseResult = config.bodySchema.safeParse(bodyResult.body);
+        if (!parseResult.success) {
+          return NextResponse.json(
+            { error: 'Invalid request body', details: parseResult.error.format() },
+            { status: 400 }
+          );
+        }
+        parsedBody = parseResult.data;
+      }
+
+      const paramsPromise = context?.params instanceof Promise 
+        ? context.params 
+        : Promise.resolve(context?.params ?? ({} as Params));
+
+      const response = await handler(request, {
+        params: paramsPromise,
+        body: parsedBody as z.infer<BodySchema>,
+      });
+
+      const fallbackMsg = config.fallbackMessage || 'An unexpected error occurred.';
+      const ensRes = ensureRouteResponse(response, fallbackMsg);
+
+      logger.info(`${config.label} completed`, {
+        status: ensRes.status,
+        duration_ms: Date.now() - startTime,
+      });
+
+      return ensRes;
+    } catch (error) {
+      logger.error(`${config.label} failed`, {
+        error,
+        duration_ms: Date.now() - startTime,
+      });
+      return jsonError(config.fallbackMessage || 'An unexpected error occurred.', 500);
+    }
+  };
+}

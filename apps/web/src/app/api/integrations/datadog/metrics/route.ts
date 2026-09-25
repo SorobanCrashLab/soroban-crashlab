@@ -7,10 +7,13 @@
  */
 
 import { successResponse } from '@/lib/api-response-utils';
-import { withRouteErrorHandling } from '@/lib/route-handler';
+import { createRouteHandler } from '@/lib/route-handler';
 
-export const GET = withRouteErrorHandling(
-  'GET /api/integrations/datadog/metrics',
+export const GET = createRouteHandler(
+  {
+    label: 'GET /api/integrations/datadog/metrics',
+    fallbackMessage: 'Failed to retrieve Datadog metrics configuration',
+  },
   async () => {
     const isEnabled = process.env.DATADOG_ENABLED === 'true';
     const agentHost = process.env.DATADOG_AGENT_HOST || 'localhost';
@@ -33,6 +36,5 @@ export const GET = withRouteErrorHandling(
     };
 
     return successResponse(metricsStatus);
-  },
-  'Failed to retrieve Datadog metrics configuration',
+  }
 );

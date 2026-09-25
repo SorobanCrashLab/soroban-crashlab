@@ -8,7 +8,7 @@
  * instead of scattering unrelated messages across the channel.
  */
 
-import { withRouteErrorHandling, readJsonBody, jsonError } from "@/lib/route-handler";
+import { createRouteHandler, jsonError } from "@/lib/route-handler";
 import { successResponse } from "@/lib/api-response-utils";
 import {
   buildRunDetailPreviewBlocks,
@@ -16,29 +16,26 @@ import {
   type RunDetailPreviewInput,
 } from "@/lib/integrations/slack-webhook";
 import { getSlackThreadStore } from "@/lib/integrations/slack-thread-store";
+import { z } from "zod";
 
-interface SlackNotifyRequestBody {
-  run: RunDetailPreviewInput;
-}
+const slackNotifySchema = z.object({
+  run: z.object({
+    runId: z.string().min(1),
+    eventType: z.enum(["started", "completed", "failed", "cancelled"]),
+    area: z.string(),
+    severity: z.string(),
+    status: z.string(),
+    durationMs: z.number(),
+  }),
+});
 
-function isValidRunDetailPreviewInput(value: unknown): value is RunDetailPreviewInput {
-  if (!value || typeof value !== "object") return false;
-  const run = value as Partial<RunDetailPreviewInput>;
-  return (
-    typeof run.runId === "string" &&
-    run.runId.length > 0 &&
-    typeof run.eventType === "string" &&
-    ["started", "completed", "failed", "cancelled"].includes(run.eventType) &&
-    typeof run.area === "string" &&
-    typeof run.severity === "string" &&
-    typeof run.status === "string" &&
-    typeof run.durationMs === "number"
-  );
-}
-
-export const POST = withRouteErrorHandling(
-  "POST /api/integrations/slack",
-  async (request: Request) => {
+export const POST = createRouteHandler(
+  {
+    label: "POST /api/integrations/slack",
+    fallbackMessage: "Failed to send Slack notification",
+    bodySchema: slackNotifySchema,
+  },
+  async (request, { body }) => {
     const botToken = process.env.SLACK_BOT_TOKEN;
     const channel = process.env.SLACK_CHANNEL_ID;
 
@@ -46,21 +43,9 @@ export const POST = withRouteErrorHandling(
       return jsonError("Slack bot token or channel is not configured", 503);
     }
 
-    const bodyResult = await readJsonBody(request);
-    if ("error" in bodyResult) {
-      return bodyResult.error;
-    }
+    const { run } = body;
 
-    const { run } = bodyResult.body as Partial<SlackNotifyRequestBody>;
-
-    if (!isValidRunDetailPreviewInput(run)) {
-      return jsonError(
-        "Request body must include a `run` object with runId, eventType, area, severity, status, and durationMs",
-        400,
-      );
-    }
-
-    const { blocks, fallbackText } = buildRunDetailPreviewBlocks(run);
+    const { blocks, fallbackText } = buildRunDetailPreviewBlocks(run as RunDetailPreviewInput);
     const store = getSlackThreadStore();
     const existingThread = store.getThread(run.runId);
 
@@ -76,8 +61,6 @@ export const POST = withRouteErrorHandling(
       return jsonError(result.error || "Failed to send Slack notification", 500);
     }
 
-    // Only the first message for a run becomes the thread root; later
-    // events keep replying into it via the stored ts.
     if (!existingThread && result.ts && result.channel) {
       store.setThread({
         runId: run.runId,
@@ -92,6 +75,5 @@ export const POST = withRouteErrorHandling(
       message: "Notification sent successfully",
       threaded: Boolean(existingThread),
     });
-  },
-  "Failed to send Slack notification",
+  }
 );

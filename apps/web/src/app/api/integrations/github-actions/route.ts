@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
 import { successResponse } from '@/lib/api-response-utils';
 import { createGithubActionsAdapter } from '@/lib/integrations/github-actions';
-import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
+import { jsonError, createRouteHandler } from '@/lib/route-handler';
 import { sanitizeSearchParams } from '@/lib/sanitize';
-
+import { z } from 'zod';
 const repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 function getRepositoryParts(repository: string | null): [string, string] | null {
@@ -23,10 +23,15 @@ function tokenUnavailableResponse() {
   );
 }
 
-export const GET = withRouteErrorHandling(
-  'GET /api/integrations/github-actions',
-  async (request: NextRequest) => {
-    const sanitized = sanitizeSearchParams(request.nextUrl.searchParams);
+export const GET = createRouteHandler(
+  {
+    label: 'GET /api/integrations/github-actions',
+    fallbackMessage: 'Unable to load GitHub Actions workflow runs.',
+  },
+  async (request: Request) => {
+    // Note: createRouteHandler passes a standard Request, we can typecast to NextRequest if needed
+    const nextReq = request as NextRequest;
+    const sanitized = sanitizeSearchParams(nextReq.nextUrl.searchParams);
     const repository = getRepositoryParts(sanitized.get('repository'));
     if (!repository) return jsonError('repository must be in the form owner/repository.', 400);
 
@@ -37,33 +42,32 @@ export const GET = withRouteErrorHandling(
     const adapter = createGithubActionsAdapter();
     const workflowRuns = await adapter.listWorkflowRuns(owner, repo, token);
     return successResponse({ workflowRuns });
-  },
-  'Unable to load GitHub Actions workflow runs.',
+  }
 );
 
-export const POST = withRouteErrorHandling(
-  'POST /api/integrations/github-actions',
-  async (request: NextRequest) => {
-    const parsed = await readJsonBody(request);
-    if ('error' in parsed) return parsed.error;
+const githubActionsPostSchema = z.object({
+  repository: z.string().optional(),
+  runId: z.number().int().positive().optional()
+});
 
-    const body = parsed.body;
-    if (!body || typeof body !== 'object') return jsonError('Request body must be an object.', 400);
-
-    const { repository, runId } = body as { repository?: unknown; runId?: unknown };
-    const repositoryParts = getRepositoryParts(typeof repository === 'string' ? repository : null);
+export const POST = createRouteHandler(
+  {
+    label: 'POST /api/integrations/github-actions',
+    fallbackMessage: 'Unable to queue the GitHub Actions re-run.',
+    bodySchema: githubActionsPostSchema
+  },
+  async (request, { body }) => {
+    const { repository, runId } = body;
+    const repositoryParts = getRepositoryParts(repository || null);
     if (!repositoryParts) return jsonError('repository must be in the form owner/repository.', 400);
-    if (!Number.isSafeInteger(runId) || (runId as number) <= 0) {
-      return jsonError('runId must be a positive integer.', 400);
-    }
+    if (!runId) return jsonError('runId must be a positive integer.', 400);
 
     const token = getGithubToken();
     if (!token) return tokenUnavailableResponse();
 
     const [owner, repo] = repositoryParts;
     const adapter = createGithubActionsAdapter();
-    await adapter.rerunFailedJobs(owner, repo, runId as number, token);
+    await adapter.rerunFailedJobs(owner, repo, runId, token);
     return successResponse({ queued: true, runId });
-  },
-  'Unable to queue the GitHub Actions re-run.',
+  }
 );
