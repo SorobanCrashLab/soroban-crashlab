@@ -5,8 +5,11 @@ set -euo pipefail
 # Documented budget: 11,000 bytes (~20% headroom over baseline 9,112 bytes).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WASM_PATH="${1:-$SCRIPT_DIR/target/wasm32-unknown-unknown/release/soroban_example.wasm}"
-REPORT_PATH="${2:-$SCRIPT_DIR/target/wasm-size-report.md}"
+# The contract is a member of the `contracts/` Cargo workspace, so build
+# artifacts land in the shared workspace target directory.
+WORKSPACE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+WASM_PATH="${1:-$WORKSPACE_DIR/target/wasm32-unknown-unknown/release/soroban_example.wasm}"
+REPORT_PATH="${2:-$WORKSPACE_DIR/target/wasm-size-report.md}"
 
 BASELINE_BYTES=9112
 BUDGET_BYTES="${WASM_SIZE_BUDGET:-11000}"

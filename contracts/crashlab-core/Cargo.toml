@@ -1,26 +1,26 @@
 [package]
 name = "crashlab-core"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-hex = "0.4"
-flate2 = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-regex = "1.10"
-sha2 = "0.10"
-soroban-sdk = { version = "22.0.0", optional = true }
-env_logger = "0.10.0"
-reqwest = { version = "0.12", features = ["json"], optional = true }
-tokio = { version = "1", features = ["full"], optional = true }
-num_cpus = "1.16"
+serde = { workspace = true }
+serde_json = { workspace = true }
+hex = { workspace = true }
+flate2 = { workspace = true }
+chrono = { workspace = true }
+regex = { workspace = true }
+sha2 = { workspace = true }
+soroban-sdk = { workspace = true, optional = true }
+env_logger = { workspace = true }
+reqwest = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+num_cpus = { workspace = true }
 
 [dev-dependencies]
-soroban-sdk = { version = "22.0.0", features = ["testutils"] }
-filetime = "0.2"
-mockito = "1.6"
+soroban-sdk = { workspace = true, features = ["testutils"] }
+filetime = { workspace = true }
+mockito = { workspace = true }
 
 [features]
 default = []
