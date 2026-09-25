@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { FuzzingRun } from './types';
 import { simulateSeedReplay } from './replay';
 import { generateMarkdownReport } from './report-utils';
 import ReportModal from './ReportModal';
 import { useMaintainerMode } from './useMaintainerMode';
 import { ReplayButtonStatus } from './replay-ui-utils';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface CrashDetailDrawerProps {
     run: FuzzingRun;
@@ -21,6 +22,16 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
     const [replayedRunId, setReplayedRunId] = useState<string | null>(null);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const { isMaintainer } = useMaintainerMode();
+
+    const asideRef = useRef<HTMLElement>(null);
+    const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+    useFocusTrap({
+        containerRef: asideRef,
+        active: true,
+        onClose,
+        initialFocusRef: closeButtonRef,
+    });
 
     const handleReplay = useCallback(async () => {
         if (!run.crashDetail || status === 'loading' || !isMaintainer) return;
@@ -58,13 +69,14 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
                 onClick={onClose}
                 aria-label="Close crash detail drawer"
             />
-            <aside className="absolute right-0 top-0 h-full w-full max-w-xl bg-white dark:bg-zinc-950 shadow-2xl border-l border-zinc-200 dark:border-zinc-800 p-8 overflow-y-auto animate-in slide-in-from-right duration-500 ease-out">
+            <aside ref={asideRef} className="absolute right-0 top-0 h-full w-full max-w-xl bg-white dark:bg-zinc-950 shadow-2xl border-l border-zinc-200 dark:border-zinc-800 p-8 overflow-y-auto animate-in slide-in-from-right duration-500 ease-out">
                 <div className="flex items-start justify-between gap-4 mb-8">
                     <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400 mb-2">Crash Analysis</p>
                         <h2 id="crash-detail-title" className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Run {run.id}</h2>
                     </div>
                     <button
+                        ref={closeButtonRef}
                         type="button"
                         onClick={onClose}
                         className="p-2 rounded-full text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-900 transition-all"
