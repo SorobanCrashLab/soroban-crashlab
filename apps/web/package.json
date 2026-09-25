@@ -123,7 +123,7 @@
     "@uploadthing/react": "^7.3.3",
     "@upstash/redis": "^1.38.4",
     "@vercel/kv": "^3.0.0",
-    "next": "16.1.6",
+    "next": "16.3.5",
     "nodemailer": "^6.10.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
