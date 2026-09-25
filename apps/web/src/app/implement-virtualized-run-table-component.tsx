@@ -289,129 +289,131 @@ export default function VirtualizedRunTable({
             role="region"
             aria-label="Virtualized fuzzing run table"
         >
-            {/* ── Sticky header ─────────────────────────────────────────────── */}
             <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse" role="presentation">
-                    <thead>
-                        <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 flex">
-                            {onToggleRunSelection && (
-                                <th scope="col" className="px-6 py-4 text-[10px] font-bold text-zinc-400 w-12">
-                                    <div className="flex items-center justify-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={effectiveRuns.length > 0 && selectedRunIds.size === effectiveRuns.length}
-                                            ref={(input) => {
-                                                if (input) {
-                                                    input.indeterminate = selectedRunIds.size > 0 && selectedRunIds.size < effectiveRuns.length;
-                                                }
-                                            }}
-                                            onChange={() => {
-                                                if (onToggleAllRunsSelection) {
-                                                    onToggleAllRunsSelection(effectiveRuns.map(r => r.id));
-                                                }
-                                            }}
-                                            className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                </th>
-                            )}
-                            {effectiveColumns.includes('id') && (
-                                <SortableColumnHeader
-                                    field="id"
-                                    label="Run ID"
-                                    sortState={activeSort}
-                                    onSort={handleSort}
-                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex-1 min-w-0"
-                                />
-                            )}
-                            {effectiveColumns.includes('status') && (
-                                <SortableColumnHeader
-                                    field="status"
-                                    label="Status"
-                                    sortState={activeSort}
-                                    onSort={handleSort}
-                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-36 shrink-0"
-                                />
-                            )}
-                            {effectiveColumns.includes('area') && (
-                                <SortableColumnHeader
-                                    field="area"
-                                    label="Area"
-                                    sortState={activeSort}
-                                    onSort={handleSort}
-                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0"
-                                />
-                            )}
-                            {effectiveColumns.includes('severity') && (
-                                <SortableColumnHeader
-                                    field="severity"
-                                    label="Severity"
-                                    sortState={activeSort}
-                                    onSort={handleSort}
-                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0"
-                                />
-                            )}
-                            {effectiveColumns.includes('duration') && (
-                                <SortableColumnHeader
-                                    field="duration"
-                                    label="Duration"
-                                    align="right"
-                                    sortState={activeSort}
-                                    onSort={handleSort}
-                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0 text-right"
-                                />
-                            )}
-                            {effectiveColumns.includes('seedCount') && (
-                                <SortableColumnHeader
-                                    field="seedCount"
-                                    label="Seed Count"
-                                    align="right"
-                                    sortState={activeSort}
-                                    onSort={handleSort}
-                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right"
-                                />
-                            )}
-                            {effectiveColumns.includes('report') && (
-                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right">
-                                    Report
-                                </th>
-                            )}
-                        </tr>
-                    </thead>
-                </table>
-            </div>
-
-            {/* ── Scrollable virtualized body ────────────────────────────────── */}
-            <div
-                ref={scrollRef}
-                style={{ height: viewportHeight, overflowY: 'auto' }}
-                role="region"
-                aria-label={`${runs.length} fuzzing runs`}
-            >
-                {/* Inner spacer whose height equals the full un-virtualized list. */}
-                <div style={{ height: totalHeight, position: 'relative' }}>
-                    <table className="w-full" role="presentation" style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
-                        <tbody
-                            style={{ position: 'relative', display: 'block', height: totalHeight }}
-                        >
-                            {visibleRuns.map((run, i) => {
-                                const rowIndex = firstVisible + i;
-                                return (
-                                <VirtualRow
-                                    key={run.id}
-                                    run={run}
-                                    top={rowIndex * ROW_HEIGHT}
-                                    onSelectRun={onSelectRun}
-                                    onViewReport={onViewReport}
-                                    visibleColumns={effectiveColumns}
-                                    selectedRunIds={selectedRunIds}
-                                    onToggleRunSelection={onToggleRunSelection}
-                                    rowKeyboardProps={getRowProps(rowIndex)}
-                                />
-                            );
-                            })}
-                        </tbody>
+                <div className="min-w-[800px]">
+                    {/* ── Sticky header ─────────────────────────────────────────────── */}
+                    <table className="w-full text-left border-collapse" role="presentation">
+                        <thead>
+                            <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 flex">
+                                {onToggleRunSelection && (
+                                    <th scope="col" className="px-6 py-4 text-[10px] font-bold text-zinc-400 w-12">
+                                        <div className="flex items-center justify-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={effectiveRuns.length > 0 && selectedRunIds.size === effectiveRuns.length}
+                                                ref={(input) => {
+                                                    if (input) {
+                                                        input.indeterminate = selectedRunIds.size > 0 && selectedRunIds.size < effectiveRuns.length;
+                                                    }
+                                                }}
+                                                onChange={() => {
+                                                    if (onToggleAllRunsSelection) {
+                                                        onToggleAllRunsSelection(effectiveRuns.map(r => r.id));
+                                                    }
+                                                }}
+                                                className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                    </th>
+                                )}
+                                {effectiveColumns.includes('id') && (
+                                    <SortableColumnHeader
+                                        field="id"
+                                        label="Run ID"
+                                        sortState={activeSort}
+                                        onSort={handleSort}
+                                        className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex-1 min-w-0"
+                                    />
+                                )}
+                                {effectiveColumns.includes('status') && (
+                                    <SortableColumnHeader
+                                        field="status"
+                                        label="Status"
+                                        sortState={activeSort}
+                                        onSort={handleSort}
+                                        className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-36 shrink-0"
+                                    />
+                                )}
+                                {effectiveColumns.includes('area') && (
+                                    <SortableColumnHeader
+                                        field="area"
+                                        label="Area"
+                                        sortState={activeSort}
+                                        onSort={handleSort}
+                                        className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0"
+                                    />
+                                )}
+                                {effectiveColumns.includes('severity') && (
+                                    <SortableColumnHeader
+                                        field="severity"
+                                        label="Severity"
+                                        sortState={activeSort}
+                                        onSort={handleSort}
+                                        className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0"
+                                    />
+                                )}
+                                {effectiveColumns.includes('duration') && (
+                                    <SortableColumnHeader
+                                        field="duration"
+                                        label="Duration"
+                                        align="right"
+                                        sortState={activeSort}
+                                        onSort={handleSort}
+                                        className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0 text-right"
+                                    />
+                                )}
+                                {effectiveColumns.includes('seedCount') && (
+                                    <SortableColumnHeader
+                                        field="seedCount"
+                                        label="Seed Count"
+                                        align="right"
+                                        sortState={activeSort}
+                                        onSort={handleSort}
+                                        className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right"
+                                    />
+                                )}
+                                {effectiveColumns.includes('report') && (
+                                    <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right">
+                                        Report
+                                    </th>
+                                )}
+                            </tr>
+                        </thead>
                     </table>
+
+                    {/* ── Scrollable virtualized body ────────────────────────────────── */}
+                    <div
+                        ref={scrollRef}
+                        style={{ height: viewportHeight, overflowY: 'auto' }}
+                        role="region"
+                        aria-label={`${runs.length} fuzzing runs`}
+                    >
+                        {/* Inner spacer whose height equals the full un-virtualized list. */}
+                        <div style={{ height: totalHeight, position: 'relative' }}>
+                            <table className="w-full" role="presentation" style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
+                                <tbody
+                                    style={{ position: 'relative', display: 'block', height: totalHeight }}
+                                >
+                                    {visibleRuns.map((run, i) => {
+                                        const rowIndex = firstVisible + i;
+                                        return (
+                                        <VirtualRow
+                                            key={run.id}
+                                            run={run}
+                                            top={rowIndex * ROW_HEIGHT}
+                                            onSelectRun={onSelectRun}
+                                            onViewReport={onViewReport}
+                                            visibleColumns={effectiveColumns}
+                                            selectedRunIds={selectedRunIds}
+                                            onToggleRunSelection={onToggleRunSelection}
+                                            rowKeyboardProps={getRowProps(rowIndex)}
+                                        />
+                                    );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
