@@ -66,6 +66,36 @@ The fuzzer runner executes case seeds against the smart contract under test. You
 - **Used by**: API token store (`apps/web/src/lib/storage/api-token-store.ts`)
 - **Description**: Overlap window in hours during which a rotated token's previous secret remains valid. After the grace window elapses, resolve calls treat the old secret as revoked.
 
+### Role-Based Access Control
+
+RBAC roles are resolved from a persisted role store keyed by an authenticated
+principal, never from the request. See
+[THREAT_MODEL_ARTIFACT_HANDLING.md](./THREAT_MODEL_ARTIFACT_HANDLING.md) (T-11).
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `CRASHLAB_GITHUB_SESSION_SECRET` | No | *(unset)* | HMAC signing secret for the `crashlab_github_session` cookie issued by the GitHub OAuth callback. When set, a browser session resolves to a `github:<login>` principal whose role comes from the role store. When unset, no session is issued or trusted and browser callers resolve to the anonymous principal, which carries the lowest role. **Do not set this while the OAuth code exchange is still stubbed** — the session then names the stub identity, so anyone who completes the flow is that user. |
+| `CRASHLAB_GITHUB_SESSION_TTL_SECONDS` | No | `604800` | Lifetime of the GitHub session cookie, in seconds (7 days). |
+| `CRASHLAB_RBAC_AUDIT_RETENTION_DAYS` | No | `90` | Age-based retention for the RBAC authorization audit log. Entries older than this are filtered out on read. |
+| `CRASHLAB_RBAC_AUDIT_MAX_ENTRIES` | No | `10000` | Hard cap on retained RBAC audit entries. The oldest are dropped once the cap is reached. |
+| `CRASHLAB_RBAC_ROLE_AUDIT_MAX_ENTRIES` | No | `1000` | Hard cap on retained role-assignment change entries. |
+
+**Durability**: role assignments and both audit logs are written through the
+record driver layer (`apps/web/src/lib/storage/record-driver.ts`). When
+`KV_REST_API_URL` and `KV_REST_API_TOKEN` are set, that is Upstash Redis and the
+writes survive the invocation. When they are not, the in-memory driver is used,
+which is a single-instance store — adequate for local development, and not a
+durable audit trail for a multi-instance deployment.
+
+**Identity sources**:
+- `Authorization: Bearer <secret>` matching `CRASHLAB_WEBHOOK_API_KEY` — principal `api-key:env:CRASHLAB_WEBHOOK_API_KEY`
+- `Authorization: Bearer <secret>` matching a token issued by `/api/settings/tokens` — principal `api-key:<token id>`
+- The signed `crashlab_github_session` cookie — principal `github:<login>`
+
+A caller that presents no usable credential is the `anonymous` principal and
+resolves to the lowest role. A role asserted in a header, query parameter,
+cookie or request body is ignored everywhere, in every environment.
+
 ---
 
 ## 4. Web Application Variables

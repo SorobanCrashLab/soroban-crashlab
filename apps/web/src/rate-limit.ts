@@ -38,12 +38,12 @@ export function generateCorrelationId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
-export function proxy(request: NextRequest): NextResponse {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (request.method === 'OPTIONS') {
     return NextResponse.next();
   }
 
-  const rbacDenial = checkRbacPermission(request);
+  const rbacDenial = await checkRbacPermission(request);
   if (rbacDenial) {
     return rbacDenial;
   }

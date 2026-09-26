@@ -7,9 +7,12 @@ const CORRELATION_ID_HEADER = 'x-correlation-id';
  * Next.js 16 proxy entry (successor to middleware.ts). Applies API rate
  * limiting via `proxy` from ./rate-limit and stamps every API response with a
  * correlation ID so requests can be traced end to end.
+ *
+ * Async because RBAC now resolves the caller's role from persisted identity
+ * state rather than from the request, which is a storage round trip.
  */
-export function proxy(request: NextRequest): NextResponse {
-  const response = rateLimitProxy(request);
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  const response = await rateLimitProxy(request);
 
   // Add correlation ID for request tracking
   const correlationId = request.headers.get(CORRELATION_ID_HEADER) || generateCorrelationId();
