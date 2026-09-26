@@ -74,9 +74,13 @@ impl RunCheckpoint {
         }
     }
 
-    /// Seeds still to process, or an error if the checkpoint does not match `seeds`.
-    pub fn remaining<'a>(&self, seeds: &'a [CaseSeed]) -> Result<&'a [CaseSeed], CheckpointError> {
-        self.validate_run(&self.campaign_id, seeds.len())?;
+    /// Seeds still to process, or an error if the checkpoint does not match `seeds` or `campaign_id`.
+    pub fn remaining<'a>(
+        &self,
+        campaign_id: &str,
+        seeds: &'a [CaseSeed],
+    ) -> Result<&'a [CaseSeed], CheckpointError> {
+        self.validate_run(campaign_id, seeds.len())?;
         Ok(&seeds[self.next_seed_index..])
     }
 
@@ -152,7 +156,7 @@ mod tests {
         let cp = RunCheckpoint::new_run("c1", &s);
         assert_eq!(cp.next_seed_index, 0);
         assert_eq!(cp.total_seeds, 10);
-        assert_eq!(cp.remaining(&s).unwrap().len(), 10);
+        assert_eq!(cp.remaining("c1", &s).unwrap().len(), 10);
     }
 
     #[test]
@@ -160,8 +164,8 @@ mod tests {
         let s = seeds(10);
         let mut cp = RunCheckpoint::new_run("c1", &s);
         cp.advance_by(3);
-        assert_eq!(cp.remaining(&s).unwrap().len(), 7);
-        assert_eq!(cp.remaining(&s).unwrap()[0].id, 3);
+        assert_eq!(cp.remaining("c1", &s).unwrap().len(), 7);
+        assert_eq!(cp.remaining("c1", &s).unwrap()[0].id, 3);
     }
 
     #[test]
@@ -169,7 +173,7 @@ mod tests {
         let s = seeds(5);
         let mut cp = RunCheckpoint::new_run("c1", &s);
         cp.advance_by(3);
-        let rest = cp.remaining(&s).unwrap();
+        let rest = cp.remaining("c1", &s).unwrap();
         let ids: Vec<u64> = rest.iter().map(|x| x.id).collect();
         assert_eq!(ids, vec![3, 4]);
     }
@@ -180,7 +184,7 @@ mod tests {
         let mut cp = RunCheckpoint::new_run("c1", &s);
         cp.total_seeds = 99;
         assert!(matches!(
-            cp.remaining(&s),
+            cp.remaining("c1", &s),
             Err(CheckpointError::TotalMismatch { .. })
         ));
     }
@@ -192,6 +196,35 @@ mod tests {
         assert!(matches!(
             cp.validate_run("c2", s.len()),
             Err(CheckpointError::CampaignMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn remaining_rejects_campaign_mismatch() {
+        let s = seeds(5);
+        let cp = RunCheckpoint::new_run("campaign-original", &s);
+        let err = cp.remaining("campaign-other", &s).unwrap_err();
+        assert_eq!(
+            err,
+            CheckpointError::CampaignMismatch {
+                recorded: "campaign-original".to_string(),
+                actual: "campaign-other".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn resume_after_rename_rejected() {
+        let s = seeds(10);
+        let mut cp = RunCheckpoint::new_run("old-campaign-name", &s);
+        cp.advance_by(4);
+        let res = cp.remaining("new-campaign-name", &s);
+        assert!(matches!(
+            res,
+            Err(CheckpointError::CampaignMismatch {
+                ref recorded,
+                ref actual,
+            }) if recorded == "old-campaign-name" && actual == "new-campaign-name"
         ));
     }
 
