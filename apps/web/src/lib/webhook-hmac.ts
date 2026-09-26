@@ -1,16 +1,88 @@
-export async function signWebhookPayload(payload: string, secret: string, timestamp: string): Promise<string> {
-  const data = `${timestamp}.${payload}`;
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
-  return `t=${timestamp},v1=${Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+import { createHash, createHmac } from "node:crypto";
+import { timingSafeStringEqual } from "./api-key-auth";
+
+const SIGNATURE_PATTERN = /^t=(\d+),v1=([a-f0-9]{64})$/;
+
+export function createWebhookSignature(
+  payload: string,
+  secret: string,
+  timestamp: string,
+): string {
+  const digest = createHmac("sha256", secret)
+    .update(`${timestamp}.${payload}`)
+    .digest("hex");
+  return `t=${timestamp},v1=${digest}`;
 }
 
-export async function verifyWebhookSignature(payload: string, signature: string, secret: string, toleranceSeconds = 300): Promise<boolean> {
-  const match = signature.match(/t=(\d+),v1=([a-f0-9]+)/);
+export async function signWebhookPayload(
+  payload: string,
+  secret: string,
+  timestamp: string = String(Math.floor(Date.now() / 1000)),
+): Promise<string> {
+  return createWebhookSignature(payload, secret, timestamp);
+}
+
+export function verifyWebhookSignatureSync(
+  payload: string,
+  signature: string,
+  secrets: string | readonly string[],
+  toleranceSeconds = 300,
+  timestampHeader?: string,
+): boolean {
+  const match = SIGNATURE_PATTERN.exec(signature);
   if (!match) return false;
+
   const timestamp = match[1];
-  const age = Math.abs(Date.now() / 1000 - Number(timestamp));
-  if (age > toleranceSeconds) return false;
-  const expected = await signWebhookPayload(payload, secret, timestamp);
-  return expected === signature;
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isSafeInteger(timestampSeconds)) return false;
+  if (Math.abs(Date.now() / 1000 - timestampSeconds) > toleranceSeconds)
+    return false;
+  if (
+    timestampHeader !== undefined &&
+    !timingSafeStringEqual(timestamp, timestampHeader)
+  )
+    return false;
+
+  const signatureHex = match[2];
+  const candidates = typeof secrets === "string" ? [secrets] : secrets;
+  let verified = false;
+  for (const secret of candidates) {
+    const expected = createWebhookSignature(payload, secret, timestamp).slice(
+      "t=".length + timestamp.length + ",v1=".length,
+    );
+    verified = timingSafeStringEqual(signatureHex, expected) || verified;
+  }
+  return verified;
+}
+
+export async function verifyWebhookSignature(
+  payload: string,
+  signature: string,
+  secrets: string | readonly string[],
+  toleranceSeconds = 300,
+  timestampHeader?: string,
+): Promise<boolean> {
+  return verifyWebhookSignatureSync(
+    payload,
+    signature,
+    secrets,
+    toleranceSeconds,
+    timestampHeader,
+  );
+}
+
+export function getWebhookSigningSecrets(
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const configured = env.CRASHLAB_WEBHOOK_SIGNING_SECRETS?.split(",")
+    .map((secret) => secret.trim())
+    .filter(Boolean);
+  if (configured?.length) return configured;
+
+  const legacySecret = env.CRASHLAB_WEBHOOK_SIGNING_SECRET?.trim();
+  return legacySecret ? [legacySecret] : [];
+}
+
+export function getWebhookSigningKeyId(secret: string): string {
+  return `key-${createHash("sha256").update(secret).digest("hex").slice(0, 16)}`;
 }

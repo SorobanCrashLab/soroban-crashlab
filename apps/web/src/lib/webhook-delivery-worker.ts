@@ -1,40 +1,55 @@
-import { WebhookStore } from './webhook-store';
-import { createDlqEntry, type DlqAttemptNote, type DlqEntry } from './webhook-dlq';
-import { createHmac } from 'node:crypto';
-import type { WebhookRetryQueue } from './webhook-retry-queue';
+import { WebhookStore } from "./webhook-store";
+import {
+  createDlqEntry,
+  type DlqAttemptNote,
+  type DlqEntry,
+} from "./webhook-dlq";
+import type { WebhookRetryQueue } from "./webhook-retry-queue";
+import {
+  createWebhookSignature,
+  getWebhookSigningKeyId,
+  getWebhookSigningSecrets,
+  verifyWebhookSignatureSync,
+} from "./webhook-hmac";
 
 export type HmacKeyRing = {
   current: string;
   previous?: string;
 };
 
-export function createHmacSignature(payload: string, secret: string): string {
-  return `sha256=${createHmac('sha256', secret).update(payload).digest('hex')}`;
+export function createHmacSignature(
+  payload: string,
+  secret: string,
+  timestamp: string = String(Math.floor(Date.now() / 1000)),
+): string {
+  return createWebhookSignature(payload, secret, timestamp);
 }
 
-export function verifyHmacSignature(payload: string, signature: string, secrets: string[]): boolean {
-  for (const secret of secrets) {
-    const expected = createHmacSignature(payload, secret);
-    if (signature.length === expected.length) {
-      let match = true;
-      for (let i = 0; i < signature.length; i++) {
-        if (signature[i] !== expected[i]) {
-          match = false;
-          break;
-        }
-      }
-      if (match) return true;
-    }
-  }
-  return false;
+export function verifyHmacSignature(
+  payload: string,
+  signature: string,
+  secrets: string[],
+  timestampHeader?: string,
+): boolean {
+  return verifyWebhookSignatureSync(
+    payload,
+    signature,
+    secrets,
+    300,
+    timestampHeader,
+  );
 }
 
-export function verifyHmacWithKeyRing(payload: string, signature: string, ring: HmacKeyRing): boolean {
+export function verifyHmacWithKeyRing(
+  payload: string,
+  signature: string,
+  ring: HmacKeyRing,
+): boolean {
   const secrets = [ring.current, ...(ring.previous ? [ring.previous] : [])];
   return verifyHmacSignature(payload, signature, secrets);
 }
 
-export type WebhookDeliveryStatus = 'queued' | 'delivered' | 'failed';
+export type WebhookDeliveryStatus = "queued" | "delivered" | "failed";
 
 export interface WebhookDeliveryRequest {
   id: string;
@@ -98,12 +113,22 @@ export function isRetryableDeliveryStatus(statusCode?: number): boolean {
   return statusCode >= 500;
 }
 
-import { WEBHOOK_DELIVERY_TIMEOUT_MS, WEBHOOK_DELIVERY_RETRY_BASE_MS } from './timeouts';
+import {
+  WEBHOOK_DELIVERY_TIMEOUT_MS,
+  WEBHOOK_DELIVERY_RETRY_BASE_MS,
+} from "./timeouts";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 export class FetchWebhookDeliveryAdapter implements WebhookDeliveryAdapter {
-  constructor(private readonly hmacSecret?: string) {}
+  private readonly hmacSecrets: readonly string[];
+
+  constructor(
+    hmacSecrets: string | readonly string[] = getWebhookSigningSecrets(),
+  ) {
+    this.hmacSecrets =
+      typeof hmacSecrets === "string" ? [hmacSecrets] : hmacSecrets;
+  }
 
   async deliver(request: WebhookDeliveryRequest): Promise<{
     ok: boolean;
@@ -119,17 +144,25 @@ export class FetchWebhookDeliveryAdapter implements WebhookDeliveryAdapter {
     try {
       const payload = JSON.stringify(request.payload);
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Webhook-Event': request.eventType,
+        "Content-Type": "application/json",
+        "X-Webhook-Event": request.eventType,
       };
-      if (this.hmacSecret) {
-        headers['X-Webhook-Signature'] = createHmacSignature(payload, this.hmacSecret);
-      }
       if (request.headers) {
         Object.assign(headers, request.headers);
       }
+      const activeSecret = this.hmacSecrets[0];
+      if (activeSecret) {
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        headers["X-Webhook-Timestamp"] = timestamp;
+        headers["X-Webhook-Key-Id"] = getWebhookSigningKeyId(activeSecret);
+        headers["X-Webhook-Signature"] = createHmacSignature(
+          payload,
+          activeSecret,
+          timestamp,
+        );
+      }
       const response = await fetch(request.url, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: payload,
         signal: controller.signal,
@@ -168,13 +201,23 @@ export class WebhookDeliveryWorker {
   private draining: Promise<void> | null = null;
 
   constructor(options: WebhookDeliveryWorkerOptions = {}) {
-    const ringSecrets = options.hmacKeyRing ? [options.hmacKeyRing.current, ...(options.hmacKeyRing.previous ? [options.hmacKeyRing.previous] : [])] : [];
-    const secrets = options.hmacSecrets ?? ringSecrets;
+    const ringSecrets = options.hmacKeyRing
+      ? [
+          options.hmacKeyRing.current,
+          ...(options.hmacKeyRing.previous
+            ? [options.hmacKeyRing.previous]
+            : []),
+        ]
+      : [];
+    const secrets =
+      options.hmacSecrets ??
+      (ringSecrets.length > 0 ? ringSecrets : getWebhookSigningSecrets());
     this.hmacSecrets = secrets;
     if (!options.adapter && secrets.length > 0) {
-      this.adapter = new FetchWebhookDeliveryAdapter(secrets[0]);
+      this.adapter = new FetchWebhookDeliveryAdapter(secrets);
     } else {
-      this.adapter = options.adapter ?? new FetchWebhookDeliveryAdapter(secrets[0]);
+      this.adapter =
+        options.adapter ?? new FetchWebhookDeliveryAdapter(secrets);
     }
     this.store = options.store ?? null;
     this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
@@ -200,7 +243,11 @@ export class WebhookDeliveryWorker {
 
   verifyPayload(payload: unknown, signature: string): boolean {
     if (this.hmacSecrets.length === 0) return false;
-    return verifyHmacSignature(JSON.stringify(payload), signature, this.hmacSecrets);
+    return verifyHmacSignature(
+      JSON.stringify(payload),
+      signature,
+      this.hmacSecrets,
+    );
   }
 
   enqueue(request: WebhookDeliveryRequest): void {
@@ -296,7 +343,7 @@ export class WebhookDeliveryWorker {
       const attemptRecord: WebhookDeliveryAttempt = {
         requestId: request.id,
         attempt,
-        status: delivered ? 'delivered' : willRetry ? 'queued' : 'failed',
+        status: delivered ? "delivered" : willRetry ? "queued" : "failed",
         statusCode: result.statusCode,
         error: result.error,
         deliveredAt: this.now().toISOString(),
@@ -319,7 +366,7 @@ export class WebhookDeliveryWorker {
         timeline.push({
           attempt,
           statusCode: result.statusCode,
-          error: result.error ?? 'Delivery failed',
+          error: result.error ?? "Delivery failed",
           at: attemptRecord.deliveredAt,
         });
       }
@@ -337,7 +384,12 @@ export class WebhookDeliveryWorker {
 
       if (!willRetry) {
         if (!delivered) {
-          this.deadLetter(request, timeline, attempt === maxAttempts, attemptRecord.deliveredAt);
+          this.deadLetter(
+            request,
+            timeline,
+            attempt === maxAttempts,
+            attemptRecord.deliveredAt,
+          );
         }
         return;
       }
@@ -363,7 +415,7 @@ export class WebhookDeliveryWorker {
       createDlqEntry({
         request,
         timeline,
-        reason: exhausted ? 'retries-exhausted' : 'non-retryable',
+        reason: exhausted ? "retries-exhausted" : "non-retryable",
         now: at,
       }),
     );
@@ -383,20 +435,20 @@ export class WebhookDeliveryWorker {
 
   private assertRequest(request: WebhookDeliveryRequest): void {
     if (!request.id.trim()) {
-      throw new Error('Webhook delivery request requires an id');
+      throw new Error("Webhook delivery request requires an id");
     }
 
     try {
       const url = new URL(request.url);
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-        throw new Error('unsupported protocol');
+      if (url.protocol !== "http:" && url.protocol !== "https:") {
+        throw new Error("unsupported protocol");
       }
     } catch {
       throw new Error(`Invalid webhook URL: ${request.url}`);
     }
 
     if (!request.eventType.trim()) {
-      throw new Error('Webhook delivery request requires an event type');
+      throw new Error("Webhook delivery request requires an event type");
     }
   }
 }
