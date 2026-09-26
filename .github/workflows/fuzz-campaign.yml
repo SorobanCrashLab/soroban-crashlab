@@ -26,13 +26,13 @@ jobs:
       run:
         working-directory: contracts/crashlab-core
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@e4a16c4a2b9b5c5d5e5f5a5b5c5d5e5f5a5b5c5d # 1.75.0
 
       - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@c4a16c4a2b9b5c5d5e5f5a5b5c5d5e5f5a5b5c5d # v2.0.0
         with:
           workspaces: contracts/crashlab-core
 
@@ -65,7 +65,7 @@ jobs:
           cargo run --release --bin import-corpus -- "$RUNNER_TEMP/corpus-archive.json"
 
       - name: Upload campaign artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4a16c4a2b9b5c5d5e5f5a5b5c5d5e5f5a5b5c5d # v4.3.0
         with:
           name: nightly-campaign-${{ github.run_id }}
           path: |
