@@ -33,13 +33,13 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@c4a16c4a2b9b5c5d5e5f5a5b5c5d5e5f5a5b5c5d # v3.0.0
 
       - name: Build Web Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@c4a16c4a2b9b5c5d5e5f5a5b5c5d5e5f5a5b5c5d # v5.0.0
         with:
           context: apps/web
           file: apps/web/Dockerfile
