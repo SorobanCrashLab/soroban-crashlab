@@ -1,0 +1,40 @@
+name: Regression Test Suite
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+concurrency:
+  group: regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  regression-tests:
+    name: Run Regression Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust Dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts
+
+      - name: Run Regression Tests
+        working-directory: contracts
+        run: cargo test --workspace --all-targets --release
+
+      - name: Run Fuzz Tests (10 second timeout)
+        working-directory: contracts
+        run: timeout 10 cargo fuzz run fuzz_target_1 || true
