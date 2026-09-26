@@ -383,6 +383,13 @@ pub fn randomize_seed(seed: &CaseSeed) -> CaseSeed {
     }
 }
 
+/// Classifies the exact payload bytes provided without preparing a replay seed.
+///
+/// **Deprecated for bundle and regression-suite flows:** direct classification
+/// can disagree with the signature stored by bundle creation when the seed is
+/// mutated first. Use [`prepare_replay_seed`] for those flows. This function
+/// remains available for callers that specifically need to classify arbitrary
+/// bytes as-is.
 pub fn classify(seed: &CaseSeed) -> CrashSignature {
     // Delegate signature construction to the taxonomy helper which produces
     // category labels consistent with `classify_failure` and a centralized
@@ -390,9 +397,19 @@ pub fn classify(seed: &CaseSeed) -> CrashSignature {
     taxonomy::crash_signature_from_seed(seed)
 }
 
+/// Produces the exact seed and signature stored in a replay bundle.
+///
+/// Classification always runs on the post-mutation payload that will be
+/// replayed. The deterministic mutation is idempotent, so this also accepts
+/// payloads already exported from a bundle.
+pub(crate) fn prepare_replay_seed(seed: &CaseSeed) -> (CaseSeed, CrashSignature) {
+    let replay_seed = mutate_seed(seed);
+    let signature = classify(&replay_seed);
+    (replay_seed, signature)
+}
+
 pub fn to_bundle(seed: CaseSeed) -> CaseBundle {
-    let mutated = mutate_seed(&seed);
-    let signature = classify(&mutated);
+    let (mutated, signature) = prepare_replay_seed(&seed);
     CaseBundle {
         seed: mutated,
         signature,
@@ -405,8 +422,7 @@ pub fn to_bundle(seed: CaseSeed) -> CaseBundle {
 /// Like [`to_bundle`], but attaches [`EnvironmentFingerprint::capture`] for replay checks.
 pub fn to_bundle_with_environment(seed: CaseSeed) -> CaseBundle {
     let environment = Some(EnvironmentFingerprint::capture());
-    let mutated = mutate_seed(&seed);
-    let signature = classify(&mutated);
+    let (mutated, signature) = prepare_replay_seed(&seed);
     CaseBundle {
         seed: mutated,
         signature,
@@ -418,8 +434,7 @@ pub fn to_bundle_with_environment(seed: CaseSeed) -> CaseBundle {
 
 /// Like [`to_bundle`], but attaches an RPC envelope capture for reproducibility auditing.
 pub fn to_bundle_with_rpc_envelope(seed: CaseSeed, envelope: RpcEnvelopeCapture) -> CaseBundle {
-    let mutated = mutate_seed(&seed);
-    let signature = classify(&mutated);
+    let (mutated, signature) = prepare_replay_seed(&seed);
     CaseBundle {
         seed: mutated,
         signature,
@@ -448,6 +463,20 @@ mod tests {
         let a = mutate_seed(&seed);
         let b = mutate_seed(&seed);
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn replay_seed_preparation_is_idempotent_for_exported_payloads() {
+        let seed = CaseSeed {
+            id: 42,
+            payload: vec![1, 2, 3, 4],
+        };
+        let (replay_seed, signature) = prepare_replay_seed(&seed);
+        let (exported_replay_seed, exported_signature) = prepare_replay_seed(&replay_seed);
+
+        assert_eq!(exported_replay_seed, replay_seed);
+        assert_eq!(exported_signature, signature);
+        assert_eq!(signature.category, classify(&replay_seed).category);
     }
 
     #[test]

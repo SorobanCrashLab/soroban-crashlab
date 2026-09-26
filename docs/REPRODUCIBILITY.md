@@ -179,7 +179,7 @@ export_to_ci(stable_pack);
 
 ### Grouped regression suites
 
-`crashlab_core::export_rust_regression_suite` places each fixture into a submodule named from **domain risk** (`FailureClass` from `classify_failure` on the bundle seed) and **expected failure mode** (`bundle.signature.category`). That lets you run slices of the suite independently:
+`crashlab_core::export_rust_regression_suite` places each fixture into a submodule named from **domain risk** (`FailureClass` from `classify_failure` on the stored replay payload) and **expected failure mode** (`bundle.signature.category`). The bundle signature category and regression fixture class are both derived from the exact payload stored for replay. Regression-suite evaluation prepares raw fixture seeds through the same deterministic, idempotent replay mutation used by bundle creation; an already-exported bundle payload therefore remains unchanged. This is a payload/classification semantics clarification, not a bundle schema change. That lets you run slices of the suite independently:
 
 ```bash
 # All regression tests under the generated root module
