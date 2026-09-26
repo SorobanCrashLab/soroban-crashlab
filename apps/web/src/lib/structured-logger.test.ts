@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StructuredLogger } from './structured-logger';
 
 describe('StructuredLogger', () => {
-  let logEntries: any[] = [];
+  let logEntries: Record<string, unknown>[] = [];
 
-  const mockWriter = vi.fn((entry) => {
+  const mockWriter = vi.fn((entry: Record<string, unknown>) => {
     logEntries.push(entry);
   });
 

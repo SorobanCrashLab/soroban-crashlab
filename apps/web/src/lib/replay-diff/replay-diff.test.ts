@@ -246,7 +246,7 @@ describe('filterOperations', () => {
         { type: 'removed' as const, key: '2' },
         { type: 'changed' as const, key: '3' },
         { type: 'unchanged' as const, key: '4' },
-    ] as any;
+    ] as Array<{ type: string; key?: string }>;
 
     it('returns all for "all" filter', () => {
         expect(filterOperations(mockOps, 'all')).toHaveLength(4);
@@ -269,7 +269,7 @@ describe('summarizeOperations', () => {
         { type: 'unchanged' },
         { type: 'unchanged' },
         { type: 'unchanged' },
-    ] as any;
+    ] as Array<{ type: string }>;
 
     it('counts by type', () => {
         const summary = summarizeOperations(mockOps);
@@ -284,7 +284,7 @@ describe('summarizeOperations', () => {
 describe('depth limiting', () => {
     it('respects MAX_DIFF_DEPTH', () => {
         // Create deeply nested object
-        let deepObj: any = { value: 1 };
+        let deepObj: Record<string, unknown> = { value: 1 };
         for (let i = 0; i < MAX_DIFF_DEPTH + 5; i++) {
             deepObj = { nested: deepObj };
         }
@@ -304,7 +304,7 @@ describe('depth limiting', () => {
                 entryType: 'ContractData',
                 changeType: 'updated',
                 before: JSON.stringify(deepObj),
-                after: JSON.stringify({ nested: { ...deepObj.nested, value: 3 } }),
+                after: JSON.stringify({ nested: { ...deepObj.nested as Record<string, unknown>, value: 3 } }),
             }],
         });
 

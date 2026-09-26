@@ -9,7 +9,7 @@ vi.mock('react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react')>();
   return {
     ...actual,
-    useRef: (init: any) => ({ current: init }),
+    useRef: <T,>(init: T) => ({ current: init }),
     useEffect: (callback: () => void | (() => void)) => {
       const cleanup = callback();
       if (typeof cleanup === 'function') {
@@ -138,7 +138,7 @@ class MockKeyboardEvent {
   }
 }
 
-let listeners: Record<string, ((event: any) => void)[]> = {};
+let listeners: Record<string, ((event: MockKeyboardEvent) => void)[]> = {};
 
 const mockDocument = {
   activeElement: null as MockElement | null,
@@ -146,16 +146,16 @@ const mockDocument = {
   createElement(tag: string) {
     return new MockElement(tag);
   },
-  addEventListener(event: string, fn: (e: any) => void) {
+  addEventListener(event: string, fn: (e: MockKeyboardEvent) => void) {
     listeners[event] = listeners[event] || [];
     listeners[event].push(fn);
   },
-  removeEventListener(event: string, fn: (e: any) => void) {
+  removeEventListener(event: string, fn: (e: MockKeyboardEvent) => void) {
     if (listeners[event]) {
       listeners[event] = listeners[event].filter((l) => l !== fn);
     }
   },
-  dispatchEvent(event: any) {
+  dispatchEvent(event: MockKeyboardEvent) {
     const list = listeners[event.type] || [];
     for (const fn of list) {
       fn(event);
@@ -171,15 +171,17 @@ beforeEach(() => {
   mockDocument.activeElement = null;
   mockDocument.body = new MockElement('BODY');
   mockDocument.body.style = { overflow: '' };
-  (global as any).document = mockDocument;
-  (global as any).HTMLElement = MockElement;
-  (global as any).KeyboardEvent = MockKeyboardEvent;
-  (global as any).requestAnimationFrame = (cb: () => void) => {
+
+  const globalContext = global as unknown as Record<string, unknown>;
+  globalContext.document = mockDocument;
+  globalContext.HTMLElement = MockElement;
+  globalContext.KeyboardEvent = MockKeyboardEvent;
+  globalContext.requestAnimationFrame = (cb: () => void) => {
     cb();
     return 1;
   };
-  (global as any).cancelAnimationFrame = () => {};
-  (global as any).window = {
+  globalContext.cancelAnimationFrame = () => {};
+  globalContext.window = {
     getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
   };
 });
