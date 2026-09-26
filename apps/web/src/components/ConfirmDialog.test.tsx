@@ -6,7 +6,7 @@ vi.mock('react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react')>();
   return {
     ...actual,
-    useRef: (init: any) => ({ current: init }),
+    useRef: <T,>(init: T) => ({ current: init }),
   };
 });
 

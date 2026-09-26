@@ -171,7 +171,7 @@ export function createRouteHandler<
         }
       }
 
-      let parsedBody: any = undefined;
+      let parsedBody: unknown = undefined;
       if (config.bodySchema) {
         const bodyResult = await readJsonBody(request);
         if ('error' in bodyResult) return bodyResult.error as Response;
