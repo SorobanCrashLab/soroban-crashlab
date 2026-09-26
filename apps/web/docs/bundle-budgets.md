@@ -92,3 +92,24 @@ If the lazy-chart loading work (#1396-adjacent) merges first, re-baseline the
 `analytics-charts` budget afterwards using the methodology above rather than
 baking extra headroom into this PR to compensate. Headroom stays at 10%; do not
 game it.
+
+## Bundle Analysis & Visual Treemaps
+
+When investigating regressions or optimizing route code-splitting, run the bundle
+analyzer locally:
+
+```bash
+# Run bundle analysis locally (generates HTML treemaps in .next/analyze/)
+pnpm --dir apps/web run analyze
+
+# Generate per-route first-load JS metrics and markdown report
+node apps/web/scripts/analyze-bundles.mjs
+```
+
+### CI Artifacts & PR Breakdown
+On pull requests:
+- **Pass/Fail Gate**: `.github/workflows/size-limit.yml` checks route groups against `.size-limit.json`.
+- **On Budget Failure**: CI runs `pnpm --dir apps/web run analyze`, uploads the interactive HTML treemaps (`client.html`, `nodejs.html`) + `route-sizes.json` as the `bundle-analysis-report` artifact.
+- **Sticky PR Comment & Job Summary**: A per-route first-load JS breakdown table is posted to the PR and recorded in `$GITHUB_STEP_SUMMARY` for immediate regression debugging without local rebuilds.
+- **Trend Tracking**: `.next/analyze/route-sizes.json` captures machine-readable per-route first-load JS metrics per build.
+

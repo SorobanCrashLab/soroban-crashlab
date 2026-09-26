@@ -19,6 +19,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   size-limit:
@@ -45,8 +46,91 @@ jobs:
       - name: Build Next.js App
         run: pnpm --dir apps/web run build
 
-      # Fails (non-zero exit) when a route group exceeds its budget and prints
-      # the offending group + its size delta versus the limit.
-      - name: Run Size-Limit and fail on budget breach
+      # Checks route groups against budgets defined in apps/web/.size-limit.json.
+      # continue-on-error: true ensures that when a budget fails, we can run the
+      # bundle analyzer, generate visual reports, post PR breakdown, and upload artifacts
+      # before enforcing failure.
+      - name: Run Size-Limit and check budgets
+        id: size_limit
         run: pnpm --dir apps/web run size
+        continue-on-error: true
+
+      # On PRs that fail (or degrade) the size check, run the analyzer to generate
+      # the visual HTML treemap reports (client.html & nodejs.html).
+      - name: Run Bundle Analyzer on budget breach
+        if: steps.size_limit.outcome == 'failure'
+        run: pnpm --dir apps/web run analyze
+
+      # Measure per-route first-load JS and produce route-sizes.json + bundle-report.md.
+      - name: Generate Route Size Analysis and Report
+        if: always()
+        run: node apps/web/scripts/analyze-bundles.mjs
+
+      # Append report to GitHub Step Summary
+      - name: Append Bundle Analysis to Step Summary
+        if: always()
+        run: |
+          if [ -f apps/web/.next/analyze/bundle-report.md ]; then
+            cat apps/web/.next/analyze/bundle-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Upload HTML treemaps, route-sizes.json (for trend tracking), and markdown report.
+      - name: Upload Bundle Analysis Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-analysis-report
+          path: apps/web/.next/analyze/
+          if-no-files-found: ignore
+
+      # Sticky PR comment with per-route first-load table and budget breakdown.
+      # Non-fatal: on a pull request from a fork GITHUB_TOKEN is read-only, so
+      # this step 403s. The audit still ran and the table is in the job
+      # summary — the budget result must decide the job, not the comment.
+      - name: Post sticky bundle analysis comment
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const MARKER = '<!-- bundle-analysis-report -->';
+            const reportPath = 'apps/web/.next/analyze/bundle-report.md';
+            if (!fs.existsSync(reportPath)) {
+              return;
+            }
+            const report = fs.readFileSync(reportPath, 'utf8');
+            const body = `${MARKER}\n${report}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.startsWith(MARKER));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      # Fails the job after the report and artifacts are preserved, so a red
+      # gate always ships with its visual breakdown and artifact attached.
+      - name: Enforce budget status
+        if: steps.size_limit.outcome == 'failure'
+        run: |
+          echo "::error::Bundle size limit exceeded! See the PR comment, job summary, and download the 'bundle-analysis-report' artifact to inspect the visual treemap."
+          exit 1
 

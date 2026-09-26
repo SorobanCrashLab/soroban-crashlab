@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   createContext,
@@ -8,7 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
-} from 'react';
+} from "react";
 import {
   shouldAutoDismiss,
   createToast,
@@ -21,9 +21,9 @@ import {
   type Toast,
   type ToastInput,
   type ToastTimerState,
-} from './toast-utils';
+} from "./toast-utils";
 
-import { toUserMessage } from '../lib/api-error-mapper';
+import { toUserMessage } from "../lib/api-error-mapper";
 
 interface ToastContextValue {
   /** Show a toast. Returns its id so callers can dismiss it programmatically. */
@@ -107,28 +107,28 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     (error: unknown) => {
       console.error(error);
       const userMsg = toUserMessage(error);
-      return notify({ message: userMsg, variant: 'error' });
+      return notify({ message: userMsg, variant: "error" });
     },
     [notify],
   );
 
   const notifySuccess = useCallback(
-    (message: string) => notify({ message, variant: 'success' }),
+    (message: string) => notify({ message, variant: "success" }),
     [notify],
   );
 
   // Pause auto-dismiss while the pointer/focus is on a toast so users can read
   // longer messages. Scoped to the one toast being read — hovering a single
   // error no longer freezes the rest of the stack indefinitely.
-  const pause = useCallback(
-    (id: string) => {
-      const timer = timersRef.current.get(id);
-      if (!timer || timer.resumedAt === null) return;
-      if (timer.handle) clearTimeout(timer.handle);
-      timersRef.current.set(id, { ...pauseTimerState(timer, Date.now()), handle: null });
-    },
-    [],
-  );
+  const pause = useCallback((id: string) => {
+    const timer = timersRef.current.get(id);
+    if (!timer || timer.resumedAt === null) return;
+    if (timer.handle) clearTimeout(timer.handle);
+    timersRef.current.set(id, {
+      ...pauseTimerState(timer, Date.now()),
+      handle: null,
+    });
+  }, []);
 
   const resume = useCallback(
     (id: string) => {
@@ -144,13 +144,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   // paused once the page is interactive again so nothing is stranded on screen.
   useEffect(() => {
     const resumeStranded = () => {
-      if (document.visibilityState !== 'visible') return;
+      if (document.visibilityState !== "visible") return;
       timersRef.current.forEach((timer, id) => {
-        if (timer.resumedAt === null) arm(id, resumeTimerState(timer, Date.now()));
+        if (timer.resumedAt === null)
+          arm(id, resumeTimerState(timer, Date.now()));
       });
     };
-    document.addEventListener('visibilitychange', resumeStranded);
-    return () => document.removeEventListener('visibilitychange', resumeStranded);
+    document.addEventListener("visibilitychange", resumeStranded);
+    return () =>
+      document.removeEventListener("visibilitychange", resumeStranded);
   }, [arm]);
 
   // Clear any outstanding timers on unmount.
@@ -193,13 +195,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-const VARIANT_STYLES: Record<Toast['variant'], string> = {
-  error: 'border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200',
+const VARIANT_STYLES: Record<Toast["variant"], string> = {
+  error:
+    "border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200",
   success:
-    'border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200',
+    "border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200",
   warning:
-    'border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200',
-  info: 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200',
+    "border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200",
+  info: "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200",
 };
 
 function ToastItem({
@@ -213,14 +216,14 @@ function ToastItem({
   onPause: () => void;
   onResume: () => void;
 }) {
+  const role = toast.variant === "error" ? "alert" : "status";
+  const ariaLive = toast.variant === "error" ? "assertive" : "polite";
+
   return (
     <div
-      // Errors are assertive so screen readers announce them immediately;
-      // other variants are polite.
-      role={toast.variant === 'error' ? 'alert' : 'status'}
-      aria-live={toast.variant === 'error' ? 'assertive' : 'polite'}
-      // Hover *and* keyboard focus hold the countdown, so a toast can't vanish
-      // mid-read or while the close button is being tabbed to.
+      role={role}
+      aria-live={ariaLive}
+      aria-atomic="true"
       onMouseEnter={onPause}
       onMouseLeave={onResume}
       onFocus={onPause}
@@ -234,8 +237,18 @@ function ToastItem({
         aria-label="Dismiss notification"
         className="shrink-0 rounded-md p-0.5 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-current transition-opacity"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
       </button>
     </div>
@@ -246,7 +259,7 @@ function ToastItem({
 export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);
   if (!ctx) {
-    throw new Error('useToast must be used within a <ToastProvider>');
+    throw new Error("useToast must be used within a <ToastProvider>");
   }
   return ctx;
 }

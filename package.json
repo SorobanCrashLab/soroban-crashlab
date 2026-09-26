@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm --dir apps/web run dev",
     "build": "pnpm --dir apps/web run build",
+    "analyze": "pnpm --dir apps/web run analyze",
     "start": "pnpm --dir apps/web run start",
     "lint": "pnpm --dir apps/web run lint",
     "test": "pnpm --dir apps/web run test",

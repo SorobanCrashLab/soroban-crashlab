@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { isEditableTarget } from '../lib/is-editable-target';
 import { commandRegistry, type ScoredEntry } from '../lib/command-palette/registry';
 import { highlightSegments } from '../lib/command-palette/matcher';
@@ -34,8 +35,14 @@ export default function CommandPalette() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  useFocusTrap({
+    containerRef: dialogRef,
+    active: isOpen,
+    onClose: closePalette,
+    initialFocusRef: inputRef,
+  });
 
   const navigate = useCallback((path: string) => router.push(path), [router]);
   const exportCurrentView = useCallback(() => {
@@ -88,7 +95,6 @@ export default function CommandPalette() {
   }, [isOpen, query, recentIds]);
 
   const openPalette = useCallback(() => {
-    previousFocusRef.current = document.activeElement as HTMLElement;
     setRecentIds(getRecents());
     setQuery('');
     setIsOpen(true);
@@ -131,12 +137,6 @@ export default function CommandPalette() {
 
       if (!isOpen) return;
 
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closePalette();
-        return;
-      }
-
       if (isEditableTarget(event.target) && event.target !== inputRef.current) {
         return;
       }
@@ -145,17 +145,6 @@ export default function CommandPalette() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, openPalette, closePalette]);
-
-  useEffect(() => {
-    if (isOpen) {
-      window.setTimeout(() => inputRef.current?.focus(), 0);
-      return;
-    }
-    if (previousFocusRef.current) {
-      previousFocusRef.current.focus();
-      previousFocusRef.current = null;
-    }
-  }, [isOpen]);
 
   const handleInputKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') {
@@ -168,20 +157,6 @@ export default function CommandPalette() {
       event.preventDefault();
       const selected = results[activeIndex];
       if (selected) executeEntry(selected);
-    } else if (event.key === 'Tab' && dialogRef.current) {
-      const focusableElements = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusableElements.length === 0) return;
-      const first = focusableElements[0];
-      const last = focusableElements[focusableElements.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
     }
   };
 

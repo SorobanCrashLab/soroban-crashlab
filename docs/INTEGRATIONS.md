@@ -55,16 +55,22 @@ Sentry provides error tracking and crash reporting for your applications.
 - Captures exceptions from the dashboard and sends them to Sentry
 - Provides a crash report viewer within the dashboard
 - Lets you configure Sentry DSN through the settings page
+- Uploads hidden source maps during production builds and deletes them post-upload
+- Tags releases with the git commit SHA and associates commit metadata
 
 **Setup**
 1. Create a Sentry account and project
 2. Copy your DSN from the Sentry project settings
 3. Set the `NEXT_PUBLIC_SENTRY_DSN` environment variable
-4. The adapter in `sentry-client.ts` initializes automatically
+4. Set build-time secrets in Vercel / CI: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT`
+5. The adapter in `sentry-client.ts` initializes automatically on the client, and `withSentryConfig` in `next.config.ts` handles source map upload and release tagging at build time
 
 **Files involved**
+- `apps/web/next.config.ts`
 - `apps/web/src/lib/integrations/sentry-client.ts`
 - `apps/web/src/lib/integrations/sentry-adapter.ts`
+- `.github/workflows/vercel-preview.yml`
+
 
 ---
 

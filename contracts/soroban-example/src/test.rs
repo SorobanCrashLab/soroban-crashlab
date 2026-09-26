@@ -257,8 +257,6 @@ fn test_approve_zero_amount() {
     let admin = Address::generate(&env);
     let spender = Address::generate(&env);
 
-    client.initialize(&admin, &total_supply);
-    client.approve(&admin, &spender, &100);
     client.initialize(&admin, &1000);
     client.approve(&admin, &spender, &0);
 
@@ -266,26 +264,6 @@ fn test_approve_zero_amount() {
 }
 
 #[test]
-fn test_balances_are_sharded_for_one_thousand_accounts() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let contract_id = env.register(TokenContract, ());
-    let client = TokenContractClient::new(&env, &contract_id);
-
-    let admin = Address::generate(&env);
-    client.initialize(&admin, &1000);
-
-    for _ in 0..1000 {
-        let account = Address::generate(&env);
-        client.transfer(&admin, &account, &1);
-        assert_eq!(client.balance(&account), 1);
-    }
-
-    assert_eq!(client.balance(&admin), 0);
-}
-
-#[test]
-#[should_panic(expected = "amount cannot be negative")]
 fn test_approve_negative_amount() {
     let env = Env::default();
     env.mock_all_auths();

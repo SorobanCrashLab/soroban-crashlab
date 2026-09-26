@@ -1,11 +1,14 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { FuzzingRun, RunStatus } from './types';
 import { STATUS_META } from '../lib/run-status';
 import AddReplayFromUiAction from './add-replay-from-ui-action';
 import { useDataTableKeyboardNav } from './use-data-table-keyboard-nav';
 import TruncatedCell from '@/components/TruncatedCell';
 import { useResponsiveRunColumns } from './use-responsive-run-columns';
+import { SortableColumnHeader } from '../components/SortableColumnHeader';
+import { getNextSortState, type SortState } from './run-history-sort-utils';
 
 interface RunHistoryTableProps {
     /** Array of fuzzing runs to display */
@@ -18,6 +21,10 @@ interface RunHistoryTableProps {
     onReplayRun?: (newRunData: { id: string; status: 'running' }) => void;
     /** List of visible columns */
     visibleColumns?: string[];
+    /** Active sort state (controlled) */
+    sortState?: SortState<string> | null;
+    /** Callback invoked when a sortable column header is activated */
+    onSort?: (field: string) => void;
 }
 
 import { formatDuration } from './utils/format';
@@ -56,22 +63,57 @@ export default function RunHistoryTable({
     onSelectRun, 
     onViewReport, 
     onReplayRun,
-    visibleColumns = ['id', 'status', 'duration', 'seedCount', 'report'] 
+    visibleColumns = ['id', 'status', 'duration', 'seedCount', 'report'],
+    sortState,
+    onSort,
 }: RunHistoryTableProps) {
+    const [internalSortState, setInternalSortState] = useState<SortState<string>>({ field: 'id', order: 'desc' });
+    const activeSort = sortState !== undefined ? sortState : internalSortState;
+
+    const handleSort = (field: string) => {
+        if (onSort) {
+            onSort(field);
+        } else {
+            setInternalSortState((prev) => getNextSortState(prev, field));
+        }
+    };
+
+    const sortedRuns = useMemo(() => {
+        if (!activeSort || !activeSort.field || activeSort.order === 'none') {
+            return runs;
+        }
+        const mult = activeSort.order === 'asc' ? 1 : -1;
+        return runs.slice().sort((a, b) => {
+            if (activeSort.field === 'id') {
+                return a.id.localeCompare(b.id) * mult;
+            }
+            if (activeSort.field === 'status') {
+                return a.status.localeCompare(b.status) * mult;
+            }
+            if (activeSort.field === 'duration') {
+                return (a.duration - b.duration) * mult;
+            }
+            if (activeSort.field === 'seedCount') {
+                return (a.seedCount - b.seedCount) * mult;
+            }
+            return 0;
+        });
+    }, [runs, activeSort]);
+
     /** Responsive column set — adapts to phone and portrait-tablet viewports. */
     const effectiveColumns = useResponsiveRunColumns(visibleColumns);
 
     const { getRowProps } = useDataTableKeyboardNav({
-        rowCount: runs.length,
+        rowCount: sortedRuns.length,
         onActivate: (index) => {
-            const run = runs[index];
+            const run = sortedRuns[index];
             if (run) {
                 onSelectRun(run.id);
             }
         },
     });
 
-    if (runs.length === 0) {
+    if (sortedRuns.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-xl bg-zinc-50 dark:bg-zinc-900/20 border-zinc-200 dark:border-zinc-800">
                 <p className="text-zinc-500 dark:text-zinc-400 font-medium">No fuzzing runs found.</p>
@@ -86,16 +128,50 @@ export default function RunHistoryTable({
                 <table className="w-full text-left border-collapse" aria-label="Fuzzing run history">
                     <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
-                            {effectiveColumns.includes('id') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Run ID</th>}
-                            {effectiveColumns.includes('status') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Status</th>}
-                            {effectiveColumns.includes('duration') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Duration</th>}
-                            {effectiveColumns.includes('seedCount') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Seed Count</th>}
+                            {effectiveColumns.includes('id') && (
+                                <SortableColumnHeader
+                                    field="id"
+                                    label="Run ID"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+                                />
+                            )}
+                            {effectiveColumns.includes('status') && (
+                                <SortableColumnHeader
+                                    field="status"
+                                    label="Status"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+                                />
+                            )}
+                            {effectiveColumns.includes('duration') && (
+                                <SortableColumnHeader
+                                    field="duration"
+                                    label="Duration"
+                                    align="right"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right"
+                                />
+                            )}
+                            {effectiveColumns.includes('seedCount') && (
+                                <SortableColumnHeader
+                                    field="seedCount"
+                                    label="Seed Count"
+                                    align="right"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right"
+                                />
+                            )}
                             {onReplayRun && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Actions</th>}
                             {effectiveColumns.includes('report') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Report</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                        {runs.map((run, index) => (
+                        {sortedRuns.map((run, index) => (
                             <tr
                                 key={run.id}
                                 {...getRowProps(index)}
