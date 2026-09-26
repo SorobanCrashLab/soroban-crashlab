@@ -193,7 +193,10 @@ pub use seed_novelty::{
     DiscoveryBenchmark, NoveltyPrioritizer, SeedNoveltyCandidate, benchmark_novelty_discovery,
 };
 pub mod stale_detector;
-pub use stale_detector::{StaleDetectorConfig, StaleRunDetector, StaleStatus};
+pub use stale_detector::{
+    Heartbeat, RunDirLock, StaleDetectorConfig, StaleRunDetector, StaleStatus,
+    is_heartbeat_alive, read_heartbeat, write_heartbeat, write_heartbeat_at,
+};
 
 pub mod worker_partition;
 pub use worker_partition::{WorkerPartition, WorkerPartitionError, worker_for_seed};

@@ -129,6 +129,133 @@ fn recovery_hint(stale_ms: u64) -> String {
     }
 }
 
+pub const HEARTBEAT_FILE_NAME: &str = "heartbeat.json";
+pub const LOCK_FILE_NAME: &str = "run.lock";
+pub const SWEEP_MARK_FILE_NAME: &str = ".sweep-mark";
+
+/// Live heartbeat state persisted on disk in an active run directory.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Heartbeat {
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub pid: u32,
+}
+
+impl Heartbeat {
+    pub fn now() -> Self {
+        Self {
+            timestamp: chrono::Utc::now(),
+            pid: std::process::id(),
+        }
+    }
+}
+
+/// Writes a fresh heartbeat file into the target directory.
+pub fn write_heartbeat(dir: &std::path::Path) -> std::io::Result<()> {
+    let hb = Heartbeat::now();
+    let bytes = serde_json::to_vec_pretty(&hb)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    std::fs::write(dir.join(HEARTBEAT_FILE_NAME), bytes)
+}
+
+/// Writes a heartbeat with an explicit timestamp into the target directory.
+pub fn write_heartbeat_at(dir: &std::path::Path, timestamp: chrono::DateTime<chrono::Utc>) -> std::io::Result<()> {
+    let hb = Heartbeat {
+        timestamp,
+        pid: std::process::id(),
+    };
+    let bytes = serde_json::to_vec_pretty(&hb)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    std::fs::write(dir.join(HEARTBEAT_FILE_NAME), bytes)
+}
+
+/// Reads the heartbeat file from the target directory if present.
+pub fn read_heartbeat(dir: &std::path::Path) -> Option<Heartbeat> {
+    let path = dir.join(HEARTBEAT_FILE_NAME);
+    if let Ok(bytes) = std::fs::read(&path) {
+        if let Ok(hb) = serde_json::from_slice::<Heartbeat>(&bytes) {
+            return Some(hb);
+        }
+    }
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if let Ok(mtime) = meta.modified() {
+            let dur = mtime.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+            return Some(Heartbeat {
+                timestamp: chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH + dur),
+                pid: 0,
+            });
+        }
+    }
+    None
+}
+
+/// Checks whether a run has a live heartbeat within the given TTL threshold.
+pub fn is_heartbeat_alive(dir: &std::path::Path, ttl: chrono::Duration, now: chrono::DateTime<chrono::Utc>) -> bool {
+    if let Some(hb) = read_heartbeat(dir) {
+        let age = now.signed_duration_since(hb.timestamp);
+        if age <= ttl && age >= -chrono::Duration::seconds(5) {
+            return true;
+        }
+    }
+    false
+}
+
+/// RAII advisory lock for a run directory to coordinate between active workers and sweepers.
+pub struct RunDirLock {
+    lock_path: std::path::PathBuf,
+}
+
+impl RunDirLock {
+    /// Attempts to acquire an exclusive advisory lock file in `dir`.
+    /// Returns `Some(RunDirLock)` if acquired, or `None` if already locked by a living process.
+    pub fn try_acquire(dir: &std::path::Path) -> std::io::Result<Option<Self>> {
+        let lock_path = dir.join(LOCK_FILE_NAME);
+        if lock_path.exists() {
+            if let Ok(contents) = std::fs::read_to_string(&lock_path) {
+                if let Ok(pid) = contents.trim().parse::<u32>() {
+                    if is_process_alive(pid) {
+                        return Ok(None);
+                    }
+                }
+            }
+        }
+
+        std::fs::write(&lock_path, format!("{}\n", std::process::id()))?;
+        Ok(Some(Self { lock_path }))
+    }
+
+    /// Releases the lock explicitly.
+    pub fn release(self) {
+        // Drop cleans up lock file
+    }
+}
+
+impl Drop for RunDirLock {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.lock_path);
+    }
+}
+
+/// Checks whether a process with `pid` is currently alive.
+fn is_process_alive(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    if pid == std::process::id() {
+        return true;
+    }
+    #[cfg(unix)]
+    {
+        extern "C" {
+            fn kill(pid: i32, sig: i32) -> i32;
+        }
+        unsafe { kill(pid as i32, 0) == 0 }
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,5 +334,42 @@ mod tests {
             detector.check_with_elapsed(StdDuration::from_millis(999)),
             StaleStatus::Ok
         );
+    }
+
+    #[test]
+    fn heartbeat_write_and_read_roundtrip() {
+        let tmp = std::env::temp_dir().join(format!("crashlab-hb-test-{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).expect("create tmp dir");
+
+        write_heartbeat(&tmp).expect("write heartbeat");
+        let hb = read_heartbeat(&tmp).expect("read heartbeat");
+        assert_eq!(hb.pid, std::process::id());
+
+        let now = chrono::Utc::now();
+        assert!(is_heartbeat_alive(&tmp, chrono::Duration::seconds(10), now));
+        assert!(!is_heartbeat_alive(&tmp, chrono::Duration::seconds(10), now + chrono::Duration::seconds(20)));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn run_dir_lock_exclusive() {
+        let tmp = std::env::temp_dir().join(format!("crashlab-lock-test-{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).expect("create tmp dir");
+
+        let lock1 = RunDirLock::try_acquire(&tmp).expect("acquire lock 1");
+        assert!(lock1.is_some());
+
+        // Second acquisition attempt should detect process is alive and return None
+        let lock2 = RunDirLock::try_acquire(&tmp).expect("acquire lock 2");
+        assert!(lock2.is_none());
+
+        drop(lock1);
+
+        // After dropping, acquisition succeeds again
+        let lock3 = RunDirLock::try_acquire(&tmp).expect("acquire lock 3");
+        assert!(lock3.is_some());
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

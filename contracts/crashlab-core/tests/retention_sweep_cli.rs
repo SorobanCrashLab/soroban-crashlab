@@ -9,12 +9,15 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 fn unique_tmp() -> PathBuf {
+    let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let n = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("time")
         .as_nanos();
-    std::env::temp_dir().join(format!("crashlab-retention-sweep-{n}"))
+    std::env::temp_dir().join(format!("crashlab-retention-sweep-{}-{}-{}", std::process::id(), n, count))
 }
 
 fn make_checkpoint(campaign_id: &str, next_seed_index: usize, total_seeds: usize) -> RunCheckpoint {
@@ -245,4 +248,207 @@ fn retention_sweep_rejects_extra_arguments() {
         "expected failure for extra arguments, got {:?}",
         output.status
     );
+}
+
+#[test]
+fn retention_sweep_preserves_directory_with_live_heartbeat() {
+    use filetime::FileTime;
+    use crashlab_core::stale_detector::write_heartbeat;
+
+    let base = unique_tmp();
+    let policy = RetentionPolicy::default();
+    let max_checkpoints = policy.max_checkpoints_per_campaign;
+    let total_runs = max_checkpoints + 2;
+
+    let thirty_days_ago = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("time")
+        .as_secs()
+        - 30 * 24 * 3600;
+
+    for i in 0..total_runs {
+        let cp = make_checkpoint("camp-hb", i * 10, 500);
+        write_checkpoint(&base, i as u64, &cp);
+
+        let cp_path = base.join("runs").join(i.to_string()).join("checkpoint.json");
+        let old_time = FileTime::from_unix_time(thirty_days_ago as i64, 0);
+        filetime::set_file_mtime(&cp_path, old_time).expect("set mtime");
+    }
+
+    // Write a live heartbeat in run 0 (which would otherwise be pruned as an older/excess checkpoint)
+    let live_run_dir = base.join("runs").join("0");
+    write_heartbeat(&live_run_dir).expect("write heartbeat");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_crashlab"))
+        .env("CRASHLAB_STATE_DIR", &base)
+        .args(["retention", "sweep"])
+        .output()
+        .expect("run crashlab binary");
+
+    assert!(
+        output.status.success(),
+        "expected success, status {:?}\nstderr: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("live heartbeat detected"),
+        "expected live heartbeat log in stdout: {stdout}"
+    );
+
+    // Verify run 0 is preserved on disk
+    assert!(
+        live_run_dir.exists(),
+        "run directory with live heartbeat must not be deleted"
+    );
+
+    let _ = fs::remove_dir_all(&base);
+}
+
+#[test]
+fn retention_sweep_preserves_directory_with_advisory_lock() {
+    use filetime::FileTime;
+    use crashlab_core::stale_detector::RunDirLock;
+
+    let base = unique_tmp();
+    let policy = RetentionPolicy::default();
+    let max_checkpoints = policy.max_checkpoints_per_campaign;
+    let total_runs = max_checkpoints + 2;
+
+    let thirty_days_ago = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("time")
+        .as_secs()
+        - 30 * 24 * 3600;
+
+    for i in 0..total_runs {
+        let cp = make_checkpoint("camp-lock", i * 10, 500);
+        write_checkpoint(&base, i as u64, &cp);
+
+        let cp_path = base.join("runs").join(i.to_string()).join("checkpoint.json");
+        let old_time = FileTime::from_unix_time(thirty_days_ago as i64, 0);
+        filetime::set_file_mtime(&cp_path, old_time).expect("set mtime");
+    }
+
+    let locked_run_dir = base.join("runs").join("0");
+    let lock = RunDirLock::try_acquire(&locked_run_dir).expect("acquire lock");
+    assert!(lock.is_some());
+
+    let output = Command::new(env!("CARGO_BIN_EXE_crashlab"))
+        .env("CRASHLAB_STATE_DIR", &base)
+        .args(["retention", "sweep"])
+        .output()
+        .expect("run crashlab binary");
+
+    assert!(
+        output.status.success(),
+        "expected success, status {:?}\nstderr: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("advisory lock held"),
+        "expected lock held log in stdout: {stdout}"
+    );
+
+    assert!(
+        locked_run_dir.exists(),
+        "locked run directory must not be deleted"
+    );
+
+    drop(lock);
+    let _ = fs::remove_dir_all(&base);
+}
+
+#[test]
+fn retention_sweep_prunes_stale_heartbeat() {
+    use filetime::FileTime;
+    use crashlab_core::stale_detector::write_heartbeat_at;
+
+    let base = unique_tmp();
+    let policy = RetentionPolicy::default();
+    let max_checkpoints = policy.max_checkpoints_per_campaign;
+    let total_runs = max_checkpoints + 2;
+
+    let thirty_days_ago = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("time")
+        .as_secs()
+        - 30 * 24 * 3600;
+
+    for i in 0..total_runs {
+        let cp = make_checkpoint("camp-stale-hb", i * 10, 500);
+        write_checkpoint(&base, i as u64, &cp);
+
+        let cp_path = base.join("runs").join(i.to_string()).join("checkpoint.json");
+        let old_time = FileTime::from_unix_time(thirty_days_ago as i64, 0);
+        filetime::set_file_mtime(&cp_path, old_time).expect("set mtime");
+    }
+
+    // Write a stale heartbeat (10 minutes ago, TTL is 60s)
+    let stale_time = chrono::Utc::now() - chrono::Duration::minutes(10);
+    let stale_run_dir = base.join("runs").join("0");
+    write_heartbeat_at(&stale_run_dir, stale_time).expect("write stale heartbeat");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_crashlab"))
+        .env("CRASHLAB_STATE_DIR", &base)
+        .args(["retention", "sweep"])
+        .output()
+        .expect("run crashlab binary");
+
+    assert!(output.status.success());
+    assert!(
+        !stale_run_dir.exists(),
+        "run directory with expired heartbeat should be pruned"
+    );
+
+    let _ = fs::remove_dir_all(&base);
+}
+
+#[test]
+fn retention_sweep_dry_run_preserves_directories() {
+    use filetime::FileTime;
+
+    let base = unique_tmp();
+    let policy = RetentionPolicy::default();
+    let max_checkpoints = policy.max_checkpoints_per_campaign;
+    let total_runs = max_checkpoints + 2;
+
+    let thirty_days_ago = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("time")
+        .as_secs()
+        - 30 * 24 * 3600;
+
+    for i in 0..total_runs {
+        let cp = make_checkpoint("camp-dry", i * 10, 500);
+        write_checkpoint(&base, i as u64, &cp);
+
+        let cp_path = base.join("runs").join(i.to_string()).join("checkpoint.json");
+        let old_time = FileTime::from_unix_time(thirty_days_ago as i64, 0);
+        filetime::set_file_mtime(&cp_path, old_time).expect("set mtime");
+    }
+
+    let output = Command::new(env!("CARGO_BIN_EXE_crashlab"))
+        .env("CRASHLAB_STATE_DIR", &base)
+        .args(["retention", "sweep", "--dry-run"])
+        .output()
+        .expect("run crashlab binary");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("(dry-run)"));
+
+    let runs_dir = base.join("runs");
+    let remaining = fs::read_dir(&runs_dir)
+        .expect("read runs dir")
+        .filter(|e| e.as_ref().map(|d| d.path().is_dir()).unwrap_or(false))
+        .count();
+    assert_eq!(remaining, total_runs, "dry run must not delete directories");
+
+    let _ = fs::remove_dir_all(&base);
 }
