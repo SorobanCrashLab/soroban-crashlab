@@ -37,10 +37,6 @@ export const nextConfig: NextConfig = {
           value: "SAMEORIGIN",
         },
         {
-          key: "X-XSS-Protection",
-          value: "1; mode=block",
-        },
-        {
           key: "Referrer-Policy",
           value: "strict-origin-when-cross-origin",
         },
@@ -50,7 +46,7 @@ export const nextConfig: NextConfig = {
         },
         {
           key: "Strict-Transport-Security",
-          value: "max-age=31536000; includeSubDomains",
+          value: "max-age=63072000; includeSubDomains; preload",
         },
         {
           key: "Content-Security-Policy",
