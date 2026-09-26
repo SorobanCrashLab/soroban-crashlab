@@ -51,7 +51,12 @@ export interface BundleManifest {
 }
 
 export interface BuildBundleOptions {
-    /** Timestamp recorded in the manifest. Defaults to now. */
+    /**
+     * Timestamp recorded in the manifest and in `metadata.downloadedAt`.
+     * Defaults to now; pass a fixed date to get byte-identical output for the
+     * same run, which is what makes the worker and main-thread paths
+     * interchangeable.
+     */
     generatedAt?: Date;
 }
 
@@ -107,7 +112,7 @@ export function buildRunBundleFiles(
     options: BuildBundleOptions = {},
 ): ZipEntry[] {
     const generatedAt = options.generatedAt ?? new Date();
-    const artifacts = collectRunArtifacts(run, ledgerChanges);
+    const artifacts = collectRunArtifacts(run, ledgerChanges, { downloadedAt: generatedAt });
 
     const payloads: ZipEntry[] = [
         { path: 'metadata.json', content: JSON.stringify(artifacts.metadata, null, 2) },
@@ -148,6 +153,10 @@ export function buildRunArtifactZipFilename(runId: string, generatedAt: Date = n
  *
  * Async so callers can keep their loading state while the archive is built, and
  * so the signature survives a future move to a compressed writer.
+ *
+ * Builds on the calling thread: prefer {@link generateRunArtifactZipWithProgress}
+ * from `artifact-zip-worker`, which hands the work to a Web Worker with a
+ * fallback to this path for environments without one.
  */
 export async function generateRunArtifactZip(
     run: FuzzingRun,

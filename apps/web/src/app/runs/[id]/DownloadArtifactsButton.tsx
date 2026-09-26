@@ -1,7 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { buildRunArtifactZipFilename, generateRunArtifactZip } from '../../utils/artifact-zip';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ZipBundleCancelledError,
+  generateRunArtifactZipWithProgress,
+  type ZipBundleProgress,
+} from '../../utils/artifact-zip-worker';
+import { registerZipWorker } from '../../utils/zip-worker-factory';
 import { triggerBrowserDownload } from '../../utils/browser-download';
 import type { FuzzingRun, LedgerStateChange } from '../../types';
 
@@ -17,20 +22,56 @@ export default function DownloadArtifactsButton({
   ledgerChanges,
 }: DownloadArtifactsButtonProps) {
   const [state, setState] = useState<DownloadState>('idle');
+  const [progress, setProgress] = useState<ZipBundleProgress | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Register the bundling worker on mount. Only the browser can construct one,
+  // and registration itself is synchronous, so a pre-render pass is unaffected.
+  useEffect(() => {
+    registerZipWorker();
+  }, []);
+
+  // Abandon an in-flight bundle if the user navigates away mid-export.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const handleDownload = async () => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setProgress(null);
     setState('loading');
+
     try {
-      const zipBlob = await generateRunArtifactZip(run, ledgerChanges);
-      triggerBrowserDownload(zipBlob, buildRunArtifactZipFilename(run.id));
+      // Bundling runs in a Web Worker, so this never blocks the main thread and
+      // the page stays responsive while a large run is exported.
+      const bundle = await generateRunArtifactZipWithProgress(run, ledgerChanges, {
+        signal: controller.signal,
+        onProgress: setProgress,
+      });
+
+      triggerBrowserDownload(bundle.blob, bundle.filename);
       setState('idle');
-    } catch {
-      setState('error');
+    } catch (error) {
+      // Cancelling is a user decision, not a failure: return to idle silently.
+      setState(error instanceof ZipBundleCancelledError ? 'idle' : 'error');
+    } finally {
+      abortRef.current = null;
+      setProgress(null);
     }
+  };
+
+  const handleCancel = () => {
+    abortRef.current?.abort();
   };
 
   const isLoading = state === 'loading';
   const isError = state === 'error';
+
+  const total = progress?.total ?? 0;
+  const percent = total > 0 ? Math.min(100, Math.round(((progress?.completed ?? 0) / total) * 100)) : 0;
+  const progressLabel =
+    progress?.phase === 'collect' && progress.currentFile
+      ? `Collecting ${progress.currentFile}`
+      : 'Assembling archive';
 
   return (
     <div className="flex flex-col items-start gap-1">
@@ -114,7 +155,36 @@ export default function DownloadArtifactsButton({
           </>
         )}
       </button>
-      {isError ? (
+
+      {isLoading ? (
+        <div className="w-full max-w-xs">
+          <div
+            role="progressbar"
+            aria-label="Artifact bundle progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+            className="h-1.5 w-full overflow-hidden rounded-full bg-green-200 dark:bg-green-900"
+          >
+            <div
+              className="h-full bg-green-600 transition-[width] duration-200 dark:bg-green-500"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs opacity-80" aria-live="polite">
+              {progressLabel} ({percent}%)
+            </span>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="text-xs font-medium underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : isError ? (
         <p role="alert" className="text-xs text-red-600 dark:text-red-400">
           Download failed. Check your browser permissions and try again.
         </p>
