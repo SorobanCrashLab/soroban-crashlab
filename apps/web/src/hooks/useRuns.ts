@@ -64,11 +64,21 @@ export function useRuns(options: UseRunsOptions = {}): UseRunsResult {
     cacheTime = DEFAULT_CACHE_TIME,
   } = options;
 
-  const cached = getCached();
-  // eslint-disable-next-line react-hooks/purity
-  const hasCache = Boolean(cached && Date.now() - cached.timestamp < cacheTime);
-  const initialRuns = initialData.length > 0 ? initialData : hasCache ? cached!.runs : [];
-  const initialTotal = initialData.length > 0 ? initialData.length : hasCache ? cached!.total : 0;
+  // Render must stay pure: no clock reads and no cache mutation. The module
+  // cache is snapshotted exactly once per mount through a lazy initializer, so
+  // every re-render of this component observes the same entry. That keeps
+  // repeated renders of one tree consistent (React 19 concurrent rendering can
+  // re-run render, and results that differ per attempt cause tearing) and it
+  // removes the need for a `react-hooks/purity` suppression.
+  //
+  // Freshness is decided in effects and callbacks instead — see `isStale` in
+  // the revalidation effect below and the `cacheTime` eviction effect at the
+  // bottom of this hook. Neither the `pollInterval` effect nor the revalidation
+  // effect depends on the render-phase read that was removed here.
+  const [cacheSnapshot] = useState<CacheEntry | undefined>(() => getCached());
+  const hasCache = cacheSnapshot !== undefined;
+  const initialRuns = initialData.length > 0 ? initialData : hasCache ? cacheSnapshot!.runs : [];
+  const initialTotal = initialData.length > 0 ? initialData.length : hasCache ? cacheSnapshot!.total : 0;
 
   const [runs, setRuns] = useState<FuzzingRun[]>(initialRuns);
   const [total, setTotal] = useState<number>(initialTotal);
