@@ -15,6 +15,7 @@ import { NextSSRPlugin } from "@uploadthing/react/next-ssr-plugin";
 import { extractRouterConfig } from "uploadthing/server";
 import { crashlabFileRouter } from "./api/uploadthing/core";
 import { SentryClientBootstrap } from "../components/SentryClientBootstrap";
+import { generateThemeBootstrapScript } from "./theme-provider-utils";
 export const metadata: Metadata = {
   title: "Soroban CrashLab | Smart Contract Fuzzing Platform",
   description:
@@ -51,7 +52,7 @@ export default function RootLayout({
     <html lang="en" className={fontVariables} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{
-          __html: `\n            try {\n              var t = localStorage.getItem('crashlab:theme');\n              var d = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);\n              document.documentElement.classList.toggle('dark', d);\n              var a = null;\n              try { a = JSON.parse(localStorage.getItem('crashlab:accessibility-prefs:v1') || 'null'); } catch(e) {}\n              var motion = a && a.motion;\n              var osReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;\n              if (motion === 'reduced' || (!motion || motion === 'system') && osReduced) document.documentElement.setAttribute('data-motion', 'reduced');\n              var scale = a && a.textScale;\n              var allowed = [100,112,125,150];\n              if (allowed.indexOf(scale) === -1) scale = 100;\n              document.documentElement.setAttribute('data-text-scale', String(scale));\n              document.documentElement.style.fontSize = ((16 * scale) / 100) + 'px';\n              if (a && a.contrast === 'high') document.documentElement.classList.add('high-contrast');\n            } catch(e) {}\n            document.documentElement.classList.add('theme-ready');\n          ` }} />
+          __html: `\n            try {\n              ${generateThemeBootstrapScript()}\n              var a = null;\n              try { a = JSON.parse(localStorage.getItem('crashlab:accessibility-prefs:v1') || 'null'); } catch(e) {}\n              var motion = a && a.motion;\n              var osReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;\n              if (motion === 'reduced' || (!motion || motion === 'system') && osReduced) document.documentElement.setAttribute('data-motion', 'reduced');\n              var scale = a && a.textScale;\n              var allowed = [100,112,125,150];\n              if (allowed.indexOf(scale) === -1) scale = 100;\n              document.documentElement.setAttribute('data-text-scale', String(scale));\n              document.documentElement.style.fontSize = ((16 * scale) / 100) + 'px';\n              if (a && a.contrast === 'high') document.documentElement.classList.add('high-contrast');\n            } catch(e) {}\n            document.documentElement.classList.add('theme-ready');\n          ` }} />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon/192x192/favicon.svg" type="image/svg+xml" sizes="192x192" />
         <link rel="apple-touch-icon" href="/favicon/180x180/favicon.svg" />
