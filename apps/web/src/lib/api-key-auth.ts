@@ -11,6 +11,15 @@ export function getConfiguredApiKey(): string | undefined {
 }
 
 /**
+ * Checks if unauthenticated webhooks are explicitly allowed via escape hatch.
+ * This should ONLY be used for local development.
+ */
+function isUnauthenticatedWebhooksAllowed(): boolean {
+  const allow = process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
+  return allow === '1' || allow === 'true';
+}
+
+/**
  * Extracts a Bearer token from an `Authorization: Bearer <token>` header.
  * Returns undefined when the header is absent or malformed.
  */
@@ -50,14 +59,54 @@ export function timingSafeStringEqual(a: string, b: string): boolean {
  * Validates the `Authorization: Bearer <key>` header on the request against
  * the configured `CRASHLAB_WEBHOOK_API_KEY` environment variable.
  *
- * - When no API key is configured in the environment the request is allowed
- *   through so existing deployments without the env var are unaffected.
+ * - When no API key is configured in the environment:
+ *   - Mutating requests (POST, PUT, PATCH, DELETE) are rejected with 503 unless
+ *     `CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS=1` is set (local dev only).
+ *   - Non-mutating requests (GET) pass through for backward compatibility.
  * - When an API key IS configured the caller must supply a matching Bearer
  *   token; mismatches or absent headers are rejected with 401.
  *
- * Returns undefined when authentication passes (or is unconfigured), or a
- * NextResponse with status 401 when it fails.
+ * Returns undefined when authentication passes, or a NextResponse with status
+ * 401 (invalid/missing token) or 503 (auth not configured) when it fails.
  */
+export function validateWebhookApiKey(request: NextRequest): NextResponse | undefined {
+  const configuredKey = getConfiguredApiKey();
+
+  // No key configured — authentication is enforced for mutating requests by default (fail-closed).
+  if (configuredKey === undefined) {
+    const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method.toUpperCase());
+    if (isMutating && !isUnauthenticatedWebhooksAllowed()) {
+      return NextResponse.json(
+        {
+          error:
+            'Webhook authentication is not configured. Set CRASHLAB_WEBHOOK_API_KEY to enable mutating webhook endpoints, or set CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS=1 for local development only.',
+          code: 'WEBHOOK_AUTH_NOT_CONFIGURED',
+        },
+        { status: 503 },
+      );
+    }
+    return undefined;
+  }
+
+  const token = extractBearerToken(request);
+  if (token === undefined) {
+    return NextResponse.json(
+      { error: 'Authentication required. Provide a valid Authorization: Bearer <token> header.' },
+      { status: 401 },
+    );
+  }
+
+  if (!timingSafeStringEqual(token, configuredKey)) {
+    return NextResponse.json(
+      { error: 'Invalid API key.' },
+      { status: 401 },
+    );
+  }
+
+  // Authentication passed.
+  return undefined;
+}
+
 /**
  * Reads the configured metrics scrape token from the environment.
  * The token guards the Prometheus metrics/health endpoints so they can only
@@ -100,33 +149,6 @@ export function validateMetricsScrapeAuth(request: NextRequest): NextResponse | 
   if (!timingSafeStringEqual(token, configuredToken)) {
     return NextResponse.json(
       { error: 'Invalid scrape token.' },
-      { status: 401 },
-    );
-  }
-
-  // Authentication passed.
-  return undefined;
-}
-
-export function validateWebhookApiKey(request: NextRequest): NextResponse | undefined {
-  const configuredKey = getConfiguredApiKey();
-
-  // No key configured — authentication is not enforced.
-  if (configuredKey === undefined) {
-    return undefined;
-  }
-
-  const token = extractBearerToken(request);
-  if (token === undefined) {
-    return NextResponse.json(
-      { error: 'Authentication required. Provide a valid Authorization: Bearer <token> header.' },
-      { status: 401 },
-    );
-  }
-
-  if (!timingSafeStringEqual(token, configuredKey)) {
-    return NextResponse.json(
-      { error: 'Invalid API key.' },
       { status: 401 },
     );
   }
@@ -207,4 +229,3 @@ export function validateScopedApiToken(
 
   return undefined;
 }
-

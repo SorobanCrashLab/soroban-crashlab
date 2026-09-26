@@ -61,7 +61,7 @@ describe('POST /api/webhooks/retry (#1635)', () => {
     vi.stubGlobal('fetch', fetchSpy);
     await RETRY(retryRequest(FAILED_ID) as never);
 
-    const res = await RECOVERY();
+    const res = await RECOVERY(retryRequest(FAILED_ID) as never);
 
     expect(res.status).toBe(200);
     const data = await readData<{ retries: { outcomes: Array<{ jobId: string; outcome: string }> } }>(res);
@@ -76,7 +76,7 @@ describe('POST /api/webhooks/retry (#1635)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('down', { status: 503 })));
     await RETRY(retryRequest(FAILED_ID) as never);
 
-    await RECOVERY();
+    await RECOVERY(retryRequest(FAILED_ID) as never);
 
     const item = getDeliveryHistoryStore().find((candidate) => candidate.id === FAILED_ID);
     expect(item?.status).toBe('queued');
@@ -86,5 +86,58 @@ describe('POST /api/webhooks/retry (#1635)', () => {
   it('rejects a missing id and an unknown delivery', async () => {
     expect((await RETRY(retryRequest('') as never)).status).toBe(400);
     expect((await RETRY(retryRequest('nope') as never)).status).toBe(404);
+  });
+
+  describe('authentication behavior', () => {
+    let originalKey: string | undefined;
+    let originalAllow: string | undefined;
+
+    beforeEach(() => {
+      originalKey = process.env.CRASHLAB_WEBHOOK_API_KEY;
+      originalAllow = process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
+    });
+
+    afterEach(() => {
+      if (originalKey === undefined) delete process.env.CRASHLAB_WEBHOOK_API_KEY;
+      else process.env.CRASHLAB_WEBHOOK_API_KEY = originalKey;
+      if (originalAllow === undefined) delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
+      else process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS = originalAllow;
+    });
+
+    it('rejects with 503 when API key is unset and no escape hatch', async () => {
+      delete process.env.CRASHLAB_WEBHOOK_API_KEY;
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
+      const res = await RETRY(retryRequest(FAILED_ID) as never);
+      expect(res.status).toBe(503);
+    });
+
+    it('allows when API key is unset but escape hatch is enabled', async () => {
+      delete process.env.CRASHLAB_WEBHOOK_API_KEY;
+      process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS = '1';
+      const res = await RETRY(retryRequest(FAILED_ID) as never);
+      expect(res.status).toBe(202);
+    });
+
+    it('rejects with 401 when API key is configured and header is missing', async () => {
+      process.env.CRASHLAB_WEBHOOK_API_KEY = 'secret-key';
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
+      const res = await RETRY(retryRequest(FAILED_ID) as never);
+      expect(res.status).toBe(401);
+    });
+
+    it('allows when API key is configured and correct token is provided', async () => {
+      process.env.CRASHLAB_WEBHOOK_API_KEY = 'secret-key';
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
+      const req = new Request('http://t/api/webhooks/retry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer secret-key',
+        },
+        body: JSON.stringify({ id: FAILED_ID }),
+      });
+      const res = await RETRY(req as never);
+      expect(res.status).toBe(202);
+    });
   });
 });
