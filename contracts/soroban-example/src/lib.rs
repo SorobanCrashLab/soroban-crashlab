@@ -381,7 +381,6 @@ impl TokenContract {
         if current_allowance < amount {
             return Err(ContractError::InsufficientAllowance);
         }
-
         allowances.set(
             (from.clone(), spender),
             current_allowance
@@ -401,7 +400,6 @@ impl TokenContract {
         if from_balance < amount {
             return Err(ContractError::InsufficientBalance);
         }
-        
         balances.set(
             from.clone(),
             from_balance
