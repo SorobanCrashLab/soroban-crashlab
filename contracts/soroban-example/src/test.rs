@@ -21,6 +21,19 @@ fn test_initialize() {
 }
 
 #[test]
+fn test_initialize_requires_admin_authorization() {
+    let env = Env::default();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+
+    assert!(client.try_initialize(&admin, &1000).is_err());
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000);
+    assert_eq!(client.balance(&admin), 1000);
+}
+
+#[test]
 fn test_initialize_twice() {
     let env = Env::default();
     env.mock_all_auths();
@@ -31,6 +44,23 @@ fn test_initialize_twice() {
     assert_eq!(
         client.try_initialize(&admin, &1000),
         Err(Ok(ContractError::AlreadyInitialized))
+    );
+}
+
+#[test]
+fn test_initialize_rejects_nonpositive_supply() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+
+    assert_eq!(
+        client.try_initialize(&admin, &0),
+        Err(Ok(ContractError::InvalidAmount))
+    );
+    assert_eq!(
+        client.try_initialize(&admin, &-100),
+        Err(Ok(ContractError::InvalidAmount))
     );
 }
 

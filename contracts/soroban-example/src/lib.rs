@@ -19,8 +19,8 @@ pub enum ContractError {
     NotInitialized = 2,
     /// The caller is not the admin.
     Unauthorized = 3,
-    /// The transfer / mint / burn amount must be strictly positive;
-    /// or the approve amount must be non-negative.
+    /// An amount that must be positive is zero or negative, or an approve
+    /// amount is negative.
     InvalidAmount = 4,
     /// The sender does not have enough tokens.
     InsufficientBalance = 5,
@@ -41,8 +41,14 @@ impl TokenContract {
         admin: Address,
         total_supply: i128,
     ) -> Result<(), ContractError> {
+        admin.require_auth();
+
         if env.storage().persistent().has(&symbol_short!("Init")) {
             return Err(ContractError::AlreadyInitialized);
+        }
+
+        if total_supply <= 0 {
+            return Err(ContractError::InvalidAmount);
         }
 
         env.storage()
