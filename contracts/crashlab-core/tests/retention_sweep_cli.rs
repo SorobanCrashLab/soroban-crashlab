@@ -1,9 +1,7 @@
-use crashlab_core::{
-    LocalArtifactStore, ArtifactStore, RetentionPolicy, RunCheckpoint,
-    to_bundle, CaseSeed,
-};
 use crashlab_core::bundle_persist::CaseBundleDocument;
-use crashlab_core::checkpoint::RUN_CHECKPOINT_SCHEMA_VERSION;
+use crashlab_core::{
+    to_bundle, ArtifactStore, CaseSeed, LocalArtifactStore, RetentionPolicy, RunCheckpoint,
+};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -18,12 +16,10 @@ fn unique_tmp() -> PathBuf {
 }
 
 fn make_checkpoint(campaign_id: &str, next_seed_index: usize, total_seeds: usize) -> RunCheckpoint {
-    RunCheckpoint {
-        schema: RUN_CHECKPOINT_SCHEMA_VERSION,
-        campaign_id: campaign_id.to_string(),
-        next_seed_index,
-        total_seeds,
-    }
+    let mut checkpoint = RunCheckpoint::new_run(campaign_id, &[]);
+    checkpoint.next_seed_index = next_seed_index;
+    checkpoint.total_seeds = total_seeds;
+    checkpoint
 }
 
 fn write_checkpoint(dir: &PathBuf, run_id: u64, checkpoint: &RunCheckpoint) {

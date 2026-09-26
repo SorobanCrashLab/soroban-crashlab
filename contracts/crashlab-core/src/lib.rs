@@ -1,18 +1,18 @@
 pub mod auth_matrix;
 pub mod cors;
-pub mod health;
-pub mod prng;
-pub mod reproducer;
-pub mod retry;
-pub mod signature_hash;
-pub mod taxonomy;
-pub mod regression_group;
 pub mod fixture;
 pub mod fixture_classifier;
-pub mod suite_runner;
+pub mod health;
+pub mod prng;
+pub mod regression_group;
+pub mod reproducer;
+pub mod retry;
 pub mod runner;
+pub mod signature_hash;
+pub mod suite_runner;
+pub mod taxonomy;
 
-pub use runner::{ContractRunner, RunnerError, RunnerCreationError, create_runner, MockRunner};
+pub use runner::{create_runner, ContractRunner, MockRunner, RunnerCreationError, RunnerError};
 
 #[cfg(feature = "host-runner")]
 pub mod host_runner;
@@ -23,8 +23,8 @@ pub mod rpc_runner;
 #[cfg(not(feature = "rpc-runner"))]
 mod rpc_runner_stub {
     //! Stub module when rpc-runner feature is not enabled.
-    use crate::{CaseSeed, CrashSignature};
     use crate::runner::RunnerError;
+    use crate::{CaseSeed, CrashSignature};
 
     pub struct RpcContractRunner;
 
@@ -72,46 +72,46 @@ mod rpc_runner_stub {
 }
 
 pub use auth_matrix::{
-    AuthMode, MatrixReport, ModeResult, collect_mismatched, format_mismatch_summary, run_matrix,
-    run_matrix_for_seeds,
+    collect_mismatched, format_mismatch_summary, run_matrix, run_matrix_for_seeds, AuthMode,
+    MatrixReport, ModeResult,
 };
 pub use cors::{
     evaluate_cors, CorsConfig, CorsError, CorsEvaluation, HttpMethod, OriginAllowlist,
     OriginPattern,
 };
+pub use fixture::RegressionFixture;
+pub use fixture_classifier::{classify_and_wrap_fixture, classify_fixture};
 pub use health::{
     FailureMetrics, HealthMonitor, HealthStatus, HealthSummary, QueueMetrics, ThroughputMetrics,
 };
 pub use prng::{PrngMutator, RandomizeMutator, SeededPrng};
-pub use reproducer::{
-    FlakyDetector, ReproReport, StabilityVerdict, filter_ci_pack, shrink_bundle_payload,
-    shrink_seed_preserving_signature,
-};
-pub use retry::{RetryConfig, SimulationError, execute_with_retry};
-pub use signature_hash::{SignatureHasher, hash_category_payload};
-pub use taxonomy::{
-    FailureClass, classify_failure, group_by_class, stable_failure_class_for_bundle,
-};
-pub use taxonomy::crash_signature_from_seed;
 pub use regression_group::RegressionGroup;
-pub use fixture::RegressionFixture;
-pub use fixture_classifier::{classify_fixture, classify_and_wrap_fixture};
-pub use suite_runner::{GroupSummary, GroupStats, SuiteRunnerConfig};
+pub use reproducer::{
+    filter_ci_pack, shrink_bundle_payload, shrink_seed_preserving_signature, FlakyDetector,
+    ReproReport, StabilityVerdict,
+};
+pub use retry::{execute_with_retry, RetryConfig, SimulationError};
+pub use signature_hash::{hash_category_payload, SignatureHasher};
+pub use suite_runner::{GroupStats, GroupSummary, SuiteRunnerConfig};
+pub use taxonomy::crash_signature_from_seed;
+pub use taxonomy::{
+    classify_failure, group_by_class, stable_failure_class_for_bundle, FailureClass,
+};
 
 #[cfg(feature = "host-runner")]
 pub use host_runner::HostContractRunner;
 
 #[cfg(feature = "rpc-runner")]
-pub use rpc_runner::{RpcContractRunner, RpcConfigError};
+pub use rpc_runner::{RpcConfigError, RpcContractRunner};
 
 #[cfg(not(feature = "rpc-runner"))]
-pub use rpc_runner_stub::{RpcContractRunner, RpcConfigError};
+pub use rpc_runner_stub::{RpcConfigError, RpcContractRunner};
 
 pub mod seed_validator;
 pub use seed_validator::{SeedSchema, SeedValidationError, Validate};
 
 pub mod havoc;
-pub use havoc::{HavocConfig, HavocMutator, HavocOp, apply_havoc_mutation, derive_seed_state};
+pub use havoc::{apply_havoc_mutation, derive_seed_state, HavocConfig, HavocMutator, HavocOp};
 
 pub mod scheduler;
 pub use scheduler::{Mutator, MutatorRegistry, SchedulerError, WeightedScheduler};
@@ -120,35 +120,37 @@ pub mod campaign_presets;
 pub use campaign_presets::{CampaignParameters, CampaignPreset, ParseCampaignPresetError};
 pub mod replay;
 pub use replay::{
-    ReplayError, ReplayResult, replay_mismatch_message, replay_seed_bundle,
-    replay_seed_bundle_json, replay_seed_bundle_path, replay_success_message,
+    replay_mismatch_message, replay_seed_bundle, replay_seed_bundle_json, replay_seed_bundle_path,
+    replay_success_message, ReplayError, ReplayResult,
 };
 
 pub mod env_fingerprint;
 pub use env_fingerprint::{
-    EnvironmentFingerprint, ReplayEnvironmentReport, check_bundle_replay_environment,
-    check_replay_environment,
+    check_bundle_replay_environment, check_replay_environment, EnvironmentFingerprint,
+    ReplayEnvironmentReport,
 };
 pub mod boundary;
-pub use boundary::{BoundaryMutator, generate_boundary_vectors};
+pub use boundary::{generate_boundary_vectors, BoundaryMutator};
 
 pub mod enum_flip;
-pub use enum_flip::{EnumVariantFlipMutator, is_invalid_enum_tag_payload};
+pub use enum_flip::{is_invalid_enum_tag_payload, EnumVariantFlipMutator};
 
 pub mod decimal_precision;
 pub use decimal_precision::{
-    DecimalBoundaryCase, DecimalPrecisionMutator, decimal_boundary_cases,
-    generate_decimal_precision_vectors,
+    decimal_boundary_cases, generate_decimal_precision_vectors, DecimalBoundaryCase,
+    DecimalPrecisionMutator,
 };
 
 pub mod bundle_persist;
 pub use bundle_persist::{
-    BundlePersistError, CASE_BUNDLE_SCHEMA_VERSION, CaseBundleDocument, SUPPORTED_BUNDLE_SCHEMAS,
     load_case_bundle_json, read_case_bundle_json, save_case_bundle_json, write_case_bundle_json,
+    BundlePersistError, CaseBundleDocument, CASE_BUNDLE_SCHEMA_VERSION, SUPPORTED_BUNDLE_SCHEMAS,
 };
 
 pub mod run_metadata;
-pub use run_metadata::{RunMetadata, MetadataPersistError, RUN_METADATA_SCHEMA_VERSION, SUPPORTED_METADATA_SCHEMAS};
+pub use run_metadata::{
+    MetadataPersistError, RunMetadata, RUN_METADATA_SCHEMA_VERSION, SUPPORTED_METADATA_SCHEMAS,
+};
 pub mod artifact_compress;
 pub use artifact_compress::{compress_artifact, decompress_artifact};
 
@@ -159,13 +161,13 @@ pub use artifact_storage::{
 
 pub mod fixture_compat;
 pub use fixture_compat::{
-    CompatReport, CompatWarning, check_bundle_fixtures, check_bundle_signature_hashes,
-    check_manifest_engine_schema, check_seed_fixtures, check_seed_sanitization,
+    check_bundle_fixtures, check_bundle_signature_hashes, check_manifest_engine_schema,
+    check_seed_fixtures, check_seed_sanitization, CompatReport, CompatWarning,
 };
 
 pub mod fixture_manifest;
 pub use fixture_manifest::{
-    FIXTURE_MANIFEST_SCHEMA_VERSION, FixtureManifest, FixtureMetadata, ManifestError,
+    FixtureManifest, FixtureMetadata, ManifestError, FIXTURE_MANIFEST_SCHEMA_VERSION,
 };
 
 pub mod fixture_linter;
@@ -175,36 +177,35 @@ pub use fixture_linter::{
 
 pub mod signature_comparison;
 pub use signature_comparison::{
-    ComparisonError, ComparisonMetrics, SignatureComparisonResult, SignatureInfo,
-    SignatureSnapshot, compare_signatures,
+    compare_signatures, ComparisonError, ComparisonMetrics, SignatureComparisonResult,
+    SignatureInfo, SignatureSnapshot,
 };
 
 pub mod fixture_sanitize;
 pub use fixture_sanitize::{
-    export_sanitized_scenario_json, export_sanitized_suite_json,
-    sanitize_and_validate_bundle, sanitize_bundle_document_for_sharing,
-    sanitize_bundle_for_sharing, sanitize_bundle_with_context, sanitize_payload_fragments,
-    sanitize_payload_with_context, sanitize_seed_for_sharing, sanitize_seed_with_context,
-    sanitized_failure_scenario, save_sanitized_case_bundle_json,
-    RedactionStrategy, SanitizationContext, SanitizationError, SanitizationReport,
-    SanitizationRule,
+    export_sanitized_scenario_json, export_sanitized_suite_json, sanitize_and_validate_bundle,
+    sanitize_bundle_document_for_sharing, sanitize_bundle_for_sharing,
+    sanitize_bundle_with_context, sanitize_payload_fragments, sanitize_payload_with_context,
+    sanitize_seed_for_sharing, sanitize_seed_with_context, sanitized_failure_scenario,
+    save_sanitized_case_bundle_json, RedactionStrategy, SanitizationContext, SanitizationError,
+    SanitizationReport, SanitizationRule,
 };
 
 pub mod checkpoint;
 pub use checkpoint::{
-    CheckpointError, RUN_CHECKPOINT_SCHEMA_VERSION, RunCheckpoint, load_run_checkpoint_json,
-    save_run_checkpoint_json,
+    load_run_checkpoint_json, save_run_checkpoint_json, CheckpointError, RunCheckpoint,
+    RUN_CHECKPOINT_SCHEMA_VERSION, SUPPORTED_RUN_CHECKPOINT_SCHEMAS,
 };
 
 pub mod corpus;
 pub use corpus::{
-    CORPUS_ARCHIVE_SCHEMA_VERSION, CorpusArchive, CorpusError, corpus_archive_from_seeds,
-    export_corpus_json, import_corpus_json,
+    corpus_archive_from_seeds, export_corpus_json, import_corpus_json, CorpusArchive, CorpusError,
+    CORPUS_ARCHIVE_SCHEMA_VERSION,
 };
 
 pub mod corpus_import;
 pub use corpus_import::{
-    CorpusImportError, CorpusImportResult, import_seeds, import_seeds_with_schema,
+    import_seeds, import_seeds_with_schema, CorpusImportError, CorpusImportResult,
 };
 
 pub mod retention;
@@ -212,34 +213,33 @@ pub use retention::{RetentionPolicy, RetentionRecord};
 
 pub mod scenario_export;
 pub use scenario_export::{
-    FailureScenario, derive_test_name, export_crash_report_markdown, export_failing_seed_json,
+    derive_test_name, export_crash_report_markdown, export_failing_seed_json,
     export_rust_regression_fixture, export_scenario_json, export_suite_json,
-    write_rust_regression_snippet,
+    write_rust_regression_snippet, FailureScenario,
 };
 
 pub mod regression_suite;
 pub use regression_suite::{
-    RegressionCaseResult, RegressionSuiteSummary, load_regression_suite_json, run_regression_suite,
-    run_regression_suite_from_json,
+    load_regression_suite_json, run_regression_suite, run_regression_suite_from_json,
+    RegressionCaseResult, RegressionSuiteSummary,
 };
 
 pub mod regression_grouping;
 pub use regression_grouping::{
-    RegressionGroupKey, export_rust_regression_suite, group_bundles_by_regression_group,
-    regression_group_key, regression_group_keys_sorted, regression_group_module_ident,
+    export_rust_regression_suite, group_bundles_by_regression_group, regression_group_key,
+    regression_group_keys_sorted, regression_group_module_ident, RegressionGroupKey,
 };
 
 pub mod simulation;
 pub use simulation::{
-    RunMetadataError, SUPPORTED_RUN_METADATA_SCHEMAS,
-    SimulationTimeoutConfig, load_run_metadata_json, run_simulation_with_timeout,
-    save_run_metadata_json, timeout_crash_signature, panic_crash_signature,
-    MAX_CONCURRENT_SIMULATION_THREADS, active_simulation_thread_count,
+    active_simulation_thread_count, load_run_metadata_json, panic_crash_signature,
+    run_simulation_with_timeout, save_run_metadata_json, timeout_crash_signature, RunMetadataError,
+    SimulationTimeoutConfig, MAX_CONCURRENT_SIMULATION_THREADS, SUPPORTED_RUN_METADATA_SCHEMAS,
 };
 
 pub mod container_stress;
 pub use container_stress::{
-    ContainerStressConfig, ContainerStressMutator, generate_container_stress_grid,
+    generate_container_stress_grid, ContainerStressConfig, ContainerStressMutator,
 };
 
 pub mod crash_index;
@@ -250,29 +250,22 @@ pub use mutation_budget::{BudgetReport, MutationBudget};
 
 pub mod seed_novelty;
 pub use seed_novelty::{
-    DiscoveryBenchmark, NoveltyPrioritizer, SeedNoveltyCandidate, benchmark_novelty_discovery,
+    benchmark_novelty_discovery, DiscoveryBenchmark, NoveltyPrioritizer, SeedNoveltyCandidate,
 };
 pub mod stale_detector;
 pub use stale_detector::{StaleDetectorConfig, StaleRunDetector, StaleStatus};
 
 pub mod worker_partition;
-pub use worker_partition::{WorkerPartition, WorkerPartitionError, worker_for_seed};
-
-pub mod health_snapshot;
-pub use health_snapshot::{
-    append_health_snapshot, classify_failure_message, health_snapshot_path, read_health_snapshots,
-    read_latest_health_snapshot, terminal_label, BudgetSnapshot, CampaignHealth, HealthSnapshot,
-    HealthSnapshotError, DEFAULT_SNAPSHOT_INTERVAL_SEEDS, HEALTH_SNAPSHOT_FILE,
-    HEALTH_SNAPSHOT_SCHEMA_VERSION, SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS,
+pub use worker_partition::{
+    ring_range_for, ring_ranges_for, ring_slot, worker_for_seed, RingCoverage, RingRange,
+    WorkerPartition, WorkerPartitionError, RING_SIZE,
 };
 
 pub mod run_control;
 pub use run_control::{
     cancel_marker_path, cancel_requested, clear_cancel_request, default_state_dir, drive_run,
-    drive_run_from_checkpoint, drive_run_from_checkpoint_with_health, drive_run_partitioned,
-    drive_run_partitioned_from_checkpoint, drive_run_partitioned_from_checkpoint_with_health,
-    drive_run_partitioned_with_health, drive_run_with_health, request_cancel_run, CancelSignal,
-    IgnoreProgress, RunId, RunProgress, RunResumeError, RunSummary, RunTerminalState,
+    drive_run_from_checkpoint, drive_run_partitioned, drive_run_partitioned_from_checkpoint,
+    request_cancel_run, CancelSignal, RunId, RunResumeError, RunSummary, RunTerminalState,
 };
 
 pub mod rpc_envelope;
@@ -285,7 +278,7 @@ pub mod stellar_address;
 #[cfg(test)]
 mod threat_model_tests;
 pub use stellar_address::{
-    AddressMutatorConfig, AddressType, StellarAddressMutator, generate_address_vectors,
+    generate_address_vectors, AddressMutatorConfig, AddressType, StellarAddressMutator,
 };
 
 /// Default mutator for the core fuzzer loop.
@@ -391,13 +384,6 @@ pub fn randomize_seed(seed: &CaseSeed) -> CaseSeed {
     }
 }
 
-/// Classifies the exact payload bytes provided without preparing a replay seed.
-///
-/// **Deprecated for bundle and regression-suite flows:** direct classification
-/// can disagree with the signature stored by bundle creation when the seed is
-/// mutated first. Use [`prepare_replay_seed`] for those flows. This function
-/// remains available for callers that specifically need to classify arbitrary
-/// bytes as-is.
 pub fn classify(seed: &CaseSeed) -> CrashSignature {
     // Delegate signature construction to the taxonomy helper which produces
     // category labels consistent with `classify_failure` and a centralized
@@ -405,19 +391,9 @@ pub fn classify(seed: &CaseSeed) -> CrashSignature {
     taxonomy::crash_signature_from_seed(seed)
 }
 
-/// Produces the exact seed and signature stored in a replay bundle.
-///
-/// Classification always runs on the post-mutation payload that will be
-/// replayed. The deterministic mutation is idempotent, so this also accepts
-/// payloads already exported from a bundle.
-pub(crate) fn prepare_replay_seed(seed: &CaseSeed) -> (CaseSeed, CrashSignature) {
-    let replay_seed = mutate_seed(seed);
-    let signature = classify(&replay_seed);
-    (replay_seed, signature)
-}
-
 pub fn to_bundle(seed: CaseSeed) -> CaseBundle {
-    let (mutated, signature) = prepare_replay_seed(&seed);
+    let mutated = mutate_seed(&seed);
+    let signature = classify(&mutated);
     CaseBundle {
         seed: mutated,
         signature,
@@ -430,7 +406,8 @@ pub fn to_bundle(seed: CaseSeed) -> CaseBundle {
 /// Like [`to_bundle`], but attaches [`EnvironmentFingerprint::capture`] for replay checks.
 pub fn to_bundle_with_environment(seed: CaseSeed) -> CaseBundle {
     let environment = Some(EnvironmentFingerprint::capture());
-    let (mutated, signature) = prepare_replay_seed(&seed);
+    let mutated = mutate_seed(&seed);
+    let signature = classify(&mutated);
     CaseBundle {
         seed: mutated,
         signature,
@@ -442,7 +419,8 @@ pub fn to_bundle_with_environment(seed: CaseSeed) -> CaseBundle {
 
 /// Like [`to_bundle`], but attaches an RPC envelope capture for reproducibility auditing.
 pub fn to_bundle_with_rpc_envelope(seed: CaseSeed, envelope: RpcEnvelopeCapture) -> CaseBundle {
-    let (mutated, signature) = prepare_replay_seed(&seed);
+    let mutated = mutate_seed(&seed);
+    let signature = classify(&mutated);
     CaseBundle {
         seed: mutated,
         signature,
@@ -474,17 +452,47 @@ mod tests {
     }
 
     #[test]
-    fn replay_seed_preparation_is_idempotent_for_exported_payloads() {
-        let seed = CaseSeed {
-            id: 42,
-            payload: vec![1, 2, 3, 4],
-        };
-        let (replay_seed, signature) = prepare_replay_seed(&seed);
-        let (exported_replay_seed, exported_signature) = prepare_replay_seed(&replay_seed);
+    fn mutation_is_never_self_inverse_over_two_steps() {
+        let test_payloads = vec![
+            vec![],
+            vec![42],
+            vec![1, 2, 3, 4],
+            vec![0xE0, 0x00, 0x01, 0x02],
+            vec![0xAA; 32],
+            (0..64u8).collect(),
+        ];
+        for (i, payload) in test_payloads.into_iter().enumerate() {
+            let s0 = CaseSeed {
+                id: (i as u64) + 100,
+                payload,
+            };
+            let s1 = mutate_seed(&s0);
+            assert_ne!(
+                s1.payload, s0.payload,
+                "single mutation should alter payload"
+            );
+            let s2 = mutate_seed(&s1);
+            assert_ne!(
+                s2.payload, s0.payload,
+                "mutation was self-inverse over two steps for seed id={}: s0={:?}, s1={:?}, s2={:?}",
+                s0.id, s0.payload, s1.payload, s2.payload
+            );
+        }
+    }
 
-        assert_eq!(exported_replay_seed, replay_seed);
-        assert_eq!(exported_signature, signature);
-        assert_eq!(signature.category, classify(&replay_seed).category);
+    #[test]
+    fn default_mutator_deterministic_with_same_rng() {
+        let mutator = DefaultMutator::default();
+        let seed = CaseSeed {
+            id: 99,
+            payload: vec![1, 2, 3, 4, 5],
+        };
+        let mut rng1 = 12345u64;
+        let mut rng2 = 12345u64;
+        let a = mutator.mutate(&seed, &mut rng1);
+        let b = mutator.mutate(&seed, &mut rng2);
+        assert_eq!(a, b);
+        assert_eq!(rng1, rng2);
     }
 
     #[test]

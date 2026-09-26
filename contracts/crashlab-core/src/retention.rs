@@ -232,12 +232,10 @@ mod tests {
     }
 
     fn checkpoint(campaign_id: &str, next_seed_index: usize) -> RunCheckpoint {
-        RunCheckpoint {
-            schema: 1,
-            campaign_id: campaign_id.to_string(),
-            next_seed_index,
-            total_seeds: 100,
-        }
+        let mut checkpoint = RunCheckpoint::new_run(campaign_id, &[]);
+        checkpoint.next_seed_index = next_seed_index;
+        checkpoint.total_seeds = 100;
+        checkpoint
     }
 
     #[test]

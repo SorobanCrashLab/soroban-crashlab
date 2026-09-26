@@ -65,15 +65,15 @@ let mutator = scheduler.select_mutator(&mut rng);
 
 ### Parallel worker partitioning
 
-When splitting a campaign across workers, use `WorkerPartition` and `drive_run_partitioned` from `crashlab-core`: global seed index `i` is assigned to worker `i % num_workers`. Each worker runs only its indices, but the runner still walks the full `0..total_seeds` order for cancellation alignment.
+When splitting a campaign across workers, use `WorkerPartition` and `drive_run_partitioned` from `crashlab-core`. Seed indices are placed on a fixed hash ring (`RING_SIZE` slots) whose layout never depends on the worker count: `ring_slot(i)` is a pure function of the seed index. Worker `w` of `num_workers` owns a contiguous ring range, and for every worker count those ranges are pairwise disjoint and cover the whole ring. A resize therefore only moves range *boundaries* — it never moves a seed to a different slot. Each worker still walks the full `0..total_seeds` order for cancellation alignment.
 
 **Guarantee**: Per-seed outputs (classification, signatures, mutation) depend only on the seed index and payload, not on worker count. Merging worker results sorted by global seed index matches a single-worker `drive_run` over the same schedule.
 
 ### Checkpoint resume
 
-Persist `RunCheckpoint` as JSON and resume with `drive_run_from_checkpoint` (single worker) or `drive_run_partitioned_from_checkpoint` (per-worker resume). The checkpoint cursor always points at the next global seed index to inspect, and it advances only after the current seed index has been fully accounted for.
+Persist `RunCheckpoint` as JSON and resume with `drive_run_from_checkpoint` (single worker) or `drive_run_partitioned_from_checkpoint` (per-worker resume). Single-worker checkpoints advance `next_seed_index` only after the current seed index has been fully accounted for. Partitioned checkpoints record `ring_coverage`: the ring slots already swept. A resumed worker subtracts the covered ranges from its own ring range and executes only the remainder, and it marks a slot covered only once that slot's last global index has run, so an interrupted sweep is never recorded as complete.
 
-**Guarantee**: Restarting from the same checkpoint replays the same remaining seed order without reprocessing seed indices already covered by that checkpoint.
+**Guarantee**: Restarting from the same checkpoint replays the same remaining seed order without reprocessing covered seeds. Because coverage is recorded on the worker-count-independent ring, resuming or scaling to a different `num_workers` also avoids double execution and coverage holes. A v1 checkpoint (no `ring_coverage`) is read as empty coverage and re-swept conservatively.
 
 ## Known Limitations
 

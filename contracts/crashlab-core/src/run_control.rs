@@ -8,9 +8,15 @@
 //! Use [`drive_run_partitioned`] with [`crate::worker_partition::WorkerPartition`] to
 //! execute only the seed indices assigned to one worker while preserving the same
 //! global iteration order and cancellation points as [`drive_run`].
+//!
+//! Partitioned workers record progress as ring coverage
+//! ([`crate::worker_partition::RingCoverage`]) rather than as a modulo cursor, so
+//! resuming with a different worker count neither re-executes covered seeds nor
+//! leaves a coverage hole.
 
 use crate::checkpoint::{CheckpointError, RunCheckpoint};
-use crate::worker_partition::WorkerPartition;
+use crate::worker_partition::{ring_slot, WorkerPartition};
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -160,114 +166,10 @@ pub fn clear_cancel_request(run_id: RunId, base: impl AsRef<Path>) -> io::Result
     }
 }
 
-/// Observer for a drive loop's progress (#1593).
-///
-/// The drive loops are the only place that knows where a campaign is, so they
-/// report it here rather than leaving operators blind between the start and the
-/// final summary. Implementations must not panic and should stay cheap:
-/// [`RunProgress::on_seed_processed`] runs once per completed seed.
-///
-/// [`CampaignHealth`](crate::health_snapshot::CampaignHealth) implements this to
-/// turn the callbacks into periodic, versioned health snapshots.
-pub trait RunProgress {
-    /// A seed's `work` returned `Ok`. `seeds_processed` counts the seeds this
-    /// loop completed; indices owned by another partition are not counted.
-    fn on_seed_processed(&mut self, seed_index: u64, seeds_processed: u64);
-
-    /// `work` returned `Err` for `seed_index`; the loop is about to stop.
-    fn on_failure(&mut self, seed_index: u64, message: &str);
-
-    /// The loop stopped, whatever the reason. Called exactly once per entered
-    /// loop, after the last seed callback.
-    fn on_finish(&mut self, seeds_processed: u64, terminal: &RunTerminalState);
-}
-
-/// A [`RunProgress`] that discards every callback.
-///
-/// The plain `drive_run*` functions use this, which is why they keep their
-/// original signatures and report nothing.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct IgnoreProgress;
-
-impl RunProgress for IgnoreProgress {
-    fn on_seed_processed(&mut self, _seed_index: u64, _seeds_processed: u64) {}
-    fn on_failure(&mut self, _seed_index: u64, _message: &str) {}
-    fn on_finish(&mut self, _seeds_processed: u64, _terminal: &RunTerminalState) {}
-}
-
-/// Shared body of every drive loop.
-///
-/// `start_index` is `0` for a fresh run and `checkpoint.next_seed_index` for a
-/// resumed one. When `checkpoint` is present it is advanced past every index the
-/// loop finishes with, including the indices this worker does not own, so a
-/// resumed worker never rescans the global timeline.
-fn drive_loop<F>(
-    start_index: u64,
-    total_seeds: u64,
-    signal: &CancelSignal,
-    partition: Option<&WorkerPartition>,
-    mut checkpoint: Option<&mut RunCheckpoint>,
-    progress: &mut dyn RunProgress,
-    work: &mut F,
-) -> RunTerminalState
-where
-    F: FnMut(u64) -> Result<(), String>,
-{
-    let mut seeds_processed = 0u64;
-
-    for seed_index in start_index..total_seeds {
-        if signal.is_cancelled() {
-            let terminal = RunTerminalState::Cancelled {
-                summary: RunSummary {
-                    seeds_processed,
-                    cancelled_at_seed: Some(seed_index),
-                },
-            };
-            progress.on_finish(seeds_processed, &terminal);
-            return terminal;
-        }
-
-        if let Some(p) = partition {
-            if !p.owns_seed(seed_index) {
-                if let Some(cp) = checkpoint.as_mut() {
-                    cp.next_seed_index = seed_index as usize + 1;
-                }
-                continue;
-            }
-        }
-
-        if let Err(message) = work(seed_index) {
-            progress.on_failure(seed_index, &message);
-            let terminal = RunTerminalState::Failed { message };
-            progress.on_finish(seeds_processed, &terminal);
-            return terminal;
-        }
-
-        // Advanced only after the seed is fully accounted for, so cancellation
-        // and failure leave the next unprocessed seed in place for a retry.
-        if let Some(cp) = checkpoint.as_mut() {
-            cp.next_seed_index = seed_index as usize + 1;
-        }
-        seeds_processed += 1;
-        progress.on_seed_processed(seed_index, seeds_processed);
-    }
-
-    let terminal = RunTerminalState::Completed {
-        summary: RunSummary {
-            seeds_processed,
-            cancelled_at_seed: None,
-        },
-    };
-    progress.on_finish(seeds_processed, &terminal);
-    terminal
-}
-
 /// Runs `work` for each seed index in `0..total`, stopping early when `signal` fires.
 /// If `partition` is provided, only seeds owned by that partition are processed, but
 /// `total_seeds` is evaluated completely for cancellation reasons.
 /// Returns [`RunTerminalState::Cancelled`] with a partial summary, or [`RunTerminalState::Completed`].
-///
-/// Reports nothing; use [`drive_run_with_health`] to observe the run.
 pub fn drive_run<F>(
     _run_id: RunId,
     total_seeds: u64,
@@ -278,46 +180,40 @@ pub fn drive_run<F>(
 where
     F: FnMut(u64) -> Result<(), String>,
 {
-    drive_loop(
-        0,
-        total_seeds,
-        signal,
-        partition.as_ref(),
-        None,
-        &mut IgnoreProgress,
-        &mut work,
-    )
+    let mut seeds_processed = 0u64;
+    for seed_index in 0..total_seeds {
+        if signal.is_cancelled() {
+            return RunTerminalState::Cancelled {
+                summary: RunSummary {
+                    seeds_processed,
+                    cancelled_at_seed: Some(seed_index),
+                },
+            };
+        }
+
+        if let Some(p) = &partition {
+            if !p.owns_seed(seed_index) {
+                continue;
+            }
+        }
+        if let Err(message) = work(seed_index) {
+            return RunTerminalState::Failed { message };
+        }
+        seeds_processed += 1;
+    }
+
+    RunTerminalState::Completed {
+        summary: RunSummary {
+            seeds_processed,
+            cancelled_at_seed: None,
+        },
+    }
 }
 
-/// [`drive_run`], reporting progress to `progress`.
-///
-/// The callbacks are the only signal a long campaign produces while it runs, so
-/// a panic-free, cheap implementation matters more here than elsewhere.
-pub fn drive_run_with_health<F>(
-    _run_id: RunId,
-    total_seeds: u64,
-    signal: &CancelSignal,
-    partition: Option<WorkerPartition>,
-    mut work: F,
-    progress: &mut dyn RunProgress,
-) -> RunTerminalState
-where
-    F: FnMut(u64) -> Result<(), String>,
-{
-    drive_loop(
-        0,
-        total_seeds,
-        signal,
-        partition.as_ref(),
-        None,
-        progress,
-        &mut work,
-    )
-}
-
-/// Like [`drive_run`], but invokes `work` only for global seed indices owned by `partition`
-/// (`seed_index % num_workers == worker_index`). Still walks `0..total_seeds` in order so
-/// cancellation checks align with the single-worker timeline.
+/// Like [`drive_run`], but invokes `work` only for global seed indices whose ring
+/// slot falls inside `partition`'s contiguous ring range. Still walks
+/// `0..total_seeds` in order so cancellation checks align with the single-worker
+/// timeline.
 pub fn drive_run_partitioned<F>(
     _run_id: RunId,
     total_seeds: u64,
@@ -328,38 +224,31 @@ pub fn drive_run_partitioned<F>(
 where
     F: FnMut(u64) -> Result<(), String>,
 {
-    drive_loop(
-        0,
-        total_seeds,
-        signal,
-        Some(partition),
-        None,
-        &mut IgnoreProgress,
-        &mut work,
-    )
-}
+    let mut seeds_processed = 0u64;
+    for seed_index in 0..total_seeds {
+        if signal.is_cancelled() {
+            return RunTerminalState::Cancelled {
+                summary: RunSummary {
+                    seeds_processed,
+                    cancelled_at_seed: Some(seed_index),
+                },
+            };
+        }
+        if !partition.owns_seed(seed_index) {
+            continue;
+        }
+        if let Err(message) = work(seed_index) {
+            return RunTerminalState::Failed { message };
+        }
+        seeds_processed += 1;
+    }
 
-/// [`drive_run_partitioned`], reporting progress to `progress`.
-pub fn drive_run_partitioned_with_health<F>(
-    _run_id: RunId,
-    total_seeds: u64,
-    partition: &WorkerPartition,
-    signal: &CancelSignal,
-    mut work: F,
-    progress: &mut dyn RunProgress,
-) -> RunTerminalState
-where
-    F: FnMut(u64) -> Result<(), String>,
-{
-    drive_loop(
-        0,
-        total_seeds,
-        signal,
-        Some(partition),
-        None,
-        progress,
-        &mut work,
-    )
+    RunTerminalState::Completed {
+        summary: RunSummary {
+            seeds_processed,
+            cancelled_at_seed: None,
+        },
+    }
 }
 
 fn validate_resume_checkpoint(
@@ -390,54 +279,52 @@ where
     F: FnMut(u64) -> Result<(), String>,
 {
     let total_seeds = validate_resume_checkpoint(checkpoint, campaign_id, total_seeds)? as u64;
-    let start_index = checkpoint.next_seed_index as u64;
+    let mut seeds_processed = 0u64;
 
-    Ok(drive_loop(
-        start_index,
-        total_seeds,
-        signal,
-        None,
-        Some(checkpoint),
-        &mut IgnoreProgress,
-        &mut work,
-    ))
+    for seed_index in checkpoint.next_seed_index as u64..total_seeds {
+        if signal.is_cancelled() {
+            return Ok(RunTerminalState::Cancelled {
+                summary: RunSummary {
+                    seeds_processed,
+                    cancelled_at_seed: Some(seed_index),
+                },
+            });
+        }
+        if let Err(message) = work(seed_index) {
+            return Ok(RunTerminalState::Failed { message });
+        }
+        checkpoint.next_seed_index = seed_index as usize + 1;
+        seeds_processed += 1;
+    }
+
+    Ok(RunTerminalState::Completed {
+        summary: RunSummary {
+            seeds_processed,
+            cancelled_at_seed: None,
+        },
+    })
 }
 
-/// [`drive_run_from_checkpoint`], reporting progress to `progress`.
+/// Resumes a worker-partitioned run from a checkpoint keyed by ring coverage.
 ///
-/// A checkpoint rejected by [`RunResumeError`] returns before the loop starts, so
-/// no callback fires in that case.
-pub fn drive_run_from_checkpoint_with_health<F>(
-    _run_id: RunId,
-    campaign_id: &str,
-    checkpoint: &mut RunCheckpoint,
-    total_seeds: u64,
-    signal: &CancelSignal,
-    mut work: F,
-    progress: &mut dyn RunProgress,
-) -> Result<RunTerminalState, RunResumeError>
-where
-    F: FnMut(u64) -> Result<(), String>,
-{
-    let total_seeds = validate_resume_checkpoint(checkpoint, campaign_id, total_seeds)? as u64;
-    let start_index = checkpoint.next_seed_index as u64;
-
-    Ok(drive_loop(
-        start_index,
-        total_seeds,
-        signal,
-        None,
-        Some(checkpoint),
-        progress,
-        &mut work,
-    ))
-}
-
-/// Resumes a worker-partitioned run from a per-worker checkpoint.
+/// The checkpoint's [`crate::worker_partition::RingCoverage`] records which fixed
+/// ring slots have already been swept. This worker claims the uncovered portions
+/// of its own ring range and walks `0..total_seeds` exactly once, processing a
+/// seed only when its slot is part of that pending set. A slot is marked covered
+/// only after its *last* global index has been processed, so cancelling mid-sweep
+/// can never leave a partially covered slot recorded as done.
 ///
-/// The checkpoint stores the next global seed index this worker should inspect.
-/// Unowned indices are still advanced past so a resumed worker does not rescan
-/// earlier parts of the global timeline.
+/// Because coverage lives on the ring and the ring is independent of the worker
+/// count, a checkpoint written by an `old_count`-worker pool can be resumed by a
+/// `new_count`-worker pool: the new workers subtract already-covered slots from
+/// their ranges, so no seed is executed twice and no seed is skipped. A v1
+/// checkpoint (empty coverage) is treated as "nothing covered yet" and re-swept,
+/// which is safe but conservative.
+///
+/// `next_seed_index` is still advanced as a monotonic global cursor for progress
+/// reporting and retention ranking, but it is not used to decide ownership:
+/// after a resize, a low index can belong to a different worker, so coverage is
+/// the authoritative record of what has been done.
 pub fn drive_run_partitioned_from_checkpoint<F>(
     _run_id: RunId,
     campaign_id: &str,
@@ -451,54 +338,83 @@ where
     F: FnMut(u64) -> Result<(), String>,
 {
     let total_seeds = validate_resume_checkpoint(checkpoint, campaign_id, total_seeds)? as u64;
-    let start_index = checkpoint.next_seed_index as u64;
+    let ring_range = partition.ring_range();
+    let pending = checkpoint.ring_coverage.uncovered_within(&ring_range);
 
-    Ok(drive_loop(
-        start_index,
-        total_seeds,
-        signal,
-        Some(partition),
-        Some(checkpoint),
-        &mut IgnoreProgress,
-        &mut work,
-    ))
-}
+    if pending.is_empty() {
+        checkpoint.next_seed_index = total_seeds as usize;
+        return Ok(RunTerminalState::Completed {
+            summary: RunSummary {
+                seeds_processed: 0,
+                cancelled_at_seed: None,
+            },
+        });
+    }
 
-/// [`drive_run_partitioned_from_checkpoint`], reporting progress to `progress`.
-///
-/// A checkpoint rejected by [`RunResumeError`] returns before the loop starts, so
-/// no callback fires in that case.
-pub fn drive_run_partitioned_from_checkpoint_with_health<F>(
-    _run_id: RunId,
-    campaign_id: &str,
-    checkpoint: &mut RunCheckpoint,
-    total_seeds: u64,
-    partition: &WorkerPartition,
-    signal: &CancelSignal,
-    mut work: F,
-    progress: &mut dyn RunProgress,
-) -> Result<RunTerminalState, RunResumeError>
-where
-    F: FnMut(u64) -> Result<(), String>,
-{
-    let total_seeds = validate_resume_checkpoint(checkpoint, campaign_id, total_seeds)? as u64;
-    let start_index = checkpoint.next_seed_index as u64;
+    // Last global index that maps into each pending slot. A slot is fully
+    // covered only once that index has been processed; anything earlier is a
+    // partial sweep and must stay pending for the next resume.
+    let mut last_index_for_slot: HashMap<u64, u64> = HashMap::new();
+    for seed_index in 0..total_seeds {
+        let slot = ring_slot(seed_index);
+        if pending.iter().any(|range| range.contains(slot)) {
+            last_index_for_slot.insert(slot, seed_index);
+        }
+    }
 
-    Ok(drive_loop(
-        start_index,
-        total_seeds,
-        signal,
-        Some(partition),
-        Some(checkpoint),
-        progress,
-        &mut work,
-    ))
+    let mut seeds_processed = 0u64;
+    let mut completed_slots: Vec<u64> = Vec::new();
+
+    for seed_index in 0..total_seeds {
+        checkpoint.next_seed_index = seed_index as usize;
+
+        if signal.is_cancelled() {
+            checkpoint.ring_coverage.mark_slots(completed_slots);
+            return Ok(RunTerminalState::Cancelled {
+                summary: RunSummary {
+                    seeds_processed,
+                    cancelled_at_seed: Some(seed_index),
+                },
+            });
+        }
+
+        let slot = ring_slot(seed_index);
+        if !pending.iter().any(|range| range.contains(slot)) {
+            checkpoint.next_seed_index = seed_index as usize + 1;
+            continue;
+        }
+
+        if let Err(message) = work(seed_index) {
+            // The failed seed's slot is deliberately *not* marked covered, so a
+            // retry re-executes it instead of silently losing it.
+            checkpoint.ring_coverage.mark_slots(completed_slots);
+            return Ok(RunTerminalState::Failed { message });
+        }
+
+        seeds_processed += 1;
+        checkpoint.next_seed_index = seed_index as usize + 1;
+
+        if last_index_for_slot.get(&slot) == Some(&seed_index) {
+            completed_slots.push(slot);
+        }
+    }
+
+    checkpoint.ring_coverage.mark_slots(completed_slots);
+    checkpoint.next_seed_index = total_seeds as usize;
+
+    Ok(RunTerminalState::Completed {
+        summary: RunSummary {
+            seeds_processed,
+            cancelled_at_seed: None,
+        },
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{worker_partition::WorkerPartition, CaseSeed};
+    use crate::worker_partition::WorkerPartition;
+    use crate::CaseSeed;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_tmp() -> PathBuf {
@@ -602,20 +518,10 @@ mod tests {
 
         match outcome {
             RunTerminalState::Completed { summary } => {
-                // 10 seeds: 0..9.
-                // Mod 3 gives:
-                // 0 -> 0
-                // 1 -> 1 *
-                // 2 -> 2
-                // 3 -> 0
-                // 4 -> 1 *
-                // 5 -> 2
-                // 6 -> 0
-                // 7 -> 1 *
-                // 8 -> 2
-                // 9 -> 0
-                assert_eq!(summary.seeds_processed, 3);
-                assert_eq!(seen, vec![1, 4, 7]);
+                // Under modulo this used to be [1, 4, 7]; with the stable ring
+                // the slot of a seed no longer depends on `num_workers`.
+                assert_eq!(summary.seeds_processed, 5);
+                assert_eq!(seen, vec![1, 2, 3, 4, 9]);
             }
             other => panic!("expected completed, got {other:?}"),
         }
@@ -649,7 +555,8 @@ mod tests {
         let signal = CancelSignal::new(id);
         signal.cancel();
 
-        // Worker 1 of 3: owns indices 1, 4, 7, ... — first iteration is global index 0 (skip), then 1 (work).
+        // Worker 1 of 3 owns a hash-scattered subset of indices, but the runner
+        // still walks from global index 0; cancellation is observed there first.
         let p = WorkerPartition::try_new(1, 3).expect("partition");
         let outcome = drive_run_partitioned(id, 20, &p, &signal, |_i| Ok(()));
         match outcome {
@@ -759,7 +666,7 @@ mod tests {
     }
 
     #[test]
-    fn drive_run_partitioned_from_checkpoint_uses_global_cursor() {
+    fn drive_run_partitioned_from_checkpoint_uses_ring_coverage() {
         let id = RunId(15);
         let signal = CancelSignal::new(id);
         let seeds = seeds(8);
@@ -784,224 +691,111 @@ mod tests {
 
         match outcome {
             RunTerminalState::Completed { summary } => {
-                assert_eq!(summary.seeds_processed, 2);
-                assert_eq!(seen, vec![4, 7]);
+                // Ring coverage is the authoritative cursor, so the whole
+                // worker-owned set runs once (modulo used to yield [4, 7]).
+                assert_eq!(summary.seeds_processed, 4);
+                assert_eq!(seen, vec![1, 2, 3, 4]);
                 assert_eq!(checkpoint.next_seed_index, seeds.len());
             }
             other => panic!("expected completed, got {other:?}"),
         }
-    }
 
-    // ── progress reporting (#1593) ────────────────────────────────────────────
-
-    fn terminal_label(terminal: &RunTerminalState) -> &'static str {
-        match terminal {
-            RunTerminalState::Completed { .. } => "completed",
-            RunTerminalState::Cancelled { .. } => "cancelled",
-            RunTerminalState::Failed { .. } => "failed",
-        }
-    }
-
-    /// Captures every callback so the reporting contract can be asserted.
-    #[derive(Default)]
-    struct RecordingProgress {
-        processed: Vec<(u64, u64)>,
-        failures: Vec<(u64, String)>,
-        finished: Vec<(u64, &'static str)>,
-    }
-
-    impl RunProgress for RecordingProgress {
-        fn on_seed_processed(&mut self, seed_index: u64, seeds_processed: u64) {
-            self.processed.push((seed_index, seeds_processed));
-        }
-
-        fn on_failure(&mut self, seed_index: u64, message: &str) {
-            self.failures.push((seed_index, message.to_string()));
-        }
-
-        fn on_finish(&mut self, seeds_processed: u64, terminal: &RunTerminalState) {
-            self.finished
-                .push((seeds_processed, terminal_label(terminal)));
-        }
-    }
-
-    #[test]
-    fn drive_run_with_health_reports_every_processed_seed_once() {
-        let id = RunId(21);
-        let signal = CancelSignal::new(id);
-        let mut progress = RecordingProgress::default();
-
-        let outcome = drive_run_with_health(id, 4, &signal, None, |_i| Ok(()), &mut progress);
-
-        assert_eq!(
-            outcome,
-            RunTerminalState::Completed {
-                summary: RunSummary {
-                    seeds_processed: 4,
-                    cancelled_at_seed: None,
-                },
-            }
-        );
-        assert_eq!(progress.processed, vec![(0, 1), (1, 2), (2, 3), (3, 4)]);
-        assert!(progress.failures.is_empty());
-        assert_eq!(progress.finished, vec![(4, "completed")]);
-    }
-
-    #[test]
-    fn drive_run_with_health_reports_failure_before_finishing() {
-        let id = RunId(22);
-        let signal = CancelSignal::new(id);
-        let mut progress = RecordingProgress::default();
-
-        let outcome = drive_run_with_health(
-            id,
-            10,
-            &signal,
-            None,
-            |i| {
-                if i == 2 {
-                    return Err("auth: missing authorization entry".to_string());
-                }
-                Ok(())
-            },
-            &mut progress,
-        );
-
-        assert_eq!(
-            outcome,
-            RunTerminalState::Failed {
-                message: "auth: missing authorization entry".to_string(),
-            }
-        );
-        assert_eq!(progress.processed, vec![(0, 1), (1, 2)]);
-        assert_eq!(
-            progress.failures,
-            vec![(2, "auth: missing authorization entry".to_string())]
-        );
-        assert_eq!(progress.finished, vec![(2, "failed")]);
-    }
-
-    #[test]
-    fn drive_run_with_health_counts_only_owned_seeds_for_partition() {
-        let id = RunId(23);
-        let signal = CancelSignal::new(id);
-        let partition = WorkerPartition::try_new(1, 3).expect("partition");
-        let mut progress = RecordingProgress::default();
-
-        drive_run_with_health(id, 6, &signal, Some(partition), |_i| Ok(()), &mut progress);
-
-        // 0..6 with worker 1 of 3 owns 1 and 4; the count is per-worker, not global.
-        assert_eq!(progress.processed, vec![(1, 1), (4, 2)]);
-        assert_eq!(progress.finished, vec![(2, "completed")]);
-    }
-
-    #[test]
-    fn drive_run_with_health_reports_cancellation_as_finished() {
-        let base = unique_tmp();
-        let id = RunId(24);
-        let signal = CancelSignal::with_state_dir(id, &base);
-        let mut progress = RecordingProgress::default();
-
-        let outcome = drive_run_with_health(
-            id,
-            10,
-            &signal,
-            None,
-            |i| {
-                if i == 2 {
-                    signal.cancel();
-                }
-                Ok(())
-            },
-            &mut progress,
-        );
-
-        match outcome {
-            RunTerminalState::Cancelled { summary } => {
-                assert_eq!(summary.cancelled_at_seed, Some(3));
-            }
-            other => panic!("expected cancelled, got {other:?}"),
-        }
-        assert_eq!(progress.processed, vec![(0, 1), (1, 2), (2, 3)]);
-        assert!(progress.failures.is_empty());
-        assert_eq!(progress.finished, vec![(3, "cancelled")]);
-        let _ = fs::remove_dir_all(&base);
-    }
-
-    #[test]
-    fn drive_run_from_checkpoint_with_health_reports_resumed_seeds() {
-        let id = RunId(25);
-        let signal = CancelSignal::new(id);
-        let seeds = seeds(5);
-        let mut checkpoint = RunCheckpoint::new_run("campaign-1", &seeds);
-        checkpoint.advance_by(3);
-        let mut progress = RecordingProgress::default();
-
-        let outcome = drive_run_from_checkpoint_with_health(
-            id,
-            "campaign-1",
-            &mut checkpoint,
-            seeds.len() as u64,
-            &signal,
-            |_i| Ok(()),
-            &mut progress,
-        )
-        .expect("resume succeeds");
-
-        assert!(matches!(outcome, RunTerminalState::Completed { .. }));
-        // Reported counts are per-resume (1..2), while the indices stay global.
-        assert_eq!(progress.processed, vec![(3, 1), (4, 2)]);
-        assert_eq!(progress.finished, vec![(2, "completed")]);
-    }
-
-    #[test]
-    fn drive_run_partitioned_from_checkpoint_with_health_reports_global_indices() {
-        let id = RunId(26);
-        let signal = CancelSignal::new(id);
-        let seeds = seeds(8);
-        let mut checkpoint = RunCheckpoint::new_run("campaign-1", &seeds);
-        checkpoint.advance_by(2);
-        let partition = WorkerPartition::try_new(1, 3).expect("partition");
-        let mut progress = RecordingProgress::default();
-
-        drive_run_partitioned_from_checkpoint_with_health(
+        // A second resume has nothing left to do.
+        let mut again = Vec::new();
+        let outcome = drive_run_partitioned_from_checkpoint(
             id,
             "campaign-1",
             &mut checkpoint,
             seeds.len() as u64,
             &partition,
             &signal,
-            |_i| Ok(()),
-            &mut progress,
+            |seed_index| {
+                again.push(seed_index);
+                Ok(())
+            },
         )
-        .expect("resume succeeds");
+        .expect("second resume succeeds");
 
-        assert_eq!(progress.processed, vec![(4, 1), (7, 2)]);
-        assert_eq!(checkpoint.next_seed_index, seeds.len());
-        assert_eq!(progress.finished, vec![(2, "completed")]);
+        match outcome {
+            RunTerminalState::Completed { summary } => {
+                assert_eq!(summary.seeds_processed, 0);
+            }
+            other => panic!("expected completed, got {other:?}"),
+        }
+        assert!(again.is_empty(), "covered slots must not be re-executed");
     }
 
     #[test]
-    fn rejected_resume_reports_nothing() {
-        let id = RunId(27);
+    fn partitioned_cancel_records_coverage_and_resume_has_no_duplicates() {
+        let id = RunId(16);
+        let total = 12u64;
+        let seeds = seeds(total as usize);
+        let partition = WorkerPartition::try_new(0, 2).expect("partition");
+        let mut checkpoint = RunCheckpoint::new_run("campaign-partial", &seeds);
+
+        // Cancel after this worker has processed two seeds.
         let signal = CancelSignal::new(id);
-        let seeds = seeds(3);
-        let mut checkpoint = RunCheckpoint::new_run("campaign-1", &seeds);
-        let mut progress = RecordingProgress::default();
-
-        drive_run_from_checkpoint_with_health(
+        let cancel_after_two = signal.clone();
+        let mut first_seen = Vec::new();
+        let outcome = drive_run_partitioned_from_checkpoint(
             id,
-            "campaign-other",
+            "campaign-partial",
             &mut checkpoint,
-            seeds.len() as u64,
+            total,
+            &partition,
             &signal,
-            |_i| Ok(()),
-            &mut progress,
+            |seed_index| {
+                first_seen.push(seed_index);
+                if first_seen.len() == 2 {
+                    cancel_after_two.cancel();
+                }
+                Ok(())
+            },
         )
-        .expect_err("campaign mismatch should fail");
+        .expect("first pass validates");
 
-        assert!(progress.processed.is_empty());
-        assert!(progress.failures.is_empty());
-        assert!(progress.finished.is_empty());
+        match outcome {
+            RunTerminalState::Cancelled { summary } => {
+                assert_eq!(summary.seeds_processed, 2);
+                assert_eq!(summary.cancelled_at_seed, Some(3));
+            }
+            other => panic!("expected cancelled, got {other:?}"),
+        }
+        assert_eq!(first_seen, vec![1, 2]);
+        assert!(
+            !checkpoint.ring_coverage.is_empty(),
+            "partial progress must be persisted even on cancel"
+        );
+
+        let resume_signal = CancelSignal::new(id);
+        let mut resumed_seen = Vec::new();
+        let outcome = drive_run_partitioned_from_checkpoint(
+            id,
+            "campaign-partial",
+            &mut checkpoint,
+            total,
+            &partition,
+            &resume_signal,
+            |seed_index| {
+                resumed_seen.push(seed_index);
+                Ok(())
+            },
+        )
+        .expect("resume validates");
+
+        match outcome {
+            RunTerminalState::Completed { summary } => {
+                assert_eq!(summary.seeds_processed, 5);
+            }
+            other => panic!("expected completed, got {other:?}"),
+        }
+
+        // Worker 0 of 2 owns exactly [1, 2, 7, 8, 9, 10, 11] in 0..12.
+        assert_eq!(resumed_seen, vec![7, 8, 9, 10, 11]);
+        let mut combined = first_seen;
+        combined.extend_from_slice(&resumed_seen);
+        combined.sort_unstable();
+        combined.dedup();
+        assert_eq!(combined, vec![1, 2, 7, 8, 9, 10, 11]);
     }
 }
