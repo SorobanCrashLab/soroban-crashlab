@@ -6,7 +6,8 @@ Closes #
 
 > **PR title (required, checked by `lint-title`):**
 > `build: unify crates under a cargo workspace`
-> The subject must start with a lowercase letter and must not end with a period.
+> Copy the line above verbatim. The subject (`unify crates under a cargo workspace`)
+> must start with a lowercase letter and must not end with a period.
 
 ## Checklist
 
@@ -35,7 +36,7 @@ The title must look like "type: subject" or "type(scope): subject" where:
   - the subject starts with a lowercase letter
   - the subject does not end with a period
 
-For this change use exactly:
+For this change use exactly (lowercase `u` in `unify`):
 
     build: unify crates under a cargo workspace
 -->
