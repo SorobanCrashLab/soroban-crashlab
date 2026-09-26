@@ -10,9 +10,6 @@ use soroban_sdk::{
 /// migration before calling this contract; no automatic migration is provided.
 pub const STORAGE_VERSION: u32 = 2;
 
-/// Contract version for upgrade tracking
-pub const CONTRACT_VERSION: u32 = 1;
-
 /// Typed errors returned by every entrypoint.
 ///
 /// Each variant is assigned a stable integer discriminant so that on-chain
@@ -36,8 +33,6 @@ pub enum ContractError {
     InsufficientAllowance = 6,
     /// An arithmetic operation would overflow.
     Overflow = 7,
-    /// No pending admin to accept.
-    NoPendingAdmin = 8,
 }
 
 #[contract]
@@ -62,8 +57,12 @@ impl TokenContract {
             .persistent()
             .set(&symbol_short!("Supply"), &total_supply);
 
+        env.storage().persistent().set(
+            &(symbol_short!("Bal"), admin),
+            &total_supply,
+        );
         let mut balances: Map<Address, i128> = map![&env];
-        balances.set(admin, total_supply);
+        balances.set(admin.clone(), total_supply);
         env.storage()
             .persistent()
             .set(&symbol_short!("Bal"), &balances);
@@ -75,81 +74,6 @@ impl TokenContract {
         Ok(())
     }
 
-    /// Get the contract version.
-    pub fn version() -> u32 {
-        CONTRACT_VERSION
-    }
-
-    /// Set a new pending admin (only current admin can call this).
-    pub fn set_admin(
-        env: Env,
-        admin: Address,
-        new_admin: Address,
-    ) -> Result<(), ContractError> {
-        admin.require_auth();
-
-        let stored_admin: Address = env
-            .storage()
-            .persistent()
-            .get(&symbol_short!("Admin"))
-            .ok_or(ContractError::NotInitialized)?;
-
-        if admin != stored_admin {
-            return Err(ContractError::Unauthorized);
-        }
-
-        env.storage()
-            .persistent()
-            .set(&symbol_short!("PendAdm"), &new_admin);
-
-        Ok(())
-    }
-
-    /// Accept admin role (only pending admin can call this).
-    pub fn accept_admin(env: Env, new_admin: Address) -> Result<(), ContractError> {
-        new_admin.require_auth();
-
-        let pending_admin: Option<Address> = env
-            .storage()
-            .persistent()
-            .get(&symbol_short!("PendAdm"));
-
-        let pending_admin = pending_admin.ok_or(ContractError::NoPendingAdmin)?;
-
-        if new_admin != pending_admin {
-            return Err(ContractError::Unauthorized);
-        }
-
-        env.storage()
-            .persistent()
-            .set(&symbol_short!("Admin"), &new_admin);
-        env.storage()
-            .persistent()
-            .remove(&symbol_short!("PendAdm"));
-
-        Ok(())
-    }
-
-    /// Get the current admin.
-    pub fn admin(env: Env) -> Result<Address, ContractError> {
-        env.storage()
-            .persistent()
-            .get(&symbol_short!("Admin"))
-            .ok_or(ContractError::NotInitialized)
-    }
-
-    /// Get the pending admin (if any).
-    pub fn pending_admin(env: Env) -> Option<Address> {
-        env.storage()
-            .persistent()
-            .get(&symbol_short!("PendAdm"))
-    }
-
-    // Note: Upgrade function implementation removed due to compilation issues
-    // with current Soroban SDK version (v22.0.0) when running tests.
-    // The upgrade functionality would be: env.deployer().update_current_contract_wasm(new_wasm_hash)
-    // See issue with __upgrade module resolution during test compilation.
-
     /// Get the total supply of tokens.
     pub fn total_supply(env: Env) -> Result<i128, ContractError> {
         env.storage()
@@ -158,6 +82,13 @@ impl TokenContract {
             .ok_or(ContractError::NotInitialized)
     }
 
+    /// Get the balance of an account
+    pub fn balance(env: Env, account: Address) -> i128 {
+        env
+            .storage()
+            .persistent()
+            .get(&(symbol_short!("Bal"), account))
+            .unwrap_or(0)
     /// Get the balance of an account.
     pub fn balance(env: Env, account: Address) -> Result<i128, ContractError> {
         let balances: Map<Address, i128> = env
@@ -181,6 +112,7 @@ impl TokenContract {
             return Err(ContractError::InvalidAmount);
         }
 
+        let from_balance = Self::balance(env.clone(), from.clone());
         let mut balances: Map<Address, i128> = env
             .storage()
             .persistent()
@@ -192,6 +124,9 @@ impl TokenContract {
             return Err(ContractError::InsufficientBalance);
         }
 
+        Self::set_balance(&env, from, from_balance - amount);
+        let to_balance = Self::balance(env.clone(), to.clone());
+        Self::set_balance(&env, to, to_balance + amount);
         balances.set(
             from.clone(),
             from_balance
@@ -247,6 +182,8 @@ impl TokenContract {
             .persistent()
             .set(&symbol_short!("Supply"), &new_supply);
 
+        let to_balance = Self::balance(env.clone(), to.clone());
+        Self::set_balance(&env, to, to_balance + amount);
         let mut balances: Map<Address, i128> = env
             .storage()
             .persistent()
@@ -265,8 +202,65 @@ impl TokenContract {
         Ok(())
     }
 
-    /// Burn tokens (only admin).
+    /// Burn tokens from the holder's balance.
     pub fn burn(
+        env: Env,
+        from: Address,
+        amount: i128,
+    ) -> Result<(), ContractError> {
+        from.require_auth();
+
+        if amount <= 0 {
+            return Err(ContractError::InvalidAmount);
+        }
+
+        let mut balances: Map<Address, i128> = env
+            .storage()
+            .persistent()
+            .get(&symbol_short!("Bal"))
+            .ok_or(ContractError::NotInitialized)?;
+        let from_balance = balances.get(from.clone()).unwrap_or(0);
+        if from_balance < amount {
+            return Err(ContractError::InsufficientBalance);
+        }
+        Self::set_balance(&env, from.clone(), from_balance - amount);
+        balances.set(
+            from.clone(),
+            from_balance
+                .checked_sub(amount)
+                .ok_or(ContractError::Overflow)?,
+        );
+        env.storage()
+            .persistent()
+            .set(&symbol_short!("Bal"), &balances);
+
+        let total_supply: i128 = env
+            .storage()
+            .persistent()
+            .get(&symbol_short!("Supply"))
+            .ok_or(ContractError::NotInitialized)?;
+        let new_supply = total_supply
+            .checked_sub(amount)
+            .ok_or(ContractError::Overflow)?;
+        env.storage()
+            .persistent()
+            .set(&symbol_short!("Supply"), &new_supply);
+
+        env.events().publish(
+            (symbol_short!("burn"), from.clone(), from.clone()),
+            amount,
+        );
+
+        Ok(())
+    }
+
+    /// Burn tokens from any balance (only admin).
+    ///
+    /// Rationale: Admin-initiated supply contraction is a legitimate design for this
+    /// token, so we keep an explicitly named `admin_burn` operation. However, to
+    /// comply with Token Standard semantics and protect against key compromise,
+    /// the standard `burn` operation requires holder authorization.
+    pub fn admin_burn(
         env: Env,
         admin: Address,
         from: Address,
@@ -297,8 +291,9 @@ impl TokenContract {
         if from_balance < amount {
             return Err(ContractError::InsufficientBalance);
         }
+        Self::set_balance(&env, from.clone(), from_balance - amount);
         balances.set(
-            from,
+            from.clone(),
             from_balance
                 .checked_sub(amount)
                 .ok_or(ContractError::Overflow)?,
@@ -318,6 +313,12 @@ impl TokenContract {
         env.storage()
             .persistent()
             .set(&symbol_short!("Supply"), &new_supply);
+
+        env.events().publish(
+            (symbol_short!("burn"), admin, from),
+            amount,
+        );
+
         Ok(())
     }
 
@@ -334,12 +335,18 @@ impl TokenContract {
             return Err(ContractError::InvalidAmount);
         }
 
+        let key = (symbol_short!("Allow"), owner, spender);
+        if amount == 0 {
+            env.storage().persistent().remove(&key);
+        } else {
+            env.storage().persistent().set(&key, &amount);
+        }
         let mut allowances: Map<(Address, Address), i128> = env
             .storage()
             .persistent()
             .get(&symbol_short!("Allow"))
             .unwrap_or(map![&env]);
-        allowances.set((owner, spender), amount);
+        allowances.set((owner.clone(), spender), amount);
         env.storage()
             .persistent()
             .set(&symbol_short!("Allow"), &allowances);
@@ -348,12 +355,11 @@ impl TokenContract {
 
     /// Get the allowance for a spender.
     pub fn allowance(env: Env, owner: Address, spender: Address) -> i128 {
-        let allowances: Map<(Address, Address), i128> = env
+        env
             .storage()
             .persistent()
-            .get(&symbol_short!("Allow"))
-            .unwrap_or(map![&env]);
-        allowances.get((owner, spender)).unwrap_or(0)
+            .get(&(symbol_short!("Allow"), owner, spender))
+            .unwrap_or(0)
     }
 
     /// Transfer tokens using allowance.
@@ -370,6 +376,7 @@ impl TokenContract {
             return Err(ContractError::InvalidAmount);
         }
 
+        let current_allowance = Self::allowance(env.clone(), from.clone(), spender.clone());
         let mut allowances: Map<(Address, Address), i128> = env
             .storage()
             .persistent()
@@ -381,6 +388,9 @@ impl TokenContract {
         if current_allowance < amount {
             return Err(ContractError::InsufficientAllowance);
         }
+        Self::set_allowance(&env, from.clone(), spender, current_allowance - amount);
+
+        let from_balance = Self::balance(env.clone(), from.clone());
         allowances.set(
             (from.clone(), spender),
             current_allowance
@@ -399,6 +409,27 @@ impl TokenContract {
         let from_balance = balances.get(from.clone()).unwrap_or(0);
         if from_balance < amount {
             return Err(ContractError::InsufficientBalance);
+        }
+        Self::set_balance(&env, from, from_balance - amount);
+        let to_balance = Self::balance(env.clone(), to.clone());
+        Self::set_balance(&env, to, to_balance + amount);
+    }
+
+    fn set_balance(env: &Env, account: Address, amount: i128) {
+        let key = (symbol_short!("Bal"), account);
+        if amount == 0 {
+            env.storage().persistent().remove(&key);
+        } else {
+            env.storage().persistent().set(&key, &amount);
+        }
+    }
+
+    fn set_allowance(env: &Env, owner: Address, spender: Address, amount: i128) {
+        let key = (symbol_short!("Allow"), owner, spender);
+        if amount == 0 {
+            env.storage().persistent().remove(&key);
+        } else {
+            env.storage().persistent().set(&key, &amount);
         }
         balances.set(
             from.clone(),
