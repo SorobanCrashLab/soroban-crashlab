@@ -116,6 +116,7 @@ export default function NavBar() {
               key={item.href}
               href={item.href}
               prefetch
+              data-tour={item.href === '/schedules' ? 'nav-schedules' : undefined}
               className="top-nav-link shrink-0 lg:px-3"
               aria-label={item.label}
               title={item.label}

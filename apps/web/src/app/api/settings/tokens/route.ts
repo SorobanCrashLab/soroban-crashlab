@@ -20,14 +20,29 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, scope, expiresAt } = body;
+    const { name, scopes, expiresAt } = body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return errorResponse('Token name is required.', 400);
     }
 
-    const validScopes: ApiTokenScope[] = ['read', 'write'];
-    const tokenScope: ApiTokenScope = validScopes.includes(scope) ? scope : 'read';
+    const validScopeValues: ApiTokenScope[] = [
+      'webhook:read',
+      'webhook:write',
+      'runs:read',
+      'runs:write',
+      'settings:read',
+      'settings:write',
+      '*',
+    ];
+
+    let tokenScopes: ApiTokenScope[] = ['runs:read'];
+    if (Array.isArray(scopes) && scopes.length > 0) {
+      tokenScopes = scopes.filter((s) => validScopeValues.includes(s));
+      if (tokenScopes.length === 0) {
+        tokenScopes = ['runs:read'];
+      }
+    }
 
     let validatedExpiry: string | null = null;
     if (expiresAt) {
@@ -40,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const { secret, token } = createApiToken({
       name: name.trim(),
-      scope: tokenScope,
+      scopes: tokenScopes,
       expiresAt: validatedExpiry,
     });
 

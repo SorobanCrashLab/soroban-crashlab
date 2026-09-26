@@ -1,6 +1,7 @@
 import { WebhookStore } from './webhook-store';
 import { createDlqEntry, type DlqAttemptNote, type DlqEntry } from './webhook-dlq';
 import { createHmac } from 'node:crypto';
+import type { WebhookRetryQueue } from './webhook-retry-queue';
 
 export type HmacKeyRing = {
   current: string;
@@ -79,6 +80,22 @@ export interface WebhookDeliveryWorkerOptions {
   onDeadLetter?: (entry: DlqEntry) => void;
   hmacSecrets?: string[];
   hmacKeyRing?: HmacKeyRing;
+  /**
+   * Durable retry queue (#1635). When set, a retryable failure is persisted
+   * as a queued job for the webhook-recovery tick instead of being retried
+   * inline with in-process sleeps that die with the serverless function.
+   */
+  retryQueue?: WebhookRetryQueue;
+}
+
+/**
+ * Network errors (no status), 429 and 5xx are worth another attempt; any
+ * other status will fail the same way next time.
+ */
+export function isRetryableDeliveryStatus(statusCode?: number): boolean {
+  if (statusCode === undefined) return true;
+  if (statusCode === 429) return true;
+  return statusCode >= 500;
 }
 
 import { WEBHOOK_DELIVERY_TIMEOUT_MS, WEBHOOK_DELIVERY_RETRY_BASE_MS } from './timeouts';
@@ -145,6 +162,7 @@ export class WebhookDeliveryWorker {
   private readonly onAttempt?: (attempt: WebhookDeliveryAttempt) => void;
   private readonly onDeadLetter?: (entry: DlqEntry) => void;
   private readonly hmacSecrets: string[];
+  private readonly retryQueue?: WebhookRetryQueue;
   private readonly queue: WebhookDeliveryRequest[] = [];
   private active = false;
   private draining: Promise<void> | null = null;
@@ -168,6 +186,7 @@ export class WebhookDeliveryWorker {
       ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.onAttempt = options.onAttempt;
     this.onDeadLetter = options.onDeadLetter;
+    this.retryQueue = options.retryQueue;
   }
 
   getHmacSecrets(): string[] {
@@ -305,6 +324,17 @@ export class WebhookDeliveryWorker {
         });
       }
 
+      if (willRetry && this.retryQueue) {
+        this.retryQueue.schedule({
+          // Carry the worker's budget so the queue stops where inline retries would have.
+          request: { ...request, maxAttempts },
+          attemptsMade: attempt,
+          timeline,
+          createdAt: timeline[0]?.at,
+        });
+        return;
+      }
+
       if (!willRetry) {
         if (!delivered) {
           this.deadLetter(request, timeline, attempt === maxAttempts, attemptRecord.deliveredAt);
@@ -340,15 +370,7 @@ export class WebhookDeliveryWorker {
   }
 
   private shouldRetry(statusCode?: number): boolean {
-    if (statusCode === undefined) {
-      return true;
-    }
-
-    if (statusCode === 429) {
-      return true;
-    }
-
-    return statusCode >= 500;
+    return isRetryableDeliveryStatus(statusCode);
   }
 
   private retryDelayMs(attempt: number): number {

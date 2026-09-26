@@ -8,6 +8,7 @@ import {
   getVersionsForTemplate,
   type TemplateVersion,
 } from './reporting-templates-version-history-utils';
+import { safeStorage } from "../lib/local-storage";
 
 type ReportingTemplateKind = 'issue' | 'pr';
 
@@ -63,7 +64,7 @@ function isReportingTemplate(value: unknown): value is ReportingTemplate {
 function readTemplatesFromStorage(): ReportingTemplate[] | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+    const raw = safeStorage.getItem(TEMPLATES_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return null;
@@ -77,7 +78,7 @@ function readTemplatesFromStorage(): ReportingTemplate[] | null {
 function readSelectedTemplateIdFromStorage(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    return localStorage.getItem(SELECTED_TEMPLATE_STORAGE_KEY);
+    return safeStorage.getItem(SELECTED_TEMPLATE_STORAGE_KEY);
   } catch {
     return null;
   }
@@ -94,17 +95,7 @@ export function isQuotaExceededError(error: unknown): boolean {
 }
 
 export function safeWriteStorage(key: string, value: string): boolean {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch (error) {
-    if (isQuotaExceededError(error)) {
-      console.warn(`localStorage quota exceeded, "${key}" will not persist`);
-    }
-    // Private mode, quota exceeded, or storage disabled: caller decides
-    // how to surface this to the user rather than failing silently.
-    return false;
-  }
+  return safeStorage.setItem(key, value);
 }
 
 /**

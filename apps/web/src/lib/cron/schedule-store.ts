@@ -44,6 +44,11 @@ export interface ScheduledRun {
   /** True when this run is one catch-up covering multiple missed ticks. */
   caughtUp: boolean;
   tags: string[];
+  /**
+   * Deterministic Idempotency-Key (schedule id + slot) for the campaign this
+   * run fires (#1634): a cron retry of the same slot dedupes server-side.
+   */
+  idempotencyKey: string;
 }
 
 export interface ScheduleInput {

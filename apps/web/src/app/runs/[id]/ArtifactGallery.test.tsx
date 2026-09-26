@@ -10,20 +10,30 @@ import type { FuzzingRun } from "../../types";
 
 const mockRunWithArtifacts: FuzzingRun = {
   id: "run-123",
-  status: "success",
+  status: "completed",
+  area: "state",
+  severity: "medium",
+  duration: 0,
+  seedCount: 1,
+  crashDetail: null,
   queuedAt: "2026-01-01T00:00:00Z",
   cpuInstructions: 500_000,
   memoryBytes: 5_000_000,
   minResourceFee: 2000,
   artifacts: [
-    { id: "art-1", name: "crash.bin", type: "crash", size: 1024 * 100 },
-    { id: "art-2", name: "seed.dat", type: "seed", size: 1024 * 50 },
+    { id: "art-1", name: "crash.bin", type: "log", size: 1024 * 100, updatedAt: "2026-01-01T00:00:00Z" },
+    { id: "art-2", name: "seed.dat", type: "seed", size: 1024 * 50, updatedAt: "2026-01-01T00:00:00Z" },
   ],
 };
 
 const mockRunWithZeroArtifacts: FuzzingRun = {
   id: "run-456",
   status: "failed",
+  area: "auth",
+  severity: "high",
+  duration: 0,
+  seedCount: 0,
+  crashDetail: null,
   queuedAt: "2026-01-01T00:00:00Z",
   cpuInstructions: 100_000,
   memoryBytes: 1_000_000,
@@ -34,6 +44,11 @@ const mockRunWithZeroArtifacts: FuzzingRun = {
 const mockRunWithUndefinedArtifacts: FuzzingRun = {
   id: "run-789",
   status: "failed",
+  area: "state",
+  severity: "high",
+  duration: 0,
+  seedCount: 0,
+  crashDetail: null,
   queuedAt: "2026-01-01T00:00:00Z",
   cpuInstructions: 100_000,
   memoryBytes: 1_000_000,

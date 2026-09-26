@@ -47,7 +47,7 @@ function testExportImportRoundtrip() {
   const preset = createPreset('Test', 'Desc', { key: 'value' });
   const json = exportPresetAsJson(preset);
   const imported = importPresetFromJson(json);
-  assert(imported !== null, 'Import should succeed');
+  if (imported === null) throw new Error('Import should succeed');
   assert(imported.name === 'Test', 'Name should match');
   assert(imported.filters.key === 'value', 'Filters should match');
   assert(imported.id !== preset.id, 'ID should be regenerated');

@@ -21,6 +21,8 @@ const ACTIONS: Array<AuditAction | 'all'> = [
   'rbac.change',
   'dlq.purge',
   'dlq.replay',
+  'dlq.park',
+  'upload.reject',
   'thread.resolve',
   'artifact.delete',
 ];

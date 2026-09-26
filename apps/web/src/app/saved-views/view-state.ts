@@ -21,7 +21,7 @@ export const VIEW_CODEC_VERSION = 2;
  */
 export const URL_LENGTH_WARNING_THRESHOLD = 1800;
 
-export type SortDirection = 'asc' | 'desc';
+export type SortDirection = 'asc' | 'desc' | 'none';
 
 export interface ViewFilters {
   status: string[];
@@ -71,7 +71,7 @@ export function normalizeViewState(state: ViewState): ViewState {
     },
     sort: {
       key: state.sort.key || 'queuedAt',
-      direction: state.sort.direction === 'asc' ? 'asc' : 'desc',
+      direction: state.sort.direction === 'asc' ? 'asc' : state.sort.direction === 'none' ? 'none' : 'desc',
     },
     columns: list(state.columns),
     page: Number.isFinite(state.page) ? Math.max(1, Math.trunc(state.page)) : 1,
@@ -176,7 +176,7 @@ export function decodeViewState(search: string): ViewState {
     },
     sort: {
       key: sanitizeSearchQuery(params.get(PARAM.sortKey) ?? 'queuedAt'),
-      direction: direction === 'asc' ? 'asc' : 'desc',
+      direction: direction === 'asc' ? 'asc' : direction === 'none' ? 'none' : 'desc',
     },
     columns: splitList(params.get(PARAM.columns)),
     page: Number.isFinite(pageValue) ? pageValue : 1,

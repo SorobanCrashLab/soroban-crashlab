@@ -6,6 +6,7 @@
  */
 
 import { encodeViewState, type ViewState } from './view-state';
+import { safeStorage } from "@/lib/local-storage";
 
 export const SAVED_VIEWS_STORAGE_KEY = 'crashlab:saved-views:v1';
 
@@ -38,12 +39,12 @@ export function createLocalSavedViewGateway(): SavedViewGateway {
     list: () =>
       typeof window === 'undefined'
         ? []
-        : parseSavedViews(localStorage.getItem(SAVED_VIEWS_STORAGE_KEY)),
+        : parseSavedViews(safeStorage.getItem(SAVED_VIEWS_STORAGE_KEY)),
     save: (views) => {
       if (typeof window === 'undefined') {
         throw new Error('Saved views are only available in the browser');
       }
-      localStorage.setItem(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(views));
+      safeStorage.setItem(SAVED_VIEWS_STORAGE_KEY, JSON.stringify(views));
     },
   };
 }

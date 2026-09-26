@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   checkDependencyHealth,
+  clearHealthCache,
   GET,
   type HealthCheckDependencies,
 } from './route';
@@ -96,11 +97,13 @@ function mockHealthyDependencies(): void {
 }
 
 beforeEach(() => {
+  clearHealthCache();
   mockHealthyDependencies();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  clearHealthCache();
 });
 
 describe('checkDependencyHealth', () => {

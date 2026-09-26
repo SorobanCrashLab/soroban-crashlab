@@ -8,7 +8,6 @@ import {
   verifySmtpConnection,
   createCriticalEventEmail,
   createRunEventEmail,
-  sendBatchEmails,
   type SmtpConfig,
   type EmailMessage,
 } from './smtp-email';
@@ -195,9 +194,10 @@ describe('sendBatchEmails', () => {
     const sendMail = vi.fn().mockResolvedValue({ messageId: '<batch@example.com>' });
     vi.mocked(nodemailer.createTransport).mockReturnValue({ sendMail } as never);
 
-    const results = await sendBatchEmails(makeConfig(), [
-      makeMessage({ to: 'a@example.com' }),
-      makeMessage({ to: 'b@example.com' }),
+    const config = makeConfig();
+    const results = await Promise.all([
+      sendEmail(config, makeMessage({ to: 'a@example.com' })),
+      sendEmail(config, makeMessage({ to: 'b@example.com' })),
     ]);
 
     expect(results).toHaveLength(2);

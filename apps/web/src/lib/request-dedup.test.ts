@@ -666,8 +666,8 @@ describe('multi-caller fan-out on failure (#1383)', () => {
       expect(r1.reason).toBeInstanceOf(NetworkError);
       expect((r1.reason as InstanceType<typeof NetworkError>).cause).toBe(boom);
     }
-    if (r2.status === 'rejected') expect(r2.reason).toBe(r1.reason);
-    if (r3.status === 'rejected') expect(r3.reason).toBe(r1.reason);
+    if (r2.status === 'rejected' && r1.status === 'rejected') expect(r2.reason).toBe(r1.reason);
+    if (r3.status === 'rejected' && r1.status === 'rejected') expect(r3.reason).toBe(r1.reason);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

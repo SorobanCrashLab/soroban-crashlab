@@ -5,12 +5,15 @@ import type { RunStorageDriver } from './run-driver';
 export interface RunDriverHarness {
   driver: RunStorageDriver;
   makeRun?: (id: string) => FuzzingRun;
+  /** Whether the driver stores artifact bytes. Upstash KV does not. */
+  storesArtifactBytes?: boolean;
 }
 
 export function runRunDriverContract(name: string, createHarness: () => RunDriverHarness): void {
   describe(`RunStorageDriver contract: ${name}`, () => {
     it('round-trips run and artifact data', async () => {
-      const { driver } = createHarness();
+      const harness = createHarness();
+      const { driver, storesArtifactBytes = true } = harness;
       const run = (await driver.listRuns()).runs[0];
       expect(run).toBeDefined();
       if (!run) return;
@@ -24,7 +27,12 @@ export function runRunDriverContract(name: string, createHarness: () => RunDrive
       await driver.putArtifact(run.id, artifact, bytes);
       const stored = await driver.getArtifact(artifact.id);
       expect(stored?.metadata).toEqual({ ...artifact, runId: run.id });
-      expect([...((stored?.bytes) ?? [])]).toEqual([...bytes]);
+      if (storesArtifactBytes) {
+        expect([...((stored?.bytes) ?? [])]).toEqual([...bytes]);
+      } else {
+        // Driver doesn't store bytes (e.g., Upstash KV) - verify metadata only
+        expect(stored?.bytes).toEqual(new Uint8Array(0));
+      }
     });
 
     it('keeps filtering and totals consistent', async () => {
@@ -48,7 +56,8 @@ export function runRunDriverContract(name: string, createHarness: () => RunDrive
     });
 
     it('handles concurrent artifact writes without byte mixing', async () => {
-      const { driver } = createHarness();
+      const harness = createHarness();
+      const { driver, storesArtifactBytes = true } = harness;
       const run = (await driver.listRuns()).runs[0];
       if (!run) return;
       const writes = [1, 2, 3, 4].map((value) => driver.putArtifact(run.id, {
@@ -57,7 +66,10 @@ export function runRunDriverContract(name: string, createHarness: () => RunDrive
       await Promise.all(writes);
       for (const value of [1, 2, 3, 4]) {
         const stored = await driver.getArtifact(`${run.id}-${value}`);
-        expect(stored?.bytes[0]).toBe(value);
+        expect(stored?.metadata.id).toBe(`${run.id}-${value}`);
+        if (storesArtifactBytes) {
+          expect(stored?.bytes[0]).toBe(value);
+        }
       }
     });
   });

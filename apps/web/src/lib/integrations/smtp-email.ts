@@ -7,6 +7,12 @@
  */
 
 import * as nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
+import {
+  SMTP_CONNECTION_TIMEOUT_MS,
+  SMTP_GREETING_TIMEOUT_MS,
+  SMTP_SOCKET_TIMEOUT_MS,
+} from "../timeouts";
 import {
   validateSmtpConfig,
   validateEmailMessage,
@@ -17,8 +23,27 @@ import {
 
 export * from "./smtp-validation";
 
-function createTransporter(config: SmtpConfig) {
-  return nodemailer.createTransport({
+export interface SmtpTimeouts {
+  connectionTimeout: number;
+  greetingTimeout: number;
+  socketTimeout: number;
+}
+
+/**
+ * nodemailer's defaults (2 min connect, 30 s greeting, 10 min socket) let a
+ * silent SMTP server hold a serverless function far past its limit (#1633).
+ */
+export const SMTP_TIMEOUTS: SmtpTimeouts = Object.freeze({
+  connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+  greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+  socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
+});
+
+export function buildSmtpTransportOptions(
+  config: SmtpConfig,
+  timeouts: SmtpTimeouts = SMTP_TIMEOUTS,
+): SMTPTransport.Options {
+  return {
     host: config.host,
     port: config.port,
     secure: config.secure,
@@ -26,7 +51,12 @@ function createTransporter(config: SmtpConfig) {
       user: config.auth.user,
       pass: config.auth.pass,
     },
-  });
+    ...timeouts,
+  };
+}
+
+function createTransporter(config: SmtpConfig) {
+  return nodemailer.createTransport(buildSmtpTransportOptions(config));
 }
 
 /**

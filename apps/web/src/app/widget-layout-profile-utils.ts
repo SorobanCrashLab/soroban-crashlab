@@ -2,6 +2,8 @@
  * Per-user-profile persistence helpers for the custom widget layout editor.
  */
 
+import { safeStorage } from "../lib/local-storage";
+
 export const WIDGET_LAYOUT_STORAGE_PREFIX = 'dashboard-widget-layout';
 export const ACTIVE_WIDGET_LAYOUT_PROFILE_KEY = 'dashboard-widget-layout-active-profile';
 export const DEFAULT_WIDGET_LAYOUT_PROFILE_ID = 'default';
@@ -17,10 +19,14 @@ export function getWidgetLayoutStorageKey(profileId?: string | null): string {
 }
 
 export function readActiveWidgetLayoutProfileId(
-  storage: Pick<Storage, 'getItem'> = globalThis.localStorage,
+  storage?: Pick<Storage, 'getItem'>,
 ): string {
   try {
-    return normalizeProfileId(storage.getItem(ACTIVE_WIDGET_LAYOUT_PROFILE_KEY));
+    return normalizeProfileId(
+      storage
+        ? storage.getItem(ACTIVE_WIDGET_LAYOUT_PROFILE_KEY)
+        : safeStorage.getItem(ACTIVE_WIDGET_LAYOUT_PROFILE_KEY),
+    );
   } catch {
     return DEFAULT_WIDGET_LAYOUT_PROFILE_ID;
   }
@@ -28,21 +34,24 @@ export function readActiveWidgetLayoutProfileId(
 
 export function writeActiveWidgetLayoutProfileId(
   profileId: string,
-  storage: Pick<Storage, 'setItem'> = globalThis.localStorage,
+  storage?: Pick<Storage, 'setItem'>,
 ): string {
   const normalized = normalizeProfileId(profileId);
-  storage.setItem(ACTIVE_WIDGET_LAYOUT_PROFILE_KEY, normalized);
+  if (storage) storage.setItem(ACTIVE_WIDGET_LAYOUT_PROFILE_KEY, normalized);
+  else safeStorage.setItem(ACTIVE_WIDGET_LAYOUT_PROFILE_KEY, normalized);
   return normalized;
 }
 
 export function loadWidgetLayoutForProfile<T>(
   profileId: string | null | undefined,
   fallback: T,
-  storage: Pick<Storage, 'getItem'> = globalThis.localStorage,
+  storage?: Pick<Storage, 'getItem'>,
 ): T {
   const key = getWidgetLayoutStorageKey(profileId);
   try {
-    const raw = storage.getItem(key);
+    const raw = storage
+      ? storage.getItem(key)
+      : safeStorage.getItem(key);
     if (!raw) return fallback;
     return JSON.parse(raw) as T;
   } catch {
@@ -53,9 +62,10 @@ export function loadWidgetLayoutForProfile<T>(
 export function saveWidgetLayoutForProfile<T>(
   profileId: string | null | undefined,
   layout: T,
-  storage: Pick<Storage, 'setItem'> = globalThis.localStorage,
+  storage?: Pick<Storage, 'setItem'>,
 ): string {
   const key = getWidgetLayoutStorageKey(profileId);
-  storage.setItem(key, JSON.stringify(layout));
+  if (storage) storage.setItem(key, JSON.stringify(layout));
+  else safeStorage.setItem(key, JSON.stringify(layout));
   return key;
 }

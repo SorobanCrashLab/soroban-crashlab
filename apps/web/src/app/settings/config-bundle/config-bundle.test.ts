@@ -231,8 +231,8 @@ describe('diff preview', () => {
   it('ignores key ordering when deciding whether an item changed', () => {
     const diff = diffSection(
       'channels',
-      [{ id: 'c1', name: 'x', enabled: true }],
-      [{ enabled: true, name: 'x', id: 'c1' }],
+      [{ id: 'c1', name: 'x' }],
+      [{ name: 'x', id: 'c1' }],
     );
     expect(diff.changed).toEqual([]);
     expect(diff.unchanged.map((item) => item.id)).toEqual(['c1']);

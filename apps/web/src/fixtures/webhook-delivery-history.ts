@@ -3,7 +3,8 @@ export interface WebhookDeliveryHistoryItem {
   webhookId: string;
   url: string;
   eventType: 'run.started' | 'run.progressing' | 'run.completed' | 'run.failed' | 'run.cancelled' | 'crash.detected';
-  status: 'delivered' | 'failed' | 'queued';
+  /** `parked`: dead-lettered and past the automatic drain budget (#1635). */
+  status: 'delivered' | 'failed' | 'queued' | 'parked';
   statusCode?: number;
   attempts: number;
   maxAttempts: number;

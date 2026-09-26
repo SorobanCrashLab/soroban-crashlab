@@ -1,3 +1,5 @@
+import { safeStorage } from "../lib/local-storage";
+
 export interface FilterPreset {
   id: string;
   name: string;
@@ -12,7 +14,7 @@ export const PRESETS_STORAGE_KEY = 'crashlab:saved-filter-presets:v1';
 export function readPresets(): FilterPreset[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
+    const raw = safeStorage.getItem(PRESETS_STORAGE_KEY);
     return raw ? (JSON.parse(raw) as FilterPreset[]) : [];
   } catch {
     return [];
@@ -21,7 +23,7 @@ export function readPresets(): FilterPreset[] {
 
 export function savePresets(presets: FilterPreset[]): boolean {
   try {
-    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+    safeStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
     return true;
   } catch {
     return false;

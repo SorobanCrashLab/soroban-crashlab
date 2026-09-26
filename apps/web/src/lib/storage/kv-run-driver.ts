@@ -14,11 +14,29 @@ interface KVArtifactRecord {
   utUrl: string;
 }
 
+export interface RedisClient {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<string>;
+  del(...keys: string[]): Promise<number>;
+  sadd(key: string, ...members: string[]): Promise<number>;
+  srem(key: string, ...members: string[]): Promise<number>;
+  smembers(key: string): Promise<string[]>;
+}
+
+function createDefaultRedis(): RedisClient {
+  return getRedis();
+}
+
 export class KVRunDriver implements RunStorageDriver {
   readonly name = 'upstash-kv';
+  private readonly redis: RedisClient;
+
+  constructor(redis?: RedisClient) {
+    this.redis = redis ?? createDefaultRedis();
+  }
 
   async listRuns(options: RunListOptions = {}): Promise<{ runs: FuzzingRun[]; total: number }> {
-    const redis = getRedis();
+    const redis = this.redis;
     const ids = await redis.smembers('run:index');
 
     const runs: FuzzingRun[] = [];
@@ -44,50 +62,51 @@ export class KVRunDriver implements RunStorageDriver {
   }
 
   async getRun(id: string): Promise<FuzzingRun | null> {
-    const redis = getRedis();
-    const raw = await redis.get(`run:${id}`);
+    const raw = await this.redis.get(`run:${id}`);
     if (!raw) return null;
     return typeof raw === 'string' ? JSON.parse(raw) : (raw as FuzzingRun);
   }
 
   async putRun(run: FuzzingRun): Promise<void> {
-    const redis = getRedis();
-    await redis.set(`run:${run.id}`, JSON.stringify(run));
-    await redis.sadd('run:index', run.id);
+    await this.redis.set(`run:${run.id}`, JSON.stringify(run));
+    await this.redis.sadd('run:index', run.id);
   }
 
   async deleteRun(id: string): Promise<boolean> {
-    const redis = getRedis();
-    const existed = await redis.srem('run:index', id);
-    await redis.del(`run:${id}`);
+    const existed = await this.redis.srem('run:index', id);
+    await this.redis.del(`run:${id}`);
 
-    const artifactIds = await redis.smembers(`artifact:run:${id}`);
+    const artifactIds = await this.redis.smembers(`artifact:run:${id}`);
     for (const aid of artifactIds) {
-      await redis.del(`artifact:${aid}`);
-      await redis.srem('artifact:index', aid);
+      await this.redis.del(`artifact:${aid}`);
+      await this.redis.srem('artifact:index', aid);
     }
-    await redis.del(`artifact:run:${id}`);
+    await this.redis.del(`artifact:run:${id}`);
 
     return existed > 0;
   }
 
-  async putArtifact(_runId: string, artifact: Artifact, _bytes: Uint8Array): Promise<Artifact> {
-    const redis = getRedis();
-    const existing = await redis.get(`artifact:${artifact.id}`);
-    if (existing) {
-      const record: KVArtifactRecord = typeof existing === 'string' ? JSON.parse(existing) : existing;
-      const updated = { ...record, ...artifact };
-      await redis.set(`artifact:${artifact.id}`, JSON.stringify(updated));
-    } else {
-      await redis.set(`artifact:${artifact.id}`, JSON.stringify(artifact));
-      await redis.sadd('artifact:index', artifact.id);
-    }
+  async putArtifact(runId: string, artifact: Artifact, _bytes: Uint8Array): Promise<Artifact> {
+    const existing = await this.redis.get(`artifact:${artifact.id}`);
+    const record: KVArtifactRecord = {
+      id: artifact.id,
+      name: artifact.name,
+      type: artifact.type,
+      size: artifact.size,
+      updatedAt: artifact.updatedAt,
+      runId,
+      utKey: '',
+      utUrl: '',
+      ...(existing ? (typeof existing === 'string' ? JSON.parse(existing) : existing) : {}),
+    };
+    await this.redis.set(`artifact:${artifact.id}`, JSON.stringify(record));
+    await this.redis.sadd('artifact:index', artifact.id);
+    await this.redis.sadd(`artifact:run:${runId}`, artifact.id);
     return artifact;
   }
 
   async getArtifact(id: string): Promise<StoredArtifact | null> {
-    const redis = getRedis();
-    const raw = await redis.get(`artifact:${id}`);
+    const raw = await this.redis.get(`artifact:${id}`);
     if (!raw) return null;
     const record: KVArtifactRecord = typeof raw === 'string' ? JSON.parse(raw) : raw;
     const metadata: Artifact = {
@@ -102,8 +121,7 @@ export class KVRunDriver implements RunStorageDriver {
   }
 
   async getArtifactUrl(id: string): Promise<string | null> {
-    const redis = getRedis();
-    const raw = await redis.get(`artifact:${id}`);
+    const raw = await this.redis.get(`artifact:${id}`);
     if (!raw) return null;
     const record: KVArtifactRecord = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return record.utUrl ?? null;

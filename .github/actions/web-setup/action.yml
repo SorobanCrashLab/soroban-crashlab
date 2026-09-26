@@ -1,5 +1,5 @@
 name: "Web Setup"
-description: "Install pnpm/Node and project dependencies for apps/web"
+description: "Install pnpm/Node and workspace dependencies"
 
 inputs:
   node-version:
@@ -15,9 +15,8 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
         cache: pnpm
-        cache-dependency-path: apps/web/pnpm-lock.yaml
+        cache-dependency-path: pnpm-lock.yaml
 
     - name: Install dependencies
       shell: bash
       run: pnpm install --frozen-lockfile
-      working-directory: apps/web

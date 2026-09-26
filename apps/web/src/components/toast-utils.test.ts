@@ -1,4 +1,4 @@
-import * as assert from 'node:assert/strict';
+import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_TOAST_DURATION,
   shouldAutoDismiss,
@@ -13,81 +13,103 @@ import {
   type Toast,
 } from './toast-utils';
 
-const runAssertions = () => {
-  // Default lifetime sits in the 5-6s window required by #841.
-  assert.ok(DEFAULT_TOAST_DURATION >= 5000 && DEFAULT_TOAST_DURATION <= 6000);
-
-  // createToast applies defaults.
-  const t = createToast({ message: 'Request failed', variant: 'error' }, 'id-1');
-  assert.deepEqual(t, {
-    id: 'id-1',
-    message: 'Request failed',
-    variant: 'error',
-    duration: DEFAULT_TOAST_DURATION,
+describe('toast-utils', () => {
+  it('defaults to a duration in the 5-6s window required by #841', () => {
+    expect(DEFAULT_TOAST_DURATION).toBeGreaterThanOrEqual(5000);
+    expect(DEFAULT_TOAST_DURATION).toBeLessThanOrEqual(6000);
   });
 
-  // Caller can opt a toast out of auto-dismiss with duration 0 (manual close only).
-  const sticky = createToast({ message: 'stays', duration: 0 }, 'id-2');
-  assert.equal(shouldAutoDismiss(sticky), false);
-  assert.equal(shouldAutoDismiss(t), true);
-  assert.equal(shouldAutoDismiss({ duration: -1 }), false);
-  assert.equal(shouldAutoDismiss({ duration: Number.POSITIVE_INFINITY }), false);
+  it('createToast applies defaults', () => {
+    const t = createToast({ message: 'Request failed', variant: 'error' }, 'id-1');
+    expect(t).toEqual({
+      id: 'id-1',
+      message: 'Request failed',
+      variant: 'error',
+      duration: DEFAULT_TOAST_DURATION,
+    });
+  });
 
-  // Variant defaults to "info".
-  assert.equal(createToast({ message: 'hi' }, 'id-3').variant, 'info');
+  it('lets a caller opt a toast out of auto-dismiss with duration 0 (manual close only)', () => {
+    const t = createToast({ message: 'Request failed', variant: 'error' }, 'id-1');
+    const sticky = createToast({ message: 'stays', duration: 0 }, 'id-2');
+    expect(shouldAutoDismiss(sticky)).toBe(false);
+    expect(shouldAutoDismiss(t)).toBe(true);
+    expect(shouldAutoDismiss({ duration: -1 })).toBe(false);
+    expect(shouldAutoDismiss({ duration: Number.POSITIVE_INFINITY })).toBe(false);
+  });
 
-  // add/remove are immutable.
-  const start: Toast[] = [];
-  const afterAdd = addToast(start, t);
-  assert.equal(start.length, 0);
-  assert.deepEqual(afterAdd, [t]);
+  it('defaults variant to "info"', () => {
+    expect(createToast({ message: 'hi' }, 'id-3').variant).toBe('info');
+  });
 
-  // removeToast clears the matching id (drives both the timer and the close button).
-  const afterRemove = removeToast(afterAdd, 'id-1');
-  assert.deepEqual(afterRemove, []);
-  // Removing an unknown id is a no-op.
-  assert.deepEqual(removeToast(afterAdd, 'nope'), [t]);
+  it('add/remove are immutable', () => {
+    const t = createToast({ message: 'Request failed', variant: 'error' }, 'id-1');
+    const start: Toast[] = [];
+    const afterAdd = addToast(start, t);
+    expect(start.length).toBe(0);
+    expect(afterAdd).toEqual([t]);
+
+    const afterRemove = removeToast(afterAdd, 'id-1');
+    expect(afterRemove).toEqual([]);
+    // Removing an unknown id is a no-op.
+    expect(removeToast(afterAdd, 'nope')).toEqual([t]);
+  });
 
   // ── #1075: pause/resume must resume, not restart ──────────────────────────
+  describe('pause/resume timer state (#1075)', () => {
+    it('starts a countdown with the full duration running', () => {
+      const err = createToast({ message: 'API request failed', variant: 'error' }, 'err-1');
+      const started = startTimerState(err, 1_000);
+      expect(started).toEqual({ remaining: DEFAULT_TOAST_DURATION, resumedAt: 1_000 });
+      expect(timerDelay(started)).toBe(DEFAULT_TOAST_DURATION);
+    });
 
-  const err = createToast({ message: 'API request failed', variant: 'error' }, 'err-1');
+    it('freezes the countdown with the rest still owing when paused mid-flight', () => {
+      const err = createToast({ message: 'API request failed', variant: 'error' }, 'err-1');
+      const started = startTimerState(err, 1_000);
+      const paused = pauseTimerState(started, 2_500);
+      expect(paused.resumedAt).toBeNull();
+      expect(paused.remaining).toBe(DEFAULT_TOAST_DURATION - 1_500);
 
-  // A countdown starts with the full duration running.
-  const started = startTimerState(err, 1_000);
-  assert.deepEqual(started, { remaining: DEFAULT_TOAST_DURATION, resumedAt: 1_000 });
-  assert.equal(timerDelay(started), DEFAULT_TOAST_DURATION);
+      // Pausing again (React fires mouseenter per element boundary) changes nothing.
+      expect(pauseTimerState(paused, 9_999)).toEqual(paused);
+    });
 
-  // Hovering 1.5s in freezes the countdown with the rest still owing.
-  const paused = pauseTimerState(started, 2_500);
-  assert.equal(paused.resumedAt, null);
-  assert.equal(paused.remaining, DEFAULT_TOAST_DURATION - 1_500);
+    it('resumes the remainder rather than restarting the full duration', () => {
+      const err = createToast({ message: 'API request failed', variant: 'error' }, 'err-1');
+      const started = startTimerState(err, 1_000);
+      const paused = pauseTimerState(started, 2_500);
 
-  // Pausing again (React fires mouseenter per element boundary) changes nothing.
-  assert.deepEqual(pauseTimerState(paused, 9_999), paused);
+      // Leaving after a long hover resumes the *remainder* — the old code restarted
+      // the full 5.5s here, which is why the toast never dismissed on time.
+      const resumed = resumeTimerState(paused, 60_000);
+      expect(resumed.remaining).toBe(DEFAULT_TOAST_DURATION - 1_500);
+      expect(resumed.resumedAt).toBe(60_000);
+      expect(resumed.remaining).toBeLessThan(DEFAULT_TOAST_DURATION);
 
-  // Leaving after a long hover resumes the *remainder* — the old code restarted
-  // the full 5.5s here, which is why the toast never dismissed on time.
-  const resumed = resumeTimerState(paused, 60_000);
-  assert.equal(resumed.remaining, DEFAULT_TOAST_DURATION - 1_500);
-  assert.equal(resumed.resumedAt, 60_000);
-  assert.ok(resumed.remaining < DEFAULT_TOAST_DURATION);
+      // Resuming a running countdown is a no-op, so it can't be extended.
+      expect(resumeTimerState(resumed, 70_000)).toEqual(resumed);
+    });
 
-  // Resuming a running countdown is a no-op, so it can't be extended.
-  assert.deepEqual(resumeTimerState(resumed, 70_000), resumed);
+    it('genuinely completes the countdown across a pause/resume cycle', () => {
+      const err = createToast({ message: 'API request failed', variant: 'error' }, 'err-1');
+      const started = startTimerState(err, 1_000);
+      const paused = pauseTimerState(started, 2_500);
+      const resumed = resumeTimerState(paused, 60_000);
 
-  // The countdown genuinely completes across a pause/resume cycle.
-  const nearlyDone = pauseTimerState(resumed, 60_000 + resumed.remaining);
-  assert.equal(nearlyDone.remaining, 0);
+      const nearlyDone = pauseTimerState(resumed, 60_000 + resumed.remaining);
+      expect(nearlyDone.remaining).toBe(0);
 
-  // An expired countdown still dismisses promptly rather than scheduling a
-  // non-positive timeout.
-  assert.equal(timerDelay(nearlyDone), MIN_RESUME_DELAY);
-  assert.ok(MIN_RESUME_DELAY > 0);
+      // An expired countdown still dismisses promptly rather than scheduling a
+      // non-positive timeout.
+      expect(timerDelay(nearlyDone)).toBe(MIN_RESUME_DELAY);
+      expect(MIN_RESUME_DELAY).toBeGreaterThan(0);
+    });
 
-  // Elapsed time is never counted as negative if clocks jump backwards.
-  assert.equal(pauseTimerState(started, 500).remaining, DEFAULT_TOAST_DURATION);
-
-  console.log('toast-utils: all assertions passed');
-};
-
-runAssertions();
+    it('never counts elapsed time as negative if clocks jump backwards', () => {
+      const err = createToast({ message: 'API request failed', variant: 'error' }, 'err-1');
+      const started = startTimerState(err, 1_000);
+      expect(pauseTimerState(started, 500).remaining).toBe(DEFAULT_TOAST_DURATION);
+    });
+  });
+});

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { CampaignConfig, CampaignSeedSource, CampaignAuthMode } from './types';
 import { api } from '../lib/api-client';
+import { createIdempotencyKeyTracker } from '../lib/idempotency-key';
 
 interface CampaignConfigFormProps {
     onSubmit: (config: CampaignConfig) => void;
@@ -18,13 +19,16 @@ export default function CampaignConfigForm({ onSubmit, onCancel }: CampaignConfi
     });
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Resubmitting the same config after a failure reuses its key (#1634).
+    const idempotencyKeys = useRef(createIdempotencyKeyTracker());
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
         setError(null);
         try {
-            await api.campaigns.create(config);
+            await api.campaigns.create(config, undefined, idempotencyKeys.current.keyFor(config));
+            idempotencyKeys.current.reset();
             onSubmit(config);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to launch campaign');

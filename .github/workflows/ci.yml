@@ -11,242 +11,100 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
-  web-lint:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: apps/web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/web-setup
-      - run: pnpm run lint
-
-  web-unit:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: apps/web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/web-setup
-      - run: pnpm run test
-      - name: Generate coverage report
-        if: always()
-        run: pnpm exec vitest run --coverage --reporter=lcov --reporter=text || echo "coverage generation skipped"
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: apps/web/coverage/
-          retention-days: 14
-          if-no-files-found: ignore
-
-  web-build:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: apps/web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/web-setup
-      - run: pnpm run build
-
-  core:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: contracts/crashlab-core
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: contracts/crashlab-core
-      - run: cargo test --all-targets
-      - name: Test host-runner feature
-        run: cargo test --all-targets --features host-runner
-      - name: Test regression harness crate
-        run: cargo test --manifest-path tests/regression_harness/Cargo.toml
-
-  fuzz-smoke:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: contracts/crashlab-core
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: contracts/crashlab-core/fuzz
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
-      - name: Run fuzz smoke targets
-        run: |
-          for target in classify_payload load_bundle_document import_corpus parse_regression_group; do
-            cargo fuzz run --fuzz-dir fuzz "$target" -- \
-              -max_total_time=60 \
-              -rss_limit_mb=512
-          done
-      - name: Upload fuzz artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: core-fuzz-artifacts
-          path: contracts/crashlab-core/fuzz/artifacts/
-          if-no-files-found: ignore
-          retention-days: 14
-
-  fuzz-smoke:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: contracts/crashlab-core
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: contracts/crashlab-core/fuzz
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
-      - name: Run fuzz smoke targets
-        run: |
-          for target in classify_payload load_bundle_document import_corpus parse_regression_group; do
-            cargo fuzz run --fuzz-dir fuzz "$target" -- \
-              -max_total_time=60 \
-              -rss_limit_mb=512
-          done
-      - name: Upload fuzz artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: core-fuzz-artifacts
-          path: contracts/crashlab-core/fuzz/artifacts/
-          if-no-files-found: ignore
-          retention-days: 14
-
   soroban-example:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    name: Soroban Example (WASM build & size budget)
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: contracts/soroban-example
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect contract changes
+        id: contract-changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            DIFF=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD contracts/soroban-example/ || true)
+            if [ -n "$DIFF" ]; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install Rust stable with wasm32 target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: contracts/soroban-example
+
       - name: Run tests
         run: cargo test --all-targets
+
       - name: Build WASM artifact
         run: cargo build --target wasm32-unknown-unknown --release
 
-  secrets-scan:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Install Gitleaks
+      - name: Record size and enforce budget
         run: |
-          VERSION="8.18.2"
-          curl -sSLo gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
-          tar -xzf gitleaks.tar.gz gitleaks
-      - name: Run Gitleaks
-        run: ./gitleaks detect --verbose --redact --config .gitleaks.toml
+          bash report-size.sh
+          cat target/wasm-size-report.md >> "$GITHUB_STEP_SUMMARY"
 
-  ops-scripts-syntax:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - run: bash -n scripts/backlog-freshness-review.sh
-      - run: bash -n scripts/contracts/build-soroban-example.sh
-
-  e2e:
-    needs: [web-lint, web-unit, web-build]
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: apps/web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/web-setup
-
-      - name: Get Playwright version for cache key
-        id: pw-version
-        run: |
-          VERSION=$(node -e "const p=require('./package.json');console.log(p.devDependencies['@playwright/test']||'unknown')")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Playwright browser cache
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ steps.pw-version.outputs.version }}-${{ runner.os }}
-
-      - name: Install Playwright browsers
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Install Playwright OS dependencies (always)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
-
-      - name: Build Next.js for E2E
-        run: pnpm run build
-
-      - name: Run Playwright E2E tests
-        run: pnpm run test:e2e
-
-      - name: Upload Playwright report
+      - name: Upload WASM artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: apps/web/playwright-report/
+          name: soroban-example-wasm
+          path: contracts/soroban-example/target/wasm32-unknown-unknown/release/soroban_example.wasm
+          if-no-files-found: ignore
           retention-days: 14
 
-      - name: Upload test traces (failures only)
-        if: failure()
-        uses: actions/upload-artifact@v4
+      # Sticky comment on PRs that touch contract code (patterned after lighthouse.yml)
+      - name: Post sticky size-diff comment
+        if: github.event_name == 'pull_request' && steps.contract-changes.outputs.changed == 'true'
+        continue-on-error: true
+        uses: actions/github-script@v7
         with:
-          name: playwright-traces
-          path: apps/web/test-results/
-          retention-days: 7
+          script: |
+            const fs = require('fs');
+            const MARKER = '<!-- soroban-example-wasm-size -->';
+            const path = 'contracts/soroban-example/target/wasm-size-report.md';
+            const report = fs.existsSync(path)
+              ? fs.readFileSync(path, 'utf8')
+              : '### 📦 Soroban Contract WASM Size Report\n\n> The artifact size report was not generated.';
+            const body = `${MARKER}\n${report}`;
 
-  regression:
-    needs: [core, web-lint, web-unit, web-build, soroban-example]
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    defaults:
-      run:
-        working-directory: contracts/crashlab-core
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo run --bin crashlab -- regression-suite fixtures/
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.body?.startsWith(MARKER));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

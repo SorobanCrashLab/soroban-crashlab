@@ -1,0 +1,110 @@
+name: Nightly fuzz campaign
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nightly-campaign:
+    # No campaign CLI ("crashlab run start") has landed yet, so this smoke run
+    # is scoped to what already exists: the fixture-based regression suite
+    # (exercises run_control/checkpoint/preset code paths) plus a corpus
+    # export/import round-trip. Runs against the mock runner only — no
+    # host-runner feature, no network fuzz target — to stay hermetic.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: contracts/crashlab-core
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/crashlab-core
+
+      - name: Build campaign binaries
+        run: cargo build --bins --release
+
+      - name: Run regression suite (smoke campaign)
+        id: regression_suite
+        run: |
+          set +e
+          cargo run --release --bin crashlab -- regression-suite fixtures \
+            | tee "$RUNNER_TEMP/regression-suite.log"
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+        shell: bash
+
+      - name: Corpus export/import round-trip
+        run: |
+          set -e
+          python3 - <<'PY' > "$RUNNER_TEMP/corpus-seeds.json"
+          import json, pathlib
+          seeds = []
+          for i, fixture in enumerate(sorted(pathlib.Path("fixtures").glob("*.json"))):
+              payload = list(fixture.read_bytes()[:32])
+              seeds.append({"id": i, "payload": payload})
+          json.dump(seeds, open("/dev/stdout", "w"))
+          PY
+          cargo run --release --bin export-corpus -- "$RUNNER_TEMP/corpus-seeds.json" \
+            > "$RUNNER_TEMP/corpus-archive.json"
+          cargo run --release --bin import-corpus -- "$RUNNER_TEMP/corpus-archive.json"
+
+      - name: Upload campaign artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-campaign-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/regression-suite.log
+            ${{ runner.temp }}/corpus-archive.json
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: File a regression issue on new failures
+        if: steps.regression_suite.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          title="Nightly fuzz campaign: regression suite failed ($(date -u +%Y-%m-%d))"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "in:title \"Nightly fuzz campaign: regression suite failed\"" \
+            --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            echo "Open regression issue #$existing already tracks this failure mode; skipping."
+            exit 0
+          fi
+          body_file="$RUNNER_TEMP/issue-body.md"
+          {
+            echo "The nightly fuzz campaign's regression suite failed against a known fixture."
+            echo ""
+            echo "Repro:"
+            echo '```'
+            echo "cd contracts/crashlab-core && cargo run --bin crashlab -- regression-suite fixtures"
+            echo '```'
+            echo ""
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "<details><summary>Regression suite output</summary>"
+            echo ""
+            echo '```'
+            cat "$RUNNER_TEMP/regression-suite.log"
+            echo '```'
+            echo "</details>"
+          } > "$body_file"
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+            --body-file "$body_file" --label bug

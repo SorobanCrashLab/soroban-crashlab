@@ -60,7 +60,7 @@ async function uploadArtifact(file: File): Promise<Artifact> {
  */
 async function fetchArtifacts(): Promise<Artifact[]> {
   const data = await api.artifacts.list();
-  return data.artifacts || [];
+  return (data.artifacts || []) as Artifact[];
 }
 
 /**

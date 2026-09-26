@@ -94,7 +94,7 @@ describe('RunMetadataEditor – metadata logic', () => {
   it('backspace does not remove tag when input has text', () => {
     const tags = ['first', 'second'];
     const tagInput = 'x';
-    if (tagInput === '' && tags.length > 0) {
+    if (tagInput.length === 0 && tags.length > 0) {
       tags.pop();
     }
     expect(tags).toEqual(['first', 'second']);

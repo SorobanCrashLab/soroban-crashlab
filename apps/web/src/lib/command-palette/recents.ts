@@ -1,3 +1,5 @@
+import { safeStorage } from "../local-storage";
+
 export const RECENTS_STORAGE_KEY = 'crashlab:command-palette-recents';
 export const MAX_RECENT_COMMANDS = 10;
 
@@ -13,7 +15,7 @@ export function computeNextRecents(current: string[], id: string, max: number = 
 function persist(list: string[]): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(RECENTS_STORAGE_KEY, JSON.stringify(list));
+    safeStorage.setItem(RECENTS_STORAGE_KEY, JSON.stringify(list));
   } catch {
     /* storage unavailable (private mode, quota) — recents simply won't persist */
   }
@@ -22,7 +24,7 @@ function persist(list: string[]): void {
 export function getRecents(): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = window.localStorage.getItem(RECENTS_STORAGE_KEY);
+    const raw = safeStorage.getItem(RECENTS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : [];

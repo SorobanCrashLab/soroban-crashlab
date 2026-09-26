@@ -70,7 +70,7 @@ describe('buildTimelineIndex', () => {
             { id: 'frame-1', order: 1, caller: 'A', callee: 'B', method: 'foo', status: 'ok', durationMs: 10, timestamp: 1100 },
         ];
 
-        const index = buildTimelineIndex(logs, frames, { epsilonMs: 100 });
+        const index = buildTimelineIndex(logs, frames, { epsilonMs: 100, useSequenceOrder: false });
 
         expect(index.logToSequence.get('log-2')).toBe('frame-1');
     });
@@ -85,7 +85,7 @@ describe('buildTimelineIndex', () => {
             { id: 'frame-1', order: 1, caller: 'A', callee: 'B', method: 'foo', status: 'ok', durationMs: 10, timestamp: 1100 },
         ];
 
-        const index = buildTimelineIndex(logs, frames, { epsilonMs: 100 });
+        const index = buildTimelineIndex(logs, frames, { epsilonMs: 100, useSequenceOrder: false });
 
         expect(index.logToSequence.get('log-2')).toBeUndefined();
     });
@@ -102,7 +102,7 @@ describe('buildTimelineIndex', () => {
             { id: 'frame-2', order: 2, caller: 'B', callee: 'C', method: 'bar', status: 'ok', durationMs: 15 },
         ];
 
-        const index = buildTimelineIndex(logs, frames, { useSequenceOrder: true });
+        const index = buildTimelineIndex(logs, frames, { epsilonMs: 100, useSequenceOrder: true });
 
         // Both unmatched logs should be distributed across frames
         expect(index.logToSequence.size).toBeGreaterThanOrEqual(1);
@@ -274,7 +274,7 @@ describe('timestamp edge cases', () => {
             { id: 'frame-1', order: 1, caller: 'A', callee: 'B', method: 'foo', status: 'ok', durationMs: 10, timestamp: 1000 },
         ];
 
-        const index = buildTimelineIndex(logs, frames, { epsilonMs: 100 });
+        const index = buildTimelineIndex(logs, frames, { epsilonMs: 100, useSequenceOrder: false });
 
         // Both logs within epsilon of frame
         expect(index.logToSequence.size).toBeGreaterThanOrEqual(1);

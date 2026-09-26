@@ -12,6 +12,8 @@
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
 import { isApiTokenReachable, joinGrafanaUrl } from '../../../../integrate-grafana-dashboard-annotation-api-utils';
+import { httpCall, outboundErrorCode } from '@/lib/http-call';
+import { GRAFANA_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
 
 export async function POST(request: Request) {
   const sizeError = checkRequestSize(request);
@@ -40,11 +42,13 @@ export async function POST(request: Request) {
     }
 
     try {
-      const healthResponse = await fetch(joinGrafanaUrl(baseUrl, '/api/health'), {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${apiToken}` },
-        signal: AbortSignal.timeout?.(10_000),
-      });
+      // GET is idempotent, so transient 429/5xx and timeouts are retried.
+      const healthResponse = await httpCall(
+        'grafana',
+        joinGrafanaUrl(baseUrl, '/api/health'),
+        { method: 'GET', headers: { Authorization: `Bearer ${apiToken}` } },
+        { attemptTimeoutMs: GRAFANA_FETCH_TIMEOUT_MS },
+      );
 
       if (healthResponse.ok) {
         return successResponse({ success: true });
@@ -56,7 +60,11 @@ export async function POST(request: Request) {
       // Network not available (e.g. offline dev environment) – fall back to
       // structural validation only, returning success if token format is valid.
       console.warn('[grafana/test-connection] Could not reach Grafana health endpoint:', networkError);
-      return successResponse({ success: true, warning: 'Structural validation only – could not reach Grafana instance' });
+      return successResponse({
+        success: true,
+        warning: 'Structural validation only – could not reach Grafana instance',
+        code: outboundErrorCode(networkError),
+      });
     }
   } catch {
     return errorResponse('Failed to parse request body', 400);

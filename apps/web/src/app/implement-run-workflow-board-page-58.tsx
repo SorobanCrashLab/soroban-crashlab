@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FuzzingRun, RunStatus } from './types';
 import { formatDurationCompact } from './utils/format';
+import { safeStorage } from "@/lib/local-storage";
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -50,7 +51,7 @@ const CARD_COLORS: Record<RunStatus, string> = {
 function loadWorkflowStates(): Map<string, WorkflowState> {
   if (typeof window === 'undefined') return new Map();
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = safeStorage.getItem(STORAGE_KEY);
     if (!raw) return new Map();
     const parsed = JSON.parse(raw) as RunWorkflowState[];
     return new Map(parsed.map((item) => [item.runId, item.workflowState]));
@@ -64,13 +65,13 @@ function saveWorkflowStates(states: Map<string, WorkflowState>) {
     runId,
     workflowState,
   }));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  safeStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
 function loadColumnOrder(): ColumnOrder {
   if (typeof window === 'undefined') return { 'open': [], 'in-review': [], 'closed': [] };
   try {
-    const raw = localStorage.getItem(ORDER_STORAGE_KEY);
+    const raw = safeStorage.getItem(ORDER_STORAGE_KEY);
     if (!raw) return { 'open': [], 'in-review': [], 'closed': [] };
     return JSON.parse(raw) as ColumnOrder;
   } catch {
@@ -79,7 +80,7 @@ function loadColumnOrder(): ColumnOrder {
 }
 
 function saveColumnOrder(order: ColumnOrder) {
-  localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(order));
+  safeStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(order));
 }
 
 function getWorkflowState(

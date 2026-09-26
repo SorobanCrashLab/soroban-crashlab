@@ -3,6 +3,21 @@ import { PROMETHEUS_FETCH_TIMEOUT_MS } from "../../../../lib/timeouts";
 import { successResponse } from "../../../../lib/api-response-utils";
 import { NextRequest } from "next/server";
 import { validateMetricsScrapeAuth } from "../../../../lib/api-key-auth";
+import { getWebhookRecovery } from "../../../../lib/webhook-recovery";
+
+/**
+ * Webhook delivery metrics (#1635): delivery latency, retry counts, retry
+ * queue and dead-letter depth. Reported with every health response so a
+ * growing DLQ or parked backlog is visible to scrapers and alerting.
+ */
+function webhookDeliveryMetrics() {
+  try {
+    return getWebhookRecovery().metrics();
+  } catch (error) {
+    console.error("Unable to read webhook delivery metrics:", error);
+    return undefined;
+  }
+}
 
 /**
  * GET /api/health/metrics
@@ -22,6 +37,8 @@ export async function GET(request: NextRequest) {
   if (authError) {
     return authError;
   }
+
+  const webhooks = webhookDeliveryMetrics();
 
   try {
     // Use environment variables or default configuration
@@ -49,6 +66,7 @@ export async function GET(request: NextRequest) {
           timestamp: new Date().toISOString(),
           error: `Metrics exporter health check failed with status ${healthResult.statusCode}`,
           statusCode: healthResult.statusCode,
+          webhooks,
         },
         { status: 503 },
       );
@@ -61,6 +79,7 @@ export async function GET(request: NextRequest) {
         endpoint: prometheusEndpoint,
         statusCode: healthResult.statusCode,
         version: "1.0.0",
+        webhooks,
       },
       { status: 200 },
     );
@@ -81,6 +100,7 @@ export async function GET(request: NextRequest) {
         timestamp: new Date().toISOString(),
         error: errorMessage,
         errorType: isConnectionError ? "connection_error" : "internal_error",
+        webhooks,
       },
       { status: isConnectionError ? 503 : 500 },
     );

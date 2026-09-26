@@ -13,6 +13,7 @@ import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
 import { isIntegrationKeyReachable } from '../../../../integrate-pagerduty-alert-integration-utils';
 import { PAGERDUTY_FETCH_TIMEOUT_MS } from '../../../../../lib/timeouts';
+import { httpCall, outboundErrorCode } from '../../../../../lib/http-call';
 
 const PD_EVENTS_API_URL = 'https://events.pagerduty.com/v2/enqueue';
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     // Attempt a real connectivity test when running in a server environment.
     // We send a "test" event with dedup_key so PagerDuty won't page anyone.
     try {
-      const pdResponse = await fetch(PD_EVENTS_API_URL, {
+      const pdResponse = await httpCall('pagerduty', PD_EVENTS_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,10 @@ export async function POST(request: Request) {
             },
           },
         }),
-        signal: AbortSignal.timeout?.(PAGERDUTY_FETCH_TIMEOUT_MS),
+      }, {
+        attemptTimeoutMs: PAGERDUTY_FETCH_TIMEOUT_MS,
+        // Events API v2 deduplicates on dedup_key, so a retried POST is safe.
+        idempotent: true,
       });
 
       if (pdResponse.ok || pdResponse.status === 202) {
@@ -72,7 +76,11 @@ export async function POST(request: Request) {
       // Network not available (e.g. offline dev environment) – fall back to
       // structural validation only, returning success if key format is valid.
       console.warn('[pagerduty/test-connection] Could not reach PagerDuty Events API:', networkError);
-      return successResponse({ success: true, warning: 'Structural validation only – could not reach PagerDuty API' });
+      return successResponse({
+        success: true,
+        warning: 'Structural validation only – could not reach PagerDuty API',
+        code: outboundErrorCode(networkError),
+      });
     }
   } catch {
     return errorResponse('Failed to parse request body', 400);

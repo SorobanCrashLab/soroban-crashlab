@@ -20,8 +20,10 @@ import {
   createDefaultViewState,
   decodeViewState,
   encodeViewState,
+  type SortDirection,
   type ViewState,
 } from '../saved-views/view-state';
+import { getNextSortState, type SortOrder, type SortState } from '../run-history-sort-utils';
 import { applyRunFilters } from '../run-filter-utils';
 import type { RunArea, RunSeverity, RunStatus } from '../types';
 import { fetchRuns } from '../../lib/api-client';
@@ -98,6 +100,32 @@ export default function RunsPage() {
     };
   }, [fetchAttempt]);
 
+  const currentSortState: SortState<string> = useMemo(
+    () => ({
+      field: viewState.sort.direction === 'none' ? null : viewState.sort.key || null,
+      order: (viewState.sort.direction as SortOrder) || 'none',
+    }),
+    [viewState.sort.key, viewState.sort.direction],
+  );
+
+  const handleSort = useCallback(
+    (field: string) => {
+      const current: SortState<string> = {
+        field: viewState.sort.direction === 'none' ? null : viewState.sort.key || null,
+        order: (viewState.sort.direction as SortOrder) || 'none',
+      };
+      const next = getNextSortState(current, field);
+      applyView({
+        ...viewState,
+        sort: {
+          key: next.field ?? '',
+          direction: next.order as SortDirection,
+        },
+      });
+    },
+    [viewState, applyView],
+  );
+
   const visibleRuns = useMemo(() => {
     const filtered = applyRunFilters(runs, {
       status: viewState.filters.status as RunStatus[],
@@ -107,11 +135,19 @@ export default function RunsPage() {
       hasCrash: viewState.filters.hasCrash,
     });
 
+    if (!viewState.sort.key || viewState.sort.direction === 'none') {
+      return filtered;
+    }
+
     const direction = viewState.sort.direction === 'asc' ? 1 : -1;
     return filtered.slice().sort((a, b) => {
-      const left = String(a[viewState.sort.key as keyof FuzzingRun] ?? '');
-      const right = String(b[viewState.sort.key as keyof FuzzingRun] ?? '');
-      return left.localeCompare(right) * direction;
+      const field = viewState.sort.key as keyof FuzzingRun;
+      const left = a[field];
+      const right = b[field];
+      if (typeof left === 'number' && typeof right === 'number') {
+        return (left - right) * direction;
+      }
+      return String(left ?? '').localeCompare(String(right ?? '')) * direction;
     });
   }, [runs, viewState]);
 
@@ -232,6 +268,8 @@ export default function RunsPage() {
           selectedRunIds={selectedRunIds}
           onToggleRunSelection={handleToggleRunSelection}
           onToggleAllRunsSelection={handleToggleAllRunsSelection}
+          sortState={currentSortState}
+          onSort={handleSort}
         />
       </ListState>
     </div>

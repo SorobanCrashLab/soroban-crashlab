@@ -2,6 +2,7 @@ import type { RunIssueLink, CampaignConfig } from '../app/types';
 import { dedupedFetchJson, HttpError } from './request-dedup';
 import { API_BASE } from './api-base';
 import { logger } from './logger';
+import { generateIdempotencyKey, IDEMPOTENCY_KEY_HEADER } from './idempotency-key';
 import { z } from 'zod';
 import type { ZodIssue, ZodTypeAny } from 'zod';
 import {
@@ -240,9 +241,19 @@ export const api = {
       }),
   },
   campaigns: {
-    create: (config: CampaignConfig, signal?: AbortSignal) =>
+    /**
+     * Always sends an Idempotency-Key (#1634). Pass the same key when retrying
+     * a failed create so the server replays the original campaign instead of
+     * forking a duplicate.
+     */
+    create: (
+      config: CampaignConfig,
+      signal?: AbortSignal,
+      idempotencyKey: string = generateIdempotencyKey(),
+    ) =>
       apiFetch('/campaigns', CampaignResponseSchema, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json', [IDEMPOTENCY_KEY_HEADER]: idempotencyKey },
         body: JSON.stringify(config),
         signal,
       }),

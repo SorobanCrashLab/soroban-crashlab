@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { safeStorage } from "../lib/local-storage";
 import {
   resolveTheme,
   parseStoredTheme,
@@ -24,7 +25,7 @@ const ThemeContext = createContext<ThemeContextType>({
 function getStoredTheme(): Theme | null {
   if (typeof window === 'undefined') return null;
   try {
-    return parseStoredTheme(localStorage.getItem(THEME_STORAGE_KEY));
+    return parseStoredTheme(safeStorage.getItem(THEME_STORAGE_KEY));
   } catch {
     return null;
   }
@@ -62,9 +63,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (!mounted || typeof window === 'undefined') return;
     try {
       if (userTheme !== null) {
-        localStorage.setItem(THEME_STORAGE_KEY, userTheme);
+        safeStorage.setItem(THEME_STORAGE_KEY, userTheme);
       } else {
-        localStorage.removeItem(THEME_STORAGE_KEY);
+        safeStorage.removeItem(THEME_STORAGE_KEY);
       }
     } catch {
       /* ignore */

@@ -5,39 +5,31 @@
  * Returns 404 if the issue is not found or credentials are not configured.
  */
 
-import { withRouteErrorHandling, jsonError, readJsonBody } from '@/lib/route-handler';
+import { createRouteHandler, jsonError } from '@/lib/route-handler';
 import { successResponse } from '@/lib/api-response-utils';
 import { createJiraIssuesAdapter } from '@/lib/integrations/jira-issues';
+import { z } from 'zod';
 
-interface RouteContext {
-  params: Promise<{ issueKey: string }>;
-}
+const jiraIssueSchema = z.object({
+  summary: z.string().min(1, 'A non-empty summary is required'),
+  description: z.string().optional(),
+  projectKey: z.string().optional(),
+  issueType: z.string().optional(),
+});
 
-export const POST = withRouteErrorHandling(
-  'POST /api/integrations/jira',
-  async (request: Request) => {
-    const bodyResult = await readJsonBody(request);
-    if ('error' in bodyResult) {
-      return bodyResult.error;
-    }
-
-    const payload = bodyResult.body as {
-      summary?: unknown;
-      description?: unknown;
-      projectKey?: unknown;
-      issueType?: unknown;
-    } | null;
-
-    if (!payload || typeof payload.summary !== 'string' || payload.summary.trim() === '') {
-      return jsonError('A non-empty summary is required', 400);
-    }
-
+export const POST = createRouteHandler(
+  {
+    label: 'POST /api/integrations/jira',
+    fallbackMessage: 'Failed to create Jira issue',
+    bodySchema: jiraIssueSchema,
+  },
+  async (request, { body }) => {
     const adapter = createJiraIssuesAdapter();
     const issue = await adapter.createIssue({
-      summary: payload.summary.trim(),
-      description: typeof payload.description === 'string' ? payload.description : undefined,
-      projectKey: typeof payload.projectKey === 'string' ? payload.projectKey : undefined,
-      issueType: typeof payload.issueType === 'string' ? payload.issueType : undefined,
+      summary: body.summary.trim(),
+      description: body.description,
+      projectKey: body.projectKey,
+      issueType: body.issueType,
     });
 
     if (!issue) {
@@ -45,14 +37,16 @@ export const POST = withRouteErrorHandling(
     }
 
     return successResponse({ issue });
-  },
-  'Failed to create Jira issue',
+  }
 );
 
-export const GET = withRouteErrorHandling(
-  'GET /api/integrations/jira/[issueKey]',
-  async (_request: Request, context: RouteContext) => {
-    const { issueKey } = await context.params;
+export const GET = createRouteHandler(
+  {
+    label: 'GET /api/integrations/jira/[issueKey]',
+    fallbackMessage: 'Failed to fetch Jira issue',
+  },
+  async (_request, { params }) => {
+    const { issueKey } = await params as { issueKey: string };
 
     if (!issueKey || issueKey.trim() === '') {
       return jsonError('Issue key is required', 400);
@@ -66,6 +60,5 @@ export const GET = withRouteErrorHandling(
     }
 
     return successResponse({ issue });
-  },
-  'Failed to fetch Jira issue',
+  }
 );

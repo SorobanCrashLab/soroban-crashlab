@@ -11,6 +11,8 @@
  */
 
 import { recordAuditEvent } from './audit/audit-sink';
+import { computeBackoffMs, type BackoffPolicy } from './retry-backoff';
+import { WEBHOOK_DLQ_DRAIN_BACKOFF_BASE_MS, WEBHOOK_DLQ_DRAIN_BACKOFF_MAX_MS } from './timeouts';
 import type { WebhookDeliveryRequest } from './webhook-delivery-worker';
 
 /** Retention policy. Pinned so the sweep and its test cannot drift apart. */
@@ -20,7 +22,20 @@ export const DLQ_RETENTION_MS = DLQ_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 /** Replays run in sequential batches of this size to spare a sick endpoint. */
 export const DLQ_REPLAY_CONCURRENCY = 5;
 
+/**
+ * Automatic drain (#1635): failed drain rounds before an entry is parked for
+ * a human. Parked entries are never drained again automatically.
+ */
+export const DLQ_PARK_AFTER_ROUNDS = 3;
+/** Entries replayed per receiver host in a single drain. */
+export const DLQ_DRAIN_PER_TARGET = 2;
+/** Upper bound on entries replayed per drain, keeping a tick bounded. */
+export const DLQ_DRAIN_MAX_PER_TICK = 10;
+
 export type DlqFailureReason = 'retries-exhausted' | 'non-retryable';
+
+/** `pending` entries are eligible for automatic drain; `parked` need a human. */
+export type DlqEntryStatus = 'pending' | 'parked';
 
 export interface DlqAttemptNote {
   attempt: number;
@@ -42,11 +57,21 @@ export interface DlqEntry {
   firstFailedAt: string;
   deadLetteredAt: string;
   replayAttempts: number;
+  /** Absent on entries written before #1635; read through `dlqEntryStatus`. */
+  status?: DlqEntryStatus;
+  /** Earliest time the automatic drain may replay this entry again. */
+  nextDrainAt?: string;
+  parkedAt?: string;
+}
+
+export function dlqEntryStatus(entry: DlqEntry): DlqEntryStatus {
+  return entry.status ?? 'pending';
 }
 
 export interface DlqFilter {
   endpoint?: string;
   reason?: DlqFailureReason;
+  status?: DlqEntryStatus;
   /** Only entries dead-lettered within this many milliseconds of `now`. */
   maxAgeMs?: number;
 }
@@ -97,6 +122,7 @@ export function filterDlqEntries(
   return entries.filter((entry) => {
     if (needle && !entry.endpoint.toLowerCase().includes(needle)) return false;
     if (filter.reason && entry.reason !== filter.reason) return false;
+    if (filter.status && dlqEntryStatus(entry) !== filter.status) return false;
     if (filter.maxAgeMs !== undefined) {
       const age = now - Date.parse(entry.deadLetteredAt);
       if (age > filter.maxAgeMs) return false;
@@ -155,6 +181,32 @@ export interface DeadLetterQueueOptions {
   now?: () => Date;
   retentionMs?: number;
   concurrency?: number;
+  parkAfterRounds?: number;
+  drainBackoff?: BackoffPolicy;
+  random?: () => number;
+}
+
+export interface DlqDrainOptions {
+  perTarget?: number;
+  maxEntries?: number;
+}
+
+export interface DlqDrainResult {
+  attempted: number;
+  replayed: number;
+  failed: number;
+  /** Entry ids parked by this drain. */
+  parked: string[];
+  /** Due entries deferred because their receiver hit the per-target cap. */
+  deferred: number;
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host.toLowerCase();
+  } catch {
+    return url;
+  }
 }
 
 export class DeadLetterQueue {
@@ -163,6 +215,9 @@ export class DeadLetterQueue {
   private readonly now: () => Date;
   private readonly retentionMs: number;
   private readonly concurrency: number;
+  private readonly parkAfterRounds: number;
+  private readonly drainBackoff: BackoffPolicy;
+  private readonly random: () => number;
   /** Entry ids with a replay in flight — the idempotency lock. */
   private readonly inFlight = new Set<string>();
 
@@ -172,6 +227,12 @@ export class DeadLetterQueue {
     this.now = options.now ?? (() => new Date());
     this.retentionMs = options.retentionMs ?? DLQ_RETENTION_MS;
     this.concurrency = options.concurrency ?? DLQ_REPLAY_CONCURRENCY;
+    this.parkAfterRounds = options.parkAfterRounds ?? DLQ_PARK_AFTER_ROUNDS;
+    this.drainBackoff = options.drainBackoff ?? {
+      baseMs: WEBHOOK_DLQ_DRAIN_BACKOFF_BASE_MS,
+      maxMs: WEBHOOK_DLQ_DRAIN_BACKOFF_MAX_MS,
+    };
+    this.random = options.random ?? Math.random;
   }
 
   list(filter: DlqFilter = {}): DlqEntry[] {
@@ -180,6 +241,10 @@ export class DeadLetterQueue {
 
   depth(): number {
     return this.gateway.load().length;
+  }
+
+  parkedDepth(): number {
+    return this.gateway.load().filter((entry) => dlqEntryStatus(entry) === 'parked').length;
   }
 
   add(entry: DlqEntry): void {
@@ -270,6 +335,86 @@ export class DeadLetterQueue {
     } finally {
       this.inFlight.delete(entryId);
     }
+  }
+
+  /**
+   * Automatic drain, run from the webhook-recovery tick (#1635). Replays due
+   * `retries-exhausted` entries (a `non-retryable` status needs a config fix,
+   * not another attempt), capped per receiver so a sick endpoint is not
+   * hammered. Each failed round pushes the next one out with backoff; after
+   * `parkAfterRounds` failed rounds the entry is parked and audited, which is
+   * what the retry dashboard surfaces for escalation.
+   */
+  async drain(options: DlqDrainOptions = {}): Promise<DlqDrainResult> {
+    const perTarget = options.perTarget ?? DLQ_DRAIN_PER_TARGET;
+    const maxEntries = options.maxEntries ?? DLQ_DRAIN_MAX_PER_TICK;
+    const nowMs = this.now().getTime();
+
+    const due = this.gateway
+      .load()
+      .filter(
+        (entry) =>
+          dlqEntryStatus(entry) === 'pending' &&
+          entry.reason === 'retries-exhausted' &&
+          !this.inFlight.has(entry.id) &&
+          Date.parse(entry.nextDrainAt ?? entry.deadLetteredAt) <= nowMs,
+      )
+      .sort(
+        (a, b) =>
+          Date.parse(a.nextDrainAt ?? a.deadLetteredAt) - Date.parse(b.nextDrainAt ?? b.deadLetteredAt),
+      );
+
+    const perHost = new Map<string, number>();
+    const selected: string[] = [];
+    let deferred = 0;
+    for (const entry of due) {
+      if (selected.length >= maxEntries) break;
+      const host = hostOf(entry.endpoint);
+      const count = perHost.get(host) ?? 0;
+      if (count >= perTarget) {
+        deferred += 1;
+        continue;
+      }
+      perHost.set(host, count + 1);
+      selected.push(entry.id);
+    }
+
+    const batch = await this.replayBatch(selected);
+    const parked: string[] = [];
+    const at = this.now();
+
+    for (const result of batch.results) {
+      if (result.status !== 'failed') continue;
+      const entry = this.gateway.load().find((candidate) => candidate.id === result.entryId);
+      if (!entry) continue;
+
+      if (entry.replayAttempts >= this.parkAfterRounds) {
+        this.replaceEntry({ ...entry, status: 'parked', parkedAt: at.toISOString(), nextDrainAt: undefined });
+        parked.push(entry.id);
+        recordAuditEvent({
+          action: 'dlq.park',
+          target: entry.endpoint,
+          metadata: { entryId: entry.id, rounds: entry.replayAttempts, eventType: entry.eventType },
+        });
+      } else {
+        const delay = computeBackoffMs(entry.replayAttempts, this.drainBackoff, this.random);
+        this.replaceEntry({ ...entry, nextDrainAt: new Date(at.getTime() + delay).toISOString() });
+      }
+    }
+
+    return {
+      attempted: selected.length,
+      replayed: batch.replayed,
+      failed: batch.failed,
+      parked,
+      deferred,
+    };
+  }
+
+  private replaceEntry(updated: DlqEntry): void {
+    this.gateway.save(
+      this.gateway.load().map((candidate) => (candidate.id === updated.id ? updated : candidate)),
+    );
   }
 
   /** Replays many entries in sequential batches capped at `concurrency`. */

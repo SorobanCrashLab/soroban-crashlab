@@ -22,7 +22,9 @@ export const GET = withRouteErrorHandling(
     }
 
     const artifacts = await selectArtifactRepository().list();
-    return successResponse({ artifacts, total: artifacts.length }, { total: artifacts.length });
+    const response = successResponse({ artifacts, total: artifacts.length }, { total: artifacts.length });
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
   },
   'Failed to list artifacts',
 );

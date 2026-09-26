@@ -1,7 +1,7 @@
 /**
  * lib/openapi/registry — single source of truth for the API surface (#1670).
  *
- * Each route handler under app/api/**/route.ts gets one entry here.
+ * Each route handler under app/api/**\/route.ts gets one entry here.
  * The contract test gains a spec-drift check: any handler without a registry
  * entry fails CI, and openapi.json is committed so PRs show a spec delta.
  */
@@ -75,7 +75,7 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('GET', '/api/artifacts/{id}', 'bearer', 'Get an artifact', ['artifacts'], ['NOT_FOUND'], { scopes: ['read'] }),
   r('POST', '/api/artifacts/validate', 'bearer', 'Validate an artifact bundle', ['artifacts'], ['ARTIFACT_INVALID_BUNDLE', 'ARTIFACT_INVALID_JSON'], { scopes: ['write'] }),
   r('GET', '/api/campaigns', 'bearer-or-maintainer', 'List fuzz campaigns', ['campaigns'], ['UNAUTHORIZED'], { paginated: true, scopes: ['read'] }),
-  r('POST', '/api/campaigns', 'bearer-or-maintainer', 'Create a fuzz campaign', ['campaigns'], ['VALIDATION_ERROR', 'FORBIDDEN'], { scopes: ['write'] }),
+  r('POST', '/api/campaigns', 'bearer-or-maintainer', 'Create a fuzz campaign', ['campaigns'], ['VALIDATION_ERROR', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'], { scopes: ['write'] }),
   r('GET', '/api/schedules', 'bearer-or-maintainer', 'List schedules', ['schedules'], ['UNAUTHORIZED'], { scopes: ['read'] }),
   r('POST', '/api/schedules', 'bearer-or-maintainer', 'Create a schedule', ['schedules'], ['VALIDATION_ERROR', 'FORBIDDEN'], { scopes: ['write'] }),
   r('GET', '/api/schedules/{id}', 'bearer-or-maintainer', 'Get a schedule', ['schedules'], ['NOT_FOUND'], { scopes: ['read'] }),
@@ -84,6 +84,7 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('POST', '/api/webhooks', 'bearer-or-maintainer', 'Create a webhook', ['webhooks'], ['VALIDATION_ERROR', 'FORBIDDEN'], { scopes: ['write'] }),
   r('GET', '/api/webhooks/history', 'bearer', 'Webhook delivery history', ['webhooks'], ['UNAUTHORIZED'], { paginated: true, scopes: ['read'] }),
   r('POST', '/api/webhooks/retry', 'bearer', 'Retry a webhook delivery', ['webhooks'], ['WEBHOOK_DELIVERY_NOT_FOUND', 'WEBHOOK_DELIVERY_ID_REQUIRED'], { scopes: ['write'] }),
+  r('POST', '/api/webhooks/recovery', 'bearer-or-maintainer', 'Run one webhook-recovery tick', ['webhooks'], ['FORBIDDEN'], { scopes: ['write'] }),
   r('GET', '/api/notifications', 'bearer', 'List notifications', ['notifications'], ['UNAUTHORIZED'], { paginated: true, scopes: ['read'] }),
   r('GET', '/api/networks', 'bearer-or-maintainer', 'List Stellar networks', ['networks'], ['UNAUTHORIZED'], { scopes: ['read'] }),
   r('GET', '/api/networks/{id}', 'bearer-or-maintainer', 'Get a network', ['networks'], ['NOT_FOUND'], { scopes: ['read'] }),
@@ -94,7 +95,7 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('GET', '/api/settings/alerting', 'bearer-or-maintainer', 'Get alerting config', ['settings'], ['FORBIDDEN'], { scopes: ['read'] }),
   r('GET', '/api/auth/github/login', 'none', 'Start GitHub OAuth', ['auth']),
   r('GET', '/api/auth/github/callback', 'none', 'GitHub OAuth callback', ['auth'], ['VALIDATION_ERROR']),
-  r('POST', '/api/uploadthing', 'bearer', 'Uploadthing callback', ['artifacts'], ['UNAUTHORIZED']),
+  r('POST', '/api/uploadthing', 'bearer', 'Uploadthing callback', ['artifacts'], ['UNAUTHORIZED', 'UPLOAD_REJECTED']),
   r('GET', '/api/sentry/config', 'bearer-or-maintainer', 'Get Sentry config', ['integrations'], ['FORBIDDEN']),
   r('GET', '/api/sentry/reports', 'bearer', 'List Sentry reports', ['integrations'], ['UNAUTHORIZED']),
   r('POST', '/api/sentry/test-connection', 'bearer-or-maintainer', 'Test Sentry connection', ['integrations'], ['FORBIDDEN']),

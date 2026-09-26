@@ -9,7 +9,7 @@ import {
   deleteReportByToken,
   listStoredReports,
   getReportStorageStats,
-} from "./shareable-report-utils.ts";
+} from "./shareable-report-utils";
 
 // Mock report for testing
 const mockReport: Report = {

@@ -107,8 +107,8 @@ async function testAdapterWithCustomHeaders(): Promise<void> {
     _input: RequestInfo | URL,
     _init?: RequestInit,
   ): Promise<Response> => {
-    if (init?.headers) {
-      const headers = init.headers as Record<string, string>;
+    if (_init?.headers) {
+      const headers = _init.headers as Record<string, string>;
       Object.assign(capturedHeaders, headers);
     }
     return new Response(JSON.stringify({ status: "healthy" }), {

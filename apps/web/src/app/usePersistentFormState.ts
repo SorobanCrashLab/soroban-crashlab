@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { safeStorage } from "@/lib/local-storage";
 import {
   buildDraftStorageKey,
   serializeDraft,
@@ -43,7 +44,7 @@ export function usePersistentFormState<T extends Record<string, unknown>>(
   const [state, setState] = useState<T>(() => {
     if (typeof window === 'undefined') return { ...defaults };
     try {
-      return deserializeDraft(window.localStorage.getItem(storageKey), defaults, ttlMs, Date.now());
+      return deserializeDraft(safeStorage.getItem(storageKey), defaults, ttlMs, Date.now());
     } catch {
       return { ...defaults };
     }
@@ -56,7 +57,7 @@ export function usePersistentFormState<T extends Record<string, unknown>>(
   const flush = useCallback(() => {
     if (typeof window === 'undefined') return;
     try {
-      window.localStorage.setItem(storageKey, serializeDraft(stateRef.current, Date.now()));
+      safeStorage.setItem(storageKey, serializeDraft(stateRef.current, Date.now()));
     } catch {
       // Storage may be full or blocked (private mode); persistence is best-effort.
     }
@@ -86,7 +87,7 @@ export function usePersistentFormState<T extends Record<string, unknown>>(
   const clear = useCallback(() => {
     if (typeof window !== 'undefined') {
       try {
-        window.localStorage.removeItem(storageKey);
+        safeStorage.removeItem(storageKey);
       } catch {
         // ignore
       }

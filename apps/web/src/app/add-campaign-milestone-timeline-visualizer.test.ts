@@ -135,7 +135,7 @@ function testCampaignTimelineVisualizer(): void {
   );
 
   // Test 9: Empty event list handling
-  const emptyEvents = mockEvents.filter((e) => e.type === "non_existent");
+  const emptyEvents = mockEvents.filter(() => false);
   assert.equal(emptyEvents.length, 0, "Empty filter should return no events");
 
   // Test 10: Sorting events by timestamp (chronological)

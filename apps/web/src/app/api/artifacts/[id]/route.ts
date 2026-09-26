@@ -40,6 +40,7 @@ export const GET = withRouteErrorHandling(
         'Content-Type': 'application/octet-stream',
         'Content-Disposition': `attachment; filename="${metadata.name}"`,
         'Content-Length': metadata.sizeBytes.toString(),
+        'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });
   },

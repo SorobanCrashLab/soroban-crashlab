@@ -3,13 +3,15 @@ import { absoluteShort } from './utils/datetime';
 
 export type { WebhookDeliveryHistoryItem };
 
-export type DeliveryStatusFilter = 'all' | 'delivered' | 'failed' | 'queued';
+export type DeliveryStatusFilter = 'all' | WebhookDeliveryHistoryItem['status'];
 
 export interface DeliveryStats {
   totalCount: number;
   deliveredCount: number;
   failedCount: number;
   queuedCount: number;
+  /** Dead-lettered deliveries parked for manual escalation (#1635). */
+  parkedCount: number;
   successRate: number; // percentage 0 - 100
   averageAttempts: number;
 }
@@ -57,6 +59,7 @@ export function computeDeliveryStats(items: WebhookDeliveryHistoryItem[]): Deliv
       deliveredCount: 0,
       failedCount: 0,
       queuedCount: 0,
+      parkedCount: 0,
       successRate: 100,
       averageAttempts: 0,
     };
@@ -65,12 +68,14 @@ export function computeDeliveryStats(items: WebhookDeliveryHistoryItem[]): Deliv
   let deliveredCount = 0;
   let failedCount = 0;
   let queuedCount = 0;
+  let parkedCount = 0;
   let totalAttempts = 0;
 
   for (const item of items) {
     if (item.status === 'delivered') deliveredCount++;
     else if (item.status === 'failed') failedCount++;
     else if (item.status === 'queued') queuedCount++;
+    else if (item.status === 'parked') parkedCount++;
 
     totalAttempts += item.attempts || 1;
   }
@@ -83,44 +88,102 @@ export function computeDeliveryStats(items: WebhookDeliveryHistoryItem[]): Deliv
     deliveredCount,
     failedCount,
     queuedCount,
+    parkedCount,
     successRate,
     averageAttempts,
   };
 }
 
 /**
- * Simulate or execute a retry action for a specific delivery item by ID.
+ * Marks a delivery as queued for a durable retry (#1635). The retry route no
+ * longer attempts delivery inline; it persists a retry job and the
+ * webhook-recovery tick reports the outcome through `applyRecoveryResult`.
  */
-export function retryDeliveryItem(
+export function queueDeliveryRetry(
   items: WebhookDeliveryHistoryItem[],
-  itemId: string
-): { updatedItems: WebhookDeliveryHistoryItem[]; retriedItem: WebhookDeliveryHistoryItem | null } {
-  let retriedItem: WebhookDeliveryHistoryItem | null = null;
+  itemId: string,
+  nextRetryAt: string,
+): { updatedItems: WebhookDeliveryHistoryItem[]; queuedItem: WebhookDeliveryHistoryItem | null } {
+  let queuedItem: WebhookDeliveryHistoryItem | null = null;
 
   const updatedItems = items.map((item) => {
-    if (item.id === itemId) {
-      const now = new Date().toISOString();
-      // Simulate successful delivery on retry if host is valid
-      const isSuccess = !item.url.includes('invalid-host-name');
-      const newAttempts = item.attempts + 1;
+    if (item.id !== itemId) return item;
+    const updated: WebhookDeliveryHistoryItem = { ...item, status: 'queued', nextRetryAt };
+    queuedItem = updated;
+    return updated;
+  });
 
-      const updated: WebhookDeliveryHistoryItem = {
+  return { updatedItems, queuedItem };
+}
+
+/**
+ * Structural subset of a webhook-recovery tick result — kept local so this
+ * client-safe module does not import the server-side recovery loop.
+ */
+export interface RecoveryResultForHistory {
+  retries: {
+    outcomes: ReadonlyArray<{
+      jobId: string;
+      outcome: 'delivered' | 'retry-scheduled' | 'dead-lettered';
+      statusCode?: number;
+      error?: string;
+      nextAttemptAt?: string;
+    }>;
+  };
+  drainedRequestIds: readonly string[];
+  parkedRequestIds: readonly string[];
+  evaluatedAt: string;
+}
+
+/**
+ * Folds one recovery tick into the delivery history: attempted jobs record
+ * their outcome, drained dead letters become delivered, and dead letters past
+ * their drain budget become `parked`.
+ */
+export function applyRecoveryResult(
+  items: WebhookDeliveryHistoryItem[],
+  result: RecoveryResultForHistory,
+): WebhookDeliveryHistoryItem[] {
+  const outcomes = new Map(result.retries.outcomes.map((outcome) => [outcome.jobId, outcome]));
+  const drained = new Set(result.drainedRequestIds);
+  const parked = new Set(result.parkedRequestIds);
+  const at = result.evaluatedAt;
+
+  return items.map((item) => {
+    const outcome = outcomes.get(item.id);
+    if (outcome) {
+      const attempted: WebhookDeliveryHistoryItem = {
         ...item,
-        status: isSuccess ? 'delivered' : 'failed',
-        statusCode: isSuccess ? 200 : item.statusCode || 500,
-        attempts: newAttempts,
-        lastAttemptedAt: now,
-        error: isSuccess ? undefined : item.error || 'Retry attempt failed',
-        responseBody: isSuccess ? '{"ok": true, "retried": true}' : item.responseBody,
+        attempts: item.attempts + 1,
+        lastAttemptedAt: at,
+        statusCode: outcome.statusCode ?? item.statusCode,
       };
-
-      retriedItem = updated;
-      return updated;
+      if (outcome.outcome === 'delivered') {
+        return { ...attempted, status: 'delivered', error: undefined, nextRetryAt: undefined };
+      }
+      if (outcome.outcome === 'retry-scheduled') {
+        return {
+          ...attempted,
+          status: 'queued',
+          error: outcome.error ?? item.error,
+          nextRetryAt: outcome.nextAttemptAt,
+        };
+      }
+      return {
+        ...attempted,
+        status: 'failed',
+        error: outcome.error ?? item.error ?? 'Delivery failed',
+        nextRetryAt: undefined,
+      };
+    }
+    if (drained.has(item.id)) {
+      return { ...item, status: 'delivered', error: undefined, nextRetryAt: undefined, lastAttemptedAt: at };
+    }
+    if (parked.has(item.id)) {
+      return { ...item, status: 'parked', nextRetryAt: undefined, lastAttemptedAt: at };
     }
     return item;
   });
-
-  return { updatedItems, retriedItem };
 }
 
 /**
@@ -139,7 +202,7 @@ export function formatStatusCode(statusCode?: number): string {
 /**
  * Get CSS badge styling class based on Navy Professional design tokens.
  */
-export function getStatusBadgeClass(status: 'delivered' | 'failed' | 'queued'): string {
+export function getStatusBadgeClass(status: WebhookDeliveryHistoryItem['status']): string {
   switch (status) {
     case 'delivered':
       return 'badge-completed';
@@ -147,6 +210,8 @@ export function getStatusBadgeClass(status: 'delivered' | 'failed' | 'queued'): 
       return 'badge-failed';
     case 'queued':
       return 'badge-running';
+    case 'parked':
+      return 'badge-critical';
     default:
       return 'badge';
   }

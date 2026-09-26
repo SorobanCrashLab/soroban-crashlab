@@ -1,3 +1,5 @@
+import { safeStorage } from "../../../lib/local-storage";
+
 export const STORAGE_KEY = 'crashlab:api-config';
 
 /**
@@ -24,9 +26,8 @@ export const DEFAULT_CONFIG: ApiConfig = {
   rateLimitWindowSeconds: 60,
 };
 
-export function loadFromStorage(storage?: typeof window.localStorage): ApiConfig {
-  const store = storage || (typeof window !== 'undefined' ? window.localStorage : undefined);
-  if (!store) return DEFAULT_CONFIG;
+export function loadFromStorage(storage?: Pick<Storage, 'getItem'>): ApiConfig {
+  const store = storage ?? safeStorage;
 
   try {
     const raw = store.getItem(STORAGE_KEY);
@@ -73,9 +74,8 @@ export function validateConfig(config: ApiConfig): ValidationErrors {
   return errors;
 }
 
-export function saveToStorage(config: ApiConfig, storage?: typeof window.localStorage): boolean {
-  const store = storage || (typeof window !== 'undefined' ? window.localStorage : undefined);
-  if (!store) return false;
+export function saveToStorage(config: ApiConfig, storage?: Pick<Storage, 'setItem'>): boolean {
+  const store = storage ?? safeStorage;
 
   try {
     store.setItem(STORAGE_KEY, JSON.stringify(config));
@@ -85,11 +85,9 @@ export function saveToStorage(config: ApiConfig, storage?: typeof window.localSt
   }
 }
 
-export function resetStorage(storage?: typeof window.localStorage): void {
-  const store = storage || (typeof window !== 'undefined' ? window.localStorage : undefined);
-  if (store) {
-    store.removeItem(STORAGE_KEY);
-  }
+export function resetStorage(storage?: Pick<Storage, 'removeItem'>): void {
+  const store = storage ?? safeStorage;
+  store.removeItem(STORAGE_KEY);
 }
 
 // ── Unsaved draft persistence (#1074) ────────────────────────────────────────
@@ -99,11 +97,13 @@ export function resetStorage(storage?: typeof window.localStorage): void {
 // the last *saved* config and silently threw the edits away. Mirroring every
 // keystroke into a draft entry lets the form rehydrate exactly what was typed.
 
-function resolveStorage(storage?: typeof window.localStorage) {
-  return storage || (typeof window !== 'undefined' ? window.localStorage : undefined);
+function resolveStorage<T extends Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>>(
+  storage?: T,
+): T | typeof safeStorage {
+  return storage ?? safeStorage;
 }
 
-export function saveDraft(config: ApiConfig, storage?: typeof window.localStorage): boolean {
+export function saveDraft(config: ApiConfig, storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>): boolean {
   const store = resolveStorage(storage);
   if (!store) return false;
 
@@ -125,7 +125,7 @@ export function saveDraft(config: ApiConfig, storage?: typeof window.localStorag
  * message rather than silently snapping back to 100. Only genuinely wrong
  * *types* fall back, so a corrupt entry can never break the form.
  */
-export function loadDraft(storage?: typeof window.localStorage): ApiConfig | null {
+export function loadDraft(storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>): ApiConfig | null {
   const store = resolveStorage(storage);
   if (!store) return null;
 
@@ -152,7 +152,7 @@ export function loadDraft(storage?: typeof window.localStorage): ApiConfig | nul
   }
 }
 
-export function clearDraft(storage?: typeof window.localStorage): void {
+export function clearDraft(storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>): void {
   const store = resolveStorage(storage);
   if (store) {
     try {

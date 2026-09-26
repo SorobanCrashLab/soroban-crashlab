@@ -7,11 +7,23 @@ exceeds its budget.
 
 ## Route groups
 
-| Route group        | Covers                                            | Budget (gzip) |
-| ------------------ | ------------------------------------------------- | ------------- |
-| `shell`            | `main-app`, `webpack`, root `layout` shared chunks | 120 kB        |
-| `analytics-charts` | `.next/static/chunks/app/analytics/**`             | 170 kB        |
-| `editor-grid`      | `.next/static/chunks/app/**/widget*/**`            | 130 kB        |
+| Route group            | Covers                                    | Budget (gzip)     |
+| ---------------------- | ----------------------------------------- | ----------------- |
+| `runtime-bootstrap`    | `.next/static/chunks/turbopack-*.js`      | 50 kB (4.0 kB)    |
+| `shared-styles`        | `.next/static/chunks/*.css`               | 50 kB (36.4 kB)   |
+| `static-bundles`       | `.next/static/chunks/*.js`                | 1500 kB (1.38 MB) |
+
+Numbers in parentheses are the measured sizes at the last re-baseline.
+
+> **Turbopack chunk naming.** Next 16 builds with Turbopack, which emits client
+> chunks as flat content-hashed files directly under `.next/static/chunks/`
+> (e.g. `01b4ae0ef5853668.js`) — there is no stable per-route file name. The old
+> `landing-sandbox` group globbed `.next/static/chunks/app/page-*.js`, a
+> webpack-era path that Turbopack never produces, so that entry matched nothing
+> and failed the size gate on **every** PR (`Size Limit can't find files at
+> .next/static/chunks/app/page-*.js`). The entry was removed; the landing page's
+> JS is bounded by the whole-app `static-bundles` budget. Do not reintroduce
+> per-route globs unless chunk naming is restored.
 
 ## Methodology
 
@@ -55,7 +67,7 @@ but the justification must still be recorded in the merged PR.
 
 To confirm failure output is actionable, temporarily lower a budget far below
 its real size, e.g. in `.size-limit.json` set `"limit": "1 B"` for
-`analytics-charts`, then:
+`static-bundles`, then:
 
 ```bash
 cd apps/web && pnpm size
@@ -80,3 +92,24 @@ If the lazy-chart loading work (#1396-adjacent) merges first, re-baseline the
 `analytics-charts` budget afterwards using the methodology above rather than
 baking extra headroom into this PR to compensate. Headroom stays at 10%; do not
 game it.
+
+## Bundle Analysis & Visual Treemaps
+
+When investigating regressions or optimizing route code-splitting, run the bundle
+analyzer locally:
+
+```bash
+# Run bundle analysis locally (generates HTML treemaps in .next/analyze/)
+pnpm --dir apps/web run analyze
+
+# Generate per-route first-load JS metrics and markdown report
+node apps/web/scripts/analyze-bundles.mjs
+```
+
+### CI Artifacts & PR Breakdown
+On pull requests:
+- **Pass/Fail Gate**: `.github/workflows/size-limit.yml` checks route groups against `.size-limit.json`.
+- **On Budget Failure**: CI runs `pnpm --dir apps/web run analyze`, uploads the interactive HTML treemaps (`client.html`, `nodejs.html`) + `route-sizes.json` as the `bundle-analysis-report` artifact.
+- **Sticky PR Comment & Job Summary**: A per-route first-load JS breakdown table is posted to the PR and recorded in `$GITHUB_STEP_SUMMARY` for immediate regression debugging without local rebuilds.
+- **Trend Tracking**: `.next/analyze/route-sizes.json` captures machine-readable per-route first-load JS metrics per build.
+

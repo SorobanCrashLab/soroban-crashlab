@@ -10,9 +10,9 @@ import {
 
 describe('Optimistic Triage Pipeline', () => {
   const initialRuns: FuzzingRun[] = [
-    { id: 'run-1', status: 'failed', area: 'auth', severity: 'high', duration: 1000, seedCount: 100, cpuInstructions: 10, memoryBytes: 10, minResourceFee: 10 },
-    { id: 'run-2', status: 'running', area: 'storage', severity: 'medium', duration: 2000, seedCount: 200, cpuInstructions: 20, memoryBytes: 20, minResourceFee: 20 },
-    { id: 'run-3', status: 'cancelled', area: 'vm', severity: 'low', duration: 3000, seedCount: 300, cpuInstructions: 30, memoryBytes: 30, minResourceFee: 30 },
+    { id: 'run-1', status: 'failed', area: 'auth', severity: 'high', duration: 1000, seedCount: 100, crashDetail: null, cpuInstructions: 10, memoryBytes: 10, minResourceFee: 10 },
+    { id: 'run-2', status: 'running', area: 'state', severity: 'medium', duration: 2000, seedCount: 200, crashDetail: null, cpuInstructions: 20, memoryBytes: 20, minResourceFee: 20 },
+    { id: 'run-3', status: 'cancelled', area: 'budget', severity: 'low', duration: 3000, seedCount: 300, crashDetail: null, cpuInstructions: 30, memoryBytes: 30, minResourceFee: 30 },
   ];
 
   beforeEach(() => {

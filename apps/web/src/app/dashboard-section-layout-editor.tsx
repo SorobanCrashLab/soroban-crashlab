@@ -12,6 +12,7 @@ import {
   sortDashboardSections,
   toggleDashboardSectionVisibility,
 } from './dashboard-layout-utils';
+import { safeStorage } from "@/lib/local-storage";
 
 const SECTION_LABELS: Record<DashboardSectionId, string> = {
   stats: 'Summary Stats',
@@ -23,7 +24,7 @@ const SECTION_LABELS: Record<DashboardSectionId, string> = {
 export default function DashboardSectionLayoutEditor() {
   const [sections, setSections] = useState<DashboardSectionConfig[]>(() => {
     try {
-      return parseDashboardLayout(localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY));
+      return parseDashboardLayout(safeStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY));
     } catch {
       return DEFAULT_DASHBOARD_LAYOUT;
     }
@@ -34,7 +35,7 @@ export default function DashboardSectionLayoutEditor() {
     const sorted = sortDashboardSections(next);
     setSections(sorted);
     try {
-      localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, serializeDashboardLayout(sorted));
+      safeStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, serializeDashboardLayout(sorted));
       setSavedMessage('Layout saved');
       window.dispatchEvent(new CustomEvent('dashboard-layout-updated'));
     } catch {

@@ -44,6 +44,12 @@ export default defineConfig({
         'src/instrumentation*.ts',
         'src/proxy.ts',
       ],
+      thresholds: {
+        lines: 30,
+        functions: 30,
+        branches: 25,
+        statements: 30,
+      },
     },
   },
 });

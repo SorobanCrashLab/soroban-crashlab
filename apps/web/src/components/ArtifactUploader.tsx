@@ -22,9 +22,15 @@ export function ArtifactUploader({
   const { startUpload, isUploading } = useUploadThing('fuzzArtifact', {
     onClientUploadComplete: (res) => {
       setUploading(false);
-      if (res?.[0]) {
-        onUploadComplete?.(res[0].url, res[0].key);
+      const uploaded = res?.[0];
+      if (!uploaded) return;
+      // The ingestion gate deletes content that fails validation (#1636).
+      const serverData = uploaded.serverData;
+      if (serverData && !serverData.accepted) {
+        setError(serverData.message);
+        return;
       }
+      onUploadComplete?.(uploaded.url, uploaded.key);
     },
     onUploadError: (err) => {
       setUploading(false);
@@ -78,7 +84,7 @@ export function ArtifactUploader({
             {uploading || isUploading ? 'Uploading...' : 'Click to upload artifact'}
           </p>
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            Seed, log, trace, or bundle file (max 50MB)
+            WASM (max 16MB), JSON bundle or seed (max 5MB), log or trace (max 10MB)
           </p>
         </div>
       </label>

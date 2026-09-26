@@ -55,3 +55,6 @@ next-env.d.ts
 
 # lighthouse ci
 /.lighthouseci/
+
+# webhook store runtime state (delivery queue, retry queue, DLQ)
+/.webhook-data/

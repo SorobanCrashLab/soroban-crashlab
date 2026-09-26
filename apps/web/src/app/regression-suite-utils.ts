@@ -1,4 +1,5 @@
 import type { FuzzingRun, RunStatus } from './types';
+import { safeStorage } from "../lib/local-storage";
 
 export type SuiteOutcome = 'passed' | 'failed';
 export type MatrixStatus = 'passed' | 'failed' | 'regression' | 'regressed-fix' | 'never-ran';
@@ -55,14 +56,14 @@ export function createInMemorySuiteGateway(seed: readonly RegressionSuite[] = []
 export function createLocalSuiteGateway(): SuiteGateway {
   const read = (): RegressionSuite[] => {
     try {
-      const parsed: unknown = JSON.parse(localStorage.getItem(SUITES_STORAGE_KEY) ?? '[]');
+      const parsed: unknown = JSON.parse(safeStorage.getItem(SUITES_STORAGE_KEY) ?? '[]');
       if (!Array.isArray(parsed)) return [];
       return parsed.filter(isRegressionSuite).map(cloneSuite);
     } catch {
       return [];
     }
   };
-  const write = (suites: RegressionSuite[]) => localStorage.setItem(SUITES_STORAGE_KEY, JSON.stringify(suites));
+  const write = (suites: RegressionSuite[]) => safeStorage.setItem(SUITES_STORAGE_KEY, JSON.stringify(suites));
   return {
     list: read,
     get: (id) => read().find((suite) => suite.id === id),

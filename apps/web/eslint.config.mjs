@@ -26,6 +26,42 @@ const eslintConfig = defineConfig([
           },
         ],
       }],
+      "no-restricted-properties": ["error",
+        { object: "window", property: "localStorage", message: "Use safeStorage helpers from '@/lib/local-storage'." },
+        { object: "window", property: "sessionStorage", message: "Use safeStorage helpers from '@/lib/local-storage'." },
+        { object: "globalThis", property: "localStorage", message: "Use safeStorage helpers from '@/lib/local-storage'." },
+        { object: "globalThis", property: "sessionStorage", message: "Use safeStorage helpers from '@/lib/local-storage'." },
+      ],
+      "no-restricted-globals": ["error",
+        { name: "localStorage", message: "Use safeStorage helpers from '@/lib/local-storage'." },
+        { name: "sessionStorage", message: "Use safeStorage helpers from '@/lib/local-storage'." },
+      ],
+      "no-restricted-syntax": ["error",
+        {
+          selector: "MemberExpression[object.name='localStorage']",
+          message: "Raw localStorage access is banned; use safeStorage helpers from '@/lib/local-storage'.",
+        },
+        {
+          selector: "MemberExpression[object.object.name='window'][property.name='localStorage']",
+          message: "Raw localStorage access is banned; use safeStorage helpers from '@/lib/local-storage'.",
+        },
+        {
+          selector: "MemberExpression[object.object.name='globalThis'][property.name='localStorage']",
+          message: "Raw localStorage access is banned; use safeStorage helpers from '@/lib/local-storage'.",
+        },
+        {
+          selector: "MemberExpression[object.name='sessionStorage']",
+          message: "Raw sessionStorage access is banned; use safeStorage helpers from '@/lib/local-storage'.",
+        },
+        {
+          selector: "MemberExpression[object.object.name='window'][property.name='sessionStorage']",
+          message: "Raw sessionStorage access is banned; use safeStorage helpers from '@/lib/local-storage'.",
+        },
+        {
+          selector: "MemberExpression[object.object.name='globalThis'][property.name='sessionStorage']",
+          message: "Raw sessionStorage access is banned; use safeStorage helpers from '@/lib/local-storage'.",
+        },
+      ],
     },
   },
   {
@@ -39,6 +75,20 @@ const eslintConfig = defineConfig([
     files: ["src/lib/**/*.test.ts", "src/lib/**/*.test.tsx", "src/app/utils/**/*.test.ts", "src/app/utils/**/*.test.tsx"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+  {
+    files: [
+      "src/lib/local-storage.ts",
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "e2e/**",
+      "public/theme-script.js",
+    ],
+    rules: {
+      "no-restricted-globals": "off",
+      "no-restricted-syntax": "off",
+      "no-restricted-properties": "off",
     },
   },
   // Override default ignores of eslint-config-next.

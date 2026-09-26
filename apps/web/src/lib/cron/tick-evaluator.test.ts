@@ -42,8 +42,21 @@ describe('evaluateTick — due schedules', () => {
       tickCount: 1,
       caughtUp: false,
       tags: ['scheduled'],
+      idempotencyKey: `schedule:sched-1:${Date.parse('2026-03-01T08:30:00.000Z')}`,
     });
     expect(out.schedules[0].lastRunAt).toBe('2026-03-01T08:30:00.000Z');
+  });
+
+  it('derives the same idempotency key for the same slot on any evaluation (#1634)', () => {
+    // A cron retry re-evaluating from the same anchor at a later wall-clock
+    // time still targets the 08:30 slot, so it must produce the same key.
+    const input = { schedules: [schedule({ createdAt: '2026-03-01T08:05:00.000Z' })], history: [] };
+    const first = evaluateTick({ ...input, now: new Date('2026-03-01T08:35:00.000Z') });
+    const retry = evaluateTick({ ...input, now: new Date('2026-03-01T08:44:00.000Z') });
+    expect(retry.created[0].idempotencyKey).toBe(first.created[0].idempotencyKey);
+
+    const nextSlot = evaluateTick({ ...input, now: new Date('2026-03-01T09:05:00.000Z') });
+    expect(nextSlot.created[0].idempotencyKey).not.toBe(first.created[0].idempotencyKey);
   });
 
   it('tags every scheduled run with "scheduled"', () => {
@@ -104,6 +117,7 @@ describe('evaluateTick — idempotency (double tick)', () => {
       tickCount: 1,
       caughtUp: false,
       tags: ['scheduled'],
+      idempotencyKey: 'schedule:sched-1:1772353800000',
     };
     const out = evaluateTick({
       schedules: [schedule({ createdAt: '2026-03-01T08:05:00.000Z', lastRunAt: null })],

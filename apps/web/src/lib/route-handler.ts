@@ -14,8 +14,8 @@ function isResponseLike(value: unknown): value is Response {
 /**
  * Standard error envelope returned by API routes: { error: string }.
  */
-export function jsonError(message: string, status: number): NextResponse {
-  return NextResponse.json({ error: message }, { status });
+export function jsonError(message: string, status: number, requestId?: string): NextResponse {
+  return NextResponse.json({ error: message, ...(requestId ? { requestId } : {}) }, { status });
 }
 
 /**
@@ -28,17 +28,18 @@ export async function readJsonBody(
   try {
     return { body: await request.json() };
   } catch {
-    return { error: jsonError('Request body must be valid JSON.', 400) };
+    const requestId = request.headers.get('x-request-id') || undefined;
+    return { error: jsonError('Request body must be valid JSON.', 400, requestId) };
   }
 }
 
-function ensureRouteResponse(value: unknown, fallbackMessage: string): Response {
+function ensureRouteResponse(value: unknown, fallbackMessage: string, requestId?: string): Response {
   if (isResponseLike(value)) {
     return value as Response;
   }
 
   logger.error('Route handler returned an invalid response payload', { value });
-  return jsonError(fallbackMessage, 500);
+  return jsonError(fallbackMessage, 500, requestId);
 }
 
 /**
@@ -57,10 +58,12 @@ export function withRouteErrorHandling<Args extends unknown[]>(
   enforceSizeLimit = true,
 ): (...args: Args) => Promise<Response> {
   return async (...args: Args) => {
+    let requestId: string | undefined = undefined;
     try {
-      if (enforceSizeLimit) {
-        const request = args[0];
-        if (request instanceof Request) {
+      const request = args[0];
+      if (request instanceof Request) {
+        requestId = request.headers.get('x-request-id') || undefined;
+        if (enforceSizeLimit) {
           const sizeError = checkRequestSize(request);
           if (sizeError) {
             return sizeError;
@@ -68,10 +71,10 @@ export function withRouteErrorHandling<Args extends unknown[]>(
         }
       }
       const response = await handler(...args);
-      return ensureRouteResponse(response, fallbackMessage);
+      return ensureRouteResponse(response, fallbackMessage, requestId);
     } catch (error) {
       logger.error(`${routeLabel} failed`, { error });
-      return jsonError(fallbackMessage, 500);
+      return jsonError(fallbackMessage, 500, requestId);
     }
   };
 }
@@ -89,6 +92,7 @@ export function withSizeLimitAndLogging<Args extends unknown[]>(
   return async (...args: Args) => {
     const request = args[0] as Request | undefined;
     const startTime = Date.now();
+    const requestId = request?.headers.get('x-request-id') || undefined;
 
     try {
       // Check request size limits
@@ -105,7 +109,7 @@ export function withSizeLimitAndLogging<Args extends unknown[]>(
         }
       }
 
-      const response = ensureRouteResponse(await handler(...args), fallbackMessage);
+      const response = ensureRouteResponse(await handler(...args), fallbackMessage, requestId);
       const duration = Date.now() - startTime;
 
       logger.info(`${routeLabel} completed`, {
@@ -120,7 +124,92 @@ export function withSizeLimitAndLogging<Args extends unknown[]>(
         error,
         duration_ms: duration,
       });
-      return jsonError(fallbackMessage, 500);
+      return jsonError(fallbackMessage, 500, requestId);
+    }
+  };
+}
+
+import { z } from 'zod';
+
+export interface RouteConfig<BodySchema extends z.ZodTypeAny = z.ZodTypeAny> {
+  label: string;
+  bodySchema?: BodySchema;
+  sizeLimit?: RequestSizeLimitConfig | boolean;
+  rateLimitClass?: string;
+  fallbackMessage?: string;
+}
+
+export function createRouteHandler<
+  BodySchema extends z.ZodTypeAny = z.ZodNever,
+  Params = unknown
+>(
+  config: RouteConfig<BodySchema>,
+  handler: (
+    req: Request,
+    context: {
+      params: Promise<Params>;
+      body: z.infer<BodySchema>;
+    }
+  ) => Promise<Response>
+) {
+  return async (
+    request: Request,
+    context: { params?: Promise<Params> | Params }
+  ): Promise<Response> => {
+    const startTime = Date.now();
+    try {
+      if (config.sizeLimit !== false) {
+        const sizeConfig = typeof config.sizeLimit === 'object' ? config.sizeLimit : undefined;
+        const sizeCheckError = checkRequestSize(request, sizeConfig);
+        if (sizeCheckError) {
+          logger.info(`${config.label} rejected (size limit)`, {
+            status: 413,
+            duration_ms: Date.now() - startTime,
+            content_length: request.headers.get('content-length'),
+          });
+          return sizeCheckError;
+        }
+      }
+
+      let parsedBody: any = undefined;
+      if (config.bodySchema) {
+        const bodyResult = await readJsonBody(request);
+        if ('error' in bodyResult) return bodyResult.error as Response;
+        
+        const parseResult = config.bodySchema.safeParse(bodyResult.body);
+        if (!parseResult.success) {
+          return NextResponse.json(
+            { error: 'Invalid request body', details: parseResult.error.format() },
+            { status: 400 }
+          );
+        }
+        parsedBody = parseResult.data;
+      }
+
+      const paramsPromise = context?.params instanceof Promise 
+        ? context.params 
+        : Promise.resolve(context?.params ?? ({} as Params));
+
+      const response = await handler(request, {
+        params: paramsPromise,
+        body: parsedBody as z.infer<BodySchema>,
+      });
+
+      const fallbackMsg = config.fallbackMessage || 'An unexpected error occurred.';
+      const ensRes = ensureRouteResponse(response, fallbackMsg);
+
+      logger.info(`${config.label} completed`, {
+        status: ensRes.status,
+        duration_ms: Date.now() - startTime,
+      });
+
+      return ensRes;
+    } catch (error) {
+      logger.error(`${config.label} failed`, {
+        error,
+        duration_ms: Date.now() - startTime,
+      });
+      return jsonError(config.fallbackMessage || 'An unexpected error occurred.', 500);
     }
   };
 }

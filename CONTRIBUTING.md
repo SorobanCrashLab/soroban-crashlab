@@ -19,19 +19,19 @@ git --version
 If the command is missing, install Git from your operating system package
 manager or from git-scm.com before continuing.
 
-### 2. Install Node.js and npm
+### 2. Install Node.js and pnpm
 
-The frontend in `apps/web` targets Node.js 22+ and npm 10+.
+The frontend in `apps/web` targets Node.js 22+ and pnpm 10+.
 
 Verify your versions:
 
 ```bash
 node -v
-npm -v
+pnpm -v
 ```
 
-If either command is missing, install Node.js 22 LTS. The bundled npm
-version that ships with Node.js 22 is supported.
+If either command is missing, install Node.js 22 LTS and enable pnpm with
+`corepack enable` before continuing.
 
 ### 3. Install Rust and Cargo
 
@@ -65,30 +65,29 @@ as described in [`MAINTAINER_WAVE_PLAYBOOK.md`](MAINTAINER_WAVE_PLAYBOOK.md).
 
 ### 5. Install frontend dependencies
 
+From the repo root, install the workspace once:
+
 ```bash
-cd apps/web
-npm ci
+pnpm install --frozen-lockfile
 ```
 
-Use `npm install` later only when you intentionally need to update
-dependencies or the lockfile.
+Use `pnpm add` or `pnpm install` later only when you intentionally need to
+update dependencies or the lockfile.
 
 ### 6. Run web verification
 
 Use the same checks referenced by the maintainer playbook:
 
 ```bash
-cd apps/web
-npm run test
-npm run lint
-npm run build
+pnpm --dir apps/web run test
+pnpm --dir apps/web run lint
+pnpm --dir apps/web run build
 ```
 
 To start the local dashboard after the checks pass:
 
 ```bash
-cd apps/web
-npm run dev
+pnpm --dir apps/web run dev
 ```
 
 ### 7. Run core tests
@@ -144,8 +143,8 @@ docker compose down
 
 On a clean machine, a successful setup looks like this:
 
-- `npm ci` completes without dependency errors
-- `npm run lint` and `npm run build` both pass in `apps/web`
+- `pnpm install --frozen-lockfile` completes without dependency errors
+- `pnpm --dir apps/web run lint` and `pnpm --dir apps/web run build` both pass
 - `cargo test --all-targets` passes in `contracts/crashlab-core`
 
 If one of those steps fails, include the failing command and its output in
@@ -172,10 +171,9 @@ which npm
 - Fix: switch your shell back to Node.js 22+, then reinstall and rerun the web checks:
 
 ```bash
-cd apps/web
-npm ci
-npm run lint
-npm run build
+pnpm install --frozen-lockfile
+pnpm --dir apps/web run lint
+pnpm --dir apps/web run build
 ```
 
 ### Web checks fail with `next: command not found` or `eslint: command not found`
@@ -184,11 +182,10 @@ npm run build
 - Run:
 
 ```bash
-cd apps/web
-rm -rf node_modules
-npm ci
-npm run lint
-npm run build
+rm -rf node_modules apps/web/node_modules
+pnpm install --frozen-lockfile
+pnpm --dir apps/web run lint
+pnpm --dir apps/web run build
 ```
 
 - Fix: if `npm ci` still fails, paste the full install error into your issue or PR instead of only the final `next` or `eslint` message.

@@ -1,10 +1,37 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FLAGS, isEnabled, setFlag, clearFlag, getEnabledFlags, FlagKey } from './flags';
+import { safeStorage } from './local-storage';
+
+function makeTestStorage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index) => Array.from(values.keys())[index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } as Storage;
+}
 
 describe('feature flags', () => {
   beforeEach(() => {
-    localStorage.clear();
+    const localStorage = makeTestStorage();
+    vi.stubGlobal('window', {
+      localStorage,
+      sessionStorage: makeTestStorage(),
+      get location() {
+        return { search: '' };
+      },
+    });
+    for (const flag of Object.keys(FLAGS)) safeStorage.removeItem(`crashlab:flag:${flag}`);
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('FLAGS registry', () => {
@@ -52,7 +79,7 @@ describe('feature flags', () => {
 
     it('URL override takes precedence over localStorage', () => {
       const flag = Object.keys(FLAGS)[0] as FlagKey;
-      localStorage.setItem(`crashlab:flag:${flag}`, 'false');
+      safeStorage.setItem(`crashlab:flag:${flag}`, 'false');
       vi.spyOn(window, 'location', 'get').mockReturnValue({
         ...window.location,
         search: `?flag:${flag}=true`,
@@ -62,7 +89,7 @@ describe('feature flags', () => {
 
     it('localStorage overrides default when no URL override', () => {
       const flag = Object.keys(FLAGS)[0] as FlagKey;
-      localStorage.setItem(`crashlab:flag:${flag}`, 'true');
+      safeStorage.setItem(`crashlab:flag:${flag}`, 'true');
       expect(isEnabled(flag)).toBe(true);
     });
 
@@ -77,7 +104,7 @@ describe('feature flags', () => {
 
     it('ignores invalid localStorage values', () => {
       const flag = Object.keys(FLAGS)[0] as FlagKey;
-      localStorage.setItem(`crashlab:flag:${flag}`, 'invalid');
+      safeStorage.setItem(`crashlab:flag:${flag}`, 'invalid');
       expect(isEnabled(flag)).toBe(!FLAGS[flag].defaultOff);
     });
   });
@@ -86,14 +113,14 @@ describe('feature flags', () => {
     it('setFlag persists to localStorage', () => {
       const flag = Object.keys(FLAGS)[0] as FlagKey;
       setFlag(flag, true);
-      expect(localStorage.getItem(`crashlab:flag:${flag}`)).toBe('true');
+      expect(safeStorage.getItem(`crashlab:flag:${flag}`)).toBe('true');
     });
 
     it('clearFlag removes from localStorage', () => {
       const flag = Object.keys(FLAGS)[0] as FlagKey;
       setFlag(flag, true);
       clearFlag(flag);
-      expect(localStorage.getItem(`crashlab:flag:${flag}`)).toBeNull();
+      expect(safeStorage.getItem(`crashlab:flag:${flag}`)).toBeNull();
     });
   });
 

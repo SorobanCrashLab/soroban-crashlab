@@ -1,6 +1,7 @@
 import { withRouteErrorHandling, jsonError, readJsonBody } from '@/lib/route-handler';
 import { successResponse } from '@/lib/api-response-utils';
 import { createJiraIssuesAdapter } from '@/lib/integrations/jira-issues';
+import { JiraCreateIssueSchema } from '@/lib/schemas/integrations/jira';
 
 export const POST = withRouteErrorHandling(
   'POST /api/integrations/jira',
@@ -10,24 +11,14 @@ export const POST = withRouteErrorHandling(
       return bodyResult.error;
     }
 
-    const payload = bodyResult.body as {
-      summary?: unknown;
-      description?: unknown;
-      projectKey?: unknown;
-      issueType?: unknown;
-    } | null;
-
-    if (!payload || typeof payload.summary !== 'string' || payload.summary.trim() === '') {
-      return jsonError('A non-empty summary is required', 400);
+    const validation = JiraCreateIssueSchema.safeParse(bodyResult.body);
+    if (!validation.success) {
+      return jsonError(validation.error.errors[0].message, 400);
     }
+    const payload = validation.data;
 
     const adapter = createJiraIssuesAdapter();
-    const issue = await adapter.createIssue({
-      summary: payload.summary.trim(),
-      description: typeof payload.description === 'string' ? payload.description : undefined,
-      projectKey: typeof payload.projectKey === 'string' ? payload.projectKey : undefined,
-      issueType: typeof payload.issueType === 'string' ? payload.issueType : undefined,
-    });
+    const issue = await adapter.createIssue(payload);
 
     if (!issue) {
       return jsonError('Jira issue could not be created', 503);

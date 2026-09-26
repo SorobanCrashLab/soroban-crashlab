@@ -11,14 +11,15 @@ import { proxy } from '../rate-limit';
 
 describe('RBAC Middleware & Authorization', () => {
   const originalEnv = process.env.NODE_ENV;
+  const env = process.env as Record<string, string>;
 
   beforeEach(() => {
     clearRbacAuditLogs();
-    process.env.NODE_ENV = 'test';
+    env.NODE_ENV = 'test';
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = originalEnv;
+    env.NODE_ENV = originalEnv;
   });
 
   function makeRequest(
@@ -52,7 +53,7 @@ describe('RBAC Middleware & Authorization', () => {
     });
 
     it('strictly IGNORES dev override headers in production environment', () => {
-      process.env.NODE_ENV = 'production';
+      env.NODE_ENV = 'production';
       const req = makeRequest('DELETE', '/api/runs/run-123', { 'x-crashlab-role': 'maintainer' });
       
       // In production, header override is ignored and defaults to analyst
@@ -137,7 +138,7 @@ describe('RBAC Middleware & Authorization', () => {
     });
 
     it('denies unauthenticated / default role when attempting maintainer action in prod', async () => {
-      process.env.NODE_ENV = 'production';
+      env.NODE_ENV = 'production';
       // Attempting to spoof maintainer role in production with header
       const req = makeRequest('POST', '/api/sentry/config', {
         'x-crashlab-role': 'maintainer',

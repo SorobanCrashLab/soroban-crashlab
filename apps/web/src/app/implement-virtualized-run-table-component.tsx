@@ -8,6 +8,8 @@ import { useDataTableKeyboardNav } from './use-data-table-keyboard-nav';
 import type { DataTableRowKeyboardProps } from './use-data-table-keyboard-nav';
 import TruncatedCell from '@/components/TruncatedCell';
 import { useResponsiveRunColumns } from './use-responsive-run-columns';
+import { SortableColumnHeader } from '../components/SortableColumnHeader';
+import { getNextSortState, type SortState } from './run-history-sort-utils';
 
 /** Height of a single data row in pixels — must match the rendered row height. */
 const ROW_HEIGHT = 57;
@@ -32,6 +34,10 @@ interface VirtualizedRunTableProps {
     onToggleRunSelection?: (runId: string) => void;
     /** Called to toggle selection of all runs */
     onToggleAllRunsSelection?: (runIds: string[]) => void;
+    /** Active sort state (controlled) */
+    sortState?: SortState<string> | null;
+    /** Callback invoked when a sortable column header is activated */
+    onSort?: (field: string) => void;
 }
 
 const StatusBadge = memo(({ status }: { status: RunStatus }) => (
@@ -178,17 +184,46 @@ export default function VirtualizedRunTable({
     selectedRunIds = new Set(),
     onToggleRunSelection,
     onToggleAllRunsSelection,
+    sortState,
+    onSort,
 }: VirtualizedRunTableProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [scrollTop, setScrollTop] = useState(0);
+
+    const [internalSortState, setInternalSortState] = useState<SortState<string>>({ field: 'id', order: 'desc' });
+    const activeSort = sortState !== undefined ? sortState : internalSortState;
+
+    const handleSort = (field: string) => {
+        if (onSort) {
+            onSort(field);
+        } else {
+            setInternalSortState((prev) => getNextSortState(prev, field));
+        }
+    };
+
+    const effectiveRuns = useMemo(() => {
+        if (onSort || !activeSort || !activeSort.field || activeSort.order === 'none') {
+            return runs;
+        }
+        const mult = activeSort.order === 'asc' ? 1 : -1;
+        return runs.slice().sort((a, b) => {
+            if (activeSort.field === 'id') return a.id.localeCompare(b.id) * mult;
+            if (activeSort.field === 'status') return a.status.localeCompare(b.status) * mult;
+            if (activeSort.field === 'area') return a.area.localeCompare(b.area) * mult;
+            if (activeSort.field === 'severity') return a.severity.localeCompare(b.severity) * mult;
+            if (activeSort.field === 'duration') return (a.duration - b.duration) * mult;
+            if (activeSort.field === 'seedCount') return (a.seedCount - b.seedCount) * mult;
+            return 0;
+        });
+    }, [runs, onSort, activeSort]);
 
     /** Responsive column set — adapts to phone and portrait-tablet viewports. */
     const effectiveColumns = useResponsiveRunColumns(visibleColumns);
 
     const { getRowProps } = useDataTableKeyboardNav({
-        rowCount: runs.length,
+        rowCount: effectiveRuns.length,
         onActivate: (index) => {
-            const run = runs[index];
+            const run = effectiveRuns[index];
             if (run) {
                 onSelectRun(run.id);
             }
@@ -225,9 +260,9 @@ export default function VirtualizedRunTable({
         queueMicrotask(() => {
             setScrollTop(0);
         });
-    }, [runs]);
+    }, [effectiveRuns]);
 
-    if (runs.length === 0) {
+    if (effectiveRuns.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-xl bg-zinc-50 dark:bg-zinc-900/20 border-zinc-200 dark:border-zinc-800">
                 <p className="text-zinc-500 dark:text-zinc-400 font-medium">No fuzzing runs found.</p>
@@ -236,17 +271,17 @@ export default function VirtualizedRunTable({
         );
     }
 
-    const totalHeight = runs.length * ROW_HEIGHT;
+    const totalHeight = effectiveRuns.length * ROW_HEIGHT;
 
     /** Index of the first row that is at least partially visible. */
     const firstVisible = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
     /** Index of the last row that is at least partially visible. */
     const lastVisible = Math.min(
-        runs.length - 1,
+        effectiveRuns.length - 1,
         Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN,
     );
 
-    const visibleRuns = runs.slice(firstVisible, lastVisible + 1);
+    const visibleRuns = effectiveRuns.slice(firstVisible, lastVisible + 1);
 
     return (
         <div
@@ -264,15 +299,15 @@ export default function VirtualizedRunTable({
                                     <div className="flex items-center justify-center">
                                         <input
                                             type="checkbox"
-                                            checked={runs.length > 0 && selectedRunIds.size === runs.length}
+                                            checked={effectiveRuns.length > 0 && selectedRunIds.size === effectiveRuns.length}
                                             ref={(input) => {
                                                 if (input) {
-                                                    input.indeterminate = selectedRunIds.size > 0 && selectedRunIds.size < runs.length;
+                                                    input.indeterminate = selectedRunIds.size > 0 && selectedRunIds.size < effectiveRuns.length;
                                                 }
                                             }}
                                             onChange={() => {
                                                 if (onToggleAllRunsSelection) {
-                                                    onToggleAllRunsSelection(runs.map(r => r.id));
+                                                    onToggleAllRunsSelection(effectiveRuns.map(r => r.id));
                                                 }
                                             }}
                                             className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
@@ -281,34 +316,60 @@ export default function VirtualizedRunTable({
                                 </th>
                             )}
                             {effectiveColumns.includes('id') && (
-                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex-1 min-w-0">
-                                    Run ID
-                                </th>
+                                <SortableColumnHeader
+                                    field="id"
+                                    label="Run ID"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex-1 min-w-0"
+                                />
                             )}
                             {effectiveColumns.includes('status') && (
-                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-36 shrink-0">
-                                    Status
-                                </th>
+                                <SortableColumnHeader
+                                    field="status"
+                                    label="Status"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-36 shrink-0"
+                                />
                             )}
                             {effectiveColumns.includes('area') && (
-                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0">
-                                    Area
-                                </th>
+                                <SortableColumnHeader
+                                    field="area"
+                                    label="Area"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0"
+                                />
                             )}
                             {effectiveColumns.includes('severity') && (
-                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0">
-                                    Severity
-                                </th>
+                                <SortableColumnHeader
+                                    field="severity"
+                                    label="Severity"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0"
+                                />
                             )}
                             {effectiveColumns.includes('duration') && (
-                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0 text-right">
-                                    Duration
-                                </th>
+                                <SortableColumnHeader
+                                    field="duration"
+                                    label="Duration"
+                                    align="right"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-28 shrink-0 text-right"
+                                />
                             )}
                             {effectiveColumns.includes('seedCount') && (
-                                <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right">
-                                    Seed Count
-                                </th>
+                                <SortableColumnHeader
+                                    field="seedCount"
+                                    label="Seed Count"
+                                    align="right"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right"
+                                />
                             )}
                             {effectiveColumns.includes('report') && (
                                 <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 w-32 shrink-0 text-right">

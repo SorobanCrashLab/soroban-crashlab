@@ -35,6 +35,7 @@ import { TextReveal } from "../../components/scroll-effects/TextReveal";
 import { FuzzingRun } from "../types";
 import { useDataTableKeyboardNav } from "../use-data-table-keyboard-nav";
 import { sanitizeSearchParams } from "../../lib/sanitize";
+import { safeStorage } from "@/lib/local-storage";
 
 const makeSuggestedLabels = (run: FuzzingRun): string[] => [
   run.area,
@@ -63,7 +64,7 @@ function DashboardContent() {
   useEffect(() => {
     const loadLayout = () => {
       try {
-        setLayout(parseDashboardLayout(localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)));
+        setLayout(parseDashboardLayout(safeStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)));
       } catch {
         setLayout(DEFAULT_DASHBOARD_LAYOUT);
       }

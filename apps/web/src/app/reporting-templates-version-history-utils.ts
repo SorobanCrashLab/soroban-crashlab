@@ -1,3 +1,5 @@
+import { safeStorage } from "../lib/local-storage";
+
 export interface TemplateVersion {
   id: string;
   templateId: string;
@@ -13,7 +15,7 @@ const MAX_VERSIONS_PER_TEMPLATE = 20;
 export function readVersionHistory(): TemplateVersion[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(VERSIONS_STORAGE_KEY);
+    const raw = safeStorage.getItem(VERSIONS_STORAGE_KEY);
     return raw ? (JSON.parse(raw) as TemplateVersion[]) : [];
   } catch {
     return [];
@@ -22,7 +24,7 @@ export function readVersionHistory(): TemplateVersion[] {
 
 export function saveVersionHistory(versions: TemplateVersion[]): boolean {
   try {
-    localStorage.setItem(VERSIONS_STORAGE_KEY, JSON.stringify(versions));
+    safeStorage.setItem(VERSIONS_STORAGE_KEY, JSON.stringify(versions));
     return true;
   } catch {
     return false;
@@ -69,7 +71,7 @@ export function restoreVersion(
 
 export function clearVersionHistory(): boolean {
   try {
-    localStorage.removeItem(VERSIONS_STORAGE_KEY);
+    safeStorage.removeItem(VERSIONS_STORAGE_KEY);
     return true;
   } catch {
     return false;

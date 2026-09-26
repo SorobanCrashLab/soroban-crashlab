@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-export type ApiTokenScope = 'read' | 'write';
+export type ApiTokenScope = 'webhook:read' | 'webhook:write' | 'runs:read' | 'runs:write' | 'settings:read' | 'settings:write' | '*';
 
 /** Default lifetime (90 days) applied when no explicit expiry is supplied. */
 export const DEFAULT_TOKEN_TTL_MS =
@@ -14,7 +14,7 @@ export interface ApiTokenRecord {
   id: string;
   name: string;
   sha256Hash: string;
-  scope: ApiTokenScope;
+  scopes: ApiTokenScope[];
   createdAt: string;
   expiresAt?: string | null;
   lastUsedAt?: string | null;
@@ -26,7 +26,7 @@ export interface ApiTokenPublic {
   id: string;
   name: string;
   prefixMasked: string;
-  scope: ApiTokenScope;
+  scopes: ApiTokenScope[];
   createdAt: string;
   expiresAt?: string | null;
   lastUsedAt?: string | null;
@@ -84,8 +84,8 @@ export function toPublicRecord(record: ApiTokenRecord): ApiTokenPublic {
   return {
     id: record.id,
     name: record.name,
-    prefixMasked: maskTokenSecret(record.sha256Hash), // Default placeholder mask if secret not present
-    scope: record.scope,
+    prefixMasked: maskTokenSecret(record.sha256Hash),
+    scopes: record.scopes,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     lastUsedAt: record.lastUsedAt,
@@ -96,7 +96,7 @@ export function toPublicRecord(record: ApiTokenRecord): ApiTokenPublic {
 
 export function createApiToken(params: {
   name: string;
-  scope: ApiTokenScope;
+  scopes: ApiTokenScope[];
   expiresAt?: string | null;
   nowMs?: number;
 }): { secret: string; token: ApiTokenPublic } {
@@ -107,15 +107,13 @@ export function createApiToken(params: {
   const nowMs = params.nowMs ?? Date.now();
   const createdAt = new Date(nowMs).toISOString();
 
-  // When no explicit expiry is supplied, apply the default token lifetime so
-  // a leaked token cannot stay valid forever.
   const expiresAt = params.expiresAt ?? new Date(nowMs + DEFAULT_TOKEN_TTL_MS).toISOString();
 
   const record: ApiTokenRecord = {
     id,
     name: params.name.trim(),
     sha256Hash,
-    scope: params.scope,
+    scopes: params.scopes,
     createdAt,
     expiresAt,
     lastUsedAt: null,
@@ -129,7 +127,7 @@ export function createApiToken(params: {
     id: record.id,
     name: record.name,
     prefixMasked: maskTokenSecret(secret),
-    scope: record.scope,
+    scopes: record.scopes,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     lastUsedAt: record.lastUsedAt,
@@ -145,7 +143,7 @@ export function listApiTokens(): ApiTokenPublic[] {
     id: record.id,
     name: record.name,
     prefixMasked: `scl_live_...${record.sha256Hash.slice(-4)}`,
-    scope: record.scope,
+    scopes: record.scopes,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     lastUsedAt: record.lastUsedAt,
@@ -167,16 +165,12 @@ export function rotateApiToken(id: string, nowMs = Date.now()): RotateTokenResul
     return undefined;
   }
 
-  // A revoked secret is dead and must not silently beget a successor unless
-  // the operator explicitly rotates it again later; block the no-op path.
   const { secret, token } = createApiToken({
     name: existing.name,
-    scope: existing.scope,
+    scopes: existing.scopes,
     nowMs,
   });
 
-  // Old token remains usable for the grace window, then resolveApiToken flips
-  // it to revoked automatically.
   existing.rotatedAt = new Date(nowMs).toISOString();
 
   return { secret, token, previousTokenId: existing.id };

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { safeStorage } from "../../../lib/local-storage";
 
 export const chartTypeSchema = z.enum(['line', 'bar', 'scatter', 'pie']);
 export type ChartType = z.infer<typeof chartTypeSchema>;
@@ -91,9 +92,11 @@ export interface SavedCustomChart extends ChartConfig {
   createdAt: string;
 }
 
-export function loadCustomCharts(storage: Pick<Storage, 'getItem'> = globalThis.localStorage): SavedCustomChart[] {
+export function loadCustomCharts(storage?: Pick<Storage, 'getItem'>): SavedCustomChart[] {
   try {
-    const raw = storage.getItem(CUSTOM_CHART_STORAGE_KEY);
+    const raw = storage
+      ? storage.getItem(CUSTOM_CHART_STORAGE_KEY)
+      : safeStorage.getItem(CUSTOM_CHART_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -104,7 +107,7 @@ export function loadCustomCharts(storage: Pick<Storage, 'getItem'> = globalThis.
 
 export function saveCustomChart(
   config: ChartConfig,
-  storage: Pick<Storage, 'getItem' | 'setItem'> = globalThis.localStorage,
+  storage?: Pick<Storage, 'getItem' | 'setItem'>,
 ): SavedCustomChart {
   const charts = loadCustomCharts(storage);
   const entry: SavedCustomChart = {
@@ -113,14 +116,16 @@ export function saveCustomChart(
     createdAt: new Date().toISOString(),
   };
   charts.push(entry);
-  storage.setItem(CUSTOM_CHART_STORAGE_KEY, JSON.stringify(charts));
+  if (storage) storage.setItem(CUSTOM_CHART_STORAGE_KEY, JSON.stringify(charts));
+  else safeStorage.setItem(CUSTOM_CHART_STORAGE_KEY, JSON.stringify(charts));
   return entry;
 }
 
 export function deleteCustomChart(
   chartId: string,
-  storage: Pick<Storage, 'getItem' | 'setItem'> = globalThis.localStorage,
+  storage?: Pick<Storage, 'getItem' | 'setItem'>,
 ): void {
   const charts = loadCustomCharts(storage).filter((c) => c.id !== chartId);
-  storage.setItem(CUSTOM_CHART_STORAGE_KEY, JSON.stringify(charts));
+  if (storage) storage.setItem(CUSTOM_CHART_STORAGE_KEY, JSON.stringify(charts));
+  else safeStorage.setItem(CUSTOM_CHART_STORAGE_KEY, JSON.stringify(charts));
 }

@@ -10,7 +10,6 @@ one workflow from cancelling another workflow's run.
 | Workflow | Decision | Rationale |
 | --- | --- | --- |
 | `ci.yml` | Apply | Full PR CI is superseded by a newer push; `main` pushes are never cancelled. |
-| `validate-casebundle.yml` | Apply | Path-scoped PR validation is iteration feedback and is safe to supersede. |
 | `lighthouse.yml` | Apply | A newer PR revision supersedes the previous performance audit and comment. |
 | `vercel-preview.yml` | Apply | Only the newest preview deployment is useful for a PR revision. |
 | `size-limit.yml` | Apply | The budget check evaluates the newest PR contents. |

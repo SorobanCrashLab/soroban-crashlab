@@ -34,12 +34,12 @@ describe('api-token-store & authentication', () => {
   it('creates token and returns plaintext secret once while storing hashed record', () => {
     const { secret, token } = createApiToken({
       name: 'CI Worker',
-      scope: 'read',
+      scopes: ['runs:read'],
     });
 
     expect(secret).toMatch(/^scl_live_/);
     expect(token.name).toBe('CI Worker');
-    expect(token.scope).toBe('read');
+    expect(token.scopes).toEqual(['runs:read']);
     expect(token.prefixMasked).not.toBe(secret);
 
     const tokensList = listApiTokens();
@@ -54,7 +54,7 @@ describe('api-token-store & authentication', () => {
 
     const { secret } = createApiToken({
       name: 'Expiring Token',
-      scope: 'write',
+      scopes: ['runs:write'],
       expiresAt: expiryDate,
     });
 
@@ -74,7 +74,7 @@ describe('api-token-store & authentication', () => {
   it('enforces revocation immediacy', () => {
     const { secret, token } = createApiToken({
       name: 'Revokable Token',
-      scope: 'write',
+      scopes: ['runs:write'],
     });
 
     // Valid initially
@@ -93,7 +93,7 @@ describe('api-token-store & authentication', () => {
     const startMs = 1000000;
     const { secret } = createApiToken({
       name: 'Throttled Token',
-      scope: 'read',
+      scopes: ['runs:read'],
     });
 
     // First use at startMs
@@ -120,20 +120,20 @@ describe('api-token-store & authentication', () => {
   it('validates HTTP requests with validateScopedApiToken middleware helper', () => {
     const { secret, token } = createApiToken({
       name: 'HTTP Test Token',
-      scope: 'read',
+      scopes: ['runs:read'],
     });
 
     // Valid read request
     const req1 = new NextRequest('http://localhost/api/test', {
       headers: { authorization: `Bearer ${secret}` },
     });
-    expect(validateScopedApiToken(req1, 'read')).toBeUndefined();
+    expect(validateScopedApiToken(req1, 'runs:read')).toBeUndefined();
 
     // Insufficient scope for write requirement
     const reqWrite = new NextRequest('http://localhost/api/test', {
       headers: { authorization: `Bearer ${secret}` },
     });
-    const writeRes = validateScopedApiToken(reqWrite, 'write');
+    const writeRes = validateScopedApiToken(reqWrite, 'runs:write');
     expect(writeRes?.status).toBe(403);
 
     // Revoked token request
@@ -149,7 +149,7 @@ describe('api-token-store & authentication', () => {
     const startMs = Date.now();
     const { secret, token } = createApiToken({
       name: 'Default Expiry Token',
-      scope: 'read',
+      scopes: ['runs:read'],
       nowMs: startMs,
     });
 
@@ -170,7 +170,7 @@ describe('api-token-store & authentication', () => {
     const explicit = new Date(startMs + 60_000).toISOString();
     const { token } = createApiToken({
       name: 'Explicit Expiry Token',
-      scope: 'read',
+      scopes: ['runs:read'],
       expiresAt: explicit,
       nowMs: startMs,
     });
@@ -181,7 +181,7 @@ describe('api-token-store & authentication', () => {
     const startMs = Date.now();
     const { secret: oldSecret, token: oldToken } = createApiToken({
       name: 'Rotation Token',
-      scope: 'write',
+      scopes: ['runs:write'],
       nowMs: startMs,
     });
 
@@ -189,7 +189,7 @@ describe('api-token-store & authentication', () => {
     expect(rotated).toBeDefined();
     expect(rotated!.secret).not.toBe(oldSecret);
     expect(rotated!.token.name).toBe('Rotation Token');
-    expect(rotated!.token.scope).toBe('write');
+    expect(rotated!.token.scopes).toEqual(['runs:write']);
     expect(rotated!.token.id).not.toBe(oldToken.id);
     expect(rotated!.previousTokenId).toBe(oldToken.id);
 
@@ -203,7 +203,7 @@ describe('api-token-store & authentication', () => {
     const startMs = Date.now();
     const { secret: oldSecret, token: oldToken } = createApiToken({
       name: 'Grace Window Token',
-      scope: 'read',
+      scopes: ['runs:read'],
       nowMs: startMs,
     });
 
@@ -242,7 +242,7 @@ describe('api-token-store & authentication', () => {
     const now = Date.now();
     const { secret } = createApiToken({
       name: 'Constant Time Token',
-      scope: 'read',
+      scopes: ['runs:read'],
       nowMs: now,
     });
 

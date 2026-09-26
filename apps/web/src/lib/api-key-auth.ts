@@ -190,7 +190,15 @@ export function validateScopedApiToken(
     );
   }
 
-  if (requiredScope === 'write' && result.token.scope === 'read') {
+  // Reject when the caller required a scope the token does not carry.
+  // `'*'` (full access) satisfies any requirement, mirroring the scope enforcer.
+  const tokenScopes = result.token.scopes;
+  const satisfiesRequiredScope =
+    requiredScope === undefined ||
+    tokenScopes.includes('*') ||
+    (requiredScope !== '*' && tokenScopes.includes(requiredScope));
+
+  if (!satisfiesRequiredScope) {
     return NextResponse.json(
       { error: 'Insufficient token scope for write operation.', code: 'INSUFFICIENT_SCOPE' },
       { status: 403 },

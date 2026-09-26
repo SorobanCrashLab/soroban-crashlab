@@ -81,16 +81,16 @@ async function testReplayServiceMapping() {
   }
 }
 
-function testSeedSubsetReplayMetadata() {
-  const first = simulateSeedReplay('run-42', [9, 1, 1, 7]);
-  const second = simulateSeedReplay('run-42', [1, 7, 9]);
+async function testSeedSubsetReplayMetadata() {
+  const first = await simulateSeedReplay('run-42', [9, 1, 1, 7]);
+  const second = await simulateSeedReplay('run-42', [1, 7, 9]);
 
   assert.deepEqual(first.seedList, [1, 7, 9]);
   assert.deepEqual(second.seedList, [1, 7, 9]);
   assert.equal(first.newRunId, second.newRunId);
   assert.equal(first.parentId, undefined);
 
-  const child = simulateSeedReplay('run-42', [3, 4], 'run-42');
+  const child = await simulateSeedReplay('run-42', [3, 4], 'run-42');
   assert.deepEqual(child.seedList, [3, 4]);
   assert.equal(child.parentId, 'run-42');
   assert.equal(child.newRunId, 'replay-run-42-seed-3-4');
@@ -110,7 +110,7 @@ async function main() {
   testGetReplayButtonLabel();
   testCreateReplayPlaceholderRun();
   await testReplayServiceMapping();
-  testSeedSubsetReplayMetadata();
+  await testSeedSubsetReplayMetadata();
   testLineageTraversal();
   console.log('replay-ui-utils.test.ts: all assertions passed');
 }

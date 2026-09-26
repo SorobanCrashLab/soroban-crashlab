@@ -105,7 +105,7 @@ describe('createDiscordAdapter', () => {
   });
 
   it('uses default username when not provided', async () => {
-    const mockFetch = vi.fn(() =>
+    const mockFetch = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
       Promise.resolve({ ok: true, status: 204 } as Response),
     );
     const adapter = createDiscordAdapter({ fetchImpl: mockFetch });

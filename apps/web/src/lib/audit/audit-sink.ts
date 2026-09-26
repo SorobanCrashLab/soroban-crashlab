@@ -8,6 +8,8 @@
  * dropped write surface in the viewer's integrity check.
  */
 
+import { safeStorage } from "../local-storage";
+
 import {
   AuditLog,
   createInMemoryAuditGateway,
@@ -36,9 +38,9 @@ export function createDefaultAuditGateway(): AuditGateway {
   if (typeof window === 'undefined') return createInMemoryAuditGateway();
 
   return {
-    load: () => parseAuditEntries(localStorage.getItem(AUDIT_STORAGE_KEY)),
+    load: () => parseAuditEntries(safeStorage.getItem(AUDIT_STORAGE_KEY)),
     save: (entries) => {
-      localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(entries));
+      safeStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(entries));
     },
   };
 }

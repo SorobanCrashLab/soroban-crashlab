@@ -8,9 +8,9 @@
 use crate::scheduler::Mutator;
 use crate::CaseSeed;
 
-const ENUM_MARKER: u8 = 0xE0;
-const VALID_TAGS: [u8; 4] = [0x00, 0x01, 0x02, 0x03];
-const INVALID_TAGS: [u8; 4] = [0x7F, 0x80, 0xFE, 0xFF];
+pub(crate) const ENUM_MARKER: u8 = 0xE0;
+pub(crate) const VALID_TAGS: [u8; 4] = [0x00, 0x01, 0x02, 0x03];
+pub(crate) const INVALID_TAGS: [u8; 4] = [0x7F, 0x80, 0xFE, 0xFF];
 
 /// Mutates enum-like payloads by flipping between valid variant tags and invalid tags.
 pub struct EnumVariantFlipMutator;

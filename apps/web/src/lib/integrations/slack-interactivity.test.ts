@@ -224,10 +224,10 @@ describe('interactivity payloads', () => {
     expect(parseInteractivityBody(body)?.user.username).toBe('ana');
   });
 
-  it('returns null for junk bodies', () => {
-    expect(parseInteractivityBody('')).toBeNull();
-    expect(parseInteractivityBody('payload=not-json')).toBeNull();
-    expect(parseInteractivityBody('payload=%7B%7D')).toBeNull();
+  it('returns error for junk bodies', () => {
+    expect(parseInteractivityBody('')).toEqual({ error: 'Missing payload parameter' });
+    expect(parseInteractivityBody('payload=not-json')).toHaveProperty('error');
+    expect(parseInteractivityBody('payload=%7B%7D')).toHaveProperty('error');
   });
 });
 
@@ -322,7 +322,7 @@ describe('fast-ack handler', () => {
         defer: () => undefined,
       },
     );
-    expect(ack).toEqual({ status: 400, body: '', reason: 'unparseable-payload', accepted: false });
+    expect(ack).toEqual({ status: 422, body: '', reason: 'invalid-payload', accepted: false });
   });
 });
 

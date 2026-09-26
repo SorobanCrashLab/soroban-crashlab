@@ -116,6 +116,43 @@ export const ERROR_CODES = Object.freeze({
     message: 'Invalid JSON in request body.',
     httpStatus: 400,
   },
+
+  // -------------------------------------------------------------------------
+  // Outbound integrations (#1633)
+  // -------------------------------------------------------------------------
+  INTEGRATION_TIMEOUT: {
+    code: 'INTEGRATION_TIMEOUT',
+    message: 'The third-party service did not respond in time.',
+    httpStatus: 504,
+  },
+  INTEGRATION_UNAVAILABLE: {
+    code: 'INTEGRATION_UNAVAILABLE',
+    message: 'The third-party service could not be reached.',
+    httpStatus: 502,
+  },
+
+  // -------------------------------------------------------------------------
+  // Upload ingestion (#1636)
+  // -------------------------------------------------------------------------
+  UPLOAD_REJECTED: {
+    code: 'UPLOAD_REJECTED',
+    message: 'The uploaded file failed ingestion validation.',
+    httpStatus: 422,
+  },
+
+  // -------------------------------------------------------------------------
+  // Idempotency (#1634)
+  // -------------------------------------------------------------------------
+  IDEMPOTENCY_KEY_INVALID: {
+    code: 'IDEMPOTENCY_KEY_INVALID',
+    message: 'The Idempotency-Key header is malformed.',
+    httpStatus: 400,
+  },
+  IDEMPOTENCY_KEY_REUSED: {
+    code: 'IDEMPOTENCY_KEY_REUSED',
+    message: 'This Idempotency-Key was already used with a different request payload.',
+    httpStatus: 422,
+  },
 } as const) satisfies Record<string, ErrorCatalogEntry>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

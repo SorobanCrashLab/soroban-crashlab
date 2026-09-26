@@ -38,7 +38,7 @@ describe('StructuredLogger', () => {
 
   it('includes service name and environment', async () => {
     process.env.SERVICE_NAME = 'test-service';
-    process.env.NODE_ENV = 'test';
+    (process.env as Record<string, string>).NODE_ENV = 'test';
 
     const logger = new StructuredLogger(mockWriter);
     await logger.info('Test');

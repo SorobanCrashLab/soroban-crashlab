@@ -79,12 +79,27 @@ Variables prefixed with `NEXT_PUBLIC_` are bundled into the browser build. Do no
 | `NEXT_PUBLIC_ENABLE_MOCK_DATA` | No | `true` | API routes | Enables mock run data when no backend is configured. Set to `false` in production once `NEXT_PUBLIC_API_URL` points at a real backend. |
 | `NEXT_PUBLIC_VERCEL_ENV` | No | platform-provided | Settings UI | Vercel-provided deployment environment label. Local development can omit it. |
 | `NEXT_PUBLIC_VERCEL_ANALYTICS_ID` | No | empty | Hosting analytics | Optional public analytics identifier. |
+| `NEXT_PUBLIC_SENTRY_DSN` | No | empty | Web app, Sentry SDK (`apps/web/src/lib/integrations/sentry-client.ts`) | Sentry Data Source Name (DSN) for client and server-side runtime error tracking. When omitted, Sentry client initialization is skipped and error reporting falls back to console logging. Safe to expose publicly in client bundles. |
 
 ---
 
 ## 5. Server-Only Variables
 
-These values are read only by Next.js server routes or middleware. Keep them out of client-side code and do not prefix them with `NEXT_PUBLIC_`.
+These values are read only by Next.js server routes, middleware, or build tools. Keep them out of client-side code and do not prefix them with `NEXT_PUBLIC_`.
+
+### Sentry Build & Release Configuration (CI & Hosting Pipeline)
+
+These variables configure source map generation, uploading, release tagging, and git commit association during production and preview builds (`next build` / `vercel build`) via `withSentryConfig` in `apps/web/next.config.ts`.
+
+> [!WARNING]
+> **Security Requirement**: `SENTRY_AUTH_TOKEN` is a privileged secret. **Never commit real tokens to the repository or expose them with `NEXT_PUBLIC_` prefixes.** Configure it exclusively in Vercel Project Settings (`Settings > Environment Variables`, scoped to Production and Preview) and GitHub Actions secrets (`secrets.SENTRY_AUTH_TOKEN`).
+
+| Variable | Required | Default | Used by | Description |
+|----------|----------|---------|---------|-------------|
+| `SENTRY_AUTH_TOKEN` | Yes (for map uploads) | *(unset)* | `@sentry/nextjs` via `withSentryConfig` in `next.config.ts` | Sentry authentication token with permissions: `project:releases` (read/write) and `org:read`. Required by the Sentry Webpack plugin at build time to upload hidden source maps and associate releases with git commits. |
+| `SENTRY_ORG` | Yes (for map uploads) | *(unset)* | `@sentry/nextjs` via `withSentryConfig` in `next.config.ts` | Sentry organization slug (e.g. `soroban-crashlab`). Must match your Sentry organization identifier. |
+| `SENTRY_PROJECT` | Yes (for map uploads) | *(unset)* | `@sentry/nextjs` via `withSentryConfig` in `next.config.ts` | Sentry project slug (e.g. `soroban-crashlab-web`). Must match your Sentry project identifier. |
+| `SENTRY_RELEASE` | No | Auto-detected git commit SHA | `@sentry/nextjs` via `withSentryConfig` in `next.config.ts` | Explicit release identifier override. If not set, `withSentryConfig` in `apps/web/next.config.ts` automatically defaults to the git commit SHA via `VERCEL_GIT_COMMIT_SHA`, `GITHUB_SHA`, or local git (`git rev-parse HEAD`). |
 
 ### API & Issue Configuration
 | Variable | Required | Default | Used by | Description |
@@ -163,3 +178,61 @@ NEXT_PUBLIC_ENABLE_MOCK_DATA=false
 CRASHLAB_API_RATE_LIMIT_MAX_REQUESTS=120
 CRASHLAB_API_RATE_LIMIT_WINDOW_MS=60000
 ```
+
+---
+
+## 7. Sentry Source Maps & Release Verification Recipe (Preview Deploy)
+
+This recipe describes how to verify that Sentry source maps upload and release tagging work end-to-end on a preview deployment.
+
+### Prerequisites
+
+1. Set the following environment variables in Vercel Project Settings (`Settings > Environment Variables`, scoped to **Preview** and **Production**):
+   - `NEXT_PUBLIC_SENTRY_DSN`: Your Sentry project DSN.
+   - `SENTRY_AUTH_TOKEN`: Secret Sentry auth token (with `project:releases` and `org:read` scopes).
+   - `SENTRY_ORG`: Your Sentry organization slug.
+   - `SENTRY_PROJECT`: Your Sentry project slug.
+2. In GitHub repository secrets (`Settings > Secrets and variables > Actions`), ensure `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are configured.
+
+### Step 1: Trigger Preview Deployment
+
+1. Open a pull request against `main` (or push a commit to an existing PR).
+2. The `.github/workflows/vercel-preview.yml` action triggers.
+3. Review the action build logs under **Build Project Artifacts**:
+   - Verify that `@sentry/nextjs` / Sentry Webpack Plugin runs.
+   - Verify that client and server bundles generate hidden source maps.
+   - Verify that source maps are uploaded to Sentry and tagged with the git commit SHA release (`VERCEL_GIT_COMMIT_SHA` / `GITHUB_SHA`).
+   - Verify that client-side `.map` files are deleted post-upload (`deleteSourcemapsAfterUpload: true`).
+
+### Step 2: Trigger Intentional Test Error on Preview URL
+
+1. Open the preview deployment URL posted on the pull request comment by the bot.
+2. Open the browser Developer Tools console (`F12` or `Cmd+Option+I`).
+3. Execute an intentional test error to trigger Sentry reporting:
+   ```javascript
+   // Trigger an unhandled exception captured by Sentry
+   setTimeout(() => {
+     throw new Error("Sentry verification test error: preview deploy symbolication check");
+   }, 0);
+   ```
+   Or trigger a captured exception via the client console:
+   ```javascript
+   window.dispatchEvent(new ErrorEvent('error', {
+     error: new Error("Sentry verification test error: preview deploy symbolication check")
+   }));
+   ```
+
+### Step 3: Validate in Sentry Dashboard
+
+1. Navigate to your Sentry dashboard and go to **Issues**.
+2. Locate the new issue with title `Error: Sentry verification test error: preview deploy symbolication check`.
+3. Check the **Release**:
+   - Verify that the release tag matches the PR's git commit SHA (`git rev-parse --short HEAD`).
+   - Verify commit tracking displays associated commits for the release (`setCommits`).
+4. Check the **Stack Trace**:
+   - Verify that the frames are cleanly symbolicated with original source code filenames (e.g. `src/lib/...`, `src/app/...`) and exact line numbers.
+   - Confirm there are **no mangled or minified stack frames** (e.g. no raw references like `chunks/452-a1b2c3d.js:1:1234`).
+5. Check **Source Maps Privacy**:
+   - Try accessing a `.map` URL directly in the browser (e.g. `https://<preview-url>/_next/static/chunks/main-<hash>.js.map`).
+   - Confirm that the response is `404 Not Found`, proving source maps are deleted from the public web server and exist only within Sentry.
+

@@ -99,18 +99,18 @@ describe('normalizeResourceImpact', () => {
     });
 
     it('scales with fee ratio', () => {
-        expect(normalizeResourceImpact(5000, 1000)).toBeCloseTo(0.5); // 5x baseline
-        expect(normalizeResourceImpact(10000, 1000)).toBe(1); // 10x baseline (capped)
+        expect(normalizeResourceImpact(5000, 1000, 1000000, 1000000, 1048576, 1048576)).toBeCloseTo(0.5); // 5x baseline
+        expect(normalizeResourceImpact(10000, 1000, 1000000, 1000000, 1048576, 1048576)).toBe(1); // 10x baseline (capped)
     });
 
     it('takes max of fee/cpu/mem ratios', () => {
         // High CPU but normal fee
-        const result = normalizeResourceImpact(1000, 1000, 5000000, 1000000);
+        const result = normalizeResourceImpact(1000, 1000, 5000000, 1000000, 1048576, 1048576);
         expect(result).toBeCloseTo(0.5); // 5x CPU
     });
 
     it('caps at 1 (10x baseline)', () => {
-        expect(normalizeResourceImpact(100000, 1000)).toBe(1);
+        expect(normalizeResourceImpact(100000, 1000, 1000000, 1000000, 1048576, 1048576)).toBe(1);
     });
 });
 

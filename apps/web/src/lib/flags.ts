@@ -1,3 +1,5 @@
+import { safeStorage } from "./local-storage";
+
 export interface FeatureFlag {
   name: string;
   description: string;
@@ -33,7 +35,7 @@ function getUrlOverride(flag: FlagKey): boolean | null {
 function getLocalStorageOverride(flag: FlagKey): boolean | null {
   if (typeof window === 'undefined') return null;
   try {
-    const val = localStorage.getItem(STORAGE_PREFIX + flag);
+    const val = safeStorage.getItem(STORAGE_PREFIX + flag);
     if (val === 'true') return true;
     if (val === 'false') return false;
   } catch {
@@ -55,7 +57,7 @@ export function isEnabled(flag: FlagKey): boolean {
 export function setFlag(flag: FlagKey, value: boolean): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_PREFIX + flag, String(value));
+    safeStorage.setItem(STORAGE_PREFIX + flag, String(value));
   } catch {
     // localStorage may be unavailable
   }
@@ -64,7 +66,7 @@ export function setFlag(flag: FlagKey, value: boolean): void {
 export function clearFlag(flag: FlagKey): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(STORAGE_PREFIX + flag);
+    safeStorage.removeItem(STORAGE_PREFIX + flag);
   } catch {
     // localStorage may be unavailable
   }

@@ -21,8 +21,23 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Test timeout */
   timeout: 30000,
+  /* Snapshots must be platform-agnostic: baselines generated on any OS must
+   * match on the Linux CI runner. Font differences are tolerated by
+   * maxDiffPixelRatio above, so omit the default {platform} segment. */
+  snapshotDir: 'e2e/visual.spec.ts-snapshots',
+  snapshotPathTemplate: '{snapshotDir}/{arg}-{projectName}{ext}',
   /* Expect timeout */
-  expect: { timeout: 5000 },
+  expect: {
+    timeout: 5000,
+    /* Visual comparison thresholds. Font rendering varies across OSes; the
+     * e2e job runs chromium on Linux while baselines may be produced anywhere,
+     * so tolerate small pixel deltas. See e2e/visual.spec.ts. */
+    toHaveScreenshot: {
+      animations: 'disabled',
+      caret: 'hide',
+      maxDiffPixelRatio: 0.02,
+    },
+  },
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['html', { open: 'never', outputFolder: 'playwright-report' }],

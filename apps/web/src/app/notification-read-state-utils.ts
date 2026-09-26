@@ -1,3 +1,5 @@
+import { safeStorage } from "@/lib/local-storage";
+
 /**
  * Notification read-state persistence and cross-tab merge (#1359).
  *
@@ -23,7 +25,7 @@ export type ReadState = Record<string, number>;
 const STORAGE_KEY = 'notification-read-state';
 
 function isBrowser(): boolean {
-  return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+  return typeof window !== 'undefined';
 }
 
 // ---------------------------------------------------------------------------
@@ -33,7 +35,7 @@ function isBrowser(): boolean {
 export function loadReadState(): ReadState {
   if (!isBrowser()) return {};
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = safeStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed: unknown = JSON.parse(raw);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -48,7 +50,7 @@ export function loadReadState(): ReadState {
 export function saveReadState(state: ReadState): void {
   if (!isBrowser()) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    safeStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
     // Quota exceeded or security error — silently ignore; badge may be stale.
   }

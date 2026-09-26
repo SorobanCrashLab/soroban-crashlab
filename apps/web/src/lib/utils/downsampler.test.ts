@@ -5,8 +5,8 @@ import { CorpusStatPoint } from '../../app/types';
 describe('downsampleCorpusStats', () => {
   it('returns original series when length is below targetPoints', () => {
     const smallSeries: CorpusStatPoint[] = [
-      { ts: 100, corpusSize: 10, execsPerSec: 50, coveragePct: 12.5 },
-      { ts: 200, corpusSize: 15, execsPerSec: 55, coveragePct: 15.0 },
+      { ts: 100, corpusSize: 10, edgesFound: 5, totalEdges: 100, execsPerSec: 50, coveragePct: 12.5 },
+      { ts: 200, corpusSize: 15, edgesFound: 8, totalEdges: 100, execsPerSec: 55, coveragePct: 15.0 },
     ];
     const result = downsampleCorpusStats(smallSeries, 500);
     expect(result).toEqual(smallSeries);
@@ -16,6 +16,8 @@ describe('downsampleCorpusStats', () => {
     const points: CorpusStatPoint[] = Array.from({ length: 1000 }, (_, i) => ({
       ts: 1000 + i * 10,
       corpusSize: 100 + (i % 50),
+      edgesFound: 400 + (i % 50),
+      totalEdges: 1000,
       execsPerSec: 200 + Math.sin(i) * 50,
       coveragePct: Math.min(100, (i / 1000) * 80 + (i % 5)),
     }));
@@ -31,13 +33,15 @@ describe('downsampleCorpusStats', () => {
     const points: CorpusStatPoint[] = Array.from({ length: 1000 }, (_, i) => ({
       ts: 1000 + i * 10,
       corpusSize: 100,
+      edgesFound: 400,
+      totalEdges: 1000,
       execsPerSec: 200,
       coveragePct: 50,
     }));
 
     // Inject sharp spike and trough
-    points[250] = { ts: 3500, corpusSize: 100, execsPerSec: 200, coveragePct: 99.9 }; // Peak
-    points[750] = { ts: 8500, corpusSize: 100, execsPerSec: 200, coveragePct: 0.1 };  // Trough
+    points[250] = { ts: 3500, corpusSize: 100, edgesFound: 999, totalEdges: 1000, execsPerSec: 200, coveragePct: 99.9 }; // Peak
+    points[750] = { ts: 8500, corpusSize: 100, edgesFound: 1, totalEdges: 1000, execsPerSec: 200, coveragePct: 0.1 };  // Trough
 
     const result = downsampleCorpusStats(points, 100);
 
@@ -52,6 +56,8 @@ describe('downsampleCorpusStats', () => {
     const largeSeries: CorpusStatPoint[] = Array.from({ length: 5000 }, (_, i) => ({
       ts: 1600000000 + i * 5,
       corpusSize: 50 + Math.floor(i / 10),
+      edgesFound: 400 + Math.floor(i / 10),
+      totalEdges: 1000,
       execsPerSec: 1000 + (i % 200),
       coveragePct: Math.min(100, 10 + (i / 5000) * 75 + (i % 3)),
     }));

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FuzzingRun } from './types';
 import { RUN_STATUSES } from '../lib/run-status';
 import { formatDurationCompact } from './utils/format';
+import { safeStorage } from "@/lib/local-storage";
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -62,7 +63,7 @@ const OPERATOR_OPTIONS: Record<string, Array<{ value: string; label: string }>> 
 function loadQueries(): SavedQuery[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = safeStorage.getItem(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as SavedQuery[]) : [];
   } catch {
     return [];
@@ -70,7 +71,7 @@ function loadQueries(): SavedQuery[] {
 }
 
 function saveQueries(queries: SavedQuery[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(queries));
+  safeStorage.setItem(STORAGE_KEY, JSON.stringify(queries));
 }
 
 function getNestedValue(obj: Record<string, unknown>, path: string): unknown {

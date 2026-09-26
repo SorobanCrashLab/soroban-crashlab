@@ -37,6 +37,7 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     try {
       const stored = accessibilityPrefsStore.get();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate persisted accessibility prefs once on mount
       if (stored) setPrefsState(parseAccessibilityPrefs(stored));
     } catch {
       /* keep defaults */

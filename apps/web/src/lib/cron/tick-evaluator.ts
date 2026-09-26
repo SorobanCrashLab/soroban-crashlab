@@ -18,6 +18,7 @@
 import { parseCron } from './parser';
 import { nextRun } from './next-run';
 import { SCHEDULED_RUN_TAG, type Schedule, type ScheduledRun } from './schedule-store';
+import { scheduledCampaignIdempotencyKey } from '../idempotency-key';
 
 export interface TickInput {
   schedules: readonly Schedule[];
@@ -95,6 +96,7 @@ export function evaluateTick(input: TickInput): TickOutcome {
         tickCount: dueTicks.length,
         caughtUp: dueTicks.length > 1,
         tags: [SCHEDULED_RUN_TAG],
+        idempotencyKey: scheduledCampaignIdempotencyKey(schedule.id, lastTickIso),
       });
     }
 
@@ -107,3 +109,4 @@ export function evaluateTick(input: TickInput): TickOutcome {
     created,
   };
 }
+

@@ -3,7 +3,7 @@
  * Mutation-generated garbage binaries - parser must return clean typed errors, never throw.
  */
 
-import { parseContractWasm, MAX_MODULE_SIZE, proposeFuzzTargets } from './index';
+import { parseContractWasm, MAX_MODULE_SIZE, proposeFuzzTargets, type ParsedContract } from './index';
 import { readULEB128, readSLEB128, readString, readBytes, readU32, readU64, readByte } from './binary-reader';
 
 describe('WASM binary reader primitives', () => {
@@ -282,7 +282,7 @@ describe('Fuzz target proposer', () => {
             ],
         };
         
-        const targets = proposeFuzzTargets(mockContract);
+        const targets = proposeFuzzTargets(mockContract as unknown as ParsedContract);
         expect(targets).toHaveLength(1);
         expect(targets[0].method).toBe('transfer');
         expect(targets[0].argTemplates).toHaveLength(3);
@@ -307,7 +307,7 @@ describe('Fuzz target proposer', () => {
             ],
         };
         
-        const targets = proposeFuzzTargets(mockContract);
+        const targets = proposeFuzzTargets(mockContract as unknown as ParsedContract);
         expect(targets[0].argTemplates).toHaveLength(0);
     });
 
@@ -326,7 +326,7 @@ describe('Fuzz target proposer', () => {
             ],
         };
         
-        const targets = proposeFuzzTargets(mockContract);
+        const targets = proposeFuzzTargets(mockContract as unknown as ParsedContract);
         expect(targets[0].argTemplates).toHaveLength(7);
         const types = targets[0].argTemplates.map(a => a.type);
         expect(types).toEqual(['i32', 'i64', 'f32', 'f64', 'v128', 'funcref', 'externref']);

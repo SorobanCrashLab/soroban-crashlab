@@ -34,6 +34,32 @@ npm run test:e2e:debug
 npx playwright test e2e/home.spec.ts
 ```
 
+## Visual Regression
+
+`e2e/visual.spec.ts` captures the landing page (`/`) and Start flow (`/start`)
+across breakpoints (desktop/mobile) and themes (light/dark). It asserts against
+committed snapshots in the `e2e/visual.spec.ts-snapshots/` directory.
+
+Visual tests run only on the `chromium` project (the CI project); other local
+browsers skip them so baselines stay deterministic.
+
+### Updating baselines
+
+After an intentional visual change, regenerate the baselines:
+
+```bash
+pnpm run test:e2e:update-snapshots
+```
+
+Then review the diff in git before committing.
+
+### Thresholds
+
+Screenshots tolerate a 2% pixel delta (`maxDiffPixelRatio: 0.02`) to absorb
+font-rendering variance between OSes; animations are disabled and the caret
+hidden. Dynamic regions count on the page are rendered at deterministic final
+states under reduced motion.
+
 ### Run tests in specific browser
 ```bash
 npx playwright test --project=chromium

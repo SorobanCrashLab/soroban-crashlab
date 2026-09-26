@@ -9,6 +9,7 @@
  */
 
 import type { AnnotationThread } from './annotation-thread-utils';
+import { safeStorage } from "../../../../lib/local-storage";
 
 export const ANNOTATION_THREADS_STORAGE_KEY = 'crashlab:run-annotation-threads:v1';
 
@@ -36,15 +37,15 @@ export function createLocalAnnotationThreadGateway(): AnnotationThreadGateway {
   return {
     load(runId) {
       if (typeof window === 'undefined') return [];
-      return parseThreadStore(localStorage.getItem(ANNOTATION_THREADS_STORAGE_KEY))[runId] ?? [];
+      return parseThreadStore(safeStorage.getItem(ANNOTATION_THREADS_STORAGE_KEY))[runId] ?? [];
     },
     save(runId, threads) {
       if (typeof window === 'undefined') {
         throw new Error('Annotation threads can only be saved in the browser');
       }
-      const store = parseThreadStore(localStorage.getItem(ANNOTATION_THREADS_STORAGE_KEY));
+      const store = parseThreadStore(safeStorage.getItem(ANNOTATION_THREADS_STORAGE_KEY));
       store[runId] = [...threads];
-      localStorage.setItem(ANNOTATION_THREADS_STORAGE_KEY, JSON.stringify(store));
+      safeStorage.setItem(ANNOTATION_THREADS_STORAGE_KEY, JSON.stringify(store));
     },
   };
 }

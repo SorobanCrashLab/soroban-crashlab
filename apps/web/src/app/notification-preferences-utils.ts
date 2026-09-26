@@ -1,3 +1,5 @@
+import { safeStorage } from "@/lib/local-storage";
+
 export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'critical';
 export type DigestFrequency = 'realtime' | 'hourly' | 'daily' | 'never';
@@ -124,7 +126,7 @@ function isNotificationPreferences(value: unknown): value is NotificationPrefere
 
 export const savePreferences = (prefs: NotificationPreferences): void => {
   try {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(prefs));
+    safeStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(prefs));
   } catch (e) {
     console.error('Failed to save notification settings:', e);
   }
@@ -132,7 +134,7 @@ export const savePreferences = (prefs: NotificationPreferences): void => {
 
 export const loadPreferences = (): NotificationPreferences => {
   try {
-    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    const stored = safeStorage.getItem(SETTINGS_STORAGE_KEY);
     if (!stored) return { ...DEFAULT_PREFERENCES };
     const parsed = JSON.parse(stored) as unknown;
     if (isNotificationPreferences(parsed)) {
@@ -146,7 +148,7 @@ export const loadPreferences = (): NotificationPreferences => {
 
 export const saveChannelPreferences = (prefs: NotificationPreference[]): void => {
   try {
-    localStorage.setItem(CHANNEL_STORAGE_KEY, JSON.stringify(prefs));
+    safeStorage.setItem(CHANNEL_STORAGE_KEY, JSON.stringify(prefs));
   } catch (e) {
     console.error('Failed to save channel notification preferences:', e);
   }
@@ -154,7 +156,7 @@ export const saveChannelPreferences = (prefs: NotificationPreference[]): void =>
 
 export const loadChannelPreferences = (): NotificationPreference[] => {
   try {
-    const stored = localStorage.getItem(CHANNEL_STORAGE_KEY);
+    const stored = safeStorage.getItem(CHANNEL_STORAGE_KEY);
     return stored ? (JSON.parse(stored) as NotificationPreference[]) : DEFAULT_CHANNEL_PREFERENCES;
   } catch {
     return DEFAULT_CHANNEL_PREFERENCES;

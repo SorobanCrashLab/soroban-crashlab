@@ -16,11 +16,5 @@
     "path": [".next/static/chunks/*.js"],
     "gzip": true,
     "limit": "1500 kB"
-  },
-  {
-    "name": "route-group: landing-sandbox",
-    "path": [".next/static/chunks/app/page-*.js"],
-    "gzip": true,
-    "limit": "120 kB"
   }
 ]

@@ -27,19 +27,57 @@ const runAssertions = () => {
     ariaSort: 'none',
   });
 
-  // Clicking a different column switches to it (descending by default).
+  // None/un-sorted state gets neutral indicator.
+  assert.deepEqual(getSortIndicator('id', { field: null, order: 'none' }), {
+    active: false,
+    symbol: '↕',
+    ariaSort: 'none',
+  });
+  assert.deepEqual(getSortIndicator('id', { field: 'id', order: 'none' }), {
+    active: false,
+    symbol: '↕',
+    ariaSort: 'none',
+  });
+  assert.deepEqual(getSortIndicator('id', null), {
+    active: false,
+    symbol: '↕',
+    ariaSort: 'none',
+  });
+
+  // Switching to a different column starts at 'asc'
   assert.deepEqual(getNextSortState(active, 'duration'), {
     field: 'duration',
-    order: 'desc',
+    order: 'asc',
   });
-  // Clicking the active column toggles direction.
-  assert.deepEqual(getNextSortState(active, 'id'), { field: 'id', order: 'asc' });
+
+  // Toggle-cycle semantics: asc → desc → none → asc
+  // 1. none/initial -> asc
+  assert.deepEqual(getNextSortState(null, 'id'), {
+    field: 'id',
+    order: 'asc',
+  });
+  assert.deepEqual(getNextSortState({ field: null, order: 'none' }, 'id'), {
+    field: 'id',
+    order: 'asc',
+  });
+  // 2. asc -> desc
   assert.deepEqual(getNextSortState({ field: 'id', order: 'asc' }, 'id'), {
     field: 'id',
     order: 'desc',
+  });
+  // 3. desc -> none
+  assert.deepEqual(getNextSortState({ field: 'id', order: 'desc' }, 'id'), {
+    field: null,
+    order: 'none',
+  });
+  // 4. none -> asc (restart cycle)
+  assert.deepEqual(getNextSortState({ field: 'id', order: 'none' }, 'id'), {
+    field: 'id',
+    order: 'asc',
   });
 
   console.log('run-history-sort-utils: all assertions passed');
 };
 
 runAssertions();
+

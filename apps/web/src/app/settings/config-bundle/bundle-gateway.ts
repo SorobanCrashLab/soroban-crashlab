@@ -14,6 +14,7 @@ import {
 } from '../../alerting-settings-page-utils';
 import { PRESETS_STORAGE_KEY } from '../../saved-filter-presets-utils';
 import { createEmptyBundle, type ConfigBundle } from './bundle-schema';
+import { safeStorage } from "../../../lib/local-storage";
 
 export interface ConfigBundleGateway {
   read(): ConfigBundle;
@@ -27,14 +28,14 @@ export function createLocalConfigBundleGateway(): ConfigBundleGateway {
       if (typeof window === 'undefined') return createEmptyBundle();
 
       const alerting = readAlertingSettingsSnapshot(
-        localStorage.getItem(ALERTING_SETTINGS_STORAGE_KEY),
+        safeStorage.getItem(ALERTING_SETTINGS_STORAGE_KEY),
       );
       const snapshot: AlertingSettingsSnapshot =
         alerting.snapshot ?? createDefaultAlertingSettingsSnapshot();
 
       let filterPresets: ConfigBundle['sections']['filterPresets'] = [];
       try {
-        const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
+        const raw = safeStorage.getItem(PRESETS_STORAGE_KEY);
         filterPresets = raw ? JSON.parse(raw) : [];
       } catch {
         filterPresets = [];
@@ -55,8 +56,8 @@ export function createLocalConfigBundleGateway(): ConfigBundleGateway {
         throw new Error('Configuration bundles can only be imported in the browser');
       }
 
-      const previousAlerting = localStorage.getItem(ALERTING_SETTINGS_STORAGE_KEY);
-      const previousPresets = localStorage.getItem(PRESETS_STORAGE_KEY);
+      const previousAlerting = safeStorage.getItem(ALERTING_SETTINGS_STORAGE_KEY);
+      const previousPresets = safeStorage.getItem(PRESETS_STORAGE_KEY);
 
       try {
         const existing = readAlertingSettingsSnapshot(previousAlerting);
@@ -70,8 +71,8 @@ export function createLocalConfigBundleGateway(): ConfigBundleGateway {
           lastUpdated: new Date().toISOString(),
         };
 
-        localStorage.setItem(ALERTING_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
-        localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(bundle.sections.filterPresets));
+        safeStorage.setItem(ALERTING_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+        safeStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(bundle.sections.filterPresets));
       } catch (error) {
         restore(ALERTING_SETTINGS_STORAGE_KEY, previousAlerting);
         restore(PRESETS_STORAGE_KEY, previousPresets);
@@ -83,8 +84,8 @@ export function createLocalConfigBundleGateway(): ConfigBundleGateway {
 
 function restore(key: string, value: string | null): void {
   try {
-    if (value === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
+    if (value === null) safeStorage.removeItem(key);
+    else safeStorage.setItem(key, value);
   } catch {
     // Nothing further to do — the caller is already surfacing the failure.
   }

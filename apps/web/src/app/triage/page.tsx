@@ -359,6 +359,7 @@ export default function TriageBoardPage() {
   useEffect(() => {
     try {
       const stored = triageSwimlaneStore.get();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate persisted swimlane layout once on mount
       if (stored) setSwimlane(parseSwimlaneConfig(stored));
     } catch {
       /* keep defaults */

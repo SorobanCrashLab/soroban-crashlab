@@ -99,25 +99,26 @@ export function applyTriageAction(
 
 // ── Payload parsing ──────────────────────────────────────────────────────────
 
-export interface SlackInteractionPayload {
-  type: string;
-  user: { id: string; username?: string };
-  actions: Array<{ action_id: string }>;
-  response_url?: string;
-}
+import { z } from 'zod';
+import { SlackInteractionPayloadSchema } from '../schemas/integrations/slack';
+import { logger } from '../logger';
+
+export type SlackInteractionPayload = z.infer<typeof SlackInteractionPayloadSchema>;
 
 /** Slack posts interactivity as a form body: `payload=<url-encoded JSON>`. */
-export function parseInteractivityBody(body: string): SlackInteractionPayload | null {
+export function parseInteractivityBody(body: string): SlackInteractionPayload | { error: string } {
   try {
     const encoded = new URLSearchParams(body).get('payload');
-    if (!encoded) return null;
+    if (!encoded) return { error: 'Missing payload parameter' };
     const parsed: unknown = JSON.parse(encoded);
-    if (!parsed || typeof parsed !== 'object') return null;
-    const payload = parsed as SlackInteractionPayload;
-    if (!payload.user?.id || !Array.isArray(payload.actions)) return null;
-    return payload;
-  } catch {
-    return null;
+    
+    const validation = SlackInteractionPayloadSchema.safeParse(parsed);
+    if (!validation.success) {
+      return { error: validation.error.message };
+    }
+    return validation.data;
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'JSON parse error' };
   }
 }
 
@@ -170,10 +171,12 @@ export function handleInteractivityRequest(
     return { status, body: '', reason: verification.reason, accepted: false };
   }
 
-  const payload = parseInteractivityBody(request.body);
-  if (!payload) {
-    return { status: 400, body: '', reason: 'unparseable-payload', accepted: false };
+  const result = parseInteractivityBody(request.body);
+  if ('error' in result) {
+    logger.warn('Slack payload validation failed', { provider: 'slack', reason: result.error });
+    return { status: 422, body: '', reason: 'invalid-payload', accepted: false };
   }
+  const payload = result;
 
   const secret = options.secret as string;
   const actor = payload.user.username ?? payload.user.id;

@@ -382,4 +382,36 @@ describe('api-client', () => {
       expect(err.message).toBe('Run not found');
     });
   });
+
+  describe('api.campaigns.create (#1634)', () => {
+    const config = { seedSource: 'random', authMode: 'none', parallelism: 4, timeoutSeconds: 60 } as const;
+    const created = () =>
+      new Response(JSON.stringify({ data: { campaign: { id: 'campaign-1' } } }), { status: 201 });
+
+    it('sends the caller-supplied Idempotency-Key so a retry can replay', async () => {
+      fetchMock.mockResolvedValue(created());
+      const { api } = await loadModule();
+
+      await api.campaigns.create(config, undefined, 'retry-key');
+
+      const init = fetchMock.mock.calls[0][1] as RequestInit;
+      const headers = init.headers as Record<string, string>;
+      expect(headers['Idempotency-Key']).toBe('retry-key');
+      expect(headers['Content-Type']).toBe('application/json');
+    });
+
+    it('generates a key when none is supplied', async () => {
+      fetchMock.mockImplementation(async () => created());
+      const { api } = await loadModule();
+
+      await api.campaigns.create(config);
+      await api.campaigns.create(config);
+
+      const keys = fetchMock.mock.calls.map(
+        ([, init]) => (init as RequestInit & { headers: Record<string, string> }).headers['Idempotency-Key'],
+      );
+      expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/);
+      expect(keys[1]).not.toBe(keys[0]);
+    });
+  });
 });

@@ -25,6 +25,8 @@ import { useDebounce } from "../../lib/useDebounce";
 import { MOCK_LOG_ENTRIES } from "../../fixtures/logs";
 import { useDataTableKeyboardNav } from "../use-data-table-keyboard-nav";
 import LogSeverityBadge from "../../components/LogSeverityBadge";
+import SortableColumnHeader from "../../components/SortableColumnHeader";
+import { getNextSortState, type SortState } from "../run-history-sort-utils";
 import { useRunStream } from "../runs/[id]/useRunStream";
 
 async function fetchLogs(): Promise<LogEntry[]> {
@@ -97,14 +99,42 @@ export default function LogViewerPage() {
     setFetchAttempt((n) => n + 1);
   };
 
-  const visible = useMemo(
-    () =>
-      filterLogEntries(entries, {
-        level: levelFilter,
-        query: debouncedSearchQuery,
-      }).sort((a, b) => a.timestamp - b.timestamp),
-    [entries, levelFilter, debouncedSearchQuery],
-  );
+  const [sortState, setSortState] = useState<SortState<string>>({
+    field: "timestamp",
+    order: "asc",
+  });
+
+  const handleSort = (field: string) => {
+    setSortState((prev) => getNextSortState(prev, field));
+  };
+
+  const visible = useMemo(() => {
+    const filtered = filterLogEntries(entries, {
+      level: levelFilter,
+      query: debouncedSearchQuery,
+    });
+
+    if (!sortState.field || sortState.order === "none") {
+      return filtered.slice().sort((a, b) => a.timestamp - b.timestamp);
+    }
+
+    const mult = sortState.order === "asc" ? 1 : -1;
+    return filtered.slice().sort((a, b) => {
+      if (sortState.field === "timestamp") {
+        return (a.timestamp - b.timestamp) * mult;
+      }
+      if (sortState.field === "level") {
+        return a.level.localeCompare(b.level) * mult;
+      }
+      if (sortState.field === "source") {
+        return a.source.localeCompare(b.source) * mult;
+      }
+      if (sortState.field === "message") {
+        return a.message.localeCompare(b.message) * mult;
+      }
+      return 0;
+    });
+  }, [entries, levelFilter, debouncedSearchQuery, sortState]);
 
   const { getRowProps } = useDataTableKeyboardNav({
     rowCount: visible.length,
@@ -320,16 +350,33 @@ export default function LogViewerPage() {
             >
               <thead>
                 <tr>
-                  <th scope="col" className="w-24 sm:w-52">
-                    Timestamp
-                  </th>
-                  <th scope="col" className="w-14 sm:w-20">
-                    Level
-                  </th>
-                  <th scope="col" className="hidden sm:table-cell w-32">
-                    Source
-                  </th>
-                  <th scope="col">Message</th>
+                  <SortableColumnHeader
+                    field="timestamp"
+                    label="Timestamp"
+                    sortState={sortState}
+                    onSort={handleSort}
+                    className="w-24 sm:w-52"
+                  />
+                  <SortableColumnHeader
+                    field="level"
+                    label="Level"
+                    sortState={sortState}
+                    onSort={handleSort}
+                    className="w-14 sm:w-20"
+                  />
+                  <SortableColumnHeader
+                    field="source"
+                    label="Source"
+                    sortState={sortState}
+                    onSort={handleSort}
+                    className="hidden sm:table-cell w-32"
+                  />
+                  <SortableColumnHeader
+                    field="message"
+                    label="Message"
+                    sortState={sortState}
+                    onSort={handleSort}
+                  />
                 </tr>
               </thead>
               <tbody>

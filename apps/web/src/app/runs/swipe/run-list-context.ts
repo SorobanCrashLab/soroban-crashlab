@@ -1,5 +1,7 @@
 'use client';
 
+import { safeStorage } from "../../../lib/local-storage";
+
 const CONTEXT_KEY = 'crashlab-run-list-context';
 const CONTEXT_MAX_AGE_MS = 5 * 60 * 1000;
 
@@ -13,7 +15,7 @@ export interface RunListContext {
 export function captureRunListContext(ids: string[], filters: Record<string, string> = {}, sort: { key: string; direction: string } = { key: 'queuedAt', direction: 'desc' }): void {
   const ctx: RunListContext = { ids, filters, sort, capturedAt: Date.now() };
   try {
-    sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(ctx));
+    safeStorage.setItem(CONTEXT_KEY, JSON.stringify(ctx), 'session');
   } catch {
     // Storage unavailable — degrade silently
   }
@@ -21,11 +23,11 @@ export function captureRunListContext(ids: string[], filters: Record<string, str
 
 export function readRunListContext(): RunListContext | null {
   try {
-    const raw = sessionStorage.getItem(CONTEXT_KEY);
+    const raw = safeStorage.getItem(CONTEXT_KEY, 'session');
     if (!raw) return null;
     const ctx: RunListContext = JSON.parse(raw);
     if (Date.now() - ctx.capturedAt > CONTEXT_MAX_AGE_MS) {
-      sessionStorage.removeItem(CONTEXT_KEY);
+      safeStorage.removeItem(CONTEXT_KEY, 'session');
       return null;
     }
     return ctx;
@@ -50,7 +52,7 @@ export function resolveNeighbors(
 
 export function clearRunListContext(): void {
   try {
-    sessionStorage.removeItem(CONTEXT_KEY);
+    safeStorage.removeItem(CONTEXT_KEY, 'session');
   } catch {
     // Ignore
   }

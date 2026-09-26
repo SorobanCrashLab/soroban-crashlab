@@ -161,7 +161,7 @@ export type AnalyticsEventsResponse = z.infer<typeof AnalyticsEventsResponseSche
 // GET /api/webhooks/history — request query params + response
 // ---------------------------------------------------------------------------
 
-export const DeliveryStatusFilterSchema = z.enum(['all', 'delivered', 'failed', 'queued']);
+export const DeliveryStatusFilterSchema = z.enum(['all', 'delivered', 'failed', 'queued', 'parked']);
 
 export const WebhookDeliveryItemSchema = z.object({
   id: z.string(),
@@ -175,7 +175,7 @@ export const WebhookDeliveryItemSchema = z.object({
     'run.cancelled',
     'crash.detected',
   ]),
-  status: z.enum(['delivered', 'failed', 'queued']),
+  status: z.enum(['delivered', 'failed', 'queued', 'parked']),
   statusCode: z.number().optional(),
   attempts: z.number(),
   maxAttempts: z.number(),
@@ -193,6 +193,7 @@ export const DeliveryStatsSchema = z.object({
   deliveredCount: z.number(),
   failedCount: z.number(),
   queuedCount: z.number(),
+  parkedCount: z.number(),
   successRate: z.number(),
   averageAttempts: z.number(),
 });

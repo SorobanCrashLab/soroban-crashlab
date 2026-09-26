@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { flattenCatalogKeys, generateKeysFileContent } from '../../scripts/lib/i18n-codegen.mjs';
 import notificationsEn from './catalogs/en/notifications.json';
+import landingEn from './catalogs/en/landing.json';
 import { MESSAGE_KEYS } from './generated/keys';
 
 describe('flattenCatalogKeys', () => {
@@ -21,14 +22,15 @@ describe('generateKeysFileContent', () => {
 });
 
 describe('generated keys stay in sync with the en catalogs', () => {
+  const enCatalogKeys = () =>
+    [...flattenCatalogKeys(notificationsEn, 'notifications'), ...flattenCatalogKeys(landingEn, 'landing')].sort();
+
   it('matches the committed src/i18n/generated/keys.ts (run `pnpm run i18n:generate` if this fails)', () => {
-    const freshKeys = flattenCatalogKeys(notificationsEn, 'notifications');
-    expect([...MESSAGE_KEYS].sort()).toEqual(freshKeys.sort());
+    expect([...MESSAGE_KEYS].sort()).toEqual(enCatalogKeys());
   });
 
   it('the committed generated file matches what the generator would produce byte-for-byte', () => {
-    const freshKeys = flattenCatalogKeys(notificationsEn, 'notifications');
-    const expectedContent = generateKeysFileContent(freshKeys);
+    const expectedContent = generateKeysFileContent(enCatalogKeys());
     const actualContent = readFileSync(path.join(__dirname, 'generated/keys.ts'), 'utf8');
     expect(actualContent).toBe(expectedContent);
   });

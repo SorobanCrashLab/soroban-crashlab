@@ -316,7 +316,7 @@ describe('depth limiting', () => {
 
 describe('performance', () => {
     it('diffs 10k entries under 150ms', () => {
-        const ledgerState = Array.from({ length: 10000 }, (_, i) => ({
+        const ledgerState: LedgerStateChange[] = Array.from({ length: 10000 }, (_, i) => ({
             id: `key-${i}`,
             entryType: 'ContractData',
             changeType: i % 3 === 0 ? 'created' : i % 3 === 1 ? 'updated' : 'deleted',

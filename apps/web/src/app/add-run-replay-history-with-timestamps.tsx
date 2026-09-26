@@ -17,6 +17,7 @@ import {
   sortReplayHistoryByTimestamp,
 } from "./run-replay-history-utils";
 import { useDataTableKeyboardNav } from "./use-data-table-keyboard-nav";
+import { safeStorage } from "@/lib/local-storage";
 
 interface AddRunReplayHistoryWithTimestampsProps {
   /** When set, only replays sourced from this run are shown. */
@@ -31,7 +32,7 @@ function loadStoredHistory(): RunReplayHistoryEntry[] {
   }
 
   try {
-    return readReplayHistory(window.localStorage.getItem(RUN_REPLAY_HISTORY_STORAGE_KEY));
+    return readReplayHistory(safeStorage.getItem(RUN_REPLAY_HISTORY_STORAGE_KEY));
   } catch {
     return [];
   }
@@ -42,7 +43,7 @@ function persistHistory(entries: RunReplayHistoryEntry[]): void {
     return;
   }
 
-  window.localStorage.setItem(
+  safeStorage.setItem(
     RUN_REPLAY_HISTORY_STORAGE_KEY,
     serializeReplayHistory(entries),
   );

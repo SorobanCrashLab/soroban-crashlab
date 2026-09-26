@@ -5,11 +5,25 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { GET } from './route';
 
+const ENV_KEYS = [
+  'DATADOG_ENABLED',
+  'DATADOG_AGENT_HOST',
+  'DATADOG_AGENT_PORT',
+  'NODE_ENV',
+] as const;
+
+function clearEnvKeys(): void {
+  const env = process.env as Record<string, string | undefined>;
+  for (const key of ENV_KEYS) {
+    delete env[key];
+  }
+}
+
 describe('GET /api/integrations/datadog/metrics', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    process.env = { ...originalEnv };
+    clearEnvKeys();
   });
 
   afterAll(() => {
@@ -20,10 +34,9 @@ describe('GET /api/integrations/datadog/metrics', () => {
     process.env.DATADOG_ENABLED = 'true';
     process.env.DATADOG_AGENT_HOST = 'datadog.example.com';
     process.env.DATADOG_AGENT_PORT = '8125';
-    process.env.NODE_ENV = 'production';
+    (process.env as Record<string, string>).NODE_ENV = 'production';
 
-    const request = new Request('http://localhost/api/integrations/datadog/metrics');
-    const response = await GET(request);
+    const response = await GET();
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -39,10 +52,9 @@ describe('GET /api/integrations/datadog/metrics', () => {
 
   it('returns mock status when Datadog is disabled', async () => {
     process.env.DATADOG_ENABLED = 'false';
-    process.env.NODE_ENV = 'development';
+    (process.env as Record<string, string>).NODE_ENV = 'development';
 
-    const request = new Request('http://localhost/api/integrations/datadog/metrics');
-    const response = await GET(request);
+    const response = await GET();
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -52,13 +64,7 @@ describe('GET /api/integrations/datadog/metrics', () => {
   });
 
   it('uses default values when environment variables are not set', async () => {
-    delete process.env.DATADOG_ENABLED;
-    delete process.env.DATADOG_AGENT_HOST;
-    delete process.env.DATADOG_AGENT_PORT;
-    delete process.env.NODE_ENV;
-
-    const request = new Request('http://localhost/api/integrations/datadog/metrics');
-    const response = await GET(request);
+    const response = await GET();
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -69,8 +75,7 @@ describe('GET /api/integrations/datadog/metrics', () => {
   });
 
   it('returns valid JSON structure', async () => {
-    const request = new Request('http://localhost/api/integrations/datadog/metrics');
-    const response = await GET(request);
+    const response = await GET();
     const data = await response.json();
 
     expect(data.data).toHaveProperty('enabled');

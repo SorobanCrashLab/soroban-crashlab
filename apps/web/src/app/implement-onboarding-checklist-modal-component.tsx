@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { safeStorage } from "@/lib/local-storage";
 
 interface OnboardingChecklistModalProps {
   isOpen: boolean;
@@ -48,7 +49,7 @@ function readCompletedTasks(): string[] {
   if (typeof window === 'undefined') return [];
 
   try {
-    const raw = localStorage.getItem(COMPLETED_TASKS_STORAGE_KEY);
+    const raw = safeStorage.getItem(COMPLETED_TASKS_STORAGE_KEY);
     if (!raw) return [];
 
     const parsed = JSON.parse(raw) as unknown;
@@ -62,7 +63,7 @@ function readCompletedTasks(): string[] {
 
 function writeCompletedTasks(taskIds: string[]) {
   try {
-    localStorage.setItem(COMPLETED_TASKS_STORAGE_KEY, JSON.stringify(taskIds));
+    safeStorage.setItem(COMPLETED_TASKS_STORAGE_KEY, JSON.stringify(taskIds));
   } catch {
     // ignore storage write errors
   }

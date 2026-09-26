@@ -3,6 +3,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { safeStorage, type StorageArea } from "../../lib/local-storage";
 
 // Typed storage key constants — no raw string literals are used for persistence.
 export const WIZARD_COMPLETE_KEY = 'crashlab:onboarding-wizard-complete:v1';
@@ -113,11 +114,14 @@ export interface OnboardingWizardState {
 
 function globalStorage(name: 'localStorage' | 'sessionStorage'): StorageLike | null {
   if (typeof window === 'undefined') return null;
-  try {
-    return window[name] ?? null;
-  } catch {
-    return null;
-  }
+  const area: StorageArea = name === 'sessionStorage' ? 'session' : 'local';
+  return {
+    getItem: (key) => safeStorage.getItem(key, area),
+    setItem: (key, value) => {
+      safeStorage.setItem(key, value, area);
+    },
+    removeItem: (key) => safeStorage.removeItem(key, area),
+  };
 }
 
 /**

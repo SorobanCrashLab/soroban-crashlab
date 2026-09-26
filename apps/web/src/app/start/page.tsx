@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { api } from '../../lib/api-client';
+import { createIdempotencyKeyTracker } from '../../lib/idempotency-key';
 import {
   parseContractWasmFile,
   proposeFuzzTargets,
@@ -30,6 +31,8 @@ export default function StartPage() {
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [campaignId, setCampaignId] = useState<string | null>(null);
+  // Relaunching the same config after a failure reuses its key (#1634).
+  const idempotencyKeys = useRef(createIdempotencyKeyTracker());
 
   const stepIndex = phase === 'upload' ? 0 : phase === 'targets' ? 1 : 2;
 
@@ -72,12 +75,9 @@ export default function StartPage() {
     setError(null);
     setLaunching(true);
     try {
-      const result = await api.campaigns.create({
-        seedSource,
-        authMode,
-        parallelism,
-        timeoutSeconds,
-      });
+      const config = { seedSource, authMode, parallelism, timeoutSeconds };
+      const result = await api.campaigns.create(config, undefined, idempotencyKeys.current.keyFor(config));
+      idempotencyKeys.current.reset();
       const campaign = result.campaign as { id?: string };
       setCampaignId(typeof campaign.id === 'string' ? campaign.id : 'campaign');
       setPhase('done');

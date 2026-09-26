@@ -1,3 +1,5 @@
+import { safeStorage } from "../../lib/local-storage";
+
 export interface OnboardingStep {
   id: string;
   title: string;
@@ -66,7 +68,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
 
 export const loadOnboardingProgress = (): OnboardingStep[] => {
   try {
-    const stored = localStorage.getItem('onboarding-progress');
+    const stored = safeStorage.getItem('onboarding-progress');
     if (!stored) return ONBOARDING_STEPS;
     return JSON.parse(stored);
   } catch {
@@ -76,7 +78,7 @@ export const loadOnboardingProgress = (): OnboardingStep[] => {
 
 export const saveOnboardingProgress = (steps: OnboardingStep[]): void => {
   try {
-    localStorage.setItem('onboarding-progress', JSON.stringify(steps));
+    safeStorage.setItem('onboarding-progress', JSON.stringify(steps));
   } catch (e) {
     console.error('Failed to save onboarding progress:', e);
   }

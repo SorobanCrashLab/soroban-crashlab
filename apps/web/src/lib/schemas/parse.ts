@@ -17,10 +17,10 @@ export interface FieldErrorEnvelope {
  * Parses `input` against `schema`. Returns `{ ok: true, data }` on success
  * or a ready-to-return 400 NextResponse with field-path errors on failure.
  */
-export function zodParseRequest<T>(
-  schema: z.ZodType<T>,
+export function zodParseRequest<S extends z.ZodTypeAny>(
+  schema: S,
   input: unknown,
-): { ok: true; data: T } | { ok: false; response: NextResponse } {
+): { ok: true; data: z.infer<S> } | { ok: false; response: NextResponse } {
   const result = schema.safeParse(input);
   if (result.success) {
     return { ok: true, data: result.data };

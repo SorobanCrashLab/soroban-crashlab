@@ -6,11 +6,19 @@ export interface RequestSizeLimitConfig {
   maxFormDataSize?: number; // in bytes
 }
 
-const DEFAULT_CONFIG: RequestSizeLimitConfig = {
+const DEFAULT_CONFIG: Required<RequestSizeLimitConfig> = {
   maxBodySize: parseInt(process.env.MAX_REQUEST_SIZE || '10485760', 10), // 10MB
   maxJsonSize: parseInt(process.env.MAX_JSON_SIZE || '5242880', 10), // 5MB
   maxFormDataSize: parseInt(process.env.MAX_FORM_DATA_SIZE || '104857600', 10), // 100MB
 };
+
+/**
+ * The effective default limits, shared with the upload ingestion gate
+ * (#1636) so uploaded artifacts obey the same caps as request bodies.
+ */
+export const DEFAULT_REQUEST_SIZE_LIMITS: Readonly<Required<RequestSizeLimitConfig>> = Object.freeze({
+  ...DEFAULT_CONFIG,
+});
 
 /**
  * Standard 413 payload emitted by every route that enforces body size limits so

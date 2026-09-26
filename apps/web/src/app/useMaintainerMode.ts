@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { recordAuditEvent } from '../lib/audit/audit-sink';
+import { safeStorage } from "@/lib/local-storage";
 
 const STORAGE_KEY = 'crashlab:maintainer-mode';
 
@@ -28,7 +29,7 @@ export function useMaintainerMode(): {
   useEffect(() => {
     const syncState = () => {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = safeStorage.getItem(STORAGE_KEY);
         setIsMaintainer(stored === 'true');
       } catch (error) {
         if (isQuotaExceededError(error)) {
@@ -60,7 +61,7 @@ export function useMaintainerMode(): {
     setIsMaintainer((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem(STORAGE_KEY, String(next));
+        safeStorage.setItem(STORAGE_KEY, String(next));
         setStorageError(false);
       } catch (error) {
         if (isQuotaExceededError(error)) {

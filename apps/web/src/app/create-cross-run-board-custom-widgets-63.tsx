@@ -9,6 +9,7 @@ import {
   computeMetric, 
   reorderWidgets 
 } from "./custom-widgets-utils";
+import { safeStorage } from "@/lib/local-storage";
 
 const STORAGE_KEY = "crashlab-custom-widgets";
 
@@ -55,7 +56,7 @@ export default function CrossRunBoardCustomWidgets({ runs = [] }: Props) {
       try {
         await new Promise(res => setTimeout(res, 800));
         if (!isMounted) return;
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = safeStorage.getItem(STORAGE_KEY);
         if (raw) {
           setWidgets(JSON.parse(raw) as CustomWidget[]);
         }
@@ -80,7 +81,7 @@ export default function CrossRunBoardCustomWidgets({ runs = [] }: Props) {
         if (Math.random() < 0.05) rej(new Error("Save failed"));
         else res(null);
       }, 500));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newWidgets));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(newWidgets));
       setWidgets(newWidgets);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);

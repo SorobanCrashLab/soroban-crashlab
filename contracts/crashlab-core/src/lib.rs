@@ -110,8 +110,11 @@ pub use rpc_runner_stub::{RpcContractRunner, RpcConfigError};
 pub mod seed_validator;
 pub use seed_validator::{SeedSchema, SeedValidationError, Validate};
 
+pub mod havoc;
+pub use havoc::{HavocConfig, HavocMutator, HavocOp, apply_havoc_mutation, derive_seed_state};
+
 pub mod scheduler;
-pub use scheduler::{Mutator, SchedulerError, WeightedScheduler};
+pub use scheduler::{Mutator, MutatorRegistry, SchedulerError, WeightedScheduler};
 
 pub mod campaign_presets;
 pub use campaign_presets::{CampaignParameters, CampaignPreset, ParseCampaignPresetError};
@@ -276,16 +279,34 @@ pub use stellar_address::{
     AddressMutatorConfig, AddressType, StellarAddressMutator, generate_address_vectors,
 };
 
-/// Wrapper for the legacy bit-flipper mutation logic.
-pub struct DefaultMutator;
+/// Default mutator for the core fuzzer loop.
+///
+/// Implements a havoc-style mutation strategy with weighted operations
+/// (byte flips, block copy, block insert, block delete, chunk repeat, XDR tag flips)
+/// and configurable length-aware bounds.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DefaultMutator {
+    pub config: HavocConfig,
+}
+
+impl DefaultMutator {
+    pub fn new(config: HavocConfig) -> Self {
+        Self { config }
+    }
+}
 
 impl Mutator for DefaultMutator {
     fn name(&self) -> &'static str {
-        "bit-flipper"
+        "havoc"
     }
 
-    fn mutate(&self, seed: &CaseSeed, _rng_state: &mut u64) -> CaseSeed {
-        mutate_seed(seed)
+    fn mutate(&self, seed: &CaseSeed, rng_state: &mut u64) -> CaseSeed {
+        let mut payload = seed.payload.clone();
+        apply_havoc_mutation(&mut payload, &self.config, rng_state);
+        CaseSeed {
+            id: seed.id,
+            payload,
+        }
     }
 }
 
@@ -338,36 +359,14 @@ impl CaseBundle {
     }
 }
 
+/// Mutates a [`CaseSeed`] using the havoc mutation strategy.
+///
+/// Deterministically mutates `seed` based on its initial state (`id` and `payload`).
+/// The mutation is guaranteed never to be self-inverse over two steps.
 pub fn mutate_seed(seed: &CaseSeed) -> CaseSeed {
-    let mut rng = SeededPrng::new(seed.id);
-    let len = seed.payload.len();
-
-    if len == 0 {
-        return CaseSeed {
-            id: seed.id,
-            payload: vec![rng.next_byte()],
-        };
-    }
-
+    let mut rng_state = derive_seed_state(seed);
     let mut payload = seed.payload.clone();
-    if len == 1 {
-        payload[0] = rng.next_byte();
-        return CaseSeed {
-            id: seed.id,
-            payload,
-        };
-    }
-
-    let preserve_index = (rng.next_u64() as usize) % len;
-    let mutate_count = (len / 2).max(1).min(len - 1);
-    let mut candidates: Vec<usize> = (0..len).filter(|&idx| idx != preserve_index).collect();
-
-    for _ in 0..mutate_count {
-        let idx = (rng.next_u64() as usize) % candidates.len();
-        let position = candidates.remove(idx);
-        payload[position] = rng.next_byte();
-    }
-
+    apply_havoc_mutation(&mut payload, &HavocConfig::default(), &mut rng_state);
     CaseSeed {
         id: seed.id,
         payload,

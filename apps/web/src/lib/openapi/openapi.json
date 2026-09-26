@@ -55,6 +55,7 @@
     },
     "/api/webhooks/history": { "get": { "summary": "Webhook delivery history", "tags": ["webhooks"] } },
     "/api/webhooks/retry": { "post": { "summary": "Retry a webhook delivery", "tags": ["webhooks"] } },
+    "/api/webhooks/recovery": { "post": { "summary": "Run one webhook-recovery tick", "tags": ["webhooks"] } },
     "/api/notifications": { "get": { "summary": "List notifications", "tags": ["notifications"] } },
     "/api/networks": { "get": { "summary": "List Stellar networks", "tags": ["networks"] } },
     "/api/networks/{id}": { "get": { "summary": "Get a network", "tags": ["networks"] } },

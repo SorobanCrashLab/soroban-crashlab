@@ -3,6 +3,7 @@ import * as path from 'path';
 import { WebhookConfig } from '../app/webhook-manager';
 import { WebhookDeliveryRequest } from './webhook-delivery-worker';
 import type { DlqEntry, DlqGateway } from './webhook-dlq';
+import type { RetryJob, RetryQueueGateway } from './webhook-retry-queue';
 
 /**
  * Persistent file-based store for webhook configurations, pending deliveries,
@@ -18,6 +19,7 @@ const CONFIGS_FILE = 'webhook-configs.json';
 const QUEUE_FILE = 'webhook-delivery-queue.json';
 const DELIVERY_LOG_FILE = 'webhook-delivery-log.json';
 const DLQ_FILE = 'webhook-dead-letter-queue.json';
+const RETRY_QUEUE_FILE = 'webhook-retry-queue.json';
 
 export interface DeliveryLogEntry {
   webhookId: string;
@@ -33,6 +35,7 @@ export interface WebhookStoreData {
   queue: WebhookDeliveryRequest[];
   deliveryLog: DeliveryLogEntry[];
   deadLetterQueue: DlqEntry[];
+  retryQueue: RetryJob[];
 }
 
 export class WebhookStore {
@@ -41,6 +44,7 @@ export class WebhookStore {
   private queue: WebhookDeliveryRequest[] = [];
   private deliveryLog: DeliveryLogEntry[] = [];
   private deadLetterQueue: DlqEntry[] = [];
+  private retryQueue: RetryJob[] = [];
   private maxLogSize: number;
 
   constructor(dataDir?: string, maxLogSize: number = 10000) {
@@ -134,6 +138,36 @@ export class WebhookStore {
     this.saveDeliveryLog();
   }
 
+  pruneDeliveryLog(params?: { ttlDays?: number; maxBatchSize?: number; nowMs?: number }): { prunedCount: number } {
+    const ttlDays = params?.ttlDays ?? parseInt(process.env.WEBHOOK_HISTORY_RETENTION_DAYS ?? '30', 10);
+    if (ttlDays <= 0) {
+      return { prunedCount: 0 };
+    }
+
+    const nowMs = params?.nowMs ?? Date.now();
+    const cutoffMs = nowMs - ttlDays * 24 * 60 * 60 * 1000;
+    const maxBatchSize = params?.maxBatchSize ?? 1000;
+
+    let prunedCount = 0;
+    const newLog: DeliveryLogEntry[] = [];
+
+    for (const entry of this.deliveryLog) {
+      const entryTime = entry.timestamp ? new Date(entry.timestamp).getTime() : 0;
+      if (entryTime > 0 && entryTime < cutoffMs && prunedCount < maxBatchSize) {
+        prunedCount++;
+      } else {
+        newLog.push(entry);
+      }
+    }
+
+    if (prunedCount > 0) {
+      this.deliveryLog = newLog;
+      this.saveDeliveryLog();
+    }
+
+    return { prunedCount };
+  }
+
   // ─── Dead-letter queue operations ─────────────────────────────────────
   //
   // Terminal delivery failures land here (#1427). Write-through like the rest
@@ -161,6 +195,28 @@ export class WebhookStore {
     };
   }
 
+  // ─── Retry queue operations ───────────────────────────────────────────
+  //
+  // Scheduled retry attempts (#1635). Persisted so a retry survives the
+  // function that scheduled it; the webhook-recovery tick executes them.
+
+  getRetryQueue(): RetryJob[] {
+    return [...this.retryQueue];
+  }
+
+  setRetryQueue(jobs: readonly RetryJob[]): void {
+    this.retryQueue = [...jobs];
+    this.saveRetryQueue();
+  }
+
+  /** Gateway view of the retry queue, for `WebhookRetryQueue` to read and write. */
+  retryQueueGateway(): RetryQueueGateway {
+    return {
+      load: () => this.getRetryQueue(),
+      save: (jobs) => this.setRetryQueue(jobs),
+    };
+  }
+
   // ─── Bulk / startup ───────────────────────────────────────────────────
 
   loadAll(): void {
@@ -168,11 +224,13 @@ export class WebhookStore {
     this.queue = [];
     this.deliveryLog = [];
     this.deadLetterQueue = [];
+    this.retryQueue = [];
 
     this.loadConfigs();
     this.loadQueue();
     this.loadDeliveryLog();
     this.loadDeadLetterQueue();
+    this.loadRetryQueue();
   }
 
   /**
@@ -184,6 +242,7 @@ export class WebhookStore {
       queue: this.getQueue(),
       deliveryLog: [...this.deliveryLog],
       deadLetterQueue: this.getDeadLetterQueue(),
+      retryQueue: this.getRetryQueue(),
     };
   }
 
@@ -248,6 +307,14 @@ export class WebhookStore {
 
   private saveDeadLetterQueue(): void {
     this.writeJson(DLQ_FILE, this.deadLetterQueue);
+  }
+
+  private loadRetryQueue(): void {
+    this.retryQueue = this.readJson<RetryJob[]>(RETRY_QUEUE_FILE, []);
+  }
+
+  private saveRetryQueue(): void {
+    this.writeJson(RETRY_QUEUE_FILE, this.retryQueue);
   }
 }
 

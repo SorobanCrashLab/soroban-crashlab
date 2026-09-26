@@ -6,105 +6,13 @@ import { getWebhookStore } from '@/lib/webhook-store';
 import { validateWebhookApiKey } from '@/lib/api-key-auth';
 import { WEBHOOK_DELIVERY_TIMEOUT_MS } from '@/lib/timeouts';
 import { sanitizeSearchParams } from '@/lib/sanitize';
-
-const VALID_PROTOCOLS = new Set(['http:', 'https:']);
-
-const VALID_EVENT_TYPES = new Set<RunEventType>([
-  'run.started',
-  'run.progressing',
-  'run.completed',
-  'run.failed',
-  'run.cancelled',
-  'crash.detected',
-]);
+import { logger } from '@/lib/logger';
 
 const store = getWebhookStore();
 
-function isValidUrl(url: unknown): url is string {
-  if (typeof url !== 'string') return false;
-  try {
-    const parsed = new URL(url);
-    return VALID_PROTOCOLS.has(parsed.protocol);
-  } catch {
-    return false;
-  }
-}
 
-function isRunEventType(value: unknown): value is RunEventType {
-  return typeof value === 'string' && VALID_EVENT_TYPES.has(value as RunEventType);
-}
 
-function parseWebhookBody(body: unknown): WebhookConfig | { error: string } {
-  if (typeof body !== 'object' || body === null) {
-    return { error: 'Request body must be a JSON object.' };
-  }
-
-  const raw = body as Record<string, unknown>;
-
-  if (typeof raw.id !== 'string' || !raw.id.trim()) {
-    return { error: 'Field "id" must be a non-empty string.' };
-  }
-
-  if (!isValidUrl(raw.url)) {
-    return { error: 'Field "url" must be a valid http or https URL.' };
-  }
-
-  if (!Array.isArray(raw.events) || raw.events.length === 0) {
-    return { error: 'Field "events" must be a non-empty array.' };
-  }
-
-  if (!raw.events.every(isRunEventType)) {
-    return {
-      error: `Field "events" contains invalid event types. Allowed: ${[...VALID_EVENT_TYPES].join(', ')}.`,
-    };
-  }
-
-  if (typeof raw.active !== 'boolean') {
-    return { error: 'Field "active" must be a boolean.' };
-  }
-
-  const config: WebhookConfig = {
-    id: raw.id.trim(),
-    url: raw.url,
-    events: raw.events as RunEventType[],
-    active: raw.active,
-  };
-
-  if (raw.secret !== undefined) {
-    if (typeof raw.secret !== 'string') {
-      return { error: 'Field "secret" must be a string when provided.' };
-    }
-    config.secret = raw.secret;
-  }
-
-  if (raw.maxRetries !== undefined) {
-    if (typeof raw.maxRetries !== 'number' || !Number.isInteger(raw.maxRetries) || raw.maxRetries < 0) {
-      return { error: 'Field "maxRetries" must be a non-negative integer when provided.' };
-    }
-    config.maxRetries = raw.maxRetries;
-  }
-
-  if (raw.timeoutMs !== undefined) {
-    if (typeof raw.timeoutMs !== 'number' || !Number.isInteger(raw.timeoutMs) || raw.timeoutMs <= 0) {
-      return { error: 'Field "timeoutMs" must be a positive integer when provided.' };
-    }
-    config.timeoutMs = raw.timeoutMs;
-  }
-
-  if (raw.headers !== undefined) {
-    if (
-      typeof raw.headers !== 'object' ||
-      raw.headers === null ||
-      Array.isArray(raw.headers) ||
-      !Object.values(raw.headers as object).every((v) => typeof v === 'string')
-    ) {
-      return { error: 'Field "headers" must be a flat object of string values when provided.' };
-    }
-    config.headers = raw.headers as Record<string, string>;
-  }
-
-  return config;
-}
+import { WebhookCreateSchema, WebhookUpdateSchema } from '@/lib/schemas/integrations/webhooks';
 
 /**
  * GET /api/webhooks
@@ -132,10 +40,15 @@ export const POST = withRouteErrorHandling('POST /api/webhooks', async (request:
   const parsedBody = await readJsonBody(request);
   if ('error' in parsedBody) return parsedBody.error;
 
-  const result = parseWebhookBody(parsedBody.body);
-  if ('error' in result) {
-    return jsonError(result.error, 422);
+  const validation = WebhookCreateSchema.safeParse(parsedBody.body);
+  if (!validation.success) {
+    logger.warn('Webhook payload validation failed', { 
+      provider: 'webhooks', 
+      reason: validation.error.message 
+    });
+    return jsonError('Invalid webhook configuration', 422);
   }
+  const result = validation.data;
 
   if (store.hasConfig(result.id)) {
     return jsonError(`Webhook with id "${result.id}" already exists.`, 409);
@@ -143,6 +56,7 @@ export const POST = withRouteErrorHandling('POST /api/webhooks', async (request:
 
   const stored: WebhookConfig = {
     ...result,
+    events: result.events as RunEventType[],
     maxRetries: result.maxRetries ?? 3,
     timeoutMs: result.timeoutMs ?? WEBHOOK_DELIVERY_TIMEOUT_MS,
   };
@@ -205,71 +119,25 @@ export const PATCH = withRouteErrorHandling('PATCH /api/webhooks', async (reques
     return jsonError('Request body must be a JSON object.', 400);
   }
 
-  const patch = body as Record<string, unknown>;
+  const validation = WebhookUpdateSchema.safeParse(body);
+  if (!validation.success) {
+    logger.warn('Webhook payload validation failed', { 
+      provider: 'webhooks', 
+      reason: validation.error.message 
+    });
+    return jsonError('Invalid webhook patch payload', 422);
+  }
+
+  const patch = validation.data;
   const updated: WebhookConfig = { ...existing };
 
-  if ('url' in patch) {
-    if (!isValidUrl(patch.url)) {
-      return jsonError('Field "url" must be a valid http or https URL.', 422);
-    }
-    updated.url = patch.url;
-  }
-
-  if ('events' in patch) {
-    if (!Array.isArray(patch.events) || patch.events.length === 0 || !patch.events.every(isRunEventType)) {
-      return jsonError('Field "events" must be a non-empty array of valid event types.', 422);
-    }
-    updated.events = patch.events as RunEventType[];
-  }
-
-  if ('active' in patch) {
-    if (typeof patch.active !== 'boolean') {
-      return jsonError('Field "active" must be a boolean.', 422);
-    }
-    updated.active = patch.active;
-  }
-
-  if ('secret' in patch) {
-    if (patch.secret !== null && typeof patch.secret !== 'string') {
-      return jsonError('Field "secret" must be a string or null.', 422);
-    }
-    updated.secret = patch.secret === null ? undefined : (patch.secret as string);
-  }
-
-  if ('maxRetries' in patch) {
-    if (
-      typeof patch.maxRetries !== 'number' ||
-      !Number.isInteger(patch.maxRetries) ||
-      patch.maxRetries < 0
-    ) {
-      return jsonError('Field "maxRetries" must be a non-negative integer.', 422);
-    }
-    updated.maxRetries = patch.maxRetries;
-  }
-
-  if ('timeoutMs' in patch) {
-    if (
-      typeof patch.timeoutMs !== 'number' ||
-      !Number.isInteger(patch.timeoutMs) ||
-      patch.timeoutMs <= 0
-    ) {
-      return jsonError('Field "timeoutMs" must be a positive integer.', 422);
-    }
-    updated.timeoutMs = patch.timeoutMs;
-  }
-
-  if ('headers' in patch) {
-    if (
-      patch.headers !== null &&
-      (typeof patch.headers !== 'object' ||
-        Array.isArray(patch.headers) ||
-        !Object.values(patch.headers as object).every((v) => typeof v === 'string'))
-    ) {
-      return jsonError('Field "headers" must be a flat object of string values or null.', 422);
-    }
-    updated.headers =
-      patch.headers === null ? undefined : (patch.headers as Record<string, string>);
-  }
+  if (patch.url !== undefined) updated.url = patch.url;
+  if (patch.events !== undefined) updated.events = patch.events as RunEventType[];
+  if (patch.active !== undefined) updated.active = patch.active;
+  if (patch.secret !== undefined) updated.secret = patch.secret === null ? undefined : patch.secret;
+  if (patch.maxRetries !== undefined) updated.maxRetries = patch.maxRetries;
+  if (patch.timeoutMs !== undefined) updated.timeoutMs = patch.timeoutMs;
+  if (patch.headers !== undefined) updated.headers = patch.headers === null ? undefined : patch.headers;
 
   store.setConfig(updated);
 

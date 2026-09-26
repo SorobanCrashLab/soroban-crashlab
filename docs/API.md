@@ -108,7 +108,7 @@ All error responses return a standardized JSON structure with an appropriate HTT
 ### Campaigns
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/api/campaigns` | Queue a new fuzzing campaign |
+| `POST` | `/api/campaigns` | Queue a new fuzzing campaign (supports `Idempotency-Key`) |
 
 ### Networks
 | Method | Path | Description |
@@ -130,7 +130,8 @@ All error responses return a standardized JSON structure with an appropriate HTT
 | --- | --- | --- |
 | `GET` `POST` `PATCH` `DELETE` | `/api/webhooks` | Full CRUD operations for outbound webhook subscribers |
 | `GET` | `/api/webhooks/history` | List webhook delivery attempts and delivery statistics |
-| `POST` | `/api/webhooks/retry` | Manually re-trigger a failed webhook delivery attempt |
+| `POST` | `/api/webhooks/retry` | Queue a durable retry for a webhook delivery (`202`) |
+| `POST` | `/api/webhooks/recovery` | Run one webhook-recovery tick (due retries + dead-letter drain) |
 
 ### Authentication
 | Method | Path | Description |
@@ -141,7 +142,8 @@ All error responses return a standardized JSON structure with an appropriate HTT
 ### Health & Monitoring
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/health` | Aggregate health check with per-dependency status |
+| `GET` | `/api/health` | Aggregate health check with per-dependency status (readiness) |
+| `GET` | `/api/health/liveness` | Lightweight process check with no external dependency calls |
 | `GET` | `/api/health/metrics` | Health check probe of metrics system via Prometheus adapter |
 | `GET` | `/api/notifications` | Fetch system notification feed |
 | `GET` | `/api/integrations/prometheus/health` | Lightweight Prometheus exporter health probe |
@@ -429,6 +431,35 @@ Upload an artifact file. Accepts `multipart/form-data` with a single file field 
 
 ---
 
+### `POST /api/uploadthing` — artifact ingestion gate
+
+Dashboard uploads go to UploadThing storage through the `fuzzArtifact`
+endpoint. Every file passes one ingestion gate
+(`apps/web/src/lib/upload-validation.ts`) in two stages:
+
+1. **Before upload** — the artifact type must be allowlisted, and the declared
+   extension, MIME type and size must fit it.
+2. **Before persisting** — the stored bytes are re-measured and sniffed; a
+   failing object is deleted from storage and never written to the artifact
+   index.
+
+| Type | Extensions | Max size | Content check |
+| --- | --- | --- | --- |
+| `wasm` | `.wasm` | 16 MiB (`MAX_MODULE_SIZE`) | `\0asm` v1 header and a full section walk |
+| `bundle`, `seed` | `.json` | 5 MiB (`MAX_JSON_SIZE`) | UTF-8 JSON document |
+| `log` | `.log`, `.txt` | 10 MiB (`MAX_REQUEST_SIZE`) | UTF-8 text |
+| `trace` | `.jsonl`, `.log`, `.txt` | 10 MiB (`MAX_REQUEST_SIZE`) | UTF-8 text |
+
+Text and JSON types reject NUL bytes and known binary signatures (WASM, ZIP,
+PDF, ELF, PE, PNG, GIF, gzip), so polyglot files cannot pass as text. A
+pre-upload rejection returns `422` `UPLOAD_REJECTED` (`{ error, code, reason,
+message }`); a content rejection is returned to the uploader as
+`{ accepted: false, code: "UPLOAD_REJECTED", reason, message }`. Every
+rejection is audited as `upload.reject` with rate-limit class
+`upload-ingestion`.
+
+---
+
 ### `GET /api/artifacts/{id}`
 
 Download an artifact's raw binary or file content stream.
@@ -524,6 +555,23 @@ Queue a new fuzzing campaign against a target Soroban contract.
   }
 }
 ```
+
+**Idempotency.** Send an `Idempotency-Key` header (1–255 visible ASCII
+characters) to make retries safe. The key and a fingerprint of the request
+body are stored for 24 hours (Upstash KV when configured, in-memory otherwise).
+
+| Request | Response |
+| --- | --- |
+| First request with a key | `201 Created`, `Idempotent-Replayed: false` |
+| Same key, same body (key order ignored) | `200 OK` with the **original** campaign, `Idempotent-Replayed: true` |
+| Same key, different body | `422` `IDEMPOTENCY_KEY_REUSED` |
+| Malformed key | `400` `IDEMPOTENCY_KEY_INVALID` |
+| No key | `201 Created`, a new campaign every time (legacy behaviour) |
+
+The dashboard's API client always sends a key and reuses it when a failed
+submission is retried with the same configuration. Scheduled runs carry a
+deterministic key, `schedule:<scheduleId>:<slot epoch ms>`, in their
+`idempotencyKey` field so a cron retry for the same slot deduplicates.
 
 ---
 
@@ -887,13 +935,40 @@ Get delivery attempt records, execution status, payload previews, and aggregate 
 
 ### `POST /api/webhooks/retry`
 
-Manually trigger an immediate delivery retry for a failed webhook delivery record.
+Queues a retry for a webhook delivery record. Delivery is **not** attempted
+inside this request: a durable retry job is persisted and the next
+webhook-recovery tick runs it, so the attempt survives the function ending.
+Any dead-letter entry for the same delivery is superseded.
 
 **Request Body:** `{ "id": "del-1001" }`
 
-**Response** `200 OK`: `{ "success": true, "item": { /* updated delivery item */ }, "stats": { /* ... */ } }`.
+**Response** `202 Accepted`: `{ "success": true, "item": { /* status "queued" */ }, "stats": { /* ... */ }, "nextAttemptAt": "<iso>" }`.
 
 **Errors:** `400 Bad Request` if `id` missing, `404 Not Found` if delivery record not found.
+
+---
+
+### `POST /api/webhooks/recovery`
+
+Runs one bounded webhook-recovery tick; the same pass also runs on every
+`POST /api/schedules/tick`.
+
+1. **Retry queue** — due jobs are attempted with exponential backoff and
+   jitter (30 s base, 30 min cap), at most 2 in flight per receiver host and
+   20 per tick. A claimed job holds a 60 s lease; if the tick dies mid-attempt
+   the job is reclaimed once the lease lapses. Exhausted jobs are
+   dead-lettered.
+2. **Dead-letter drain** — `retries-exhausted` entries are replayed (2 per
+   host, 10 per tick) with an `Idempotency-Key` of `<entryId>#replay-<n>`.
+   Rounds back off from 15 min up to 6 h; after 3 failed rounds an entry is
+   **parked** (audited as `dlq.park`) and shown as `parked` in the retry
+   dashboard for manual escalation.
+
+**Response** `200 OK`: `{ "retries": { "outcomes": [...], "throttled": 0, "pending": 0 }, "drain": { "attempted": 0, "replayed": 0, "failed": 0, "parked": [], "deferred": 0 }, "drainedRequestIds": [], "parkedRequestIds": [], "evaluatedAt": "<iso>", "metrics": { /* see below */ } }`.
+
+Webhook delivery metrics — recovered-delivery latency, retry counts, retry
+queue depth, DLQ depth and parked depth — are also reported under `webhooks`
+in `GET /api/health/metrics`.
 
 ---
 
@@ -968,6 +1043,23 @@ Each dependency reports one of `ok`, `degraded`, `unavailable`, or `not_configur
 - `unhealthy` — a critical dependency (the database, or a configured backend) is unavailable.
 
 **Errors:** `503 Service Unavailable` when the overall status is `unhealthy` (critical dependency down) or when the health check itself throws.
+
+---
+
+### `GET /api/health/liveness`
+
+Lightweight process check with no external dependency calls. Never touches external dependencies, databases, or third-party APIs. Used as a pure container liveness probe for Docker or Kubernetes restart policies.
+
+**Response** `200 OK`:
+
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-08-30T12:00:00.000Z",
+  "version": "1.0.0",
+  "type": "liveness"
+}
+```
 
 ---
 

@@ -26,3 +26,10 @@ export {
   type SchedulePatch,
 } from './schedule-store';
 export { evaluateTick, type TickInput, type TickOutcome } from './tick-evaluator';
+export {
+  CronLock,
+  createCronLock,
+  createInMemoryCronLock,
+  getCronLock,
+  setCronLock,
+} from './lock';
