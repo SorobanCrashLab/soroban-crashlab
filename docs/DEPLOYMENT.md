@@ -1,144 +1,138 @@
 # Deployment Guide
 
-This guide covers how to deploy Soroban CrashLab to production. The dashboard can be deployed on Vercel for free, or run in a Docker container for self hosted setups.
+Canonical deployment documentation for Soroban CrashLab. There is no GitLab
+pipeline in this repository — CI/CD runs on GitHub Actions, and the first-class
+hosting paths are **Vercel** (web dashboard) and **Docker Compose** (self-host).
 
 ---
 
-## Deploy to Vercel
+## Deploy paths at a glance
 
-Vercel is the recommended hosting platform for the web dashboard. The free tier is sufficient for most use cases.
+| Path | Entry point | Who it is for |
+|---|---|---|
+| Vercel | [`vercel.json`](../vercel.json) + GitHub → Vercel | Hosted dashboard (recommended) |
+| Docker Compose (dev) | [`docker-compose.yml`](../docker-compose.yml) `web` service + [`apps/web/Dockerfile`](../apps/web/Dockerfile) `dev` target | Local iteration |
+| Docker Compose (prod) | `web-prod` service (`--profile prod`) + Dockerfile `runner` target | Self-hosted production image |
+| Rust core (optional) | `core` service (`--profile core`) + [`contracts/crashlab-core/Dockerfile`](../contracts/crashlab-core/Dockerfile) | Containerized fuzz engine builds |
 
-### Step 1: Push to GitHub
+Environment variables for every path are documented in [`ENV.md`](ENV.md). Copy
+`apps/web/.env.example` → `apps/web/.env.local` for Next.js, or
+`.env.docker.example` → `.env` for Compose (`env_file: .env`).
+
+---
+
+## 1. Deploy to Vercel
+
+Vercel is the recommended host for `apps/web`. Root [`vercel.json`](../vercel.json)
+pins the monorepo build:
+
+| Setting | Value |
+|---|---|
+| Framework | `nextjs` |
+| Install | `pnpm install --frozen-lockfile` |
+| Build | `pnpm --filter web build` |
+| Output | `apps/web/.next` |
+| Dev | `pnpm --filter web dev` |
+| Auto-deploy | enabled on `main` |
+
+### Steps
+
+1. Push to GitHub (this repo is GitHub-hosted; there is no GitLab mirror required).
+2. Import the repository at [vercel.com](https://vercel.com).
+3. Confirm the project picks up `vercel.json` (defaults usually work).
+4. Set environment variables in **Project → Settings → Environment Variables**
+   (Production + Preview as needed). Minimum for a browsable dashboard:
+
+| Variable | Classification | Example / notes |
+|---|---|---|
+| `NEXT_PUBLIC_ENABLE_MOCK_DATA` | public | `true` until a real backend is wired |
+| `NEXT_PUBLIC_APP_URL` | public | Your Vercel URL (`https://….vercel.app`) |
+| `NEXT_PUBLIC_API_URL` | public | Leave empty for same-origin `/api/*` |
+| `NEXT_PUBLIC_SENTRY_DSN` | public | Optional error reporting |
+| `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | secret / server-only | Only if uploading source maps |
+
+Full tables (including storage drivers, webhooks, integrations): [`ENV.md`](ENV.md).
+
+5. Deploy. Preview deploys are also driven by
+   [`.github/workflows/vercel-preview.yml`](../.github/workflows/vercel-preview.yml)
+   when Vercel secrets are present.
+
+### Custom domain
+
+Add the domain under Vercel → Domains. TLS is provisioned automatically.
+
+---
+
+## 2. Docker Compose (self-host)
+
+Two Dockerfiles matter:
+
+- `apps/web/Dockerfile` — multi-stage (`dev` + `runner` / production)
+- `contracts/crashlab-core/Dockerfile` — optional Rust engine image
+
+### Bootstrap env
 
 ```bash
-git add .
-git commit -m "Ready for deployment"
-git push origin main
+cp .env.docker.example .env
+# edit .env as needed
+docker compose up web                 # http://localhost:3000 (HMR)
+docker compose --profile prod up web-prod   # http://localhost:3001
+docker compose --profile core build core    # Rust engine image
 ```
 
-### Step 2: Import to Vercel
-
-1. Go to [vercel.com](https://vercel.com) and sign in with GitHub
-2. Click Add New and select Project
-3. Import your Soroban CrashLab repository
-4. Vercel auto detects Next.js. The default settings work.
-
-### Step 3: Configure Environment Variables
-
-Add these environment variables in the Vercel project settings.
-
-| Variable | Value | Purpose |
+| Profile | Command | What starts |
 |---|---|---|
-| `NEXT_PUBLIC_ENABLE_MOCK_DATA` | `true` | Enables mock data until backend is ready |
-| `NEXT_PUBLIC_APP_URL` | Your Vercel domain | Used for server side URL generation |
+| Default | `docker compose up web` | Dev server, bind-mounted source |
+| `prod` | `docker compose --profile prod up web-prod` | Standalone production Next.js server |
+| `core` | `docker compose --profile core build core` | crashlab-core image |
 
-### Step 4: Deploy
+Compose healthchecks hit `/api/health/liveness` and honor
+`CRASHLAB_METRICS_SCRAPE_TOKEN` when set.
 
-Click Deploy. Your dashboard will be live in about two minutes.
+### Docker env table (common)
 
-### Step 5: Connect a Custom Domain (Optional)
-
-In the Vercel project settings, go to Domains and add your custom domain. Vercel provisions an SSL certificate automatically.
+| Variable | Classification | Purpose |
+|---|---|---|
+| `NODE_ENV` | server-only | `development` / `production` |
+| `WATCHPACK_POLLING` | server-only | Hot reload inside containers |
+| `NEXT_PUBLIC_ENABLE_MOCK_DATA` | public | Mock dashboard data |
+| `DATABASE_TYPE` / `SQLITE_PATH` | server-only | Local persistence defaults |
+| `CRASHLAB_METRICS_SCRAPE_TOKEN` | secret | Optional bearer for metrics/health probes |
+| Integration tokens (`DISCORD_WEBHOOK_URL`, `SLACK_BOT_TOKEN`, …) | secret | Leave blank to disable |
 
 ---
 
-## Docker Deployment
+## 3. Deploy gating (what must be green before deploy)
 
-A Dockerfile is included for containerized deployments.
+Deploy is gated by GitHub Actions — not by a GitLab trigger. Before merging to
+`main` (which Vercel auto-deploys), treat these as required:
 
-### Build the Image
-
-```bash
-docker compose build web-prod
-```
-
-### Run the Container
-
-```bash
-docker compose --profile prod up web-prod
-```
-
-The dashboard will be available at http://localhost:3000.
-
-### Docker Compose Profiles
-
-The project includes several Docker Compose profiles for different scenarios.
-
-| Profile | Command | What It Starts |
+| Check | Workflow / job | Why it gates deploy |
 |---|---|---|
-| Default | `docker compose up web` | Development server with hot reload |
-| Production | `docker compose --profile prod up web-prod` | Production optimized build |
-| Core | `docker compose --profile core build core` | Rust fuzzing engine build |
+| Secrets scan | `secrets-scan` (when present in CI) | Blocks credential leaks |
+| Ops / scripts syntax | `ops-scripts-syntax` | Shell syntax + `scripts/audit-env.mjs` env drift |
+| Web lint / unit / build | `web-lint`, `web-unit`, `web-build` | Dashboard must compile and test |
+| E2E | Playwright e2e job | User paths still work on fresh install |
+| Storage conformance | [`storage-minio.yml`](../.github/workflows/storage-minio.yml) | S3/MinIO driver contract (nightly / on storage changes) |
+| Semantic PR title | [`semantic-pr.yml`](../.github/workflows/semantic-pr.yml) | Conventional Commits on the PR title |
+| Soroban example size | `soroban-example` in [`ci.yml`](../.github/workflows/ci.yml) | WASM budget when contract code changes |
+| Preview deploy | `vercel-preview.yml` | Optional; runs when Vercel secrets exist |
+
+Production checklist:
+
+- [ ] Env vars set on the host (Vercel or `.env`) — see [`ENV.md`](ENV.md)
+- [ ] `NEXT_PUBLIC_ENABLE_MOCK_DATA=false` only when a real backend is configured
+- [ ] Local verification: `pnpm lint`, `pnpm test`, `pnpm build`
+- [ ] No secrets committed (examples use empty placeholders only)
 
 ---
 
-## Environment Variables
+## 4. Related docs
 
-The application uses environment variables for configuration. Copy `apps/web/.env.example` to `apps/web/.env.local` and fill in your values.
+- [`ENV.md`](ENV.md) — full environment variable contract + secrecy classification
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — how web, Rust core, runners, and storage fit together
+- [`README.md`](README.md) — documentation index
+- Root [`README.md`](../README.md) — quick start + short Vercel summary (points here for detail)
 
-### Required Variables
-
-| Variable | Description | Default |
-|---|---|---|
-| `NEXT_PUBLIC_ENABLE_MOCK_DATA` | Use mock data when no backend is available | `true` |
-
-### Optional Variables
-
-| Variable | Description | Default |
-|---|---|---|
-| `NEXT_PUBLIC_API_URL` | Backend API URL for real fuzzing data | Empty (uses mock data) |
-| `NEXT_PUBLIC_APP_URL` | Application URL for server side operations | Auto detected |
-| `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN for error tracking | Empty (Sentry disabled) |
-| `NEXT_PUBLIC_STELLAR_NETWORK` | Stellar network to target | `testnet` |
-| `NEXT_PUBLIC_CONTRACT_ID` | Deployed contract ID | Empty |
-| `CRASHLAB_ARTIFACT_DIR` | Directory for storing run artifacts | System temp directory |
-
----
-
-## Production Checklist
-
-Before deploying to production, verify these items.
-
-- [ ] All environment variables are configured in the hosting platform
-- [ ] `NEXT_PUBLIC_ENABLE_MOCK_DATA` is set to `false` when a real backend is connected
-- [ ] The application builds with zero errors: `npm run build`
-- [ ] All tests pass: `npm test`
-- [ ] Lint passes with zero errors: `npm run lint`
-- [ ] The vercel.json file is present if deploying to Vercel
-- [ ] A custom domain is configured if needed
-- [ ] SSL certificate is active
-
----
-
-## CI/CD Pipeline
-
-The project includes GitHub Actions workflows that run on every push and pull request.
-
-**The CI workflow** has six jobs that run in parallel where possible.
-
-| Job | What It Does | Run Time |
-|---|---|---|
-| web | Lints, tests, and builds the web dashboard | About 2 minutes |
-| core | Runs Rust tests for the fuzzing engine | About 3 minutes |
-| soroban example | Tests and builds the example contract | About 4 minutes |
-| secrets scan | Scans for leaked credentials | About 1 minute |
-| scripts syntax | Validates shell script syntax | About 30 seconds |
-| e2e | Runs Playwright end to end tests | About 3 minutes |
-
-**Other workflows**
-
-| Workflow | Schedule | Purpose |
-|---|---|---|
-| Stale issue management | Daily | Marks inactive issues as stale |
-| Backlog freshness | Weekly | Reviews and updates the issue backlog |
-
----
-
-## Monitoring
-
-Once deployed, you can monitor the dashboard through these channels.
-
-- **Vercel Analytics** provides real time traffic and performance data if enabled
-- **Sentry integration** captures JavaScript errors from the dashboard
-- **Playwright test reports** from CI show E2E test results
-- **GitHub Actions logs** show build and deployment status
+> **Removed:** the root `DEPLOYMENT.md` stub (git add/commit/push lines) and the
+> dead `.gitlab-ci.yml` downstream trigger. Do not revive either file.

@@ -1,177 +1,154 @@
 # Architecture
 
-This document describes the system architecture of Soroban CrashLab, including the data flow between the fuzzer generator and web dashboard.
+How Soroban CrashLab's pieces fit together: the Next.js dashboard, the Rust
+fuzzing engine, runners, storage drivers, and the fixture/replay lifecycle.
 
-> **Note:** For in-depth rationale on specific design choices (e.g., why we use XOR-shift PRNG, why we enforce a multi-tier split), please refer to the [Architecture Decision Records (ADRs)](adr/README.md).
+> Design rationale for individual choices lives in [ADRs](adr/README.md).
+> **Update rule:** PRs that change architecture (data mode, runners, storage
+> drivers, campaign/replay flow, or system boundaries) must update this file.
+> See the review checklist in [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
-## System Overview
+---
 
-```
-                            Soroban CrashLab Architecture
-    ┌─────────────────────────────────────────────────────────────────────────────┐
-    │                                                                             │
-    │  ┌───────────────────────────────────────────────────────────────────────┐  │
-    │  │                        crashlab-core (Rust)                           │  │
-    │  │                                                                       │  │
-    │  │   ┌─────────────┐     ┌─────────────┐     ┌──────────────────┐       │  │
-    │  │   │   Seed      │     │   Mutator   │     │   Classifier     │       │  │
-    │  │   │  Generator  │────▶│             │────▶│                  │       │  │
-    │  │   │             │     │ mutate_seed │     │ classify/taxonomy│       │  │
-    │  │   └─────────────┘     └─────────────┘     └────────┬─────────┘       │  │
-    │  │                                                    │                 │  │
-    │  │                         ┌──────────────────────────┴───────┐         │  │
-    │  │                         ▼                                  ▼         │  │
-    │  │              ┌──────────────────┐            ┌──────────────────┐    │  │
-    │  │              │  Auth Matrix     │            │  Flaky Detector  │    │  │
-    │  │              │  Runner          │            │  (Reproducer)    │    │  │
-    │  │              │                  │            │                  │    │  │
-    │  │              │ Enforce/Record/  │            │ Stability check  │    │  │
-    │  │              │ RecordAllowNonroot│           │ for CI packs     │    │  │
-    │  │              └────────┬─────────┘            └────────┬─────────┘    │  │
-    │  │                       │                               │              │  │
-    │  │                       └───────────────┬───────────────┘              │  │
-    │  │                                       ▼                              │  │
-    │  │                          ┌────────────────────┐                      │  │
-    │  │                          │  CaseBundle        │                      │  │
-    │  │                          │  ─────────         │                      │  │
-    │  │                          │  seed + signature  │                      │  │
-    │  │                          │  + matrix report   │                      │  │
-    │  │                          │  + repro status    │                      │  │
-    │  │                          └─────────┬──────────┘                      │  │
-    │  │                                    │                                 │  │
-    │  └────────────────────────────────────┼─────────────────────────────────┘  │
-    │                                       │                                    │
-    │                                       │ JSON/API                           │
-    │                                       ▼                                    │
-    │  ┌────────────────────────────────────────────────────────────────────┐   │
-    │  │                         apps/web (Next.js)                         │   │
-    │  │                                                                    │   │
-    │  │   ┌────────────────┐  ┌────────────────┐  ┌────────────────┐      │   │
-    │  │   │  Run History   │  │ Failure Triage │  │ Replay Control │      │   │
-    │  │   │  Dashboard     │  │ View           │  │ Panel          │      │   │
-    │  │   └────────────────┘  └────────────────┘  └────────────────┘      │   │
-    │  │                                                                    │   │
-    │  └────────────────────────────────────────────────────────────────────┘   │
-    │                                                                             │
-    └─────────────────────────────────────────────────────────────────────────────┘
-```
-
-## Component Breakdown
-
-### crashlab-core (Rust Crate)
-
-The core fuzzing engine lives in `contracts/crashlab-core/`. It handles all seed generation, mutation, classification, and reproducibility verification.
-
-| Module | Responsibility |
-|--------|----------------|
-| `lib.rs` | Core types (`CaseSeed`, `CrashSignature`, `CaseBundle`), mutation and classification entry points |
-| `taxonomy.rs` | Failure classification into categories: Auth, Budget, State, Xdr, EmptyInput, OversizedInput, Unknown |
-| `auth_matrix.rs` | Runs seeds across three Soroban auth modes (Enforce, Record, RecordAllowNonroot) to detect mode-sensitive behavior |
-| `reproducer.rs` | `FlakyDetector` verifies failure stability; `filter_ci_pack` excludes flaky cases from CI regression packs |
-| `seed_validator.rs` | `SeedSchema` enforces payload size and ID bounds before fuzzing |
-
-### apps/web (Next.js Frontend)
-
-The dashboard in `apps/web/` provides visibility into fuzzing runs and triage workflows.
-
-- **Run History** — lists past fuzzing campaigns with summary stats
-- **Failure Triage** — groups failures by signature and classification for review
-- **Replay Control** — triggers deterministic replay of specific seeds
-
-## Data Flow
+## System diagram
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                            Fuzzing Pipeline                              │
-└──────────────────────────────────────────────────────────────────────────┘
+Browser (apps/web UI)
+    │  fetch / EventSource
+    ▼
+Next.js App Router  ── /api/* routes ──►  mock handlers (NEXT_PUBLIC_ENABLE_MOCK_DATA)
+    │                         │
+    │                         └── tryBackend() ──► upstream NEXT_PUBLIC_API_URL / RUNS_API_URL
+    │
+    ├── storage drivers (server-only)
+    │     • in-memory (default)
+    │     • KV / Upstash (KV_REST_API_*)
+    │     • S3 / MinIO (CRASHLAB_STORAGE_DRIVER=s3)
+    │     • local FS artifacts (CRASHLAB_ARTIFACT_DIR)
+    │
+    └── migration runner (boot) ──► sqlite / postgres / KV key-revision sweeps
 
-1. SEED GENERATION
-   ┌──────────────┐
-   │ CaseSeed     │  Raw seed with id + payload bytes
-   │ { id, payload}│
-   └──────┬───────┘
-          │
-          ▼
-2. MUTATION
-   ┌──────────────┐
-   │ mutate_seed  │  XOR-based deterministic mutation
-   └──────┬───────┘
-          │
-          ▼
-3. CLASSIFICATION
-   ┌──────────────┐         ┌───────────────────────────────────────┐
-   │ classify()   │────────▶│ CrashSignature                        │
-   │ taxonomy     │         │ { category, digest, signature_hash }  │
-   └──────────────┘         └───────────────────────────────────────┘
-          │
-          │  Categories:
-          │  ├── empty-input      (payload empty)
-          │  ├── oversized-input  (payload > 64 bytes)
-          │  ├── xdr              (0x00-0x1F first byte)
-          │  ├── state            (0x20-0x5F first byte)
-          │  ├── budget           (0x60-0x9F first byte)
-          │  └── auth             (0xA0-0xFF first byte)
-          │
-          ▼
-4. AUTH MATRIX TESTING
-   ┌──────────────────────────────────────────────────────────────┐
-   │ run_matrix() executes seed under each AuthMode:              │
-   │                                                              │
-   │   Enforce ─────────┐                                         │
-   │                    ├──▶ MatrixReport { mismatches }          │
-   │   Record ──────────┤                                         │
-   │                    │                                         │
-   │   RecordAllowNonroot                                         │
-   └──────────────────────────────────────────────────────────────┘
-          │
-          ▼
-5. STABILITY VERIFICATION
-   ┌──────────────────────────────────────────────────────────────┐
-   │ FlakyDetector.check() re-runs seed N times                   │
-   │                                                              │
-   │   → flake_rate = divergent_runs / total_runs                 │
-   │   → is_stable  = flake_rate <= threshold                     │
-   │                                                              │
-   │ filter_ci_pack() excludes unstable bundles from CI fixtures  │
-   └──────────────────────────────────────────────────────────────┘
-          │
-          ▼
-6. OUTPUT
-   ┌──────────────────────────────────────────────────────────────┐
-   │ CaseBundle = seed + signature + matrix_report + repro_status │
-   │                                                              │
-   │ Stable bundles → exported as deterministic regression tests  │
-   │ Unstable bundles → quarantined for manual review             │
-   │                                                              │
-   │ All results → surfaced in web dashboard for triage           │
-   └──────────────────────────────────────────────────────────────┘
+CLI / CI (contracts/crashlab-core)
+    │  CRASHLAB_RUNNER=mock|host|rpc
+    ▼
+ContractRunner
+    ├── MockRunner          — deterministic signatures (CI / default)
+    ├── HostContractRunner  — soroban-sdk testutils (feature: host-runner)
+    └── RpcContractRunner   — live Soroban RPC (feature: rpc-runner)
+              │
+              ▼
+         CaseBundle JSON ──► fixture sanitize / corpus / replay / CI pack
 ```
 
-## Integration Points
+Example contract under test: `contracts/soroban-example` (WASM build + size budget in CI).
 
-| From | To | Format | Purpose |
-|------|----|--------|---------|
-| crashlab-core | apps/web | JSON | Failure reports, run summaries, seed metadata |
-| apps/web | crashlab-core | CLI/API | Replay requests, campaign configuration |
-| crashlab-core | CI | Rust test fixtures | Deterministic regression tests from stable failures |
+---
 
-## Directory Structure
+## Mock vs backend data mode
+
+Decision tree used by API routes (`api-base.ts`, `api-proxy.ts`, run routes):
 
 ```
-soroban-crashlab/
-├── apps/
-│   └── web/                    # Next.js dashboard
-│       └── src/app/            # React components
-├── contracts/
-│   └── crashlab-core/          # Rust fuzzing engine
-│       └── src/
-│           ├── lib.rs          # Core types and mutation
-│           ├── taxonomy.rs     # Failure classification
-│           ├── auth_matrix.rs  # Auth mode testing
-│           ├── reproducer.rs   # Stability detection
-│           └── seed_validator.rs # Schema validation
-├── docs/
-│   └── ARCHITECTURE.md         # This file
-├── scripts/                    # Issue management automation
-└── ops/                        # Wave backlog and TSV data
+Is NEXT_PUBLIC_API_URL (or route-specific RUNS_API_URL / ISSUES_API_URL) set?
+  ├─ yes → tryBackend(url, path, …, fallback)
+  │         ├─ upstream OK  → proxy JSON
+  │         └─ upstream fail → 502/503 (no silent invention of progress)
+  └─ no  → Is NEXT_PUBLIC_ENABLE_MOCK_DATA !== "false"?
+            ├─ yes → serve in-process mock data (default for local + early deploys)
+            └─ no  → fail closed / empty (production misconfig)
 ```
+
+Notes:
+
+- `API_BASE` in `apps/web/src/lib/api-base.ts` is **build-time** (browser bundle).
+- Server routes re-read `process.env.NEXT_PUBLIC_API_URL` at request time so tests
+  and runtime config work.
+- SSE run streams (`/api/runs/[id]/stream`) must not fabricate telemetry when a
+  snapshot lookup fails — they close cleanly instead.
+
+---
+
+## Runner matrix (`CRASHLAB_RUNNER`)
+
+Selected in `contracts/crashlab-core/src/runner.rs` via `create_runner()`.
+
+| Value | Implementation | Feature flag | Status |
+|---|---|---|---|
+| `mock` (default / unset) | `MockRunner` | none | **Real** — deterministic crash signatures for tests/CI |
+| `host` | `HostContractRunner` | `host-runner` | **Real** when feature enabled; loads WASM from `CRASHLAB_CONTRACT_WASM` or bundled fixture |
+| `rpc` | `RpcContractRunner` | `rpc-runner` | **Real** when feature enabled; requires `CRASHLAB_RPC_URL` + `CRASHLAB_CONTRACT_ID` |
+
+Related: `CRASHLAB_PRESET` (`smoke` / `nightly` / `deep`), `CRASHLAB_STATE_DIR`,
+`CRASHLAB_OUTPUT_FORMAT=json` for the Rust ↔ web bridge.
+
+Known gaps (document honestly; link issues when filing follow-ups):
+
+- Host/RPC runners still need operators to enable Cargo features and supply WASM/RPC
+  config; default CI stays on `mock`.
+- Some dashboard integration pages historically mocked capabilities that the
+  storage/migration layer is catching up to (see migration framework below).
+
+---
+
+## Campaign lifecycle
+
+```
+start campaign (preset / CLI)
+    → mutate seeds → run through ContractRunner
+    → classify (taxonomy) + auth matrix
+    → checkpoint run state (CRASHLAB_STATE_DIR)
+    → persist CaseBundle (schema v1→v2 via bundle_persist)
+    → flaky detection / filter_ci_pack
+    → replay (deterministic) → regression fixtures / CI export
+```
+
+Web surfaces: run history, triage, replay controls, analytics. Artifacts land in
+the configured storage driver or `CRASHLAB_ARTIFACT_DIR`.
+
+---
+
+## Fixture / corpus flow
+
+1. Stable `CaseBundle` documents written at `CASE_BUNDLE_SCHEMA_VERSION` (v2;
+   v1 still loadable — see `bundle_persist.rs`).
+2. Fixture sanitize (`fixture_sanitize.rs`) redacts secrets before sharing.
+3. Corpus import/export binaries under `contracts/crashlab-core/src/bin/`.
+4. `check-fixtures` validates on-disk fixtures against the current schema.
+5. Web config bundles use a separate versioned migrator
+   (`apps/web/src/app/settings/config-bundle/bundle-migrations.ts`).
+
+---
+
+## Storage & migrations
+
+| Layer | Location | Notes |
+|---|---|---|
+| Artifact blobs | `lib/storage` drivers | Default in-memory; S3 opt-in |
+| Run metadata | in-memory / KV run drivers | |
+| DB boot | `lib/database` | Detects sqlite / postgres / vercel-postgres |
+| Schema evolution | `lib/database/migration-runner.ts` + `migrations/` | Ordered, checksummed; baseline `000`; KV key-revision sweeps |
+
+PRs that change persisted shapes must add an explicit migration and update this
+section.
+
+---
+
+## Directory map (high level)
+
+```
+apps/web/                 Next.js dashboard + /api routes + storage/migration
+contracts/crashlab-core/  Rust engine (mutators, runners, campaigns, replay)
+contracts/soroban-example Example Soroban contract (WASM)
+docs/                     Canonical docs (this file, DEPLOYMENT, ENV, …)
+scripts/                  Maintainer + CI audit scripts
+.github/workflows/        GitHub Actions (no GitLab CI)
+```
+
+---
+
+## Related
+
+- [`DEPLOYMENT.md`](DEPLOYMENT.md) — Vercel + Docker paths and deploy gating
+- [`ENV.md`](ENV.md) — environment variable contract
+- [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) — deterministic replay guarantees
+- [`API.md`](API.md) — HTTP surface of the dashboard

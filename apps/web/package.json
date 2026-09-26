@@ -24,6 +24,7 @@
     "test:config-bundle": "vitest run config-bundle",
     "test:sigv4": "vitest run sigv4",
     "test:storage-driver": "vitest run storage-driver",
+    "test:migrations": "vitest run src/lib/database/migration-runner.test.ts",
     "test:audit-log": "vitest run audit-log",
     "test:search-grammar": "vitest run search-grammar",
     "test:saved-views": "vitest run saved-views",
