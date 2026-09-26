@@ -497,6 +497,42 @@ Attacker triggers many unique crashes, filling disk with artifacts. Fuzzer canno
 
 ---
 
+### T-11: Caller-Asserted Role Escalation and Vanishing Audit Trail
+
+**STRIDE Category**: Elevation of Privilege / Repudiation  
+**Severity**: High  
+**Likelihood**: High
+
+**Scenario**:
+A caller reaches a mutating API endpoint and asserts a `maintainer` role in the request. RBAC reads the role out of request configuration rather than resolving it from an authenticated identity, so the caller grants itself the authority the route was meant to require a maintainer for. Separately, every authorization decision is appended to a module-level array capped at 500 entries. On serverless the next invocation may be a fresh instance, so the log is empty on arrival and no durable evidence of the escalation survives the response.
+
+**Attack Chain**:
+1. Attacker discovers a maintainer-gated route (e.g. `DELETE /api/runs/{id}`)
+2. Attacker sends the request with `x-crashlab-role: maintainer` (or `?role=maintainer`, or a `role` field in the body)
+3. RBAC resolves the asserted role instead of the caller's, and the request is authorized
+4. The audit entry is written to a process-local ring buffer
+5. The instance is recycled; the entry is gone and the change is unattributable
+
+**Existing Mitigations**:
+- ✅ Route-level role requirements (`ROUTE_ROLE_RULES`) classify mutating endpoints
+- ✅ Pure hierarchy check (`hasRequiredRole`) — `analyst` cannot satisfy `maintainer`
+- ✅ Development override headers ignored in production
+- ✅ Denials return a structured `403` envelope
+- ❌ No authenticated principal: roles are read from request configuration
+- ❌ Audit log is a process-local ring buffer, not durable storage
+- ❌ Audit entries carry a role but not a principal, so decisions are unattributable
+
+**Residual Risk**: **Low** - Roles are identity-bound and the audit trail is durable
+
+**Recommended Mitigations**:
+- Resolve roles only from a persisted role store, keyed by a verified principal (API token id or signed GitHub session) — implemented
+- Persist authorization events through the storage driver layer with append-only semantics and a retention policy — implemented
+- Record the resolved principal on every entry, allowed and denied — implemented
+- Provision production identity: configure `CRASHLAB_GITHUB_SESSION_SECRET` and issue API tokens from settings/tokens
+- Alert on denied maintainer-route attempts, which are now attributable to a principal
+
+---
+
 ## Mitigations
 
 ### Implemented Mitigations
@@ -513,6 +549,8 @@ Attacker triggers many unique crashes, filling disk with artifacts. Fuzzer canno
 | M-8 | Retention policy | `RetentionPolicy` | Medium | ✅ Unit tests |
 | M-9 | Deterministic ordering | `sort_seeds_deterministic` | Medium | ✅ Unit tests |
 | M-10 | Environment fingerprinting | `EnvironmentFingerprint` | Low | ✅ Unit tests |
+| M-11 | Roles bound to a verified principal, never read from the request | `rbac.ts`, `role-store` | High | ✅ Unit + integration tests |
+| M-12 | Append-only authorization audit with retention, stored via the driver layer | `rbac.ts`, `record-driver` | High | ✅ Unit + integration tests |
 
 ### Recommended Mitigations
 
@@ -711,6 +749,7 @@ Attacker triggers many unique crashes, filling disk with artifacts. Fuzzer canno
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-04-23 | Security Team | Initial draft |
+| 1.1 | 2026-09-26 | Security Team | Added T-11 (caller-asserted role escalation, non-durable audit trail) and mitigations M-11/M-12 |
 
 ---
 

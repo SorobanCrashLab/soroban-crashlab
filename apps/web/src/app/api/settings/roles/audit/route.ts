@@ -3,10 +3,10 @@ import { checkRbacPermission } from '../../../../../lib/rbac';
 import { listAuditLogs } from '../../../../../lib/storage/role-store';
 
 export async function GET(request: NextRequest) {
-  const rbacError = checkRbacPermission(request);
+  const rbacError = await checkRbacPermission(request);
   if (rbacError) return rbacError;
 
-  const logs = listAuditLogs(100);
+  const logs = await listAuditLogs(100);
 
   return NextResponse.json({
     logs,

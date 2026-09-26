@@ -4,6 +4,11 @@
 
 Closes #
 
+> **PR title (required, checked by `lint-title`):**
+> `build: unify crates under a cargo workspace`
+> Copy the line above verbatim. The subject (`unify crates under a cargo workspace`)
+> must start with a lowercase letter and must not end with a period.
+
 ## Checklist
 
 - [ ] CI is green (all checks pass)
@@ -23,3 +28,15 @@ Closes #
 ## Test plan
 
 <!-- Steps to verify. Paste output of relevant verification commands. -->
+
+<!--
+PR titles are validated by the `lint-title` job (see .github/workflows/semantic-pr.yml).
+The title must look like "type: subject" or "type(scope): subject" where:
+  - type is one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+  - the subject starts with a lowercase letter
+  - the subject does not end with a period
+
+For this change use exactly (lowercase `u` in `unify`):
+
+    build: unify crates under a cargo workspace
+-->

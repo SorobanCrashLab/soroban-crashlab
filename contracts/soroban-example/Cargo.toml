@@ -1,21 +1,14 @@
 [package]
 name = "soroban-example"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 publish = false
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-soroban-sdk = "22.0.0"
+soroban-sdk = { workspace = true }
 
 [dev-dependencies]
-soroban-sdk = { version = "22.0.0", features = ["testutils"] }
-
-[profile.release]
-opt-level = "z"
-overflow-checks = true
-lto = true
-codegen-units = 1
-panic = "abort"
+soroban-sdk = { workspace = true, features = ["testutils"] }

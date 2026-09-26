@@ -3,22 +3,25 @@ import path from "path";
 import { execSync } from "child_process";
 import { withSentryConfig } from "@sentry/nextjs";
 
-const nextConfig: NextConfig = {
+export const nextConfig: NextConfig = {
   reactCompiler: true,
   output: "standalone",
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '**' },
-      { protocol: 'http', hostname: '**' },
+      {
+        protocol: "https",
+        hostname: "www.google.com",
+        pathname: "/s2/favicons",
+      },
     ],
-    formats: ['image/avif', 'image/webp'],
+    formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60,
   },
   turbopack: {
     root: path.resolve(__dirname, "../../"),
   },
   experimental: {
-    optimizePackageImports: ['recharts', 'react-markdown', 'remark-gfm'],
+    optimizePackageImports: ["recharts", "react-markdown", "remark-gfm"],
     viewTransition: true,
   },
   headers: async () => [
@@ -83,7 +86,9 @@ function getGitSha(): string | undefined {
     return process.env.GITHUB_SHA;
   }
   try {
-    return execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+    return execSync("git rev-parse HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
       .toString()
       .trim();
   } catch {
@@ -137,6 +142,5 @@ export default withSentryConfig(
     sourcemaps: {
       deleteSourcemapsAfterUpload: true,
     },
-  }
+  },
 );
-

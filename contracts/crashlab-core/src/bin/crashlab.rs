@@ -1,16 +1,18 @@
 //! CrashLab CLI — campaign control helpers for operators.
 //!
 //! Run `crashlab run cancel <id>` to request cooperative cancellation for the
-//! campaign identified by `id`, `crashlab replay seed <bundle.json>` to
+//! campaign identified by `id`, `crashlab runs status <id>` to read the latest
+//! health snapshot a campaign wrote, `crashlab replay seed <bundle.json>` to
 //! replay one persisted seed bundle end to end, or `crashlab regression-suite <path>`
 //! to run all regression fixtures from a file or directory.
 
 use crashlab_core::{
-    RunId, cancel_marker_path, cancel_requested, default_state_dir, replay_mismatch_message,
+    RunId, cancel_marker_path, cancel_requested, default_state_dir, read_latest_health_snapshot,
+    replay_mismatch_message,
     replay_seed_bundle_path, replay_success_message, request_cancel_run,
     run_regression_suite_from_json,
-    RetentionPolicy, RetentionRecord, LocalArtifactStore, ArtifactStore,
-    RunCheckpoint, CaseBundleDocument,
+    HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
+    ArtifactStore, RunCheckpoint, CaseBundleDocument,
 };
 use std::fs;
 use std::path::Path;
@@ -85,6 +87,22 @@ fn main() {
             }
             list_runs();
         }
+        (Some("runs"), Some("status"), Some(id_str), flag)
+            if flag.is_none() || flag == Some("--json") =>
+        {
+            if args.next().is_some() {
+                print_usage();
+                std::process::exit(1);
+            }
+            let id: u64 = match id_str.parse() {
+                Ok(v) => v,
+                Err(_) => {
+                    eprintln!("invalid run id: {id_str}");
+                    std::process::exit(1);
+                }
+            };
+            report_run_status(id, flag == Some("--json"));
+        }
         (Some("retention"), Some("sweep"), None, None) => {
             if args.next().is_some() {
                 print_usage();
@@ -103,6 +121,7 @@ fn print_usage() {
     eprintln!(
         "usage: crashlab run cancel <id>\n\
                 crashlab runs list\n\
+                crashlab runs status <id> [--json]\n\
                 crashlab replay seed <bundle-json-path>\n\
                 crashlab regression-suite <suite-json-path-or-directory>\n\
                 crashlab retention sweep"
@@ -140,6 +159,102 @@ fn list_runs() {
             "active"
         };
         println!("{id}\t{status}");
+    }
+}
+
+/// Prints the latest health snapshot a campaign wrote for `id`.
+fn report_run_status(id: u64, as_json: bool) {
+    let base = default_state_dir();
+    let run_id = RunId(id);
+
+    match read_latest_health_snapshot(run_id, &base) {
+        Ok(Some(snapshot)) => {
+            if as_json {
+                // The raw line, so the web SSE route reads exactly what the
+                // campaign wrote.
+                match snapshot.to_json_line() {
+                    Ok(line) => print!("{line}"),
+                    Err(e) => {
+                        eprintln!("failed to serialize health snapshot for run {id}: {e}");
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                print_snapshot_summary(&snapshot);
+            }
+        }
+        // A run without snapshots has not started, or ran before snapshots
+        // existed. That is a normal state, not a failure.
+        Ok(None) => {
+            if as_json {
+                println!("null");
+            } else {
+                println!("no health snapshot for run {id}");
+            }
+        }
+        Err(e) => {
+            eprintln!("failed to read health snapshot for run {id}: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn print_snapshot_summary(snapshot: &HealthSnapshot) {
+    println!(
+        "run {}: {}",
+        snapshot.run_id,
+        health_status_label(&snapshot.status)
+    );
+
+    if let Some(campaign_id) = &snapshot.campaign_id {
+        println!("  campaign: {campaign_id}");
+    }
+    if let Some(terminal) = &snapshot.terminal {
+        println!("  terminal: {terminal}");
+    }
+    println!(
+        "  snapshot: #{} emitted {}",
+        snapshot.sequence, snapshot.emitted_at
+    );
+    println!(
+        "  seeds: {}/{} processed, {} remaining",
+        snapshot.budget.processed_seeds,
+        snapshot.budget.total_seeds,
+        snapshot.budget.remaining_seeds
+    );
+    println!(
+        "  throughput: {:.2} seeds/sec over {:.2}s",
+        snapshot.throughput.cases_per_second, snapshot.throughput.elapsed_secs
+    );
+    println!(
+        "  failures: {} total, {} distinct class(es), rate {:.4}",
+        snapshot.failures.total_failures,
+        snapshot.failures.unique_signatures,
+        snapshot.failures.failure_rate
+    );
+
+    if snapshot.failure_classes.is_empty() {
+        println!("    (no classified failures)");
+    } else {
+        for (class, count) in &snapshot.failure_classes {
+            println!("    {class}: {count}");
+        }
+    }
+
+    println!(
+        "  queue: {} pending, {} in progress, capacity {} ({:.1}%)",
+        snapshot.queue.pending,
+        snapshot.queue.in_progress,
+        snapshot.queue.capacity,
+        snapshot.queue.utilization * 100.0
+    );
+}
+
+fn health_status_label(status: &HealthStatus) -> &'static str {
+    match status {
+        HealthStatus::Healthy => "healthy",
+        HealthStatus::Degraded => "degraded",
+        HealthStatus::Unhealthy => "unhealthy",
     }
 }
 

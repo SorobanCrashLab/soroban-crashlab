@@ -9,7 +9,7 @@
     "seed_id": 7,
     "input_payload": "",
     "mode": "invoker",
-    "failure_class": "empty-input"
+    "failure_class": "auth"
   },
   {
     "seed_id": 11,

@@ -3,6 +3,7 @@ import {
   parseStoredTheme,
   nextTheme,
   toggleTheme,
+  generateThemeBootstrapScript,
   THEME_STORAGE_KEY,
   type Theme,
 } from './theme-provider-utils';
@@ -173,6 +174,89 @@ function assertEqual<T>(actual: T, expected: T, message?: string): void {
     assertEqual(history[i], expected, `Toggle step ${i + 1} expected ${expected} but got ${history[i]}`);
   }
   assertEqual(current, 'dark', '20 toggles in dark system mode should return to dark');
+}
+
+// --- generateThemeBootstrapScript: first-paint decision matches resolveTheme ---
+
+/**
+ * Runs the generated bootstrap snippet against fake `localStorage`/`window`/
+ * `document` globals and reports whether it applied the 'dark' class.
+ */
+function runBootstrapScript(storedValue: string | null, systemPrefersDark: boolean): boolean {
+  let hasDarkClass = false;
+  const fakeLocalStorage = {
+    getItem: (key: string) => (key === THEME_STORAGE_KEY ? storedValue : null),
+  };
+  const fakeWindow = {
+    matchMedia: () => ({ matches: systemPrefersDark }),
+  };
+  const fakeDocument = {
+    documentElement: {
+      classList: {
+        toggle: (_className: string, force: boolean) => {
+          hasDarkClass = force;
+        },
+      },
+    },
+  };
+  const runner = new Function(
+    'localStorage',
+    'window',
+    'document',
+    generateThemeBootstrapScript(),
+  );
+  runner(fakeLocalStorage, fakeWindow, fakeDocument);
+  return hasDarkClass;
+}
+
+const bootstrapCases: Array<{ stored: string | null; systemPrefersDark: boolean; label: string }> = [
+  { stored: null, systemPrefersDark: false, label: 'no override, system light' },
+  { stored: null, systemPrefersDark: true, label: 'no override, system dark' },
+  { stored: 'light', systemPrefersDark: true, label: 'override light, system dark' },
+  { stored: 'dark', systemPrefersDark: false, label: 'override dark, system light' },
+  { stored: 'dark', systemPrefersDark: true, label: 'override dark, system dark' },
+  { stored: 'light', systemPrefersDark: false, label: 'override light, system light' },
+  { stored: 'invalid_corrupted_theme', systemPrefersDark: false, label: 'corrupted value, system light' },
+  { stored: 'invalid_corrupted_theme', systemPrefersDark: true, label: 'corrupted value, system dark' },
+];
+
+for (const { stored, systemPrefersDark, label } of bootstrapCases) {
+  // Mirrors the bootstrap script's own literal contract (matches the
+  // pre-existing behavior in both layout.tsx's script and public/theme-script.js):
+  // an explicit 'dark' string wins, otherwise a falsy stored value defers to
+  // system preference. This intentionally differs from parseStoredTheme(),
+  // which also treats any *invalid* non-empty string as "no override" — that
+  // stricter validation is a client-side (ThemeProvider) concern, not part of
+  // this pre-hydration snippet, and changing it is out of scope for this fix.
+  const expectedDark = stored === 'dark' || (!stored && systemPrefersDark);
+  const scriptAppliedDark = runBootstrapScript(stored, systemPrefersDark);
+  assertEqual(
+    scriptAppliedDark,
+    expectedDark,
+    `generateThemeBootstrapScript() (${label}): expected dark class = ${expectedDark} but got ${scriptAppliedDark}`,
+  );
+}
+
+// Sanity check: for valid stored values (or none), the script's decision
+// still agrees with the provider's resolveTheme() — i.e. no drift for the
+// cases that actually matter (a real override, or none at all).
+for (const { stored, systemPrefersDark, label } of bootstrapCases) {
+  if (stored !== null && stored !== 'light' && stored !== 'dark') continue; // skip corrupted case, see above
+  const providerTheme = resolveTheme(parseStoredTheme(stored), systemPrefersDark);
+  const scriptAppliedDark = runBootstrapScript(stored, systemPrefersDark);
+  assertEqual(
+    scriptAppliedDark,
+    providerTheme === 'dark',
+    `bootstrap/provider drift (${label}): script dark=${scriptAppliedDark}, provider theme=${providerTheme}`,
+  );
+}
+
+// generateThemeBootstrapScript: references the shared storage key, not a hardcoded duplicate
+{
+  const script = generateThemeBootstrapScript();
+  if (!script.includes(THEME_STORAGE_KEY)) {
+    throw new Error('generateThemeBootstrapScript() must read from THEME_STORAGE_KEY');
+  }
 }
 
 console.log('theme-provider-utils.test.ts: all assertions passed');

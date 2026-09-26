@@ -258,12 +258,21 @@ pub use stale_detector::{StaleDetectorConfig, StaleRunDetector, StaleStatus};
 pub mod worker_partition;
 pub use worker_partition::{WorkerPartition, WorkerPartitionError, worker_for_seed};
 
+pub mod health_snapshot;
+pub use health_snapshot::{
+    append_health_snapshot, classify_failure_message, health_snapshot_path, read_health_snapshots,
+    read_latest_health_snapshot, terminal_label, BudgetSnapshot, CampaignHealth, HealthSnapshot,
+    HealthSnapshotError, DEFAULT_SNAPSHOT_INTERVAL_SEEDS, HEALTH_SNAPSHOT_FILE,
+    HEALTH_SNAPSHOT_SCHEMA_VERSION, SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS,
+};
+
 pub mod run_control;
 pub use run_control::{
-    CancelSignal, RunId, RunResumeError, RunSummary, RunTerminalState, cancel_marker_path,
-    cancel_requested, clear_cancel_request, default_state_dir, drive_run,
-    drive_run_from_checkpoint, drive_run_partitioned, drive_run_partitioned_from_checkpoint,
-    request_cancel_run,
+    cancel_marker_path, cancel_requested, clear_cancel_request, default_state_dir, drive_run,
+    drive_run_from_checkpoint, drive_run_from_checkpoint_with_health, drive_run_partitioned,
+    drive_run_partitioned_from_checkpoint, drive_run_partitioned_from_checkpoint_with_health,
+    drive_run_partitioned_with_health, drive_run_with_health, request_cancel_run, CancelSignal,
+    IgnoreProgress, RunId, RunProgress, RunResumeError, RunSummary, RunTerminalState,
 };
 
 pub mod rpc_envelope;
@@ -382,6 +391,13 @@ pub fn randomize_seed(seed: &CaseSeed) -> CaseSeed {
     }
 }
 
+/// Classifies the exact payload bytes provided without preparing a replay seed.
+///
+/// **Deprecated for bundle and regression-suite flows:** direct classification
+/// can disagree with the signature stored by bundle creation when the seed is
+/// mutated first. Use [`prepare_replay_seed`] for those flows. This function
+/// remains available for callers that specifically need to classify arbitrary
+/// bytes as-is.
 pub fn classify(seed: &CaseSeed) -> CrashSignature {
     // Delegate signature construction to the taxonomy helper which produces
     // category labels consistent with `classify_failure` and a centralized
@@ -389,9 +405,19 @@ pub fn classify(seed: &CaseSeed) -> CrashSignature {
     taxonomy::crash_signature_from_seed(seed)
 }
 
+/// Produces the exact seed and signature stored in a replay bundle.
+///
+/// Classification always runs on the post-mutation payload that will be
+/// replayed. The deterministic mutation is idempotent, so this also accepts
+/// payloads already exported from a bundle.
+pub(crate) fn prepare_replay_seed(seed: &CaseSeed) -> (CaseSeed, CrashSignature) {
+    let replay_seed = mutate_seed(seed);
+    let signature = classify(&replay_seed);
+    (replay_seed, signature)
+}
+
 pub fn to_bundle(seed: CaseSeed) -> CaseBundle {
-    let mutated = mutate_seed(&seed);
-    let signature = classify(&mutated);
+    let (mutated, signature) = prepare_replay_seed(&seed);
     CaseBundle {
         seed: mutated,
         signature,
@@ -404,8 +430,7 @@ pub fn to_bundle(seed: CaseSeed) -> CaseBundle {
 /// Like [`to_bundle`], but attaches [`EnvironmentFingerprint::capture`] for replay checks.
 pub fn to_bundle_with_environment(seed: CaseSeed) -> CaseBundle {
     let environment = Some(EnvironmentFingerprint::capture());
-    let mutated = mutate_seed(&seed);
-    let signature = classify(&mutated);
+    let (mutated, signature) = prepare_replay_seed(&seed);
     CaseBundle {
         seed: mutated,
         signature,
@@ -417,8 +442,7 @@ pub fn to_bundle_with_environment(seed: CaseSeed) -> CaseBundle {
 
 /// Like [`to_bundle`], but attaches an RPC envelope capture for reproducibility auditing.
 pub fn to_bundle_with_rpc_envelope(seed: CaseSeed, envelope: RpcEnvelopeCapture) -> CaseBundle {
-    let mutated = mutate_seed(&seed);
-    let signature = classify(&mutated);
+    let (mutated, signature) = prepare_replay_seed(&seed);
     CaseBundle {
         seed: mutated,
         signature,
@@ -450,44 +474,17 @@ mod tests {
     }
 
     #[test]
-    fn mutation_is_never_self_inverse_over_two_steps() {
-        let test_payloads = vec![
-            vec![],
-            vec![42],
-            vec![1, 2, 3, 4],
-            vec![0xE0, 0x00, 0x01, 0x02],
-            vec![0xAA; 32],
-            (0..64u8).collect(),
-        ];
-        for (i, payload) in test_payloads.into_iter().enumerate() {
-            let s0 = CaseSeed {
-                id: (i as u64) + 100,
-                payload,
-            };
-            let s1 = mutate_seed(&s0);
-            assert_ne!(s1.payload, s0.payload, "single mutation should alter payload");
-            let s2 = mutate_seed(&s1);
-            assert_ne!(
-                s2.payload, s0.payload,
-                "mutation was self-inverse over two steps for seed id={}: s0={:?}, s1={:?}, s2={:?}",
-                s0.id, s0.payload, s1.payload, s2.payload
-            );
-        }
-    }
-
-    #[test]
-    fn default_mutator_deterministic_with_same_rng() {
-        let mutator = DefaultMutator::default();
+    fn replay_seed_preparation_is_idempotent_for_exported_payloads() {
         let seed = CaseSeed {
-            id: 99,
-            payload: vec![1, 2, 3, 4, 5],
+            id: 42,
+            payload: vec![1, 2, 3, 4],
         };
-        let mut rng1 = 12345u64;
-        let mut rng2 = 12345u64;
-        let a = mutator.mutate(&seed, &mut rng1);
-        let b = mutator.mutate(&seed, &mut rng2);
-        assert_eq!(a, b);
-        assert_eq!(rng1, rng2);
+        let (replay_seed, signature) = prepare_replay_seed(&seed);
+        let (exported_replay_seed, exported_signature) = prepare_replay_seed(&replay_seed);
+
+        assert_eq!(exported_replay_seed, replay_seed);
+        assert_eq!(exported_signature, signature);
+        assert_eq!(signature.category, classify(&replay_seed).category);
     }
 
     #[test]

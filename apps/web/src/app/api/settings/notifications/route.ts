@@ -8,7 +8,7 @@ import {
 } from '../../../../lib/storage/notification-store';
 
 export async function GET(request: NextRequest) {
-  const rbacError = checkRbacPermission(request);
+  const rbacError = await checkRbacPermission(request);
   if (rbacError) return rbacError;
 
   const userId = 'current-user';
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const rbacError = checkRbacPermission(request);
+  const rbacError = await checkRbacPermission(request);
   if (rbacError) return rbacError;
 
   const sizeError = checkRequestSize(request);
