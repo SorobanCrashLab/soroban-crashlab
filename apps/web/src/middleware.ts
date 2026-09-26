@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { proxy } from '@/rate-limit';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let requestId = request.headers.get('x-request-id');
 
   if (!requestId) {
@@ -11,7 +11,7 @@ export function middleware(request: NextRequest) {
 
   // Apply rate limiting to unauthenticated mutating routes
   if (isMutatingRequest(request)) {
-    const rateLimitResponse = proxy(request);
+    const rateLimitResponse = await proxy(request);
     if (rateLimitResponse.status === 429) {
       return rateLimitResponse;
     }

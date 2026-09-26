@@ -223,3 +223,15 @@ export function resolveApiToken(secret: string, nowMs = Date.now()): ResolveToke
 export function resetApiTokenStore(): void {
   tokensStore = [];
 }
+
+/**
+ * The stored SHA-256 digest of a token, by id.
+ *
+ * Exists so callers that maintain token-adjacent state (the RBAC principal
+ * index) do not have to re-derive it from a secret they no longer hold. It
+ * returns the same digest that was persisted at creation time, not a new
+ * secret.
+ */
+export function getApiTokenSecretHash(id: string): string | undefined {
+  return tokensStore.find((t) => t.id === id)?.sha256Hash;
+}

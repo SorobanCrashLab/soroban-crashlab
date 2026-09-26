@@ -1,17 +1,31 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { proxy } from './rate-limit';
+import { InMemoryRecordDriver, setRecordDriver, resetRecordDriver } from './lib/storage/record-driver';
+import { resetRoleStore } from './lib/storage/role-store';
+import { resetTokenPrincipalStore } from './lib/storage/token-principal-store';
 
 describe('API Rate Limit Middleware', () => {
-  beforeEach(() => {
-    vi.resetModules();
-    // Reset global state
+  function resetGlobalBuckets() {
     const globalForRateLimit = globalThis as unknown as Record<string, unknown>;
     const buckets = globalForRateLimit.crashlabApiRateLimitBuckets as Map<string, unknown> | undefined;
     if (buckets) {
       buckets.clear();
     }
     delete globalForRateLimit.crashlabApiRateLimitLastCleanup;
+  }
+
+  beforeEach(async () => {
+    resetGlobalBuckets();
+    // RBAC now resolves roles through the record layer; give each test a clean
+    // one so rate-limit assertions are not perturbed by a leftover assignment.
+    setRecordDriver(new InMemoryRecordDriver());
+    await resetRoleStore();
+    await resetTokenPrincipalStore();
+  });
+
+  afterEach(() => {
+    resetRecordDriver();
   });
 
   function makeRequest(
@@ -27,22 +41,22 @@ describe('API Rate Limit Middleware', () => {
     });
   }
 
-  it('allows requests within the rate limit', () => {
+  it('allows requests within the rate limit', async () => {
     const request = makeRequest('192.168.1.1');
-    const response = proxy(request);
+    const response = await proxy(request);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('RateLimit-Limit')).toBe('120');
     expect(response.headers.get('RateLimit-Remaining')).toBe('119');
   });
 
-  it('tracks and increments request count per IP', () => {
+  it('tracks and increments request count per IP', async () => {
     const ip = '192.168.1.1';
     const req1 = makeRequest(ip);
-    const res1 = proxy(req1);
+    const res1 = await proxy(req1);
 
     const req2 = makeRequest(ip);
-    const res2 = proxy(req2);
+    const res2 = await proxy(req2);
 
     expect(res1.headers.get('RateLimit-Remaining')).toBe('119');
     expect(res2.headers.get('RateLimit-Remaining')).toBe('118');
@@ -50,12 +64,12 @@ describe('API Rate Limit Middleware', () => {
 
   it('returns 429 when rate limit is exceeded', async () => {
     const ip = '10.0.0.1';
-    
+
     // Make 121 requests (exceeds limit of 120)
     for (let i = 0; i < 121; i++) {
       const request = makeRequest(ip);
-      const response = proxy(request);
-      
+      const response = await proxy(request);
+
       if (i < 120) {
         expect(response.status).toBe(200);
       } else {
@@ -66,14 +80,14 @@ describe('API Rate Limit Middleware', () => {
     }
   });
 
-  it('includes Retry-After header on 429 response', () => {
+  it('includes Retry-After header on 429 response', async () => {
     const ip = '10.0.0.2';
-    
+
     // Exceed rate limit
     for (let i = 0; i < 121; i++) {
       const request = makeRequest(ip);
-      const response = proxy(request);
-      
+      const response = await proxy(request);
+
       if (i === 120) {
         expect(response.status).toBe(429);
         const retryAfter = response.headers.get('Retry-After');
@@ -83,7 +97,7 @@ describe('API Rate Limit Middleware', () => {
     }
   });
 
-  it('extracts IP from x-forwarded-for header', () => {
+  it('extracts IP from x-forwarded-for header', async () => {
     const req = new NextRequest('http://localhost/api/runs', {
       method: 'GET',
       headers: {
@@ -91,12 +105,12 @@ describe('API Rate Limit Middleware', () => {
       },
     });
 
-    const res1 = proxy(req);
-    expect(res1.status).toBe(200);
-    expect(res1.headers.get('RateLimit-Remaining')).toBe('119');
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('RateLimit-Remaining')).toBe('119');
   });
 
-  it('falls back to x-real-ip when x-forwarded-for is missing', () => {
+  it('falls back to x-real-ip when x-forwarded-for is missing', async () => {
     const req = new NextRequest('http://localhost/api/runs', {
       method: 'GET',
       headers: {
@@ -104,12 +118,12 @@ describe('API Rate Limit Middleware', () => {
       },
     });
 
-    const res1 = proxy(req);
-    expect(res1.status).toBe(200);
-    expect(res1.headers.get('RateLimit-Remaining')).toBe('119');
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('RateLimit-Remaining')).toBe('119');
   });
 
-  it('allows OPTIONS requests without rate limiting', () => {
+  it('allows OPTIONS requests without rate limiting', async () => {
     const req = new NextRequest('http://localhost/api/runs', {
       method: 'OPTIONS',
       headers: {
@@ -117,7 +131,7 @@ describe('API Rate Limit Middleware', () => {
       },
     });
 
-    const res = proxy(req);
+    const res = await proxy(req);
     expect(res.status).toBe(200);
   });
 });

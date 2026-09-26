@@ -22,9 +22,27 @@ interface AuditLog {
   performedBy?: string;
 }
 
+/** Mirrors the server's own view of the caller. Never taken from the client. */
+interface EffectiveAccess {
+  principal: {
+    identityType: 'github' | 'api-key' | 'anonymous';
+    identityValue: string;
+    subject: string;
+    authenticated: boolean;
+  };
+  role: 'analyst' | 'maintainer';
+  capabilities: {
+    canAnnotate: boolean;
+    canAdminister: boolean;
+  };
+  maintainerCount: number;
+  gitHubSessionsEnabled: boolean;
+}
+
 export default function RoleManagementPage() {
   const [assignments, setAssignments] = useState<RoleAssignment[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [access, setAccess] = useState<EffectiveAccess | null>(null);
   const [loading, setLoading] = useState(true);
   const [newIdentityType, setNewIdentityType] = useState<'github' | 'api-key'>('github');
   const [newIdentityValue, setNewIdentityValue] = useState('');
@@ -33,9 +51,10 @@ export default function RoleManagementPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [assignRes, auditRes] = await Promise.all([
+        const [assignRes, auditRes, meRes] = await Promise.all([
           fetch('/api/settings/roles'),
           fetch('/api/settings/roles/audit'),
+          fetch('/api/settings/roles/me'),
         ]);
 
         if (assignRes.ok) {
@@ -46,6 +65,10 @@ export default function RoleManagementPage() {
         if (auditRes.ok) {
           const data = await auditRes.json();
           setAuditLogs(data.logs || []);
+        }
+
+        if (meRes.ok) {
+          setAccess(await meRes.json());
         }
       } catch (err) {
         console.error('Failed to fetch role data:', err);
@@ -114,13 +137,66 @@ export default function RoleManagementPage() {
     return <div className="p-6">Loading...</div>;
   }
 
-  const maintainerCount = assignments.filter((a) => a.role === 'maintainer').length;
+  const maintainerCount = access?.maintainerCount ?? assignments.filter((a) => a.role === 'maintainer').length;
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold mb-2">Role Management</h1>
-        <p className="text-gray-600">Manage RBAC assignments and audit trail</p>
+        <p className="text-gray-600">
+          Roles are bound to a verified identity — a GitHub login or an API key from
+          Settings &rarr; API. They are not read from request headers, query parameters or
+          request bodies, so presenting a role in a request does nothing.
+        </p>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6 space-y-2">
+        <h2 className="text-lg font-semibold">Your effective access</h2>
+        {access ? (
+          <dl className="text-sm space-y-1">
+            <div className="flex gap-2">
+              <dt className="text-gray-500 w-40">Identity</dt>
+              <dd className="font-mono text-xs">{access.principal.subject}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-gray-500 w-40">Authenticated</dt>
+              <dd>{access.principal.authenticated ? 'Yes' : 'No — anonymous'}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-gray-500 w-40">Role</dt>
+              <dd>
+                <span
+                  className={`px-2 py-1 rounded text-xs font-semibold ${
+                    access.role === 'maintainer'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}
+                >
+                  {access.role}
+                </span>
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-gray-500 w-40">Annotate &amp; triage</dt>
+              <dd>{access.capabilities.canAnnotate ? 'Allowed' : 'Denied'}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-gray-500 w-40">Administer settings</dt>
+              <dd>{access.capabilities.canAdminister ? 'Allowed' : 'Denied'}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="text-gray-500 text-sm">
+            Effective access could not be resolved. You are treated as anonymous.
+          </p>
+        )}
+        {access && !access.gitHubSessionsEnabled && (
+          <p className="text-xs text-gray-500">
+            GitHub sign-in is not enabled on this deployment. Set
+            CRASHLAB_GITHUB_SESSION_SECRET to bind browser sessions to a GitHub identity;
+            until then, roles can only be anchored to API keys.
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
@@ -147,6 +223,11 @@ export default function RoleManagementPage() {
                 placeholder={newIdentityType === 'github' ? 'username' : 'key_id'}
                 className="w-full px-3 py-2 border rounded-md"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                {newIdentityType === 'github'
+                  ? 'The GitHub login, as it appears in the OAuth session.'
+                  : 'The token id shown in Settings → API, not the secret.'}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Role</label>

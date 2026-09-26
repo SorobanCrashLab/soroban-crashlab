@@ -19,6 +19,17 @@ export { S3StorageDriver } from './s3-driver';
 export { InMemoryRunDriver } from './in-memory-run-driver';
 export type { RunListOptions, RunStorageDriver, StoredArtifact } from './run-driver';
 export { RunStorageError } from './run-driver';
+// Record storage for security state (roles, audit logs). Separate from the
+// blob drivers above: same selection discipline, different shape.
+export {
+  InMemoryRecordDriver,
+  RedisRecordDriver,
+  selectRecordDriver,
+  setRecordDriver,
+  resetRecordDriver,
+  readPositiveIntegerEnv,
+} from './record-driver';
+export type { RecordDriver, RecordRedisClient } from './record-driver';
 
 export interface DriverSelection {
   driver: StorageDriver;
