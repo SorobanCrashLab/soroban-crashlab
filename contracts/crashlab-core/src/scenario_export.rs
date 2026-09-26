@@ -13,7 +13,11 @@ pub struct FailureScenario {
     /// Unique identifier for the seed that produced this failure.
     pub seed_id: u64,
 
-    /// Input payload as a hex-encoded string for JSON compatibility.
+    /// Replay payload as a hex-encoded string for JSON compatibility.
+    ///
+    /// Exported bundles contain the already-mutated stored payload. Regression
+    /// evaluation applies the canonical replay preparation, which is
+    /// idempotent for an already-prepared payload.
     pub input_payload: String,
 
     /// Execution mode or context (e.g., "invoker", "contract", "none").
