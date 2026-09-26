@@ -54,27 +54,52 @@ describe('getMetricsScrapeToken', () => {
 // ─── validateMetricsScrapeAuth ───────────────────────────────────────────────
 
 describe('validateMetricsScrapeAuth', () => {
-  let original: string | undefined;
+  let originalToken: string | undefined;
+  let originalAllow: string | undefined;
 
   beforeEach(() => {
-    original = process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
+    originalToken = process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
+    originalAllow = process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS;
   });
 
   afterEach(() => {
-    if (original === undefined) {
+    if (originalToken === undefined) {
       delete process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
     } else {
-      process.env.CRASHLAB_METRICS_SCRAPE_TOKEN = original;
+      process.env.CRASHLAB_METRICS_SCRAPE_TOKEN = originalToken;
+    }
+    if (originalAllow === undefined) {
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS;
+    } else {
+      process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS = originalAllow;
     }
   });
 
-  describe('when no scrape token is configured', () => {
+  describe('when no scrape token is configured and no escape hatch', () => {
     beforeEach(() => {
       delete process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS;
+    });
+
+    it('rejects requests without an Authorization header with 503', async () => {
+      const res = validateMetricsScrapeAuth(makeRequest());
+      expect(res).not.toBeUndefined();
+      expect(res!.status).toBe(503);
+      const body = await res!.json();
+      expect(body.error).toMatch(/Metrics authentication is not configured/i);
+      expect(body.code).toBe('METRICS_AUTH_NOT_CONFIGURED');
+    });
+  });
+
+  describe('when no scrape token is configured but escape hatch is enabled', () => {
+    beforeEach(() => {
+      delete process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
+      process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS = '1';
     });
 
     it('allows requests without an Authorization header', () => {
-      expect(validateMetricsScrapeAuth(makeRequest())).toBeUndefined();
+      const res = validateMetricsScrapeAuth(makeRequest());
+      expect(res).toBeUndefined();
     });
   });
 
@@ -83,6 +108,7 @@ describe('validateMetricsScrapeAuth', () => {
 
     beforeEach(() => {
       process.env.CRASHLAB_METRICS_SCRAPE_TOKEN = VALID_TOKEN;
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS;
     });
 
     it('allows a request with the correct Bearer token', () => {
@@ -110,34 +136,59 @@ describe('validateMetricsScrapeAuth', () => {
       expect(res).not.toBeUndefined();
       expect(res!.status).toBe(401);
     });
+
+    it('escape hatch is ignored when token is configured', () => {
+      process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS = '1';
+      const res = validateMetricsScrapeAuth(makeRequest());
+      expect(res).not.toBeUndefined();
+      expect(res!.status).toBe(401);
+    });
   });
 });
 
 // ─── GET /api/health/metrics wiring ──────────────────────────────────────────
 
 describe('GET /api/health/metrics', () => {
-  let original: string | undefined;
+  let originalToken: string | undefined;
+  let originalAllow: string | undefined;
 
   beforeEach(() => {
-    original = process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
-    delete process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
+    originalToken = process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
+    originalAllow = process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS;
   });
 
   afterEach(() => {
-    if (original === undefined) {
+    if (originalToken === undefined) {
       delete process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
     } else {
-      process.env.CRASHLAB_METRICS_SCRAPE_TOKEN = original;
+      process.env.CRASHLAB_METRICS_SCRAPE_TOKEN = originalToken;
+    }
+    if (originalAllow === undefined) {
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS;
+    } else {
+      process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS = originalAllow;
     }
   });
 
-  it('returns 200 when unauthenticated by default (no token configured)', async () => {
+  it('returns 503 when unauthenticated and no escape hatch (no token configured)', async () => {
+    delete process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
+    delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS;
+    const res = await GET(makeRequest());
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toMatch(/Metrics authentication is not configured/i);
+  });
+
+  it('returns 200 when unauthenticated and escape hatch is enabled (no token configured)', async () => {
+    delete process.env.CRASHLAB_METRICS_SCRAPE_TOKEN;
+    process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS = '1';
     const res = await GET(makeRequest());
     expect(res.status).toBe(200);
   });
 
   it('returns 401 when a scrape token is configured and the header is missing', async () => {
     process.env.CRASHLAB_METRICS_SCRAPE_TOKEN = 'scrape-token-secret';
+    delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS;
     const res = await GET(makeRequest());
     expect(res.status).toBe(401);
     const body = await res.json();

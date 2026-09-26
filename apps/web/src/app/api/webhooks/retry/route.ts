@@ -5,6 +5,7 @@ import { getDeliveryHistoryStore, updateDeliveryHistoryStore } from '../history/
 import { queueDeliveryRetry, computeDeliveryStats } from '../../../webhook-retry-dashboard-utils';
 import { codedErrorResponse } from '../../../../lib/error-codes';
 import { getWebhookRecovery } from '../../../../lib/webhook-recovery';
+import { validateWebhookApiKey } from '../../../../lib/api-key-auth';
 
 /**
  * Queues a manual retry (#1635). Delivery is not attempted inside this
@@ -12,6 +13,8 @@ import { getWebhookRecovery } from '../../../../lib/webhook-recovery';
  * runs it, so the attempt survives this function ending. Responds 202.
  */
 export const POST = withRouteErrorHandling('POST /api/webhooks/retry', async (request: NextRequest) => {
+  const authError = validateWebhookApiKey(request);
+  if (authError) return authError;
   const parsedBody = await readJsonBody(request);
   if ('error' in parsedBody) return parsedBody.error;
 

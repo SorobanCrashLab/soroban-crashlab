@@ -31,8 +31,10 @@ Drift is enforced by `node scripts/audit-env.mjs` (wired into `ops-scripts-synta
 | `SLACK_CHANNEL_ID` | server-only | Slack channel for run threads | empty |
 | `SLACK_SIGNING_SECRET` | secret | Slack interactivity request verification | empty |
 | `CRASHLAB_WEBHOOK_API_KEY` | secret | Bearer for `/api/webhooks` | empty |
+| `CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS` | secret | Escape hatch for unauthenticated webhooks | empty |
 | `CRASHLAB_CRON_SECRET` | secret | Bearer for `/api/schedules/tick` | empty |
 | `CRASHLAB_METRICS_SCRAPE_TOKEN` | secret | Bearer for metrics/health scrape routes | empty |
+| `CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS` | secret | Escape hatch for unauthenticated metrics | empty |
 | `CRASHLAB_API_TOKEN_TTL_DAYS` | server-only | Default API token lifetime (days) | `90` |
 | `CRASHLAB_API_TOKEN_ROTATION_GRACE_HOURS` | server-only | Rotated token grace window | `24` |
 | `CRASHLAB_API_RATE_LIMIT_WINDOW_MS` | server-only | Rate-limit window | `60000` |
@@ -121,9 +123,15 @@ Mock vs backend mode: see [`ARCHITECTURE.md`](ARCHITECTURE.md). Deploy paths: se
 
 ### `CRASHLAB_WEBHOOK_API_KEY`
 - **Required**: No
-- **Default**: empty (no authentication enforced)
-- **Used by**: Webhook API routes (`apps/web/src/app/api/webhooks/route.ts`)
-- **Description**: When set, all `GET`, `POST`, `PATCH`, and `DELETE` requests to `/api/webhooks` must include an `Authorization: Bearer <key>` header that matches this value exactly. The comparison is performed using a timing-safe algorithm to prevent side-channel attacks. Requests with a missing or incorrect token are rejected with HTTP 401. When this variable is absent or empty, the endpoint is unauthenticated (existing behaviour is preserved for deployments that have not yet configured this variable).
+- **Default**: empty (authentication enforced by default — endpoints return 503 when unset)
+- **Used by**: Webhook API routes (`apps/web/src/app/api/webhooks/route.ts`, `/api/webhooks/retry`, `/api/webhooks/recovery`)
+- **Description**: When set, all `GET`, `POST`, `PATCH`, and `DELETE` requests to `/api/webhooks` and related endpoints must include an `Authorization: Bearer <key>` header that matches this value exactly. The comparison is performed using a timing-safe algorithm to prevent side-channel attacks. Requests with a missing or incorrect token are rejected with HTTP 401. When this variable is absent or empty, the endpoints return HTTP 503 with a clear operator-facing message. To explicitly allow unauthenticated access for local development only, set `CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS=1` (NOT recommended for production or preview deployments).
+
+### `CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS`
+- **Required**: No
+- **Default**: empty (authentication enforced)
+- **Used by**: Webhook API routes (`apps/web/src/app/api/webhooks/route.ts`, `/api/webhooks/retry`, `/api/webhooks/recovery`)
+- **Description**: Escape hatch for local development only. When set to `1` or `true`, webhook endpoints allow unauthenticated requests even when `CRASHLAB_WEBHOOK_API_KEY` is not configured. **WARNING**: Do not enable in production or preview deployments — this exposes mutating endpoints to the internet.
 
 ### `CRASHLAB_API_TOKEN_TTL_DAYS`
 - **Required**: No
