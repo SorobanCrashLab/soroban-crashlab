@@ -5,12 +5,13 @@ set -e
 # This script builds the contract to a .wasm file that can be deployed to Soroban
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONTRACT_DIR="$(cd "$SCRIPT_DIR/../../contracts/soroban-example" && pwd)"
+WORKSPACE_DIR="$(cd "$SCRIPT_DIR/../../contracts" && pwd)"
+CONTRACT_DIR="$WORKSPACE_DIR/soroban-example"
 
 echo "Building soroban-example contract for wasm32-unknown-unknown..."
-cd "$CONTRACT_DIR"
+cd "$WORKSPACE_DIR"
 
-cargo build --target wasm32-unknown-unknown --release
+cargo build -p soroban-example --target wasm32-unknown-unknown --release
 
 echo "Build complete!"
-echo "WASM file location: $CONTRACT_DIR/target/wasm32-unknown-unknown/release/soroban_example.wasm"
+echo "WASM file location: $WORKSPACE_DIR/target/wasm32-unknown-unknown/release/soroban_example.wasm"
