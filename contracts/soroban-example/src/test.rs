@@ -561,3 +561,38 @@ fn test_update_allowance() {
     client.approve(&admin, &spender, &200);
     assert_eq!(client.allowance(&admin, &spender), 200);
 }
+
+// ── supply invariant ─────────────────────────────────────────────────────────
+
+/// `total_supply` must always equal the sum of all balances, so the checked
+/// arithmetic above can never let value appear or disappear silently.
+#[test]
+fn test_supply_equals_sum_of_balances() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    client.initialize(&admin, &1000);
+
+    client.transfer(&admin, &alice, &250);
+    assert_eq!(client.total_supply(), 1000);
+
+    client.transfer(&alice, &bob, &100);
+    client.mint(&admin, &bob, &500);
+    client.burn(&admin, &alice, &50);
+    client.approve(&admin, &bob, &300);
+    client.transfer_from(&bob, &admin, &alice, &300);
+
+    let mut sum: i128 = 0;
+    for account in [&admin, &alice, &bob].iter() {
+        sum = sum
+            .checked_add(client.balance(*account))
+            .expect("balance sum overflowed");
+    }
+
+    assert_eq!(sum, client.total_supply());
+    assert_eq!(sum, 1450);
+}
