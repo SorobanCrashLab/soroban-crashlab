@@ -334,6 +334,16 @@ If you know that an issue assignment, PR review, merge, security triage, or reso
 - no dead code or placeholder logic in merged PRs
 - tests cover the introduced behavior
 - docs are updated when user-facing behavior changes
+- **Architecture changes** (data mode, runners, storage drivers, campaign/replay flow, or system boundaries) update [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+
+### Review checklist (architecture)
+
+When a PR changes how systems fit together:
+
+- [ ] [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) diagram / decision tree / runner matrix / lifecycle section updated
+- [ ] Known gaps remain marked honestly (with issue links when available)
+- [ ] [`docs/ENV.md`](docs/ENV.md) updated if new env vars were introduced (`node scripts/audit-env.mjs` green)
+- [ ] [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) updated if deploy paths or gating changed
 
 ## Security Guidance for Contributors
 When adding new fuzz input handling:

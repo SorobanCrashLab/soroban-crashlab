@@ -143,7 +143,8 @@ cargo build --release --target wasm32-unknown-unknown
 | [API Reference](docs/API.md) | HTTP API for the dashboard's Next.js routes (runs, artifacts, settings, and more) |
 | [Reproducibility Guide](docs/REPRODUCIBILITY.md) | Deterministic guarantees and troubleshooting |
 | [Roadmap](docs/ROADMAP.md) | Milestone overview and issue tracking |
-| [Environment Variables](docs/ENVIRONMENT_VARIABLES.md) | Web app, API route, and deployment configuration reference |
+| [Environment Variables](docs/ENV.md) | Web app, API route, and deployment configuration reference (secrecy classification) |
+| [Deployment Guide](docs/DEPLOYMENT.md) | Vercel + Docker Compose paths and deploy gating |
 | [Release Process](docs/RELEASE_PROCESS.md) | Maintainer checklist for releases |
 | [Product Vision](docs/VISION.md) | 90% done criteria and roadmap alignment |
 | [Maintainer Onboarding Checklist](docs/MAINTAINER_ONBOARDING.md) | Step-by-step guide for onboarding new maintainers |
@@ -191,18 +192,19 @@ You will need real XLM for mainnet deployment fees.
 
 ## Frontend Deployment
 
-### Deploy to Vercel (Free)
+See the canonical guide: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (Vercel via `vercel.json`, Docker Compose via both Dockerfiles, and CI deploy gating).
+
+Quick Vercel path:
 
 1. Push your code to GitHub
-2. Go to [vercel.com](https://vercel.com) and import your repository
-3. Vercel auto-detects Next.js — use the default settings
-4. Add environment variables:
-   - `NEXT_PUBLIC_ENABLE_MOCK_DATA=true` (until backend is ready)
-5. Deploy — your dashboard will be live in about 2 minutes
+2. Import the repository at [vercel.com](https://vercel.com)
+3. Confirm settings from root `vercel.json`
+4. Set env vars from [`docs/ENV.md`](docs/ENV.md) (start with `NEXT_PUBLIC_ENABLE_MOCK_DATA=true`)
+5. Deploy
 
 ### Environment Variables
 
-For the complete reference, including server-only API route settings, see
+For the complete reference, including secrecy classification (public / server-only / secret), see
 [`docs/ENV.md`](docs/ENV.md).
 
 | Variable | Purpose | Default |
@@ -210,8 +212,6 @@ For the complete reference, including server-only API route settings, see
 | `NEXT_PUBLIC_API_URL` | Backend API URL (leave empty for mock data) | empty |
 | `NEXT_PUBLIC_ENABLE_MOCK_DATA` | Use mock data when backend is unavailable | `true` |
 | `NEXT_PUBLIC_APP_URL` | Application URL for server-side fetches | auto-detected |
-| `NEXT_PUBLIC_STELLAR_NETWORK` | Stellar network (testnet/mainnet) | `testnet` |
-| `NEXT_PUBLIC_CONTRACT_ID` | Deployed contract ID | empty |
 
 ---
 

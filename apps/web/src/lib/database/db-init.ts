@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { runBootMigrations } from './migrations';
 
 export type DatabaseType = 'sqlite' | 'postgres' | 'vercel-postgres';
 
@@ -78,6 +79,11 @@ class Database {
           await this.initializeSQLite();
           break;
       }
+
+      await runBootMigrations({
+        type: this.config.type,
+        sqlitePath: this.config.path,
+      });
 
       this.initialized = true;
       logger.info('Database initialized successfully', {

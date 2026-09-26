@@ -1,0 +1,9 @@
+{
+  "schemaVersion": -1,
+  "applied": [],
+  "kvRevisions": {},
+  "note": "Previous-release empty store fixture used by migration upgrade CI",
+  "legacyRuns": [
+    { "id": "run-legacy-1", "status": "completed", "crashCount": 2 }
+  ]
+}
