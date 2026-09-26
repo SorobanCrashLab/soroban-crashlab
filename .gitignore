@@ -9,6 +9,14 @@ test_snapshots/
 node_modules/
 apps/web/node_modules/
 apps/web/.next/
+*.tsbuildinfo
+test-results/
+playwright-report/
+
+# Python
+__pycache__/
+*.pyc
+.mypy_cache/
 
 # Env and logs
 .env

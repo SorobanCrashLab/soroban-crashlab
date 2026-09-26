@@ -9,16 +9,26 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: storage-minio-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/web
 
     services:
       minio:
-        image: bitnami/minio:latest
+        # 2026.4.10-photon-5-r0 (alias: latest)
+        image: bitnami/minio@sha256:e4a9e29cc120b1c216b9d8370507498e4608ee3e09cb317eb0743605210d0264
         ports:
           - 9000:9000
         env:
@@ -48,4 +58,63 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - name: Run the storage contract suite against MinIO
-        run: pnpm --dir apps/web exec vitest run src/lib/storage/minio-contract.test.ts
+        run: pnpm exec vitest run src/lib/storage/minio-contract.test.ts
+      - name: Open or update nightly failure issue
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = "CI failure: storage-driver-minio nightly";
+            const label = "ci-failure";
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const body = [
+              "The nightly MinIO storage-driver contract workflow failed.",
+              "",
+              `- Workflow run: ${runUrl}`,
+              `- Commit: ${context.sha}`,
+              `- Triggered at: ${new Date().toISOString()}`,
+            ].join("\n");
+
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: label });
+            } catch (error) {
+              if (error.status === 404) {
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name: label,
+                  color: "B60205",
+                  description: "Automated CI failure notifications",
+                });
+              } else {
+                throw error;
+              }
+            }
+
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: "open",
+              labels: label,
+              per_page: 100,
+            });
+
+            const existing = openIssues.find((issue) => issue.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body,
+                labels: [label],
+              });
+            }

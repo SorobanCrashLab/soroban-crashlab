@@ -1,8 +1,16 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
+  - package-ecosystem: "docker"
     directory: "/"
-    open-pull-requests-limit: 0
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"
   - package-ecosystem: "github-actions"
     directory: "/"
-    open-pull-requests-limit: 0
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"
