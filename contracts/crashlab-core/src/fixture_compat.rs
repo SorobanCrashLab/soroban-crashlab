@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn seed_too_short_produces_warning() {
         let seeds = vec![make_seed(1, 0)];
-        let report = check_seed_fixtures(&seeds, &SeedSchema::default());
+        let report = check_seed_fixtures(&seeds, &SeedSchema::with_payload_bounds(1, 64));
         assert!(!report.is_compatible());
         assert_eq!(report.warnings.len(), 1);
         assert_eq!(report.warnings[0].fixture_index, 0);
@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn multiple_invalid_seeds_all_reported() {
         let seeds = vec![make_seed(1, 0), make_seed(2, 4), make_seed(3, 65)];
-        let report = check_seed_fixtures(&seeds, &SeedSchema::default());
+        let report = check_seed_fixtures(&seeds, &SeedSchema::with_payload_bounds(1, 64));
         assert_eq!(report.warnings.len(), 2);
         assert_eq!(report.warnings[0].fixture_index, 0);
         assert_eq!(report.warnings[1].fixture_index, 2);
@@ -242,7 +242,7 @@ mod tests {
     #[test]
     fn warning_message_includes_fixture_index_and_seed_id() {
         let seeds = vec![make_seed(42, 0)];
-        let report = check_seed_fixtures(&seeds, &SeedSchema::default());
+        let report = check_seed_fixtures(&seeds, &SeedSchema::with_payload_bounds(1, 64));
         let msg = &report.warnings[0].message;
         assert!(msg.contains("seed[0]"));
         assert!(msg.contains("id=42"));
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn bundle_with_invalid_seed_produces_warning() {
         let doc = make_doc(CASE_BUNDLE_SCHEMA_VERSION, make_seed(1, 0));
-        let report = check_bundle_fixtures(&[doc], &SeedSchema::default());
+        let report = check_bundle_fixtures(&[doc], &SeedSchema::with_payload_bounds(1, 64));
         assert!(!report.is_compatible());
         assert!(report.warnings[0].message.contains("payload too short"));
     }
@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn bundle_with_bad_schema_and_bad_seed_produces_two_warnings() {
         let doc = make_doc(999, make_seed(1, 0));
-        let report = check_bundle_fixtures(&[doc], &SeedSchema::default());
+        let report = check_bundle_fixtures(&[doc], &SeedSchema::with_payload_bounds(1, 64));
         assert_eq!(report.warnings.len(), 2);
     }
 

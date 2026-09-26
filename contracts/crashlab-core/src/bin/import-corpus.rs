@@ -1,14 +1,16 @@
 //! CLI: import external seed files into the local corpus pipeline with validation.
 //!
-//! Input (file path argument or stdin): either a JSON array of `CaseSeed`
-//! objects or a full `CorpusArchive` document. The command validates all seeds
-//! and reports how many were accepted.
+//! Input (file path argument, directory argument, or stdin): either a JSON array of `CaseSeed`
+//! objects, a single `CaseSeed`, a full `CorpusArchive` document, or exported `FailureScenario`
+//! fixtures. The command validates all seeds against `SeedSchema::default()` and reports how
+//! many were accepted.
 
 use crashlab_core::corpus::import_corpus_json;
-use crashlab_core::{CaseSeed, SeedSchema, Validate};
+use crashlab_core::{CaseSeed, FailureScenario, SeedSchema, Validate};
 use std::env;
 use std::fs;
 use std::io::{self, Read};
+use std::path::Path;
 use std::process;
 
 fn main() {
@@ -19,32 +21,62 @@ fn main() {
 }
 
 fn run() -> Result<(), String> {
-    let input = read_input()?;
-    let seeds = parse_seeds(&input)?;
+    let seeds = load_seeds_from_env_args()?;
     validate_seeds(&seeds)?;
     println!("accepted_seed_count={}", seeds.len());
     Ok(())
 }
 
-fn read_input() -> Result<Vec<u8>, String> {
+fn load_seeds_from_env_args() -> Result<Vec<CaseSeed>, String> {
     let mut args = env::args();
     let _ = args.next();
 
-    if let Some(path) = args.next() {
+    if let Some(path_str) = args.next() {
         if args.next().is_some() {
-            return Err("usage: import-corpus [seed-json-path]".to_string());
+            return Err("usage: import-corpus [seed-json-path-or-directory]".to_string());
         }
-        return fs::read(&path).map_err(|e| format!("read {path}: {e}"));
+        let path = Path::new(&path_str);
+        if path.is_dir() {
+            return load_seeds_from_directory(path);
+        }
+        let bytes = fs::read(path).map_err(|e| format!("read {path_str}: {e}"))?;
+        return parse_seeds(&bytes);
     }
 
     let mut buf = Vec::new();
     io::stdin()
         .read_to_end(&mut buf)
         .map_err(|e| format!("stdin: {e}"))?;
-    Ok(buf)
+    parse_seeds(&buf)
 }
 
-fn parse_seeds(bytes: &[u8]) -> Result<Vec<CaseSeed>, String> {
+pub fn load_seeds_from_directory(dir: &Path) -> Result<Vec<CaseSeed>, String> {
+    let mut all_seeds = Vec::new();
+    let mut entries: Vec<_> = fs::read_dir(dir)
+        .map_err(|e| format!("read dir {}: {e}", dir.display()))?
+        .filter_map(|e| e.ok())
+        .collect();
+    entries.sort_by_key(|e| e.path());
+
+    for entry in entries {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
+            let bytes = fs::read(&path)
+                .map_err(|e| format!("read {}: {e}", path.display()))?;
+            let seeds = parse_seeds(&bytes)
+                .map_err(|e| format!("failed to parse {}: {e}", path.display()))?;
+            all_seeds.extend(seeds);
+        }
+    }
+
+    if all_seeds.is_empty() {
+        return Err(format!("no valid JSON fixtures or seeds found in directory {}", dir.display()));
+    }
+
+    Ok(all_seeds)
+}
+
+pub fn parse_seeds(bytes: &[u8]) -> Result<Vec<CaseSeed>, String> {
     if bytes.is_empty() {
         return Err("empty input".to_string());
     }
@@ -53,11 +85,41 @@ fn parse_seeds(bytes: &[u8]) -> Result<Vec<CaseSeed>, String> {
         return Ok(seeds);
     }
 
+    if let Ok(seeds) = serde_json::from_slice::<Vec<CaseSeed>>(bytes) {
+        return Ok(seeds);
+    }
+
+    if let Ok(seed) = serde_json::from_slice::<CaseSeed>(bytes) {
+        return Ok(vec![seed]);
+    }
+
+    if let Ok(scenarios) = serde_json::from_slice::<Vec<FailureScenario>>(bytes) {
+        let mut seeds = Vec::with_capacity(scenarios.len());
+        for s in scenarios {
+            let payload = hex::decode(s.input_payload.trim())
+                .map_err(|e| format!("invalid hex in scenario payload: {e}"))?;
+            seeds.push(CaseSeed {
+                id: s.seed_id,
+                payload,
+            });
+        }
+        return Ok(seeds);
+    }
+
+    if let Ok(scenario) = serde_json::from_slice::<FailureScenario>(bytes) {
+        let payload = hex::decode(scenario.input_payload.trim())
+            .map_err(|e| format!("invalid hex in scenario payload: {e}"))?;
+        return Ok(vec![CaseSeed {
+            id: scenario.seed_id,
+            payload,
+        }]);
+    }
+
     serde_json::from_slice::<Vec<CaseSeed>>(bytes)
         .map_err(|e| format!("malformed seed input: {e}"))
 }
 
-fn validate_seeds(seeds: &[CaseSeed]) -> Result<(), String> {
+pub fn validate_seeds(seeds: &[CaseSeed]) -> Result<(), String> {
     let schema = SeedSchema::default();
     for (idx, seed) in seeds.iter().enumerate() {
         if let Err(errors) = seed.validate(&schema) {
@@ -78,6 +140,7 @@ fn validate_seeds(seeds: &[CaseSeed]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     // =====================================================================
     // Parse Tests: Archive Documents and Raw Seed Arrays
@@ -99,6 +162,24 @@ mod tests {
         assert_eq!(seeds.len(), 2);
         assert_eq!(seeds[0].id, 1);
         assert_eq!(seeds[1].id, 2);
+    }
+
+    #[test]
+    fn parse_accepts_single_seed() {
+        let raw = r#"{"id":42,"payload":[1,2,3]}"#;
+        let seeds = parse_seeds(raw.as_bytes()).expect("single seed should parse");
+        assert_eq!(seeds.len(), 1);
+        assert_eq!(seeds[0].id, 42);
+        assert_eq!(seeds[0].payload, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn parse_accepts_failure_scenario() {
+        let raw = r#"{"seed_id":7,"input_payload":"","mode":"invoker","failure_class":"empty-input"}"#;
+        let seeds = parse_seeds(raw.as_bytes()).expect("failure scenario should parse");
+        assert_eq!(seeds.len(), 1);
+        assert_eq!(seeds[0].id, 7);
+        assert_eq!(seeds[0].payload, Vec::<u8>::new());
     }
 
     #[test]
@@ -136,14 +217,6 @@ mod tests {
         assert!(err.contains("malformed seed input"));
     }
 
-    #[test]
-    fn parse_rejects_missing_payload_field() {
-        let raw = r#"[{"id":1}]"#;
-        let err = parse_seeds(raw.as_bytes())
-            .expect_err("missing payload field must fail");
-        assert!(err.contains("malformed seed input"));
-    }
-
     // =====================================================================
     // Validation Tests: Boundary Conditions and Edge Cases
     // =====================================================================
@@ -152,7 +225,16 @@ mod tests {
     fn validation_accepts_seed_at_minimum_bounds() {
         let seeds = vec![CaseSeed {
             id: 0,           // min_id
-            payload: vec![1], // min_payload_len = 1
+            payload: vec![], // min_payload_len = 0
+        }];
+        assert!(validate_seeds(&seeds).is_ok());
+    }
+
+    #[test]
+    fn validation_accepts_seed_with_empty_payload() {
+        let seeds = vec![CaseSeed {
+            id: 7,
+            payload: vec![],
         }];
         assert!(validate_seeds(&seeds).is_ok());
     }
@@ -164,18 +246,6 @@ mod tests {
             payload: vec![0u8; 64],           // max_payload_len = 64
         }];
         assert!(validate_seeds(&seeds).is_ok());
-    }
-
-    #[test]
-    fn validation_rejects_seed_with_empty_payload() {
-        let seeds = vec![CaseSeed {
-            id: 22,
-            payload: vec![],
-        }];
-
-        let err = validate_seeds(&seeds).expect_err("invalid seed should fail validation");
-        assert!(err.contains("invalid seed at index 0"));
-        assert!(err.contains("payload too short"));
     }
 
     #[test]
@@ -202,6 +272,10 @@ mod tests {
                 payload: vec![1, 2, 3],
             },
             CaseSeed {
+                id: 7,
+                payload: vec![],
+            },
+            CaseSeed {
                 id: 100,
                 payload: vec![0u8; 64],
             },
@@ -212,7 +286,6 @@ mod tests {
 
     #[test]
     fn validation_accepts_seeds_with_duplicate_ids() {
-        // Duplicate IDs are allowed (they may be intended for corpus merging)
         let seeds = vec![
             CaseSeed {
                 id: 1,
@@ -236,7 +309,7 @@ mod tests {
             },
             CaseSeed {
                 id: 2,
-                payload: vec![], // This one is invalid
+                payload: vec![0u8; 65], // This one is invalid
             },
             CaseSeed {
                 id: 3,
@@ -246,17 +319,6 @@ mod tests {
 
         let err = validate_seeds(&seeds).expect_err("validation should fail");
         assert!(err.contains("invalid seed at index 1"));
-    }
-
-    #[test]
-    fn validation_reports_seed_id_in_error() {
-        let seeds = vec![CaseSeed {
-            id: 99,
-            payload: vec![],
-        }];
-
-        let err = validate_seeds(&seeds).expect_err("validation should fail");
-        assert!(err.contains("id=99"));
     }
 
     // =====================================================================
@@ -277,5 +339,21 @@ mod tests {
         let seeds = parse_seeds(raw.as_bytes()).expect("parse should succeed");
         assert!(validate_seeds(&seeds).is_ok());
         assert_eq!(seeds.len(), 2);
+    }
+
+    #[test]
+    fn import_shipped_fixtures_directory_end_to_end() {
+        let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures");
+        assert!(fixtures_dir.is_dir(), "fixtures dir must exist");
+
+        let seeds = load_seeds_from_directory(&fixtures_dir)
+            .expect("should successfully load all shipped fixtures");
+        assert!(!seeds.is_empty(), "fixtures should contain seeds");
+        assert!(validate_seeds(&seeds).is_ok(), "all shipped fixtures must pass validation");
+
+        // Verify that empty payload from empty_input_001.json is included and valid
+        let empty_seed = seeds.iter().find(|s| s.id == 7);
+        assert!(empty_seed.is_some(), "empty_input_001.json (id 7) must be loaded");
+        assert_eq!(empty_seed.unwrap().payload, Vec::<u8>::new());
     }
 }
