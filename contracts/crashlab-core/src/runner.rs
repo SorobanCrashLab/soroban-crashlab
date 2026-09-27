@@ -127,7 +127,7 @@ impl std::fmt::Display for RunnerCreationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RunnerCreationError::InvalidRunnerType { runner_type } => {
-                write!(f, "invalid runner type: '{}'. Supported types: mock, host", runner_type)
+                write!(f, "invalid runner type: '{}'. Supported types: mock, host, rpc", runner_type)
             }
             RunnerCreationError::FeatureNotEnabled { feature, runner_type } => {
                 write!(f, "runner type '{}' requires the '{}' feature to be enabled", runner_type, feature)
@@ -412,7 +412,7 @@ mod tests {
 
         assert_eq!(
             err.to_string(),
-            "invalid runner type: 'xyz'. Supported types: mock, host"
+            "invalid runner type: 'xyz'. Supported types: mock, host, rpc"
         );
     }
 
@@ -441,11 +441,40 @@ mod tests {
         assert_eq!(sig.category, "runtime-failure");
     }
 
-    #[cfg(feature = "rpc-runner")]
     #[test]
-    fn create_runner_rejects_rpc_without_feature_flag() {
-        // This test verifies the error message when trying to use rpc runner
-        // without the feature flag - handled by cfg not feature
+    fn create_runner_rpc_without_feature_returns_feature_not_enabled() {
+        let _env = RunnerEnvGuard::set("rpc");
+        // Remove RPC env vars so we only test the feature-gate path
+        std::env::remove_var("CRASHLAB_RPC_URL");
+        std::env::remove_var("CRASHLAB_CONTRACT_ID");
+
+        #[cfg(not(feature = "rpc-runner"))]
+        {
+            let result = create_runner();
+            assert!(result.is_err(), "create_runner should fail without rpc-runner feature");
+
+            if let Err(err) = result {
+                assert_eq!(
+                    err,
+                    RunnerCreationError::FeatureNotEnabled {
+                        feature: "rpc-runner".to_string(),
+                        runner_type: "rpc".to_string(),
+                    }
+                );
+            }
+        }
+
+        #[cfg(feature = "rpc-runner")]
+        {
+            // With the feature enabled and missing env vars, we expect a
+            // configuration error (missing CRASHLAB_RPC_URL), not a feature error.
+            let result = create_runner();
+            assert!(result.is_err(), "create_runner should fail without CRASHLAB_RPC_URL");
+            if let Err(err) = result {
+                let msg = err.to_string();
+                assert!(msg.contains("rpc"), "Error should mention rpc: {}", msg);
+            }
+        }
     }
 
     #[test]
@@ -468,15 +497,31 @@ mod tests {
 
     #[test]
     fn runner_creation_error_display_includes_rpc() {
-        // Test that the error display mentions supported types including rpc when feature is enabled
-        #[cfg(feature = "rpc-runner")]
-        {
-            let err = RunnerCreationError::FeatureNotEnabled {
-                feature: "rpc-runner".to_string(),
-                runner_type: "rpc".to_string(),
-            };
-            let err_str = err.to_string();
-            assert!(err_str.contains("rpc-runner"), "Expected rpc-runner in error: {}", err_str);
+        // InvalidRunnerType always lists rpc in supported types (feature-independent)
+        let err = RunnerCreationError::InvalidRunnerType {
+            runner_type: "bad-value".to_string(),
+        };
+        let err_str = err.to_string();
+        assert!(err_str.contains("rpc"), "Supported types should include rpc: {}", err_str);
+
+        // FeatureNotEnabled correctly reports the rpc-runner feature name
+        let feature_err = RunnerCreationError::FeatureNotEnabled {
+            feature: "rpc-runner".to_string(),
+            runner_type: "rpc".to_string(),
+        };
+        assert!(feature_err.to_string().contains("rpc-runner"));
+    }
+
+    #[test]
+    fn create_runner_unknown_value_is_invalid() {
+        let _env = RunnerEnvGuard::set("unknown-runner");
+
+        let result = create_runner();
+        assert!(result.is_err());
+        if let Err(RunnerCreationError::InvalidRunnerType { runner_type }) = result {
+            assert_eq!(runner_type, "unknown-runner");
+        } else {
+            panic!("Expected InvalidRunnerType for unknown runner");
         }
     }
 }

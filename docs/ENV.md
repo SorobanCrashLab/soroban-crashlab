@@ -243,6 +243,18 @@ These variables configure source map generation, uploading, release tagging, and
 
 These variables configure the fuzzer execution when running via the Rust CLI tools (`contracts/crashlab-core`).
 
+### `CRASHLAB_RUNNER`
+- **Required**: No
+- **Default**: `mock`
+- **Values**:
+  - `mock` *(default)*: In-process mock runner. Returns deterministic signatures without any network or host access. Used in unit tests and CI where no Soroban environment is available.
+  - `host`: Soroban SDK testutils-based sandbox runner. Requires the `host-runner` Cargo feature to be enabled at compile time (`--features host-runner`). Used for integration tests against a local contract binary.
+  - `rpc`: RPC-backed runner that submits transactions to a live Soroban RPC endpoint. Requires the `rpc-runner` Cargo feature (`--features rpc-runner`) **and** both companion variables below.
+- **Companion variables (required when `CRASHLAB_RUNNER=rpc`)**:
+  - `CRASHLAB_RPC_URL`: Full URL of the Soroban RPC endpoint (e.g. `https://rpc-futurenet.stellar.org:443`). Must begin with `http://` or `https://`. Missing or empty → `RunnerCreationError::Misconfigured`.
+  - `CRASHLAB_CONTRACT_ID`: Soroban contract ID (G-address format) to target. Missing or empty → `RunnerCreationError::Misconfigured`.
+- **Error behaviour**: An unrecognised value yields `RunnerCreationError::InvalidRunnerType` with the message `"invalid runner type: '<value>'. Supported types: mock, host, rpc"`. Requesting `host` or `rpc` without the matching Cargo feature yields `RunnerCreationError::FeatureNotEnabled`.
+
 ### `CRASHLAB_STATE_DIR`
 - **Required**: No
 - **Default**: `.crashlab`
