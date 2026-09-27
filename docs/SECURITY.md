@@ -134,6 +134,26 @@ See the [Operational Security Assumptions](../MAINTAINER_WAVE_PLAYBOOK.md#operat
 
 ---
 
+## Response Header Hardening
+
+The dashboard (both Vercel and self-hosted Docker deployments) ships the following
+security headers. They are defined in `vercel.json` (root and `apps/web/vercel.json`)
+and in `apps/web/next.config.ts` so both deployment paths behave identically.
+
+| Header | Value | Rationale |
+|--------|-------|-----------|
+| `X-Content-Type-Options` | `nosniff` | Prevents browsers from MIME-sniffing responses away from the declared `Content-Type`, reducing drive-by download risks. |
+| `X-Frame-Options` | `SAMEORIGIN` | Legacy clickjacking protection for older clients that do not understand CSP `frame-ancestors`. |
+| `Content-Security-Policy` | `… frame-ancestors 'self' …` | Modern clickjacking defense; `frame-ancestors 'self'` allows embedding only by same-origin pages. |
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | Enforces HTTPS for 2 years (63072000 s) across all subdomains and opts into browser preload lists, eliminating SSL-stripping downgrades on repeat visits. |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Sends full URL on same-origin navigations, origin only on cross-origin, and nothing on downgrade (HTTPS→HTTP), preventing run IDs and filter state from leaking to third parties. |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), interest-cohort=()` | Explicitly disables powerful browser features the dashboard never uses, shrinking the attack surface for compromised subresources. |
+| `X-XSS-Protection` | **removed** | Deprecated; ignored by all modern browsers. Its presence misleads security reviewers into thinking XSS protection exists. Rely on CSP instead. |
+
+Headers are snapshot-tested in `apps/web/src/app/security-headers.test.ts` to prevent regressions.
+
+---
+
 ## Related Documents
 
 | Document | Purpose |

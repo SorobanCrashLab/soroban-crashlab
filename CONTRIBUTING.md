@@ -305,6 +305,19 @@ git checkout -b issue/137-contributing-md
 4. **Test evidence.** Include output from relevant verification commands and reproduction notes for behavior changes.
 5. **API / schema / CLI changes.** If your change alters a public API, persisted schema, CLI contract, or documented maintainer workflow, call that out clearly in the PR so the next release maintainer can update [`CHANGELOG.md`](CHANGELOG.md) and run the compatibility review in [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 
+## Labels and triage lifecycle
+
+Maintainers apply a small, authoritative label set during triage; contributors
+do not need to apply labels themselves. The labels the automation depends on are
+`wave4`, exactly one `complexity:*` (`complexity:trivial` /
+`complexity:medium` / `complexity:high`), and at least one `area:*`. The
+reserved labels `pinned`, `security`, `backlog`, and `dependencies` must keep
+their exact names because the stale workflow exempts on them.
+
+See [`docs/LABEL_TAXONOMY.md`](docs/LABEL_TAXONOMY.md) for the full taxonomy
+(purpose + owner of each prefix), the deprecated labels being retired and their
+canonical replacements, and the end-to-end issue/PR lifecycle with SLA timers.
+
 ## Lockfile policy
 
 Do not commit changes to `pnpm-lock.yaml` or `package-lock.json`. If your

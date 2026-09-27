@@ -14,7 +14,7 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@c4a16c4a2b9b5c5d5e5f5a5b5c5d5e5f5a5b5c5d # v9.0.0
         with:
           stale-issue-message: >
             This issue has been automatically marked as stale because it has not

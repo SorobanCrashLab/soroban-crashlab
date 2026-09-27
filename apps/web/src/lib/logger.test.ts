@@ -9,19 +9,19 @@ const nextHeadersModule = {
 };
 // Must mock before importing the module that uses it
 const modulePath = require.resolve('next/headers');
-require.cache[modulePath] = {
+(require.cache as Record<string, unknown>)[modulePath] = {
   id: modulePath,
   filename: modulePath,
   loaded: true,
   exports: nextHeadersModule
-} as any;
+} as unknown as NodeJS.Module;
 
 import { StructuredLogger } from './structured-logger';
 
-function makeCapture(): { lines: string[]; write: (entry: any) => void } {
+function makeCapture(): { lines: string[]; write: (entry: Record<string, unknown>) => void } {
 
   const lines: string[] = [];
-  return { lines, write: (entry: any) => lines.push(JSON.stringify(entry)) };
+  return { lines, write: (entry: Record<string, unknown>) => lines.push(JSON.stringify(entry)) };
 }
 
 async function runTests() {

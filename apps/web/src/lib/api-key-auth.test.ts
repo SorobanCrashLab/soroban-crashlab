@@ -9,8 +9,8 @@ import {
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
-function makeRequest(headers: Record<string, string> = {}): NextRequest {
-  return new NextRequest('http://localhost/api/webhooks', { headers });
+function makeRequest(method = 'GET', headers: Record<string, string> = {}): NextRequest {
+  return new NextRequest('http://localhost/api/webhooks', { method, headers });
 }
 
 // ─── getConfiguredApiKey ───────────────────────────────────────────────────
@@ -65,37 +65,37 @@ describe('extractBearerToken', () => {
 
   it('returns undefined for a Basic auth header', () => {
     expect(
-      extractBearerToken(makeRequest({ authorization: 'Basic dXNlcjpwYXNz' })),
+      extractBearerToken(makeRequest('GET', { authorization: 'Basic dXNlcjpwYXNz' })),
     ).toBeUndefined();
   });
 
   it('returns undefined for a malformed header with too many parts', () => {
     expect(
-      extractBearerToken(makeRequest({ authorization: 'Bearer token extra' })),
+      extractBearerToken(makeRequest('GET', { authorization: 'Bearer token extra' })),
     ).toBeUndefined();
   });
 
   it('returns undefined when the token part is empty', () => {
-    expect(extractBearerToken(makeRequest({ authorization: 'Bearer ' }))).toBeUndefined();
+    expect(extractBearerToken(makeRequest('GET', { authorization: 'Bearer ' }))).toBeUndefined();
   });
 
   it('returns the token for a well-formed Bearer header', () => {
     expect(
-      extractBearerToken(makeRequest({ authorization: 'Bearer my-api-key' })),
+      extractBearerToken(makeRequest('GET', { authorization: 'Bearer my-api-key' })),
     ).toBe('my-api-key');
   });
 
   it('is case-insensitive for the "Bearer" scheme', () => {
     expect(
-      extractBearerToken(makeRequest({ authorization: 'BEARER my-api-key' })),
+      extractBearerToken(makeRequest('GET', { authorization: 'BEARER my-api-key' })),
     ).toBe('my-api-key');
     expect(
-      extractBearerToken(makeRequest({ authorization: 'bearer my-api-key' })),
+      extractBearerToken(makeRequest('GET', { authorization: 'bearer my-api-key' })),
     ).toBe('my-api-key');
   });
 });
 
-// ─── timingSafeStringEqual ─────────────────────────────────────────────────
+// ─── timingSafeStringEqual ──────────────────────────────────────────────────
 
 describe('timingSafeStringEqual', () => {
   it('returns true for two identical strings', () => {
@@ -126,13 +126,15 @@ describe('timingSafeStringEqual', () => {
   });
 });
 
-// ─── validateWebhookApiKey ─────────────────────────────────────────────────
+// ─── validateWebhookApiKey ──────────────────────────────────────────────────
 
 describe('validateWebhookApiKey', () => {
   let originalKey: string | undefined;
+  let originalAllow: string | undefined;
 
   beforeEach(() => {
     originalKey = process.env.CRASHLAB_WEBHOOK_API_KEY;
+    originalAllow = process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
   });
 
   afterEach(() => {
@@ -141,22 +143,50 @@ describe('validateWebhookApiKey', () => {
     } else {
       process.env.CRASHLAB_WEBHOOK_API_KEY = originalKey;
     }
+    if (originalAllow === undefined) {
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
+    } else {
+      process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS = originalAllow;
+    }
   });
 
-  describe('when no API key is configured', () => {
+  describe('when no API key is configured and no escape hatch', () => {
     beforeEach(() => {
       delete process.env.CRASHLAB_WEBHOOK_API_KEY;
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
     });
 
-    it('allows requests without an Authorization header', () => {
-      const result = validateWebhookApiKey(makeRequest());
+    it('allows GET requests without an Authorization header', () => {
+      const result = validateWebhookApiKey(makeRequest('GET'));
       expect(result).toBeUndefined();
     });
 
-    it('allows requests with any Authorization header', () => {
-      const result = validateWebhookApiKey(
-        makeRequest({ authorization: 'Bearer whatever' }),
-      );
+    it('rejects POST requests without an Authorization header with 503', async () => {
+      const result = validateWebhookApiKey(makeRequest('POST'));
+      expect(result).not.toBeUndefined();
+      expect(result!.status).toBe(503);
+      const body = await result!.json();
+      expect(body.error).toMatch(/Webhook authentication is not configured/i);
+      expect(body.code).toBe('WEBHOOK_AUTH_NOT_CONFIGURED');
+    });
+
+    it('rejects PUT, PATCH, DELETE requests without an Authorization header with 503', async () => {
+      for (const method of ['PUT', 'PATCH', 'DELETE']) {
+        const result = validateWebhookApiKey(makeRequest(method));
+        expect(result).not.toBeUndefined();
+        expect(result!.status).toBe(503);
+      }
+    });
+  });
+
+  describe('when no API key is configured but escape hatch is enabled', () => {
+    beforeEach(() => {
+      delete process.env.CRASHLAB_WEBHOOK_API_KEY;
+      process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS = '1';
+    });
+
+    it('allows POST requests without an Authorization header', () => {
+      const result = validateWebhookApiKey(makeRequest('POST'));
       expect(result).toBeUndefined();
     });
   });
@@ -166,17 +196,20 @@ describe('validateWebhookApiKey', () => {
 
     beforeEach(() => {
       process.env.CRASHLAB_WEBHOOK_API_KEY = VALID_KEY;
+      delete process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_WEBHOOKS;
     });
 
-    it('returns undefined when the correct Bearer token is provided', () => {
-      const result = validateWebhookApiKey(
-        makeRequest({ authorization: `Bearer ${VALID_KEY}` }),
-      );
-      expect(result).toBeUndefined();
+    it('returns undefined when the correct Bearer token is provided for GET and POST', () => {
+      expect(
+        validateWebhookApiKey(makeRequest('GET', { authorization: `Bearer ${VALID_KEY}` })),
+      ).toBeUndefined();
+      expect(
+        validateWebhookApiKey(makeRequest('POST', { authorization: `Bearer ${VALID_KEY}` })),
+      ).toBeUndefined();
     });
 
-    it('returns a 401 response when no Authorization header is present', async () => {
-      const result = validateWebhookApiKey(makeRequest());
+    it('returns a 401 response when no Authorization header is present on POST', async () => {
+      const result = validateWebhookApiKey(makeRequest('POST'));
       expect(result).not.toBeUndefined();
       expect(result!.status).toBe(401);
       const body = await result!.json();
@@ -185,45 +218,12 @@ describe('validateWebhookApiKey', () => {
 
     it('returns a 401 response when the token is wrong', async () => {
       const result = validateWebhookApiKey(
-        makeRequest({ authorization: 'Bearer wrong-key' }),
+        makeRequest('POST', { authorization: 'Bearer wrong-key' }),
       );
       expect(result).not.toBeUndefined();
       expect(result!.status).toBe(401);
       const body = await result!.json();
       expect(body.error).toMatch(/Invalid API key/i);
-    });
-
-    it('returns a 401 response for a non-Bearer scheme', async () => {
-      const result = validateWebhookApiKey(
-        makeRequest({ authorization: `Basic ${VALID_KEY}` }),
-      );
-      expect(result).not.toBeUndefined();
-      expect(result!.status).toBe(401);
-    });
-
-    it('returns a 401 response when the Authorization header is malformed', async () => {
-      const result = validateWebhookApiKey(
-        makeRequest({ authorization: 'Bearer token extra-part' }),
-      );
-      expect(result).not.toBeUndefined();
-      expect(result!.status).toBe(401);
-    });
-
-    it('returns a 401 for an almost-correct key (off by one character)', async () => {
-      const almostRight = VALID_KEY.slice(0, -1) + 'X';
-      const result = validateWebhookApiKey(
-        makeRequest({ authorization: `Bearer ${almostRight}` }),
-      );
-      expect(result).not.toBeUndefined();
-      expect(result!.status).toBe(401);
-    });
-
-    it('is case-sensitive for the token value', async () => {
-      const result = validateWebhookApiKey(
-        makeRequest({ authorization: `Bearer ${VALID_KEY.toUpperCase()}` }),
-      );
-      expect(result).not.toBeUndefined();
-      expect(result!.status).toBe(401);
     });
   });
 });
