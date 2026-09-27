@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import MarkdownPreview from './MarkdownPreview';
 import { triggerBrowserDownload } from './utils/browser-download';
+import { WidgetErrorBoundary } from '../components/WidgetErrorBoundary';
 
 interface ReportModalProps {
     isOpen: boolean;
@@ -73,7 +74,9 @@ export default function ReportModal({ isOpen, onClose, markdown, runId }: Report
 
                 {/* Body - Markdown Preview */}
                 <div className="flex-1 overflow-hidden p-6 md:p-8 bg-white dark:bg-zinc-950">
-                    <MarkdownPreview content={markdown} />
+                    <WidgetErrorBoundary title="Markdown Preview">
+                        <MarkdownPreview content={markdown} />
+                    </WidgetErrorBoundary>
                 </div>
 
                 {/* Footer - Actions */}

@@ -10,6 +10,8 @@ import { useRuns } from "../../hooks/useRuns";
 import { usePullToRefresh } from "../../hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "../../components/PullToRefreshIndicator";
 import DashboardSectionLayoutEditor from "../dashboard-section-layout-editor";
+import { WidgetErrorBoundary } from "../../components/WidgetErrorBoundary";
+import { useToast } from "../../components/Toast";
 import {
   DASHBOARD_LAYOUT_STORAGE_KEY,
   DEFAULT_DASHBOARD_LAYOUT,
@@ -51,6 +53,7 @@ function DashboardContent() {
     revalidateOnFocus: true,
     revalidateOnVisibility: true,
   });
+  const { notifyError } = useToast();
   const [layout, setLayout] = useState<DashboardSectionConfig[]>(DEFAULT_DASHBOARD_LAYOUT);
   const router = useRouter();
   const pathname = usePathname();
@@ -277,6 +280,7 @@ function DashboardContent() {
             const sectionContent: Record<DashboardSectionId, ReactNode> = {
               stats: (
                 <PageSection>
+                  <WidgetErrorBoundary title="Run Stats" onError={notifyError}>
                   <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-4 gap-3">
                     {[
                       { label: "Total", value: filteredRuns.length },
@@ -289,6 +293,7 @@ function DashboardContent() {
                       </ScaleFade>
                     ))}
                   </div>
+                  </WidgetErrorBoundary>
                 </PageSection>
               ),
               "widget-editor": (
@@ -371,11 +376,15 @@ function DashboardContent() {
           </StickyStack>
           <ScaleFade>
             <PageSection>
-              <RunHealthScoreWidget runs={filteredRuns} dataState={dataState} />
+              <WidgetErrorBoundary title="Run Health Score" onError={notifyError}>
+                <RunHealthScoreWidget runs={filteredRuns} dataState={dataState} />
+              </WidgetErrorBoundary>
             </PageSection>
 
             <PageSection>
-              <ResourceFeeInsightPanel runs={filteredRuns} dataState={dataState} />
+              <WidgetErrorBoundary title="Resource Fee Insights" onError={notifyError}>
+                <ResourceFeeInsightPanel runs={filteredRuns} dataState={dataState} />
+              </WidgetErrorBoundary>
             </PageSection>
 
             <PageSection>
