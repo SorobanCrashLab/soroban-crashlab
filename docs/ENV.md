@@ -253,6 +253,17 @@ These variables configure the fuzzer execution when running via the Rust CLI too
   - `nightly`: Balanced default for standard scheduled runs.
   - `deep`: High-intensity mutation suite for thorough verification.
 
+### Retention Sweep Configuration
+These variables configure the behavior of `crashlab retention sweep`:
+
+- `CRASHLAB_SWEEP_DRY_RUN`: Set to `1` or `true` (or pass `--dry-run`) to simulate pruning without deleting any directories or files.
+- `CRASHLAB_HEARTBEAT_TTL_SECS`: Heartbeat freshness window in seconds (or pass `--heartbeat-ttl <secs>`). Defaults to stale detector threshold (60s). Active runs with fresh heartbeats or locked advisory files are protected from deletion.
+- `CRASHLAB_SWEEP_GRACE_PERIOD_SECS`: Grace period in seconds (or pass `--grace-period <secs>`) between marking candidates and deletion.
+- `CRASHLAB_RETENTION_MAX_RUNS`: Maximum number of completed run directories to retain (default: 50).
+- `CRASHLAB_RETENTION_MAX_DAYS`: Maximum age in days before pruning completed run directories (default: 30).
+- `CRASHLAB_RETENTION_MAX_FAILURE_BUNDLES`: Maximum failure bundles to retain per run directory (default: 50).
+- `CRASHLAB_RETENTION_MAX_CHECKPOINTS`: Maximum checkpoints to retain per run directory (default: 10).
+
 ---
 
 ## Local Configuration Examples

@@ -1,18 +1,16 @@
 //! CrashLab CLI — campaign control helpers for operators.
 //!
 //! Run `crashlab run cancel <id>` to request cooperative cancellation for the
-//! campaign identified by `id`, `crashlab runs status <id>` to read the latest
-//! health snapshot a campaign wrote, `crashlab replay seed <bundle.json>` to
+//! campaign identified by `id`, `crashlab replay seed <bundle.json>` to
 //! replay one persisted seed bundle end to end, or `crashlab regression-suite <path>`
 //! to run all regression fixtures from a file or directory.
 
 use crashlab_core::{
-    RunId, cancel_marker_path, cancel_requested, default_state_dir, read_latest_health_snapshot,
-    replay_mismatch_message,
+    RunId, cancel_marker_path, cancel_requested, default_state_dir, replay_mismatch_message,
     replay_seed_bundle_path, replay_success_message, request_cancel_run,
     run_regression_suite_from_json,
-    HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
-    ArtifactStore, RunCheckpoint, CaseBundleDocument,
+    RetentionPolicy, RetentionRecord, LocalArtifactStore, ArtifactStore,
+    RunCheckpoint, CaseBundleDocument,
 };
 use std::fs;
 use std::path::Path;
@@ -87,28 +85,75 @@ fn main() {
             }
             list_runs();
         }
-        (Some("runs"), Some("status"), Some(id_str), flag)
-            if flag.is_none() || flag == Some("--json") =>
-        {
-            if args.next().is_some() {
-                print_usage();
-                std::process::exit(1);
+        (Some("retention"), Some("sweep"), extra1, extra2) => {
+            let mut remaining_args: Vec<String> = Vec::new();
+            if let Some(e1) = extra1 {
+                remaining_args.push(e1.to_string());
             }
-            let id: u64 = match id_str.parse() {
-                Ok(v) => v,
-                Err(_) => {
-                    eprintln!("invalid run id: {id_str}");
-                    std::process::exit(1);
+            if let Some(e2) = extra2 {
+                remaining_args.push(e2.to_string());
+            }
+            for rest in args {
+                remaining_args.push(rest);
+            }
+
+            let mut dry_run = std::env::var("CRASHLAB_SWEEP_DRY_RUN")
+                .map(|v| v == "1" || v == "true")
+                .unwrap_or(false);
+            let mut heartbeat_ttl_secs: Option<i64> = std::env::var("CRASHLAB_HEARTBEAT_TTL_SECS")
+                .ok()
+                .and_then(|v| v.parse().ok());
+            let mut grace_period_secs: i64 = std::env::var("CRASHLAB_SWEEP_GRACE_PERIOD_SECS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
+
+            let mut iter = remaining_args.into_iter();
+            while let Some(arg) = iter.next() {
+                match arg.as_str() {
+                    "--dry-run" => dry_run = true,
+                    "--heartbeat-ttl" => {
+                        if let Some(val) = iter.next() {
+                            match val.parse::<i64>() {
+                                Ok(v) => heartbeat_ttl_secs = Some(v),
+                                Err(_) => {
+                                    eprintln!("invalid heartbeat-ttl value: {val}");
+                                    std::process::exit(1);
+                                }
+                            }
+                        } else {
+                            eprintln!("missing value for --heartbeat-ttl");
+                            std::process::exit(1);
+                        }
+                    }
+                    "--grace-period" => {
+                        if let Some(val) = iter.next() {
+                            match val.parse::<i64>() {
+                                Ok(v) => grace_period_secs = v,
+                                Err(_) => {
+                                    eprintln!("invalid grace-period value: {val}");
+                                    std::process::exit(1);
+                                }
+                            }
+                        } else {
+                            eprintln!("missing value for --grace-period");
+                            std::process::exit(1);
+                        }
+                    }
+                    _ => {
+                        print_usage();
+                        std::process::exit(1);
+                    }
                 }
-            };
-            report_run_status(id, flag == Some("--json"));
-        }
-        (Some("retention"), Some("sweep"), None, None) => {
-            if args.next().is_some() {
-                print_usage();
-                std::process::exit(1);
             }
-            sweep_retention();
+
+            let mut policy = RetentionPolicy::default();
+            if let Some(ttl) = heartbeat_ttl_secs {
+                policy.heartbeat_ttl = Some(chrono::Duration::seconds(ttl));
+            }
+            policy.sweep_grace_period = chrono::Duration::seconds(grace_period_secs);
+
+            sweep_retention(&policy, dry_run);
         }
         _ => {
             print_usage();
@@ -121,10 +166,9 @@ fn print_usage() {
     eprintln!(
         "usage: crashlab run cancel <id>\n\
                 crashlab runs list\n\
-                crashlab runs status <id> [--json]\n\
                 crashlab replay seed <bundle-json-path>\n\
                 crashlab regression-suite <suite-json-path-or-directory>\n\
-                crashlab retention sweep"
+                crashlab retention sweep [--dry-run] [--heartbeat-ttl <secs>] [--grace-period <secs>]"
     );
 }
 
@@ -159,102 +203,6 @@ fn list_runs() {
             "active"
         };
         println!("{id}\t{status}");
-    }
-}
-
-/// Prints the latest health snapshot a campaign wrote for `id`.
-fn report_run_status(id: u64, as_json: bool) {
-    let base = default_state_dir();
-    let run_id = RunId(id);
-
-    match read_latest_health_snapshot(run_id, &base) {
-        Ok(Some(snapshot)) => {
-            if as_json {
-                // The raw line, so the web SSE route reads exactly what the
-                // campaign wrote.
-                match snapshot.to_json_line() {
-                    Ok(line) => print!("{line}"),
-                    Err(e) => {
-                        eprintln!("failed to serialize health snapshot for run {id}: {e}");
-                        std::process::exit(1);
-                    }
-                }
-            } else {
-                print_snapshot_summary(&snapshot);
-            }
-        }
-        // A run without snapshots has not started, or ran before snapshots
-        // existed. That is a normal state, not a failure.
-        Ok(None) => {
-            if as_json {
-                println!("null");
-            } else {
-                println!("no health snapshot for run {id}");
-            }
-        }
-        Err(e) => {
-            eprintln!("failed to read health snapshot for run {id}: {e}");
-            std::process::exit(1);
-        }
-    }
-}
-
-fn print_snapshot_summary(snapshot: &HealthSnapshot) {
-    println!(
-        "run {}: {}",
-        snapshot.run_id,
-        health_status_label(&snapshot.status)
-    );
-
-    if let Some(campaign_id) = &snapshot.campaign_id {
-        println!("  campaign: {campaign_id}");
-    }
-    if let Some(terminal) = &snapshot.terminal {
-        println!("  terminal: {terminal}");
-    }
-    println!(
-        "  snapshot: #{} emitted {}",
-        snapshot.sequence, snapshot.emitted_at
-    );
-    println!(
-        "  seeds: {}/{} processed, {} remaining",
-        snapshot.budget.processed_seeds,
-        snapshot.budget.total_seeds,
-        snapshot.budget.remaining_seeds
-    );
-    println!(
-        "  throughput: {:.2} seeds/sec over {:.2}s",
-        snapshot.throughput.cases_per_second, snapshot.throughput.elapsed_secs
-    );
-    println!(
-        "  failures: {} total, {} distinct class(es), rate {:.4}",
-        snapshot.failures.total_failures,
-        snapshot.failures.unique_signatures,
-        snapshot.failures.failure_rate
-    );
-
-    if snapshot.failure_classes.is_empty() {
-        println!("    (no classified failures)");
-    } else {
-        for (class, count) in &snapshot.failure_classes {
-            println!("    {class}: {count}");
-        }
-    }
-
-    println!(
-        "  queue: {} pending, {} in progress, capacity {} ({:.1}%)",
-        snapshot.queue.pending,
-        snapshot.queue.in_progress,
-        snapshot.queue.capacity,
-        snapshot.queue.utilization * 100.0
-    );
-}
-
-fn health_status_label(status: &HealthStatus) -> &'static str {
-    match status {
-        HealthStatus::Healthy => "healthy",
-        HealthStatus::Degraded => "degraded",
-        HealthStatus::Unhealthy => "unhealthy",
     }
 }
 
@@ -368,9 +316,8 @@ fn load_fixtures_from_directory(dir: &Path) -> Result<Vec<u8>, String> {
     serde_json::to_vec(&scenarios).map_err(|e| format!("failed to serialize scenarios: {}", e))
 }
 
-fn sweep_retention() {
+fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
     let base = default_state_dir();
-    let policy = RetentionPolicy::default();
     let now = chrono::Utc::now();
 
     // 1. Sweep failure bundles (artifacts)
@@ -424,6 +371,10 @@ fn sweep_retention() {
     for (i, &keep) in bundles_keep.iter().enumerate() {
         if !keep {
             let id = &artifact_ids[i];
+            if dry_run {
+                println!("[retention] (dry-run) would prune failure bundle: {id}");
+                continue;
+            }
             match store.delete_artifact(id) {
                 Ok(()) => {
                     println!("pruned old failure bundle: {id}");
@@ -484,6 +435,96 @@ fn sweep_retention() {
     for (i, &keep) in checkpoints_keep.iter().enumerate() {
         if !keep {
             let dir = &run_dirs[i];
+            let checkpoint_created_at = checkpoint_records[i].created_at;
+
+            // Live Heartbeat check: refuse deletion if heartbeat is fresh within TTL
+            let heartbeat_ttl = policy.heartbeat_ttl.unwrap_or_else(|| chrono::Duration::seconds(60));
+            let heartbeat = crashlab_core::stale_detector::read_heartbeat(dir);
+            let has_live_heartbeat = crashlab_core::stale_detector::is_heartbeat_alive(dir, heartbeat_ttl, now);
+
+            let heartbeat_desc = match &heartbeat {
+                Some(hb) => {
+                    let age = now.signed_duration_since(hb.timestamp).num_seconds();
+                    format!("timestamp={}, age={}s", hb.timestamp.to_rfc3339(), age)
+                }
+                None => "none".to_string(),
+            };
+
+            println!(
+                "[retention] evaluating candidate run directory {}: checkpoint_mtime={}, heartbeat={}",
+                dir.display(),
+                checkpoint_created_at.to_rfc3339(),
+                heartbeat_desc
+            );
+
+            if has_live_heartbeat {
+                println!(
+                    "[retention] skipping active run directory {}: live heartbeat detected ({})",
+                    dir.display(),
+                    heartbeat_desc
+                );
+                continue;
+            }
+
+            // Advisory Lock check: refuse deletion if active worker holds lock
+            let _lock = match crashlab_core::stale_detector::RunDirLock::try_acquire(dir) {
+                Ok(Some(l)) => l,
+                Ok(None) => {
+                    println!(
+                        "[retention] skipping locked run directory {}: advisory lock held by active worker",
+                        dir.display()
+                    );
+                    continue;
+                }
+                Err(e) => {
+                    eprintln!("warning: failed to acquire advisory lock for {}: {}", dir.display(), e);
+                    continue;
+                }
+            };
+
+            // Two-phase sweep: mark -> grace period -> delete
+            let mark_path = dir.join(crashlab_core::stale_detector::SWEEP_MARK_FILE_NAME);
+            if policy.sweep_grace_period > chrono::Duration::zero() {
+                if !mark_path.exists() {
+                    let mark_content = format!(
+                        "marked_at={}\ncheckpoint_mtime={}\nheartbeat={}\n",
+                        now.to_rfc3339(),
+                        checkpoint_created_at.to_rfc3339(),
+                        heartbeat_desc
+                    );
+                    if let Err(e) = fs::write(&mark_path, mark_content) {
+                        eprintln!("warning: failed to write sweep mark file at {}: {}", mark_path.display(), e);
+                    } else {
+                        println!(
+                            "[retention] marked candidate run directory for deletion: {} (grace period: {}s)",
+                            dir.display(),
+                            policy.sweep_grace_period.num_seconds()
+                        );
+                    }
+                    continue;
+                } else if let Ok(meta) = fs::metadata(&mark_path) {
+                    if let Ok(mtime) = meta.modified() {
+                        let dur = mtime.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+                        let marked_at = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH + dur);
+                        let elapsed = now.signed_duration_since(marked_at);
+                        if elapsed < policy.sweep_grace_period {
+                            println!(
+                                "[retention] candidate run directory {} is still within grace period ({}s / {}s)",
+                                dir.display(),
+                                elapsed.num_seconds(),
+                                policy.sweep_grace_period.num_seconds()
+                            );
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            if dry_run {
+                println!("[retention] (dry-run) would prune run directory: {}", dir.display());
+                continue;
+            }
+
             match fs::remove_dir_all(dir) {
                 Ok(()) => {
                     println!("pruned old run checkpoint directory: {}", dir.display());

@@ -150,14 +150,14 @@ mod threat_model_tests {
 
     #[test]
     fn t2_seed_schema_rejects_empty_payload() {
-        let schema = SeedSchema::default();
+        let schema = SeedSchema::strict();
         let empty = CaseSeed {
             id: 1,
             payload: vec![],
         };
 
         let result = empty.validate(&schema);
-        assert!(result.is_err(), "empty payload should fail validation");
+        assert!(result.is_err(), "empty payload should fail validation with strict schema");
         
         let errors = result.unwrap_err();
         assert!(errors.iter().any(|e| matches!(e, SeedValidationError::PayloadTooShort { .. })),

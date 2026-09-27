@@ -4,6 +4,11 @@ use crate::CaseSeed;
 ///
 /// Ensures seeds meet the technical requirements of the Soroban CrashLab
 /// fuzzer, such as payload size limits and ID ranges.
+///
+/// By default, zero-length payloads (`min_payload_len: 0`) are allowed to
+/// treat empty input payloads as first-class failure cases (e.g. [`EmptyInput`](crate::FailureClass::EmptyInput)).
+/// Callers needing to reject empty payloads can configure custom bounds using
+/// [`SeedSchema::with_payload_bounds`] or [`SeedSchema::strict`].
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SeedSchema {
     pub min_payload_len: usize,
@@ -17,7 +22,7 @@ pub struct SeedSchema {
 impl Default for SeedSchema {
     fn default() -> Self {
         Self {
-            min_payload_len: 1,
+            min_payload_len: 0,
             max_payload_len: 64,
             min_id: 0,
             max_id: u64::MAX,
@@ -180,12 +185,21 @@ mod tests {
     }
 
     #[test]
-    fn default_schema_rejects_empty_payload() {
+    fn default_schema_accepts_empty_payload() {
         let seed = CaseSeed {
             id: 1,
             payload: vec![],
         };
-        let result = seed.validate(&SeedSchema::default());
+        assert!(seed.validate(&SeedSchema::default()).is_ok());
+    }
+
+    #[test]
+    fn strict_schema_rejects_empty_payload() {
+        let seed = CaseSeed {
+            id: 1,
+            payload: vec![],
+        };
+        let result = seed.validate(&SeedSchema::strict());
         assert!(result.is_err());
         let errors = result.unwrap_err();
         assert!(errors.contains(&SeedValidationError::PayloadTooShort {
@@ -221,10 +235,10 @@ mod tests {
 
     #[test]
     fn validate_seeds_returns_error_details() {
-        let schema = SeedSchema::default();
+        let schema = SeedSchema::with_payload_bounds(1, 64);
         let seeds = vec![
             CaseSeed { id: 1, payload: vec![1] },
-            CaseSeed { id: 2, payload: vec![] }, // Invalid
+            CaseSeed { id: 2, payload: vec![] }, // Invalid for min_payload_len: 1
         ];
         let result = validate_seeds(&seeds, &schema);
         assert!(result.is_err());

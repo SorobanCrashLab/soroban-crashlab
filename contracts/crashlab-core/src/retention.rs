@@ -36,6 +36,10 @@ pub struct RetentionPolicy {
     pub checkpoint_retention_window: Option<Duration>,
     /// Number of newest failures to pin even when outside the retention window.
     pub keep_latest_failures: usize,
+    /// Maximum age for run heartbeats before considering a run directory abandoned (default: 60s).
+    pub heartbeat_ttl: Option<Duration>,
+    /// Grace period between marking a candidate and actual deletion in two-phase sweep.
+    pub sweep_grace_period: Duration,
 }
 
 impl Default for RetentionPolicy {
@@ -46,6 +50,8 @@ impl Default for RetentionPolicy {
             failure_retention_window: Some(Duration::days(30)),
             checkpoint_retention_window: Some(Duration::days(14)),
             keep_latest_failures: 10,
+            heartbeat_ttl: Some(Duration::seconds(60)),
+            sweep_grace_period: Duration::zero(),
         }
     }
 }
@@ -246,6 +252,8 @@ mod tests {
             failure_retention_window: None,
             checkpoint_retention_window: None,
             keep_latest_failures: 0,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
         };
 
         let bundles = vec![
@@ -266,6 +274,8 @@ mod tests {
             failure_retention_window: None,
             checkpoint_retention_window: None,
             keep_latest_failures: 0,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
         };
 
         let checkpoints = vec![
@@ -287,6 +297,8 @@ mod tests {
             failure_retention_window: Some(Duration::days(7)),
             checkpoint_retention_window: Some(Duration::days(7)),
             keep_latest_failures: 2,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
         };
 
         let bundles = vec![
@@ -308,6 +320,8 @@ mod tests {
             failure_retention_window: Some(Duration::days(90)),
             checkpoint_retention_window: Some(Duration::days(7)),
             keep_latest_failures: 1,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
         };
 
         let bundles = vec![
@@ -329,6 +343,8 @@ mod tests {
             failure_retention_window: Some(Duration::days(30)),
             checkpoint_retention_window: Some(Duration::days(2)),
             keep_latest_failures: 1,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
         };
 
         let checkpoints = vec![
@@ -348,5 +364,7 @@ mod tests {
         assert_eq!(policy.failure_retention_window, Some(Duration::days(30)));
         assert_eq!(policy.checkpoint_retention_window, Some(Duration::days(14)));
         assert_eq!(policy.keep_latest_failures, 10);
+        assert_eq!(policy.heartbeat_ttl, Some(Duration::seconds(60)));
+        assert_eq!(policy.sweep_grace_period, Duration::zero());
     }
 }
