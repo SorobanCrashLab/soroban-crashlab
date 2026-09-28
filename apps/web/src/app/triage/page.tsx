@@ -37,6 +37,8 @@ import {
 } from "./triage-swimlane-layout";
 import { triageSwimlaneStore } from "../../lib/storage-registry";
 import { toUserMessage } from "../../lib/api-error-mapper";
+import { WidgetErrorBoundary } from "../../components/WidgetErrorBoundary";
+import { useToast } from "../../components/Toast";
 
 // ---------------------------------------------------------------------------
 // Data fetching
@@ -337,6 +339,7 @@ export default function TriageBoardPage() {
   const [activeFilter, setActiveFilter] = useState<TriageFilter>("all");
   const [swimlane, setSwimlane] = useState(DEFAULT_SWIMLANE_CONFIG);
   const filterButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const { notifyError } = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -585,8 +588,12 @@ export default function TriageBoardPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6" role="region" aria-label="Triage board - one tab stop, arrows navigate, Space lifts/drops, Escape cancels">
             {visibleColumns.map((col) => (
-            <TriageColumn
+            <WidgetErrorBoundary
               key={col.id}
+              title={`${col.title} column`}
+              onError={notifyError}
+            >
+            <TriageColumn
               col={col}
               runs={getColumnRuns(runs, col)}
               kbState={kbStateForBoard}
@@ -594,6 +601,7 @@ export default function TriageBoardPage() {
               onKeyNav={handleKeyNav}
               firstBoardId={firstBoardId}
             />
+            </WidgetErrorBoundary>
             ))}
           </div>
         </>
