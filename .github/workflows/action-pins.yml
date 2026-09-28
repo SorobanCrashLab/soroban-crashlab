@@ -1,0 +1,45 @@
+name: Action Pins
+
+# Validates the structure of the action pins in .github/workflows/*.yml.
+#
+# Every SHA pin in these workflows was fabricated, so each affected workflow
+# failed at "Prepare all required actions" and never ran a step. Nine of
+# thirteen workflows were affected; `main` reported 6 of 8 checks red, and the
+# only check that passed was the `ci.yml` placeholder that always passes.
+#
+# This gate catches the two shapes a fabricated pin reliably takes, offline and
+# without a token:
+#
+#   1. a ref that is not exactly 40 hex characters (one pin was 41), and
+#   2. one SHA pinned to two or more different actions (five actions shared a
+#      single placeholder), which is impossible for real releases.
+#
+# It cannot confirm a SHA *exists* — that needs the GitHub API. Fixing the
+# pins is what un-breaks the workflows; this only stops a bad pin from landing
+# again. See the related issue for the repair itself.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: action-pins-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  action-pins:
+    name: Check action pins are well-formed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Check every action pin is a single-action 40-character SHA
+        run: bash scripts/check-action-pins.sh
