@@ -1,8 +1,43 @@
 version: 2
+
+# Dependabot version updates are currently disabled: both ecosystems carry
+# `open-pull-requests-limit: 0`, set deliberately in 2252204 ("Retire CI gates
+# and disable Dependabot version updates"). The `groups` blocks below are inert
+# while that limit stands — they describe how updates should be batched on the
+# day the limit is raised, so that re-enabling does not open one PR per patch.
+#
+# The four dependabot PRs this replaces (#1535–#1538) are all closed, and the
+# `mergeability-bot.yml` workflow they referenced no longer exists. See #1683.
 updates:
+  # Patch and minor bumps are mechanical and low-risk; batching them keeps the
+  # PR list reviewable. A major bump stays on its own because it is the case
+  # that needs a human read: github-script 7→9 changes the Node runtime and the
+  # inline mergeability script's `require` behaviour, and stale 9→11 changes
+  # the options schema. Separating minors from patches keeps an unrelated
+  # transitive bump from riding along inside a major's diff.
   - package-ecosystem: "npm"
     directory: "/"
     open-pull-requests-limit: 0
+    groups:
+      npm-minor:
+        update-types:
+          - "minor"
+          - "patch"
+      # Lockfile churn and metadata-only updates belong with the bump that
+      # caused them, not in a PR of their own.
+      npm-lockfile:
+        patterns:
+          - "*"
+        dependency-type: "indirect"
+        update-types:
+          - "minor"
+          - "patch"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     open-pull-requests-limit: 0
+    groups:
+      actions-minor:
+        update-types:
+          - "minor"
+          - "patch"

@@ -220,6 +220,12 @@ const valid = await verifyWebhookSignature(
 if (!valid) throw new Error("Invalid or expired webhook signature");
 ```
 
+**Building the receiving side?** [WEBHOOKS.md](WEBHOOKS.md) is the consumer
+cookbook: the exact string that is signed, constant-time verification snippets
+for Node, Python and Rust, the retry and dead-letter semantics a receiver has
+to design for, the payload schema, and a runnable local receiver for debugging
+signature handling.
+
 ---
 
 ## Issue Trackers
