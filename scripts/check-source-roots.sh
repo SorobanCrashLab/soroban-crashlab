@@ -31,9 +31,15 @@ is_allowed() {
 
 # Only tracked files matter. Untracked scratch files are the developer's
 # business until someone adds them to the repository.
+#
+# A path staged for deletion is still listed by `ls-files --cached` until the
+# commit lands, so those are skipped: this check must not flag the very
+# deletion it exists to accompany. Testing the working tree is enough to tell
+# them apart, and needs no extra git plumbing.
 stray_sources="$(
   git ls-files --cached -- '*.ts' '*.tsx' '*.mts' '*.cts' |
     while IFS= read -r file; do
+      [[ -e "$file" ]] || continue
       is_allowed "$file" || printf '%s\n' "$file"
     done
 )"
