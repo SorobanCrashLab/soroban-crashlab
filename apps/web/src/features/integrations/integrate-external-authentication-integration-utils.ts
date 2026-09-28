@@ -1,9 +1,9 @@
-import type { SorobanAuthMode } from '../types';
-import { absoluteShort } from './utils/datetime';
+import type { SorobanAuthMode } from '../../types/index';
+import { absoluteShort } from '../../app/utils/datetime';
 
 // Re-exported from the shared contract-types module (../types) for backward
 // compatibility — single source of truth lives in src/types/contracts.ts.
-export type { SorobanAuthMode } from '../types';
+export type { SorobanAuthMode } from '../../types/index';
 
 export type AuthProviderType = 'stellar-wallet' | 'oauth' | 'api-key';
 export type AuthProviderStatus = 'disconnected' | 'connecting' | 'connected' | 'error';

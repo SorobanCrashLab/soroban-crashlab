@@ -39,19 +39,29 @@ const markdownComponents: Components = {
             {children}
         </li>
     ),
-    // The `Components` type automatically infers `node`, `inline`, `className`, and `children` 
-    // without requiring explicit inline assertions or `any`.
-    code: ({ node, inline, className, children, ...props }) => {
-        return !inline ? (
+    // react-markdown v10 no longer passes an `inline` flag to the `code`
+    // component, so block code is identified by its language class or by
+    // spanning more than one line. `pre` is collapsed to a fragment to avoid
+    // nesting two <pre> elements (same pattern as TemplateMarkdownPreview).
+    pre: ({ children }) => <>{children}</>,
+    code: ({ className, children, ...props }) => {
+        const text = String(children ?? '');
+        const isBlock = (className ?? '').includes('language-') || text.includes('\n');
+
+        if (!isBlock) {
+            return (
+                <code className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-blue-600 dark:text-blue-400 font-mono text-xs" {...props}>
+                    {children}
+                </code>
+            );
+        }
+
+        return (
             <pre className="bg-zinc-950 dark:bg-black p-4 rounded-lg overflow-x-auto my-4 border border-zinc-800 shadow-lg">
                 <code className={`${className} text-xs text-blue-400 font-mono`} {...props}>
                     {children}
                 </code>
             </pre>
-        ) : (
-            <code className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-blue-600 dark:text-blue-400 font-mono text-xs" {...props}>
-                {children}
-            </code>
         );
     },
     strong: ({ children }) => (

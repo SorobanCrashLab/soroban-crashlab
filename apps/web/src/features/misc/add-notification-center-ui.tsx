@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { loadPreferences, filterByPreferences } from './notification-preferences-utils';
-import type { NotificationType, NotificationPriority } from './notification-preferences-utils';
+import { loadPreferences, filterByPreferences } from '../../app/notification-preferences-utils';
+import type { NotificationType, NotificationPriority } from '../../app/notification-preferences-utils';
 import {
   mergeNotificationFeed,
   pruneDismissedIds,
-} from './notification-feed-utils';
+} from '../../app/notification-feed-utils';
 import {
   loadReadState,
   mergeReadState,
@@ -16,10 +16,10 @@ import {
   isNotificationRead,
   subscribeToReadStateChanges,
   type ReadState,
-} from './notification-read-state-utils';
-import { api, type NotificationFeedItem } from '../lib/api-client';
-import { NOTIFICATION_POLL_INTERVAL_MS } from '../lib/timeouts';
-import { relative } from './utils/datetime';
+} from '../../app/notification-read-state-utils';
+import { api, type NotificationFeedItem } from '../../lib/api-client';
+import { NOTIFICATION_POLL_INTERVAL_MS } from '../../lib/timeouts';
+import { relative } from '../../app/utils/datetime';
 
 export type { NotificationType, NotificationPriority };
 

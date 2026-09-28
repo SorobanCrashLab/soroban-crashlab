@@ -8,7 +8,7 @@ import { triageSwimlaneStore } from '../../../lib/storage-registry';
 import { parseSwimlaneConfig, DEFAULT_SWIMLANE_CONFIG } from '../triage-swimlane-layout';
 
 const ImplementRunWorkflowBoardPage58 = dynamic(
-  () => import('../../implement-run-workflow-board-page-58'),
+  () => import('../../../features/runs/implement-run-workflow-board-page-58'),
   { ssr: false },
 );
 

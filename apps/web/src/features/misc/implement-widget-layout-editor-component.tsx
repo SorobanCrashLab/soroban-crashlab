@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { useMaintainerMode } from './useMaintainerMode';
-import { createMeasuredResizer } from '../lib/createMeasuredResizer';
+import { useMaintainerMode } from '../../app/useMaintainerMode';
+import { createMeasuredResizer } from '../../lib/createMeasuredResizer';
 import {
   loadWidgetLayoutForProfile,
   readActiveWidgetLayoutProfileId,
   saveWidgetLayoutForProfile,
   writeActiveWidgetLayoutProfileId,
-} from './widget-layout-profile-utils';
+} from '../../app/widget-layout-profile-utils';
 import { getColumnCountForWidth, clampLayoutForTier } from '@/lib/widget-grid';
 
-import { logger } from '../lib/logger';
+import { logger } from '../../lib/logger';
 
 // Widget types and interfaces
 export interface Widget {

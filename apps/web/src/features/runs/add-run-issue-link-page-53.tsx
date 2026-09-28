@@ -1,4 +1,4 @@
-import type { RunIssueLink } from './types';
+import type { RunIssueLink } from '../../app/types';
 
 interface RunIssueLinkPage53Props {
     issues: RunIssueLink[];

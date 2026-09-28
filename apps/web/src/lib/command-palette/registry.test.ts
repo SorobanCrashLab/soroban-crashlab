@@ -104,4 +104,18 @@ describe('command registry search', () => {
 
     expect(results).toEqual([]);
   });
+
+  it('listEntries exposes a read-only snapshot of registered static entries', () => {
+    const registry = createCommandRegistry();
+    registry.registerEntries([entry('a', 'Toggle theme'), entry('b', 'Toggle maintainer mode')]);
+
+    expect(registry.listEntries().map((e) => e.id).sort()).toEqual(['a', 'b']);
+
+    // Providers are query-driven and not part of the snapshot.
+    registry.registerProvider({
+      id: 'test-provider',
+      suggest: async () => [entry('run-y', 'Run Y details')],
+    });
+    expect(registry.listEntries().map((e) => e.id).sort()).toEqual(['a', 'b']);
+  });
 });

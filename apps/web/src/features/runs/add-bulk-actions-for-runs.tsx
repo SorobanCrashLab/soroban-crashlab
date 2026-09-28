@@ -2,14 +2,14 @@
 
 import * as React from 'react';
 import { useState, useCallback } from 'react';
-import { FuzzingRun } from './types';
+import { FuzzingRun } from '../../app/types';
 import {
   canPerformBulkAction,
   getBulkActionDescription,
   type BulkActionType,
-} from './runs-bulk-actions-utils';
-import ConfirmDialog from '../components/ConfirmDialog';
-import { getConfirmDialogConfig } from '../components/confirm-dialog-utils';
+} from '../../app/runs-bulk-actions-utils';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { getConfirmDialogConfig } from '../../components/confirm-dialog-utils';
 
 export type BulkAction = BulkActionType;
 

@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { LoadingSpinner } from '../../components/LoadingSkeleton';
 
 const CreateSavedFilterPresetsPage = dynamic(
-  () => import('../create-saved-filter-presets-page'),
+  () => import('../../features/misc/create-saved-filter-presets-page'),
   { loading: () => <LoadingSpinner /> },
 );
 

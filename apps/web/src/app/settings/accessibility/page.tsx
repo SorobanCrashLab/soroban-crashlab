@@ -12,7 +12,7 @@ import { useAccessibility } from '../../../components/AccessibilityProvider';
 import type { ContrastPref, MotionPref, TextScale } from '../../../lib/accessibility-prefs';
 
 const AddAccessibleKeyboardNavBlueprintPage49 = dynamic(
-  () => import('../../add-accessible-keyboard-nav-blueprint-page-49'),
+  () => import('../../../features/misc/add-accessible-keyboard-nav-blueprint-page-49'),
   { loading: () => <LoadingSpinner /> },
 );
 

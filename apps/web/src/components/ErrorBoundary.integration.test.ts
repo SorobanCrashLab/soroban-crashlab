@@ -30,6 +30,25 @@ function SafeChild({ label = 'ok' }: { label?: string }) {
 }
 
 /**
+ * Call a function-component element's render function to expand it into the
+ * element tree it produces. Class components cannot be "called" like this, so
+ * callers must check `typeof node.type === 'function'` first (which excludes
+ * string hosts but not class components); a class component simply keeps its
+ * original element, which is fine for tree walking.
+ */
+function expandFunctionComponent(node: React.ReactElement): React.ReactNode {
+  const type = node.type as unknown as (props: unknown) => React.ReactNode;
+  return type(node.props);
+}
+
+/** Props of an arbitrary element, with `children` surfaced for tree walking. */
+function elementProps(
+  node: React.ReactElement,
+): { children?: React.ReactNode } & Record<string, unknown> {
+  return node.props as { children?: React.ReactNode } & Record<string, unknown>;
+}
+
+/**
  * Walk a React element tree and return whether it contains the given text.
  * Expands function-component elements by calling the component.
  */
@@ -43,21 +62,18 @@ function elementTreeContainsText(
   if (!React.isValidElement(el)) return false;
 
   // If the element type is a function component, expand it first.
-   
-  let node: React.ReactElement = el as any;
+  let node: React.ReactElement = el as React.ReactElement;
   while (typeof node.type === 'function') {
-     
-    const expanded = (node.type as any)(node.props);
+    const expanded = expandFunctionComponent(node);
     if (!React.isValidElement(expanded)) {
       return elementTreeContainsText(expanded, text);
     }
     node = expanded;
   }
 
-  // Access props via any cast to avoid strict React type issues.
-   
-  const props = node.props as any;
-  if (props?.children) {
+  // If it's a class component, walk the props of the unexpanded element.
+  const props = elementProps(node);
+  if (props.children) {
     const kids: React.ReactNode[] = Array.isArray(props.children)
       ? props.children
       : [props.children];
@@ -80,23 +96,20 @@ function findElementByClass(
   if (!React.isValidElement(el)) return null;
 
   // If the element type is a function component, expand it first.
-   
-  let node: React.ReactElement = el as any;
+  let node: React.ReactElement = el as React.ReactElement;
   while (typeof node.type === 'function') {
-     
-    const expanded = (node.type as any)(node.props);
+    const expanded = expandFunctionComponent(node);
     if (!React.isValidElement(expanded)) {
       return expanded != null ? null : null; // primitive or null
     }
     node = expanded;
   }
 
-  // Access props via any cast to avoid strict React type issues.
-   
-  const props = node.props as any;
-  if (props?.className === className) return node;
+  // If it's a class component, walk the props of the unexpanded element.
+  const props = elementProps(node);
+  if (props.className === className) return node;
 
-  if (props?.children) {
+  if (props.children) {
     const kids: React.ReactNode[] = Array.isArray(props.children)
       ? props.children
       : [props.children];

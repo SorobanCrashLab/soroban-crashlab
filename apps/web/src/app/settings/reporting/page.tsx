@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { LoadingSpinner } from '../../../components/LoadingSkeleton';
 
 const CreateReportingTemplatesPage60 = dynamic(
-  () => import('../../create-reporting-templates-page-60'),
+  () => import('../../../features/analytics/create-reporting-templates-page-60'),
   { loading: () => <LoadingSpinner /> },
 );
 

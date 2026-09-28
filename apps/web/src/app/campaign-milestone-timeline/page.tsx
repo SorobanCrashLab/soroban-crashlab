@@ -1,6 +1,6 @@
 'use client';
 
-import CampaignMilestoneTimelineVisualizer from "../add-campaign-milestone-timeline-visualizer";
+import CampaignMilestoneTimelineVisualizer from "../../features/misc/add-campaign-milestone-timeline-visualizer";
 import { mockMilestoneEvents } from "../campaign-milestone-mock-data";
 
 export default function CampaignMilestoneTimelinePage() {

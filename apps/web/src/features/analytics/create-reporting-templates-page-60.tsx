@@ -1,14 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import TemplateMarkdownPreview from './settings/reporting/TemplateMarkdownPreview';
-import type { PreviewMode } from './settings/reporting/template-preview-utils';
+import TemplateMarkdownPreview from '../../app/settings/reporting/TemplateMarkdownPreview';
+import type { PreviewMode } from '../../app/settings/reporting/template-preview-utils';
 import {
   addVersion,
   getVersionsForTemplate,
   type TemplateVersion,
-} from './reporting-templates-version-history-utils';
-import { safeStorage } from "../lib/local-storage";
+} from '../../app/reporting-templates-version-history-utils';
+import { safeStorage } from "../../lib/local-storage";
 
 type ReportingTemplateKind = 'issue' | 'pr';
 

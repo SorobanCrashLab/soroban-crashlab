@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { simulateSeedReplay } from "./replay";
-import { getReplayButtonLabel, ReplayButtonStatus } from "./replay-ui-utils";
+import { simulateSeedReplay } from "../../app/replay";
+import { getReplayButtonLabel, ReplayButtonStatus } from "../../app/replay-ui-utils";
 import {
   buildReplayHistoryEntryFromReplay,
   recordRunReplayHistoryEntry,
-} from "./add-run-replay-history-with-timestamps";
-import OperationProgressIndicator from "../components/OperationProgressIndicator";
+} from "../runs/add-run-replay-history-with-timestamps";
+import OperationProgressIndicator from "../../components/OperationProgressIndicator";
 
 interface AddReplayFromUiActionProps {
   /** Run ID to replay */

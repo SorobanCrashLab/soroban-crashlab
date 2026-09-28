@@ -195,6 +195,9 @@ function runHook(options: UseFocusTrapOptions) {
   // Run prior cleanups
   currentCleanups.forEach((c) => c());
   currentCleanups = [];
+  // The hook is deliberately invoked with a mocked `react` (see vi.mock above)
+  // to exercise its effect lifecycle outside a real component render.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   useFocusTrap(options);
 }
 

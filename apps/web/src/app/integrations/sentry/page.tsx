@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
 const IntegrateSentryIntegrationForCrashReporting = dynamic(
-  () => import('../../integrate-sentry-integration-for-crash-reporting'),
+  () => import('../../../features/integrations/integrate-sentry-integration-for-crash-reporting'),
   { loading: () => <IntegrationPageSkeleton /> },
 );
 

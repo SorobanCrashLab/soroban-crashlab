@@ -16,7 +16,7 @@ import { S3StorageDriver } from './s3-driver';
 import { InMemoryRunDriver } from './in-memory-run-driver';
 import { KVRunDriver, type RedisClient } from './kv-run-driver';
 import { runRunDriverContract, type RunDriverHarness } from './run-driver-contract';
-import { runStorageDriverContract, type ContractHarness } from './driver-contract';
+import type { ContractHarness } from './driver-contract';
 import {
   DEFAULT_TICKET_TTL_SECONDS,
   StorageError,

@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import type { Report } from "./add-report-generator";
+import type { Report } from "../features/misc/add-report-generator";
 import {
   generateReportToken,
   storeReportForSharing,

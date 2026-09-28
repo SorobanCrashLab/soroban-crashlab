@@ -1,12 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { fetchRuns } from '../lib/api-client';
-import { FuzzingRun } from './types';
-import { fuzzySearch, getSearchableFieldLabels, type FuzzySearchResult } from './fuzzy-search-utils';
-import { searchRuns, usesGrammar } from './search/grammar/compiler';
-import { caretLine, type QueryError } from './search/grammar/lexer';
-import { suggestFields } from './search/grammar/fields';
+import { fetchRuns } from '../../lib/api-client';
+import { FuzzingRun } from '../../app/types';
+import { fuzzySearch, getSearchableFieldLabels, type FuzzySearchResult } from '../../app/fuzzy-search-utils';
+import { searchRuns, usesGrammar } from '../../app/search/grammar/compiler';
+import { caretLine, type QueryError } from '../../app/search/grammar/lexer';
+import { suggestFields } from '../../app/search/grammar/fields';
 
 type PageState = 'loading' | 'success' | 'error';
 

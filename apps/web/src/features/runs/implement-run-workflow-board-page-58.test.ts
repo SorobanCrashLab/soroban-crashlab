@@ -9,7 +9,7 @@
  * - Run grouping by workflow state
  */
 
-import { FuzzingRun, RunStatus } from './types';
+import { FuzzingRun, RunStatus } from '../../app/types';
 
 // Mock localStorage
 const localStorageMock = (() => {

@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
 const IntegratePagerdutyAlertIntegration = dynamic(
-  () => import('../../integrate-pagerduty-alert-integration'),
+  () => import('../../../features/integrations/integrate-pagerduty-alert-integration'),
   { loading: () => <IntegrationPageSkeleton /> },
 );
 

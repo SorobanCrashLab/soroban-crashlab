@@ -15,8 +15,8 @@
  */
 
 import React, { useState } from 'react';
-import { simulateSeedReplay } from './replay';
-import { FuzzingRun, type SorobanAuthMode } from './types';
+import { simulateSeedReplay } from '../../app/replay';
+import { FuzzingRun, type SorobanAuthMode } from '../../app/types';
 
 export type CIReplayStatus = 'idle' | 'queued' | 'running' | 'passed' | 'failed' | 'timeout';
 

@@ -16,7 +16,7 @@ interface KVArtifactRecord {
 
 export interface RedisClient {
   get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<string>;
+  set(key: string, value: string): Promise<string | null>;
   del(...keys: string[]): Promise<number>;
   sadd(key: string, ...members: string[]): Promise<number>;
   srem(key: string, ...members: string[]): Promise<number>;

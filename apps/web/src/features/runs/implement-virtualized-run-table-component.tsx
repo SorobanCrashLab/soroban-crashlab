@@ -1,15 +1,15 @@
 'use client';
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { FuzzingRun, RunStatus } from './types';
-import { STATUS_META } from '../lib/run-status';
-import { formatDuration } from './utils/format';
-import { useDataTableKeyboardNav } from './use-data-table-keyboard-nav';
-import type { DataTableRowKeyboardProps } from './use-data-table-keyboard-nav';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FuzzingRun, RunStatus } from '../../app/types';
+import { STATUS_META } from '../../lib/run-status';
+import { formatDuration } from '../../app/utils/format';
+import { useDataTableKeyboardNav } from '../../app/use-data-table-keyboard-nav';
+import type { DataTableRowKeyboardProps } from '../../app/use-data-table-keyboard-nav';
 import TruncatedCell from '@/components/TruncatedCell';
-import { useResponsiveRunColumns } from './use-responsive-run-columns';
-import { SortableColumnHeader } from '../components/SortableColumnHeader';
-import { getNextSortState, type SortState } from './run-history-sort-utils';
+import { useResponsiveRunColumns } from '../../app/use-responsive-run-columns';
+import { SortableColumnHeader } from '../../components/SortableColumnHeader';
+import { getNextSortState, type SortState } from '../../app/run-history-sort-utils';
 
 /** Height of a single data row in pixels — must match the rendered row height. */
 const ROW_HEIGHT = 57;

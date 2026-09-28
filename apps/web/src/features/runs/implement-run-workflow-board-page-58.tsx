@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FuzzingRun, RunStatus } from './types';
-import { formatDurationCompact } from './utils/format';
+import { FuzzingRun, RunStatus } from '../../app/types';
+import { formatDurationCompact } from '../../app/utils/format';
 import { safeStorage } from "@/lib/local-storage";
 
 /* ── Types ─────────────────────────────────────────────────────────── */

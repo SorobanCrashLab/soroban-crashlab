@@ -18,8 +18,8 @@ import {
   type AlertingSettingsSnapshot,
   type AlertingTabId,
   type DryRunEvaluation,
-} from './alerting-settings-page-utils';
-import { evaluateRules } from './alerting-evaluator';
+} from '../../app/alerting-settings-page-utils';
+import { evaluateRules } from '../../app/alerting-evaluator';
 
 const ALERTING_API_URL = '/api/settings/alerting';
 
@@ -343,9 +343,9 @@ export default function AlertingSettingsPage({
         // Build synthetic runs from recent history entries as evaluation context
         const syntheticRuns = settings.history.map((entry, index) => ({
           id: `dry-run-history-${index}`,
-          status: (entry.outcome === 'triggered' ? 'failed' : 'completed') as import('./types').RunStatus,
-          area: 'auth' as import('./types').RunArea,
-          severity: 'medium' as import('./types').RunSeverity,
+          status: (entry.outcome === 'triggered' ? 'failed' : 'completed') as import('../../app/types').RunStatus,
+          area: 'auth' as import('../../app/types').RunArea,
+          severity: 'medium' as import('../../app/types').RunSeverity,
           duration: 1000 + index * 500,
           seedCount: 100 + index * 10,
           crashDetail: null,

@@ -8,9 +8,9 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { formatSize } from './utils/format';
-import { triggerBrowserDownload } from './utils/browser-download';
-import { api } from '../lib/api-client';
+import { formatSize } from '../../app/utils/format';
+import { triggerBrowserDownload } from '../../app/utils/browser-download';
+import { api } from '../../lib/api-client';
 
 // --- Types ---
 

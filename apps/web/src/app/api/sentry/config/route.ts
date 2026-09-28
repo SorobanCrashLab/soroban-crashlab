@@ -3,7 +3,7 @@ import { checkRequestSize } from '@/lib/request-size-limits';
 import {
   validateSentryConfig,
   type SentryConfig,
-} from '@/app/integrate-sentry-integration-for-crash-reporting-utils';
+} from '../../../../features/integrations/integrate-sentry-integration-for-crash-reporting-utils';
 import { errorResponse, successResponse } from '@/lib/api-response-utils';
 
 // In-memory store (persists for the lifetime of the process)

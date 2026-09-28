@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { FuzzingRun, RunStatus } from './types';
 import { STATUS_META } from '../lib/run-status';
-import AddReplayFromUiAction from './add-replay-from-ui-action';
+import AddReplayFromUiAction from '../features/misc/add-replay-from-ui-action';
 import { useDataTableKeyboardNav } from './use-data-table-keyboard-nav';
 import TruncatedCell from '@/components/TruncatedCell';
 import { useResponsiveRunColumns } from './use-responsive-run-columns';

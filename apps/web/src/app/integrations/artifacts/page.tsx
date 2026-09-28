@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
 const ArtifactStorageIntegration = dynamic(
-  () => import('../../integrate-storage-backend-integration-for-artifacts'),
+  () => import('../../../features/integrations/integrate-storage-backend-integration-for-artifacts'),
   {
     loading: () => <IntegrationPageSkeleton />,
   }

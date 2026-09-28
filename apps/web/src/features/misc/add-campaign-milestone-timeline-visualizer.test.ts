@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import type { MilestoneEvent } from "./campaign-milestone-timeline-utils";
+import type { MilestoneEvent } from "../../app/campaign-milestone-timeline-utils";
 
 // Mock milestone events for testing
 const mockEvents: MilestoneEvent[] = [

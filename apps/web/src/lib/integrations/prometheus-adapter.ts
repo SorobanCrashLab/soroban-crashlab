@@ -2,7 +2,7 @@ import { createAbortSignal } from './adapter-utils';
 import {
   type ExportConfig,
   type MetricsExportDependencies,
-} from '../../app/integrate-metrics-export-to-prometheus-utils';
+} from '../../features/integrations/integrate-metrics-export-to-prometheus-utils';
 
 export interface PrometheusAdapterOptions {
   endpoint: string;

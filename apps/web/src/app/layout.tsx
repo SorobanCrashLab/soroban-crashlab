@@ -6,7 +6,7 @@ import { AccessibilityProvider } from "../components/AccessibilityProvider";
 import { LocaleProvider } from "../i18n/context";
 import { ToastProvider } from "../components/Toast";
 import NavBar from "../components/NavBar";
-import AddKeyboardShortcutCheatsheetModal from "./add-keyboard-shortcut-cheatsheet-modal";
+import AddKeyboardShortcutCheatsheetModal from "../features/misc/add-keyboard-shortcut-cheatsheet-modal";
 import OnboardingWizardHost from "./OnboardingWizardHost";
 import CommandPalette from "../components/CommandPalette";
 import PageTransition from "../components/PageTransition";

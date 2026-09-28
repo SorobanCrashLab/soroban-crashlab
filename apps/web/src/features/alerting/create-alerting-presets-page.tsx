@@ -9,13 +9,13 @@ import {
   type AlertPreset,
   type PresetId,
   type PresetStatus,
-} from './alerting-presets-utils';
+} from '../../app/alerting-presets-utils';
 import {
   createDefaultAlertingSettingsSnapshot,
   type AlertingSettingsSnapshot,
   type AlertCategory,
   type AlertSeverity,
-} from './alerting-settings-page-utils';
+} from '../../app/alerting-settings-page-utils';
 
 const ALERTING_API_URL = '/api/settings/alerting';
 

@@ -9,7 +9,7 @@ import { createSentryAdapter } from './lib/integrations/sentry-adapter';
 import type {
   SentryConfig,
   CrashReport,
-} from './app/integrate-sentry-integration-for-crash-reporting-utils';
+} from './features/integrations/integrate-sentry-integration-for-crash-reporting-utils';
 import type {
   SentryAdapterOptions,
   SentryConnectionTestResult,

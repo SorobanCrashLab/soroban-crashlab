@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Home from './page';
-import { DashboardFilters } from './create-advanced-dashboard-filters-page';
+import { DashboardFilters } from '../features/analytics/create-advanced-dashboard-filters-page';
 
 // Mock Next.js navigation hooks
 jest.mock('next/navigation', () => ({

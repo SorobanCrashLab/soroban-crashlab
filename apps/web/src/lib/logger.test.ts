@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict';
 
 // Mock next/headers for testing in raw node
-let mockedHeaders = new Map<string, string>();
+const mockedHeaders = new Map<string, string>();
 const nextHeadersModule = {
   headers: async () => ({
     get: (key: string) => mockedHeaders.get(key) || null,

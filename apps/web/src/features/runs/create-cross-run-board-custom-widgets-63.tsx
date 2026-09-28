@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { FuzzingRun } from "./types";
+import { FuzzingRun } from "../../app/types";
 import { 
   WidgetMetric, 
   WidgetColor, 
   CustomWidget, 
   computeMetric, 
   reorderWidgets 
-} from "./custom-widgets-utils";
+} from "../../app/custom-widgets-utils";
 import { safeStorage } from "@/lib/local-storage";
 
 const STORAGE_KEY = "crashlab-custom-widgets";

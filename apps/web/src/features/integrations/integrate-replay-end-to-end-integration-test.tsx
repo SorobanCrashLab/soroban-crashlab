@@ -14,8 +14,8 @@
  */
 
 import React, { useState } from 'react';
-import { simulateSeedReplay } from './replay';
-import { FuzzingRun } from './types';
+import { simulateSeedReplay } from '../../app/replay';
+import { FuzzingRun } from '../../app/types';
 
 export type ReplayTestStatus = 'idle' | 'running' | 'passed' | 'failed';
 

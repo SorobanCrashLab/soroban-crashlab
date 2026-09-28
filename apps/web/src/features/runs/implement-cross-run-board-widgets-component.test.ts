@@ -1,5 +1,5 @@
 import { computeWidgetMetrics } from "./implement-cross-run-board-widgets-component";
-import { FuzzingRun, RunStatus, RunArea, RunSeverity } from "./types";
+import { FuzzingRun, RunStatus, RunArea, RunSeverity } from "../../app/types";
 
 // Test utilities
 function makeRun(overrides: Partial<FuzzingRun> = {}): FuzzingRun {

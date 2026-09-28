@@ -7,7 +7,7 @@ import {
   ExportConfig,
   MetricsExportDependencies,
 } from "./integrate-metrics-export-to-prometheus-utils";
-import { createPrometheusMetricsExportDependencies } from "../lib/integrations/prometheus-adapter";
+import { createPrometheusMetricsExportDependencies } from "../../lib/integrations/prometheus-adapter";
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`Assertion failed: ${message}`);

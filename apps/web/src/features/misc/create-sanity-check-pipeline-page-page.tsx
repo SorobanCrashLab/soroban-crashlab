@@ -8,10 +8,10 @@ import {
   CheckCategory,
   toggleSanityCheck,
   createNewPipelineRun 
-} from './sanity-check-utils';
-import { MOCK_SANITY_CHECKS, MOCK_PIPELINE_RUNS } from '../fixtures/sanity-checks';
-import { relative } from './utils/datetime';
-import { formatDuration as sharedFormatDuration } from './utils/format';
+} from '../../app/sanity-check-utils';
+import { MOCK_SANITY_CHECKS, MOCK_PIPELINE_RUNS } from '../../fixtures/sanity-checks';
+import { relative } from '../../app/utils/datetime';
+import { formatDuration as sharedFormatDuration } from '../../app/utils/format';
 
 interface SanityCheckPipelinePageProps {
   className?: string;

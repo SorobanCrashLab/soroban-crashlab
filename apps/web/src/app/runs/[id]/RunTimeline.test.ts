@@ -6,8 +6,7 @@ import * as assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const appRoot = path.resolve(__dirname);
-const componentPath = path.resolve(appRoot, '../runs/[id]/RunTimeline.tsx');
+const componentPath = path.resolve(process.cwd(), 'src/app/runs/[id]/RunTimeline.tsx');
 
 const runAssertions = (): void => {
   console.log('Starting RunTimeline assertions...');
@@ -21,7 +20,7 @@ const runAssertions = (): void => {
   // Basic structural requirements
   assert.ok(content.includes("'use client'"), 'Should be a client component');
   assert.ok(content.includes('export default function RunTimeline'), 'Should export RunTimeline');
-  assert.ok(content.includes('interface TimelineProps'), 'Should define props interface');
+  assert.ok(content.includes('interface RunTimelineProps') || content.includes('interface TimelineProps'), 'Should define props interface');
   
   // Requirement: Loading and Error states
   assert.ok(content.includes('isLoading'), 'Should handle loading state');

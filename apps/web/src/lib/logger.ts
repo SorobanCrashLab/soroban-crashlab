@@ -1,7 +1,5 @@
 import { structuredLogger } from './structured-logger';
 
-type LogLevel = 'info' | 'warn' | 'error';
-
 interface LogFields {
   [key: string]: unknown;
 }

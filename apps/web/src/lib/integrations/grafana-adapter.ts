@@ -10,7 +10,7 @@ import { createAbortSignal } from './adapter-utils';
 import type {
   GrafanaConfig,
   GrafanaAnnotation,
-} from '../../app/integrate-grafana-dashboard-annotation-api-utils';
+} from '../../features/integrations/integrate-grafana-dashboard-annotation-api-utils';
 
 export interface GrafanaAdapterOptions {
   apiBase?: string;

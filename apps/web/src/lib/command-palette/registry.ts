@@ -15,6 +15,9 @@ export interface CommandEntry {
   subtitle?: string;
   category: CommandCategory;
   keywords?: string[];
+  /** Route path for navigation commands (e.g. `/runs`). Declarative so the
+   *  keyboard-cheatsheet overlay can match key chords and execute by route. */
+  route?: string;
   run: () => void | Promise<void>;
 }
 
@@ -116,7 +119,17 @@ export function createCommandRegistry() {
     providers.clear();
   }
 
-  return { registerEntries, registerProvider, search, clear };
+  /**
+   * Enumerates the currently registered static entries. Read-only view used by
+   * surfaces that render the registry as the single source of truth (e.g. the
+   * keyboard-cheatsheet overlay). Provider results are query-driven and are
+   * not part of this snapshot.
+   */
+  function listEntries(): CommandEntry[] {
+    return Array.from(staticEntries.values());
+  }
+
+  return { registerEntries, registerProvider, search, clear, listEntries };
 }
 
 export type CommandRegistry = ReturnType<typeof createCommandRegistry>;

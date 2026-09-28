@@ -8,8 +8,8 @@
  */
 
 import React, { useState } from 'react';
-import { triggerBrowserDownload } from './utils/browser-download';
-import { FuzzingRun, RunArea, RunSeverity } from './types';
+import { triggerBrowserDownload } from '../../app/utils/browser-download';
+import { FuzzingRun, RunArea, RunSeverity } from '../../app/types';
 
 // --- Types ---
 

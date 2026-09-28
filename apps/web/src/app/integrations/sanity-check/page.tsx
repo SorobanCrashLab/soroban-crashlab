@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-const SanityCheckPipelinePage = dynamic(() => import('../../create-sanity-check-pipeline-page-page'), {
+const SanityCheckPipelinePage = dynamic(() => import('../../../features/misc/create-sanity-check-pipeline-page-page'), {
   loading: () => <IntegrationPageSkeleton />,
 });
 

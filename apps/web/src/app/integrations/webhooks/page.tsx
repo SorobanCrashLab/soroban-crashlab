@@ -3,10 +3,11 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
+import WebhookSigningSecretsSection from '../../../features/integrations/webhook-signing-secrets-section';
 
 import Link from 'next/link';
 
-const IntegrateWebhookManagerForRunEvents = dynamic(() => import('../../integrate-webhook-manager-for-run-events'), {
+const IntegrateWebhookManagerForRunEvents = dynamic(() => import('../../../features/integrations/integrate-webhook-manager-for-run-events'), {
   loading: () => <IntegrationPageSkeleton />,
 });
 
@@ -34,6 +35,7 @@ export default function WebhooksPage() {
         </div>
       </div>
       <IntegrateWebhookManagerForRunEvents />
+      <WebhookSigningSecretsSection />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { timeOnly } from './utils/datetime';
+import { timeOnly } from '../../app/utils/datetime';
 
 /**
  * Issue: Integrate Metrics export to Prometheus

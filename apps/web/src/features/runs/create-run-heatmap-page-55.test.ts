@@ -23,7 +23,7 @@ import {
   normalizeCell,
   METRICS,
   LEGEND_ITEMS,
-} from "./add-heatmap-interactions";
+} from "../analytics/add-heatmap-interactions";
 
 // Test: Metric definitions
 function testMetricDefinitions() {

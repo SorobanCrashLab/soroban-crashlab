@@ -15,8 +15,8 @@ import {
   type RunReplayHistoryEntry,
   serializeReplayHistory,
   sortReplayHistoryByTimestamp,
-} from "./run-replay-history-utils";
-import { useDataTableKeyboardNav } from "./use-data-table-keyboard-nav";
+} from "../../app/run-replay-history-utils";
+import { useDataTableKeyboardNav } from "../../app/use-data-table-keyboard-nav";
 import { safeStorage } from "@/lib/local-storage";
 
 interface AddRunReplayHistoryWithTimestampsProps {

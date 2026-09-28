@@ -8,7 +8,7 @@
 
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
-import type { GrafanaConfig } from '../../../../integrate-grafana-dashboard-annotation-api-utils';
+import type { GrafanaConfig } from '../../../../../features/integrations/integrate-grafana-dashboard-annotation-api-utils';
 
 // Module-level in-memory store (same pattern as other lightweight integrations).
 let storedConfig: GrafanaConfig | null = null;

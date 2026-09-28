@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { FuzzingRun, RunArea } from './types';
+import { FuzzingRun, RunArea } from '../../app/types';
 import {
   computeOverallHealth,
   computeAreaHealthScores,
   getHealthStatus,
   getTrendIcon,
   type AreaHealthScore,
-} from './run-health-score-utils';
+} from '../../app/run-health-score-utils';
 
 interface AreaConfig {
   label: string;

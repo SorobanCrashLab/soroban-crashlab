@@ -5,7 +5,14 @@
  * a DOM environment and reuse it across different trigger sites.
  */
 
-export type DestructiveAction = 'delete-run' | 'delete-runs' | 'reset-config' | 'revoke-token' | 'rotate-token';
+export type DestructiveAction =
+  | 'delete-run'
+  | 'delete-runs'
+  | 'reset-config'
+  | 'revoke-token'
+  | 'rotate-token'
+  | 'rotate-signing-secret'
+  | 'revoke-signing-secret';
 
 export interface ConfirmDialogConfig {
   title: string;
@@ -76,6 +83,26 @@ export function getConfirmDialogConfig(
         cancelText: 'Cancel',
         variant: 'warning',
       };
+
+    case 'rotate-signing-secret':
+      return {
+        title: 'Rotate Webhook Signing Secret',
+        message:
+          'A fresh signing secret will become active for outbound deliveries. The current secret is demoted to a grace window where inbound verification still accepts it, then it is revoked. Copy the new secret immediately — it will only be shown once.',
+        confirmText: 'Rotate Secret',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      };
+
+    case 'revoke-signing-secret':
+      return {
+        title: 'Revoke Grace Secret',
+        message:
+          'This grace-period signing secret will be revoked immediately and will no longer be accepted for inbound verification. Confirm only if you are sure no producer is still signing with it.',
+        confirmText: 'Revoke Secret',
+        cancelText: 'Cancel',
+        variant: 'danger',
+      };
   }
 }
 
@@ -84,7 +111,7 @@ export function getConfirmDialogConfig(
  * proceeding. Non-destructive actions (export, tag, assign) return false.
  */
 export function requiresConfirmation(action: string): boolean {
-  return action === 'delete' || action === 'delete-run' || action === 'delete-runs' || action === 'reset-config' || action === 'revoke-token' || action === 'rotate-token';
+  return action === 'delete' || action === 'delete-run' || action === 'delete-runs' || action === 'reset-config' || action === 'revoke-token' || action === 'rotate-token' || action === 'rotate-signing-secret' || action === 'revoke-signing-secret';
 }
 
 /**

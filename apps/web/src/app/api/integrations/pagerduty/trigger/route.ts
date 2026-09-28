@@ -11,8 +11,7 @@
 
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
-import { buildDedupKey } from '../../../../integrate-pagerduty-alert-integration-utils';
-import type { TriggerAlertPayload } from '../../../../../lib/integrations/pagerduty-adapter';
+import { buildDedupKey } from '../../../../../features/integrations/integrate-pagerduty-alert-integration-utils';
 import { PAGERDUTY_FETCH_TIMEOUT_MS } from '../../../../../lib/timeouts';
 import { PagerDutyTriggerSchema } from '@/lib/schemas/integrations/pagerduty';
 

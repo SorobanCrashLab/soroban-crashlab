@@ -355,6 +355,7 @@ export default function WebhookRetryDashboardComponent() {
                   <th scope="col" className="py-3 px-4">Delivery ID & Event</th>
                   <th scope="col" className="py-3 px-4">Endpoint URL</th>
                   <th scope="col" className="py-3 px-4">HTTP Status</th>
+                  <th scope="col" className="py-3 px-4">Signing Key</th>
                   <th scope="col" className="py-3 px-4">Attempts</th>
                   <th scope="col" className="py-3 px-4">Timestamp</th>
                   <th scope="col" className="py-3 px-4 text-right">Actions</th>
@@ -404,6 +405,20 @@ export default function WebhookRetryDashboardComponent() {
                       >
                         {formatStatusCode(item.statusCode)}
                       </span>
+                    </td>
+
+                    {/* Signing Key */}
+                    <td className="py-3 px-4">
+                      {item.keyId ? (
+                        <span
+                          className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400"
+                          title={`Delivery signed with key ${item.keyId}`}
+                        >
+                          {item.keyId}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-300 dark:text-zinc-600">—</span>
+                      )}
                     </td>
 
                     {/* Attempts */}

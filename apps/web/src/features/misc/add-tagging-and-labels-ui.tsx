@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { FuzzingRun } from './types';
-import { normalizeTag, runMatchesTagFilter } from './run-tags-utils';
+import type { FuzzingRun } from '../../app/types';
+import { normalizeTag, runMatchesTagFilter } from '../../app/run-tags-utils';
 
 type TaggingAndLabelsUiProps = {
   runs: FuzzingRun[];

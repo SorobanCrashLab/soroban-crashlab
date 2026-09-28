@@ -11,7 +11,7 @@ import {
   getHeatClassName,
   formatDelta,
   getCellId,
-} from '../../add-heatmap-interactions';
+} from '../../../features/analytics/add-heatmap-interactions';
 
 export default function HeatmapPage() {
   const [metric, setMetric] = useState<MetricKey>('runtimeDelta');

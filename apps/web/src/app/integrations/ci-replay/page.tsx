@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-const CIIntegrationForRunReplayTests = dynamic(() => import('../../integrate-ci-integration-for-run-replay-tests'), {
+const CIIntegrationForRunReplayTests = dynamic(() => import('../../../features/integrations/integrate-ci-integration-for-run-replay-tests'), {
   loading: () => <IntegrationPageSkeleton />,
 });
 

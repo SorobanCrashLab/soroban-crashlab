@@ -18,7 +18,7 @@ const runAssertions = (): void => {
   const content = fs.readFileSync(componentPath, 'utf-8');
   
   // Basic structural requirements
-  assert.ok(content.includes("'use client'"), 'Should be a client component');
+  assert.ok(content.includes("'use client'") || content.includes('"use client"'), 'Should be a client component');
   assert.ok(content.includes('export default function RunStatusTimeline'), 'Should export RunStatusTimeline');
   assert.ok(content.includes('interface TimelineProps'), 'Should define props interface');
   
@@ -46,9 +46,9 @@ const runAssertions = (): void => {
   assert.ok(content.includes('md:hidden'), 'Should have mobile-only elements');
   
   // Requirement: Logic for states
-  assert.ok(content.includes('status === \'running\''), 'Should handle running status');
-  assert.ok(content.includes('status === \'failed\''), 'Should handle failed status');
-  assert.ok(content.includes('status === \'completed\''), 'Should handle completed status');
+  assert.ok(content.includes("status === 'running'") || content.includes('status === "running"'), 'Should handle running status');
+  assert.ok(content.includes("status === 'failed'") || content.includes('status === "failed"'), 'Should handle failed status');
+  assert.ok(content.includes("status === 'completed'") || content.includes('status === "completed"'), 'Should handle completed status');
 
   // Requirement: Hover details
   assert.ok(content.includes('role="tooltip"'), 'Should expose hover tooltip details');

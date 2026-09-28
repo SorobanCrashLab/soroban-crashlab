@@ -4,7 +4,7 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 
 const OnboardingChecklistModal = dynamic(
-  () => import('../implement-onboarding-checklist-modal-component'),
+  () => import('../../features/misc/implement-onboarding-checklist-modal-component'),
   { ssr: false },
 );
 
