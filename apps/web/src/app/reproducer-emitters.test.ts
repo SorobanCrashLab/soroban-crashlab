@@ -183,7 +183,12 @@ function testMetadataBundleEmittersDeterministic(): void {
   const python = generatePythonReproducer(model);
   assert.ok(rust.includes('CAS3ODD6H6T4MWOTPGE4ZZGXWJZL4RBRVXHZCWXG7GJNUWQNIVPLJOTJ'), 'Rust should embed contract id');
   assert.ok(rust.includes('vec![0xca, 0xfe, 0xba, 0xbe]'), 'Rust should embed payload bytes');
-  assert.ok(python.includes('https://soroban-futurenet.stellar.org'), 'Python should embed RPC url');
+  const rpcUrlLine = python.split('\n').find((line) => line.startsWith('RPC_URL = '));
+  assert.strictEqual(
+    rpcUrlLine,
+    `RPC_URL = "${model.envFingerprint?.sorobanRpcUrl}"`,
+    'Python should embed RPC url',
+  );
   assert.ok(python.includes('0x01'), 'Python should embed invoke arg value');
   assert.equal(rust, generateRustReproducer(model), 'Rust emitter must be deterministic');
   assert.equal(python, generatePythonReproducer(model), 'Python emitter must be deterministic');
