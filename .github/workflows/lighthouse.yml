@@ -37,7 +37,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build production bundle
-        run: pnpm --dir apps/web run build
+        # Working-directory is already apps/web (workflow-level default), so a
+        # bare `pnpm run build` — `pnpm --dir apps/web` would resolve relative
+        # to that cwd and die with ENOENT apps/web/apps.
+        run: pnpm run build
 
       # `next start`, not a static dist dir: /runs/:id is server-rendered on
       # demand and the dashboard fetches /api/runs on mount.
