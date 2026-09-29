@@ -4,7 +4,7 @@ import {
   computeResourceMetrics,
   ResourceFeeInsightPanel,
 } from "./add-resource-fee-insight-panel";
-import { FuzzingRun } from "./types";
+import { FuzzingRun } from "../../app/types";
 
 // Helper to build a minimal FuzzingRun
 function makeRun(overrides: Partial<FuzzingRun>): FuzzingRun {

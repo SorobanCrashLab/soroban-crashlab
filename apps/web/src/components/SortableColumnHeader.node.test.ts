@@ -1,8 +1,8 @@
-import * as assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { SortableColumnHeader } from './SortableColumnHeader';
-import { getNextSortState, getSortIndicator } from '../app/run-history-sort-utils';
+import { getNextSortState, getSortIndicator, type SortState } from '../app/run-history-sort-utils';
 
 function testSortableColumnHeaderHtml() {
   // Test 1: Neutral / Unsorted state
@@ -62,7 +62,7 @@ function testSortableColumnHeaderHtml() {
   assert(html4.includes('justify-end'), 'right-aligned column must include justify-end');
 
   // Test 5: State machine toggle transitions
-  let current = { field: 'id', order: 'none' as const };
+  let current: SortState = { field: 'id', order: 'none' };
   current = getNextSortState(current, 'id');
   assert.equal(current.order, 'asc');
   assert.equal(getSortIndicator('id', current).ariaSort, 'ascending');

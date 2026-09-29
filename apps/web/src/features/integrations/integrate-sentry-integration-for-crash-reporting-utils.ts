@@ -1,4 +1,4 @@
-import { absoluteShort } from './utils/datetime';
+import { absoluteShort } from '../../app/utils/datetime';
 
 /**
  * Issue #248 – Integrate: Sentry integration for crash reporting

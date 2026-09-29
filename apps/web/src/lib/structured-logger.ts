@@ -1,5 +1,3 @@
-import { headers } from 'next/headers';
-
 type LogLevel = 'info' | 'warn' | 'error';
 
 interface StructuredLogEntry {
@@ -62,9 +60,12 @@ export class StructuredLogger {
   private async log(level: LogLevel, message: string, fields: Record<string, unknown> = {}): Promise<void> {
     let requestId: string | undefined = undefined;
     try {
+      // Lazy dynamic import so this module stays importable from client code;
+      // headers() is a server-only API and throws outside a request context.
+      const { headers } = await import('next/headers');
       const h = await headers();
       requestId = h.get('x-request-id') || undefined;
-    } catch (e) {
+    } catch {
       // not in a request context
     }
 

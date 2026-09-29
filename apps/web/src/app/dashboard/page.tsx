@@ -20,13 +20,13 @@ import {
   type DashboardSectionConfig,
   type DashboardSectionId,
 } from "../dashboard-layout-utils";
-import { ResourceFeeInsightPanel } from "../implement-resource-fee-insight-panel-component";
-import RunHealthScoreWidget from "../implement-run-health-score-widget";
+import { ResourceFeeInsightPanel } from "../../features/misc/implement-resource-fee-insight-panel-component";
+import RunHealthScoreWidget from "../../features/runs/implement-run-health-score-widget";
 import Pagination from "../Pagination";
 import { getPageSlice, computeTotalPages, clampPage } from "../pagination-utils";
 
 const AddTaggingAndLabelsUi = dynamic(
-  () => import("../add-tagging-and-labels-ui"),
+  () => import("../../features/misc/add-tagging-and-labels-ui"),
   { ssr: false }
 );
 import { runMatchesTagFilter } from "../run-tags-utils";

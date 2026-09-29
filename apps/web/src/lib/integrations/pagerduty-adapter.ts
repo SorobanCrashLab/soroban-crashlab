@@ -9,7 +9,7 @@ import { createAbortSignal } from './adapter-utils';
 import type {
   PagerDutyConfig,
   PagerDutyAlert,
-} from '../../app/integrate-pagerduty-alert-integration-utils';
+} from '../../features/integrations/integrate-pagerduty-alert-integration-utils';
 
 export interface PagerDutyAdapterOptions {
   apiBase?: string;

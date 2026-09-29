@@ -29,7 +29,9 @@ export type AuditAction =
   | 'dlq.park'
   | 'upload.reject'
   | 'thread.resolve'
-  | 'artifact.delete';
+  | 'artifact.delete'
+  | 'webhook.secret.rotate'
+  | 'webhook.secret.revokeGrace';
 
 /** Used when no principal could be resolved — availability over attribution. */
 export const SYSTEM_ACTOR = 'system';

@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   lighthouse:
-    name: Budgets
+    name: Lighthouse budgets
     runs-on: blacksmith-4vcpu-ubuntu-2404
     defaults:
       run:
@@ -37,7 +37,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build production bundle
-        run: pnpm --dir apps/web run build
+        # Working-directory is already apps/web (workflow-level default), so a
+        # bare `pnpm run build` — `pnpm --dir apps/web` would resolve relative
+        # to that cwd and die with ENOENT apps/web/apps.
+        run: pnpm run build
 
       # `next start`, not a static dist dir: /runs/:id is server-rendered on
       # demand and the dashboard fetches /api/runs on mount.
@@ -61,12 +64,31 @@ jobs:
             curl -s -o /dev/null "http://127.0.0.1:3210$r"
           done
 
-      - name: Collect and assert budgets
+      - name: Collect and assert budgets (desktop + mobile)
         id: lhci
         # Pinned: a Lighthouse minor bump can move scores by more than our
         # margins, so the version is part of the contract.
-        run: pnpm dlx @lhci/cli@0.15.1 autorun --config=lighthouserc.js
-        continue-on-error: true
+        #
+        # Enforcement is native: there is no `continue-on-error` here. Each
+        # form factor runs its own autorun (desktop lighthouserc.js, mobile
+        # lighthouserc.mobile.js) into a staged directory so the shared
+        # assertion files and LHRs never overwrite each other, and the job
+        # fails if either run's assertions are red. The score table and
+        # sticky comment below still render because they run with `if:
+        # always()` after the failure.
+        run: |
+          set +e
+          pnpm dlx @lhci/cli@0.15.1 autorun --config=lighthouserc.js
+          desktop=$?
+          cp -r .lighthouseci .lighthouseci-desktop
+          rm -rf .lighthouseci
+          pnpm dlx @lhci/cli@0.15.1 autorun --config=lighthouserc.mobile.js
+          mobile=$?
+          cp -r .lighthouseci .lighthouseci-mobile
+          if [ $desktop -ne 0 ] || [ $mobile -ne 0 ]; then
+            echo "::error::Lighthouse budgets failed — see the PR comment for the per-assertion breakdown."
+            exit 1
+          fi
 
       - name: Build score table
         if: always()
@@ -116,16 +138,25 @@ jobs:
               });
             }
 
+      # Store the raw Lighthouse reports for trend tracking: both form factors,
+      # the assertion outcomes, and the temporary-storage links. Consumers can
+      # diff LHRs across PRs without re-running the audit.
+      - name: Upload LHR artifacts
+        if: always()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: lighthouse-reports
+          path: |
+            apps/web/.lighthouseci-desktop/**/*.lhr.json
+            apps/web/.lighthouseci-mobile/**/*.lhr.json
+            apps/web/.lighthouseci-desktop/assertion-results.json
+            apps/web/.lighthouseci-mobile/assertion-results.json
+            apps/web/.lighthouseci-desktop/links.json
+            apps/web/.lighthouseci-mobile/links.json
+          if-no-files-found: ignore
+
       - name: Stop production server
         if: always()
         # pkill by pattern, not the recorded pid: `$!` is pnpm's pid and the
         # actual next-server runs as its child.
         run: pkill -f "next start -p 3210" || true
-
-      # Fails the job after the comment is posted, so a red gate always ships
-      # with its explanation attached.
-      - name: Enforce budgets
-        if: steps.lhci.outcome == 'failure'
-        run: |
-          echo "::error::Lighthouse budgets failed — see the PR comment for the per-assertion breakdown."
-          exit 1

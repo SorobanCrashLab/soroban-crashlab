@@ -46,7 +46,13 @@ export default function DatabaseMigrationPanel() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    // Defer the initial load out of the synchronous effect tick: `refresh`
+    // sets `busy` on entry, and calling it directly would run setState
+    // synchronously within the effect (react-hooks/set-state-in-effect).
+    const timer = setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [refresh]);
 
   const runUp = async () => {

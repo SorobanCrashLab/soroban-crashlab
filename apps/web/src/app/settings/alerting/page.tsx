@@ -5,7 +5,7 @@ import BreadcrumbNav from '@/components/BreadcrumbNav';
 import { LoadingSpinner } from '../../../components/LoadingSkeleton';
 
 const AlertingSettingsPage = dynamic(
-  () => import('../../create-alerting-settings-page-page'),
+  () => import('../../../features/alerting/create-alerting-settings-page-page'),
   { loading: () => <LoadingSpinner /> },
 );
 

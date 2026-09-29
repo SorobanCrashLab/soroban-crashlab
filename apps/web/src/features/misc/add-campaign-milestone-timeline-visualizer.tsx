@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import type { MilestoneEvent } from './campaign-milestone-timeline-utils';
+import type { MilestoneEvent } from '../../app/campaign-milestone-timeline-utils';
 
 interface CampaignMilestoneTimelineVisualizerProps {
   /** Array of milestone events to visualize */

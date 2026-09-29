@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-const DatabaseMigrationIntegrationTests = dynamic(() => import('../../integrate-database-migration-integration-tests'), {
+const DatabaseMigrationIntegrationTests = dynamic(() => import('../../../features/integrations/integrate-database-migration-integration-tests'), {
   loading: () => <IntegrationPageSkeleton />,
 });
 

@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import { buildMockRuns } from "./mockRuns";
+import { buildMockRuns } from "../../app/mockRuns";
 import {
   buildSideBySideRows,
   selectComparableRuns,

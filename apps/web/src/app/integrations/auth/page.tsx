@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-const ExternalAuthenticationIntegration = dynamic(() => import('../../integrate-external-authentication-integration'), {
+const ExternalAuthenticationIntegration = dynamic(() => import('../../../features/integrations/integrate-external-authentication-integration'), {
   loading: () => <IntegrationPageSkeleton />,
 });
 

@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-const MetricsExportToPrometheus = dynamic(() => import('../../integrate-metrics-export-to-prometheus'), {
+const MetricsExportToPrometheus = dynamic(() => import('../../../features/integrations/integrate-metrics-export-to-prometheus'), {
   loading: () => <IntegrationPageSkeleton />,
 });
 

@@ -28,7 +28,10 @@ export async function getArtifactDirOrCreate(): Promise<string> {
 
 export async function listArtifactMetadata(): Promise<ArtifactMetadata[]> {
   const dir = await getArtifactDirOrCreate();
-  const entries = await fs.readdir(dir, { withFileTypes: true });
+  // The artifact root comes from an env var / os.tmpdir(), so it cannot be
+  // statically scoped at build time; opt out of Turbopack's fs path analysis
+  // the same way Next.js documents for dynamic filesystem roots.
+  const entries = await fs.readdir(/*turbopackIgnore: true*/ dir, { withFileTypes: true });
   const artifacts: ArtifactMetadata[] = [];
 
   for (const entry of entries) {

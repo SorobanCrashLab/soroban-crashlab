@@ -13,7 +13,6 @@
  */
 
 import {
-    ZIP_BUILD,
     ZIP_CANCEL,
     handleZipBuildRequest,
     isZipWorkerRequest,

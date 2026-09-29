@@ -17,21 +17,53 @@ export interface StaticEntryDeps {
 
 export function buildStaticEntries(deps: StaticEntryDeps): CommandEntry[] {
   const navigation: CommandEntry[] = [
-    { id: 'nav:dashboard', title: 'Go to Dashboard', category: 'navigation', run: () => deps.navigate('/') },
-    { id: 'nav:runs', title: 'Go to Runs', category: 'navigation', run: () => deps.navigate('/runs') },
-    { id: 'nav:analytics', title: 'Go to Analytics', category: 'navigation', run: () => deps.navigate('/analytics') },
-    { id: 'nav:triage', title: 'Go to Triage', category: 'navigation', run: () => deps.navigate('/triage') },
-    { id: 'nav:logs', title: 'Go to Logs', category: 'navigation', run: () => deps.navigate('/logs') },
+    {
+      id: 'nav:dashboard',
+      title: 'Go to Dashboard',
+      category: 'navigation',
+      route: '/',
+      run: () => deps.navigate('/'),
+    },
+    {
+      id: 'nav:runs',
+      title: 'Go to Runs',
+      category: 'navigation',
+      route: '/runs',
+      run: () => deps.navigate('/runs'),
+    },
+    {
+      id: 'nav:analytics',
+      title: 'Go to Analytics',
+      category: 'navigation',
+      route: '/analytics',
+      run: () => deps.navigate('/analytics'),
+    },
+    {
+      id: 'nav:triage',
+      title: 'Go to Triage',
+      category: 'navigation',
+      route: '/triage',
+      run: () => deps.navigate('/triage'),
+    },
+    {
+      id: 'nav:logs',
+      title: 'Go to Logs',
+      category: 'navigation',
+      route: '/logs',
+      run: () => deps.navigate('/logs'),
+    },
     {
       id: 'nav:notification-center',
       title: 'Go to Notification Center',
       category: 'navigation',
+      route: '/notification-center',
       run: () => deps.navigate('/notification-center'),
     },
     {
       id: 'nav:notification-preferences',
       title: 'Go to Notification Preferences',
       category: 'navigation',
+      route: '/settings/notifications',
       keywords: ['settings', 'digest', 'quiet hours'],
       run: () => deps.navigate('/settings/notifications'),
     },
@@ -39,9 +71,16 @@ export function buildStaticEntries(deps: StaticEntryDeps): CommandEntry[] {
       id: 'nav:settings-api',
       title: 'Go to API Settings',
       category: 'navigation',
+      route: '/settings/api',
       run: () => deps.navigate('/settings/api'),
     },
-    { id: 'nav:settings', title: 'Go to Settings', category: 'navigation', run: () => deps.navigate('/settings') },
+    {
+      id: 'nav:settings',
+      title: 'Go to Settings',
+      category: 'navigation',
+      route: '/settings',
+      run: () => deps.navigate('/settings'),
+    },
   ];
 
   const actions: CommandEntry[] = [

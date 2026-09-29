@@ -98,14 +98,14 @@ const hostileDataAssertions = () => {
   assert.equal(fieldsComma[1], 'completed', 'status field should remain intact');
 
   // Test case 2: Field with double quotes
-  const runWithQuotes = makeRun({ area: 'error: "auth failure"' as any });
+  const runWithQuotes = makeRun({ area: 'error: "auth failure"' as unknown as FuzzingRun['area'] });
   const csvWithQuotes = buildRunsCsv([runWithQuotes], ['area', 'status']);
   const [, dataQuotes] = csvWithQuotes.split('\n');
   const fieldsQuotes = parseCSVLine(dataQuotes);
   assert.equal(fieldsQuotes[0], 'error: "auth failure"', 'quotes in field should round-trip');
 
   // Test case 3: Field with newline
-  const runWithNewline = makeRun({ status: 'failed\nwith details' as any });
+  const runWithNewline = makeRun({ status: 'failed\nwith details' as unknown as FuzzingRun['status'] });
   const csvWithNewline = buildRunsCsv([runWithNewline], ['id', 'status']);
   // With newline in data, we need to parse the entire CSV (not just split by \n)
   // For this simple test, we verify the CSV is well-formed by checking quote escaping
@@ -113,7 +113,7 @@ const hostileDataAssertions = () => {
 
   // Test case 4: Complex hostile case - all three together
   const complexPayload = 'Error: "invalid", context\nline 2\nline 3';
-  const runComplex = makeRun({ area: complexPayload as any });
+  const runComplex = makeRun({ area: complexPayload as unknown as FuzzingRun['area'] });
   const csvComplex = buildRunsCsv([runComplex], ['area']);
   // Don't split on \n since the data itself contains newlines
   // Just parse the CSV directly
@@ -126,7 +126,7 @@ const hostileDataAssertions = () => {
   // Test case 5: Multiple runs with hostile data
   const runs = [
     makeRun({ id: 'run-1' }),
-    makeRun({ id: 'run-2, dangerous', status: 'failed\nwith reason' as any }),
+    makeRun({ id: 'run-2, dangerous', status: 'failed\nwith reason' as unknown as FuzzingRun['status'] }),
     makeRun({ id: 'quote"test', severity: 'critical' }),
   ];
   const csvMultiple = buildRunsCsv(runs, ['id', 'status', 'severity']);

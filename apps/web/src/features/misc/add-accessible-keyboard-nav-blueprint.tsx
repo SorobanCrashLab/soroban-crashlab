@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback, type MouseEvent } from 'react';
-import { shouldIgnoreGlobalShortcut } from '../lib/is-editable-target';
+import { shouldIgnoreGlobalShortcut } from '../../lib/is-editable-target';
 
 /**
  * Accessible Keyboard Navigation Blueprint

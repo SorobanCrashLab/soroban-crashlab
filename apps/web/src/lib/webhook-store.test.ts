@@ -254,3 +254,174 @@ void (async () => {
   resetWebhookStore();
   console.log('ALL webhook-store tests passed');
 })();
+
+// ─── WebhookStore: signing-secret rotation matrix (#1663) ──────────────
+//
+// rotate → outbound signing uses the new key → old accepted in grace window
+// → rejected after expiry → revoke-grace terminates the window early. Secret
+// records persist across restarts and seed from env on first boot only.
+
+function withEnvSecrets(env: Record<string, string>, fn: () => void) {
+  const previous: Record<string, string | undefined> = {};
+  for (const key of Object.keys(env)) {
+    previous[key] = process.env[key];
+    process.env[key] = env[key];
+  }
+  try {
+    fn();
+  } finally {
+    for (const key of Object.keys(env)) {
+      if (previous[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = previous[key];
+      }
+    }
+  }
+}
+
+withEnvSecrets(
+  {
+    CRASHLAB_WEBHOOK_SIGNING_SECRETS: 'older-secret,newer-secret',
+    CRASHLAB_WEBHOOK_SIGNING_GRACE_TTL_DAYS: '7',
+  },
+  () => {
+    const dir = path.join(TEST_DATA_DIR, 'signing1');
+    const store = new WebhookStore(dir);
+
+    // Seeding: first env secret is active, the rest are grace records.
+    const seeded = store.listSigningSecretRecords();
+    assert.strictEqual(seeded.length, 2, 'seeds one record per env secret');
+    const active = store.getActiveSigningSecretRecord();
+    assert.ok(active, 'seeding produces an active secret');
+    assert.strictEqual(active.secret, 'older-secret');
+    assert.strictEqual(
+      store.getSigningSecretsForVerification()[0],
+      'older-secret',
+      'active secret is verified first',
+    );
+    assert.deepStrictEqual(
+      store.getSigningSecretsForVerification().sort(),
+      ['newer-secret', 'older-secret'],
+      'verification accepts active + grace secrets',
+    );
+    console.log('PASS: seeds signing-secret records from env (active + grace)');
+  },
+);
+
+withEnvSecrets(
+  {
+    CRASHLAB_WEBHOOK_SIGNING_SECRETS: 'old-secret',
+    CRASHLAB_WEBHOOK_SIGNING_GRACE_TTL_DAYS: '2',
+  },
+  () => {
+    const dir = path.join(TEST_DATA_DIR, 'signing2');
+    const store = new WebhookStore(dir);
+
+    const { active, previousKeyId } = store.rotateSigningSecret();
+
+    // The new secret is the active signer; the old one is in grace.
+    assert.notStrictEqual(active.secret, 'old-secret');
+    assert.strictEqual(active.status, 'active');
+    assert.strictEqual(previousKeyId, store.listSigningSecretRecords()[1].keyId);
+    assert.strictEqual(store.getActiveSigningSecretRecord()?.secret, active.secret, 'rotation swaps the active secret');
+    const grace = store.listSigningSecretRecords().find((record) => record.status === 'grace');
+    assert.ok(grace?.expiresAt, 'demoted secret gets an expiry');
+
+    // Matrix: signing uses the new key; verification still accepts the old one
+    // inside the window; after expiry only the new key verifies.
+    assert.strictEqual(store.getSigningSecretsForVerification()[0], active.secret, 'deliveries sign with the new key');
+    assert.ok(
+      store.getSigningSecretsForVerification().includes('old-secret'),
+      'old secret accepted inside the grace window',
+    );
+
+    const pruned = store.pruneExpiredSigningSecrets(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    assert.strictEqual(pruned, 1, 'expired grace secret is pruned');
+    assert.ok(
+      !store.getSigningSecretsForVerification().includes('old-secret'),
+      'old secret rejected after its grace window lapses',
+    );
+
+    // Cleanup: rotate again so the remaining expiry math is irrelevant, then
+    // verify that the file persisted records survive a restart.
+    console.log('PASS: rotation matrix — sign new, accept old in window, reject after expiry');
+  },
+);
+
+withEnvSecrets(
+  {
+    CRASHLAB_WEBHOOK_SIGNING_SECRETS: 'old-secret,grace-secret',
+    CRASHLAB_WEBHOOK_SIGNING_GRACE_TTL_DAYS: '7',
+  },
+  () => {
+    const dir = path.join(TEST_DATA_DIR, 'signing3');
+    const store = new WebhookStore(dir);
+
+    const graceRecord = store.listSigningSecretRecords().find((record) => record.status === 'grace');
+    assert.ok(graceRecord, 'a grace record exists to revoke');
+
+    const revoked = store.revokeGraceSigningSecret(graceRecord.keyId);
+    assert.strictEqual(revoked, true);
+    assert.ok(
+      !store.listSigningSecretRecords().some((record) => record.status === 'grace'),
+      'revoke-grace removes the grace record immediately',
+    );
+    assert.ok(!store.getSigningSecretsForVerification().includes('grace-secret'), 'revoked secret is no longer accepted');
+
+    const missing = store.revokeGraceSigningSecret('key-does-not-exist');
+    assert.strictEqual(missing, false, 'revoking an unknown key reports false');
+
+    // The active secret cannot be revoked through the grace path.
+    const again = store.revokeGraceSigningSecret(store.getActiveSigningSecretRecord()!.keyId);
+    assert.strictEqual(again, false, 'active secrets are never touched by revoke-grace');
+    console.log('PASS: revoke-grace terminates a grace window immediately');
+  },
+);
+
+withEnvSecrets(
+  {
+    CRASHLAB_WEBHOOK_SIGNING_SECRETS: 'persist-me',
+    CRASHLAB_WEBHOOK_SIGNING_GRACE_TTL_DAYS: '5',
+  },
+  () => {
+    const dir = path.join(TEST_DATA_DIR, 'signing4');
+    const store = new WebhookStore(dir);
+    store.rotateSigningSecret();
+    const rotatedKeyId = store.getActiveSigningSecretRecord()!.keyId;
+
+    const reloaded = new WebhookStore(dir);
+    assert.strictEqual(reloaded.listSigningSecretRecords().length, 2, 'secret records survive a restart');
+    assert.strictEqual(
+      reloaded.getActiveSigningSecretRecord()!.keyId,
+      rotatedKeyId,
+      'the rotated active secret survives the restart',
+    );
+    assert.strictEqual(
+      reloaded.getSigningSecretsForVerification()[0],
+      reloaded.getActiveSigningSecretRecord()!.secret,
+      'active-first ordering is restored after reload',
+    );
+    console.log('PASS: signing-secret records persist across restarts');
+  },
+);
+
+withEnvSecrets(
+  {
+    CRASHLAB_WEBHOOK_SIGNING_SECRETS: 'old-env,grace-env',
+  },
+  () => {
+    const dir = path.join(TEST_DATA_DIR, 'signing5');
+    const store = new WebhookStore(dir);
+
+    const worker = new WebhookDeliveryWorker({ store });
+    assert.deepStrictEqual(
+      worker.getHmacSecrets().sort(),
+      ['old-env', 'grace-env'].sort(),
+      'delivery worker draws its ring from the store records',
+    );
+    assert.strictEqual(worker.getHmacSecrets()[0], 'old-env', 'active secret signs outbound');
+
+    console.log('PASS: delivery worker signs with the store active secret');
+  },
+);

@@ -6,6 +6,7 @@ import {
   getNotificationPreference,
   DigestFrequency,
 } from '../../../../lib/storage/notification-store';
+import type { NotificationEventType } from '../../../../lib/storage/notification-store';
 
 export async function GET(request: NextRequest) {
   const rbacError = await checkRbacPermission(request);
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const preference = setNotificationPreference(userId, {
       emailDigestFrequency: body.emailDigestFrequency,
-      enabledEventTypes: body.enabledEventTypes as any,
+      enabledEventTypes: body.enabledEventTypes as NotificationEventType[],
     });
 
     return NextResponse.json({ preference }, { status: 201 });

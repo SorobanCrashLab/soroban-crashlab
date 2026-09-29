@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import type { FuzzingRun } from './types';
-import { getStatusMeta } from '../lib/run-status';
+import type { FuzzingRun } from '../../app/types';
+import { getStatusMeta } from '../../lib/run-status';
 
 interface RunComparisonProps {
   runs: FuzzingRun[];

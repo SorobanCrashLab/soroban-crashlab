@@ -68,7 +68,7 @@ export default function ReproductionSnippetPage() {
                   Language
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {(["rust", "typescript", "bash"] as SnippetLanguage[]).map(
+                  {(["rust", "typescript", "bash", "python"] as SnippetLanguage[]).map(
                     (lang) => (
                       <button
                         key={lang}
@@ -149,7 +149,7 @@ export default function ReproductionSnippetPage() {
               <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
                 <li>Select a failed run from the dropdown</li>
                 <li>
-                  Choose your preferred language (Rust, TypeScript, or Bash)
+                  Choose your preferred language (Rust, TypeScript, Bash, or Python)
                 </li>
                 <li>Copy the generated snippet</li>
                 <li>

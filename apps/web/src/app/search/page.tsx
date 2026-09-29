@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { LoadingSpinner } from '../../components/LoadingSkeleton';
 
 const CreateFuzzySearchPage = dynamic(
-  () => import('../create-fuzzy-search-page'),
+  () => import('../../features/misc/create-fuzzy-search-page'),
   { loading: () => <LoadingSpinner /> },
 );
 

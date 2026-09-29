@@ -209,9 +209,18 @@ export class WebhookDeliveryWorker {
             : []),
         ]
       : [];
+    // Prefer the store's signing-secret records (active + grace) over the env
+    // defaults so in-app rotation (#1663) is honoured from the moment it
+    // happens. Store-provided secrets are: active first, then grace.
+    this.store = options.store ?? null;
+    const storeSecrets = this.store?.getSigningSecretsForVerification() ?? [];
     const secrets =
       options.hmacSecrets ??
-      (ringSecrets.length > 0 ? ringSecrets : getWebhookSigningSecrets());
+      (ringSecrets.length > 0
+        ? ringSecrets
+        : storeSecrets.length > 0
+          ? storeSecrets
+          : getWebhookSigningSecrets());
     this.hmacSecrets = secrets;
     if (!options.adapter && secrets.length > 0) {
       this.adapter = new FetchWebhookDeliveryAdapter(secrets);
@@ -219,7 +228,6 @@ export class WebhookDeliveryWorker {
       this.adapter =
         options.adapter ?? new FetchWebhookDeliveryAdapter(secrets);
     }
-    this.store = options.store ?? null;
     this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.retryBaseMs = options.retryBaseMs ?? WEBHOOK_DELIVERY_RETRY_BASE_MS;
     this.timeoutMs = options.timeoutMs ?? WEBHOOK_DELIVERY_TIMEOUT_MS;
@@ -359,6 +367,11 @@ export class WebhookDeliveryWorker {
           error: result.error,
           retryCount: attempt - 1,
           timestamp: attemptRecord.deliveredAt,
+          // Public key id of the secret that signed this request (#1663).
+          signingKeyId:
+            this.hmacSecrets.length > 0
+              ? getWebhookSigningKeyId(this.hmacSecrets[0])
+              : undefined,
         });
       }
 

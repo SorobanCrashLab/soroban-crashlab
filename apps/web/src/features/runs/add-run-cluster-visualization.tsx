@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from "react";
-import { FuzzingRun } from "./types";
+import { FuzzingRun } from "../../app/types";
 import {
   buildClustersForMode,
   buildMockClusters,
@@ -10,7 +10,7 @@ import {
   type ClusterMetrics,
   type ClusterMode,
   type RunCluster,
-} from "./run-cluster-visualization-utils";
+} from "../../app/run-cluster-visualization-utils";
 
 export type RunClusterVisualizationDataState = "loading" | "error" | "success";
 
@@ -24,8 +24,8 @@ export {
   buildPerformanceClusters,
   buildFailureSignatureClusters,
   buildMockClusters,
-} from "./run-cluster-visualization-utils";
-export type { RunCluster, ClusterMode } from "./run-cluster-visualization-utils";
+} from "../../app/run-cluster-visualization-utils";
+export type { RunCluster, ClusterMode } from "../../app/run-cluster-visualization-utils";
 
 interface RunClusterVisualizationProps {
   runs?: FuzzingRun[];

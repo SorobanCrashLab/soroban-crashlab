@@ -1,5 +1,6 @@
 import dynamic from 'next/dynamic';
-import type { AreaChartProps } from 'recharts';
+import type { ComponentProps, ReactElement } from 'react';
+import { AreaChart } from 'recharts';
 
 /**
  * Lazy-loaded AreaChart wrapper that only loads recharts when the chart
@@ -8,6 +9,8 @@ import type { AreaChartProps } from 'recharts';
  * Shows a skeleton placeholder while the chart library loads, matching the
  * final chart height to avoid layout shift (CLS).
  */
+
+type AreaChartProps = ComponentProps<typeof AreaChart>;
 
 const AreaChartDynamic = dynamic(
   () => import('recharts').then((mod) => mod.AreaChart),
@@ -24,6 +27,6 @@ const AreaChartDynamic = dynamic(
   }
 );
 
-export function LazyAreaChart(props: AreaChartProps) {
+export function LazyAreaChart(props: AreaChartProps): ReactElement {
   return <AreaChartDynamic {...props} />;
 }

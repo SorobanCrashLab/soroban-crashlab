@@ -5,7 +5,7 @@
  */
 
 import type { SmtpConfig } from './smtp-email';
-import type { EmailLogEntry } from '../../app/integrate-smtp-email-integration-utils';
+import type { EmailLogEntry } from '../../features/integrations/integrate-smtp-email-integration-utils';
 
 const MAX_LOG_ENTRIES = 50;
 

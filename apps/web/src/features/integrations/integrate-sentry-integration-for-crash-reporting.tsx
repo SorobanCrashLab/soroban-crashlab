@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 
 import { createSentryAdapter } from "@/lib/integrations/sentry-adapter";
 import type { SentryConfig, CrashReport } from "./integrate-sentry-integration-for-crash-reporting-utils";
-import { absoluteShort } from "./utils/datetime";
+import { absoluteShort } from "../../app/utils/datetime";
 
 /**
  * Issue #248: Integrate Sentry integration for crash reporting

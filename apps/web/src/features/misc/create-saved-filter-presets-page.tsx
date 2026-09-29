@@ -9,7 +9,7 @@ import {
   exportPresetAsJson,
   importPresetFromJson,
   type FilterPreset,
-} from './saved-filter-presets-utils';
+} from '../../app/saved-filter-presets-utils';
 
 export default function CreateSavedFilterPresetsPage() {
   const [presets, setPresets] = useState<FilterPreset[]>(() => (typeof window === 'undefined' ? [] : readPresets()));

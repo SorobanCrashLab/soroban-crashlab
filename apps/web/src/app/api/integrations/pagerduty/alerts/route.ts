@@ -7,7 +7,7 @@
  */
 
 import { successResponse } from '@/lib/api-response-utils';
-import type { PagerDutyAlert } from '../../../../integrate-pagerduty-alert-integration-utils';
+import type { PagerDutyAlert } from '../../../../../features/integrations/integrate-pagerduty-alert-integration-utils';
 
 // Mock data for dev/demo use when PagerDuty is not yet configured.
 const MOCK_ALERTS: PagerDutyAlert[] = [

@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { fetchRuns as fetchRunsFromApi } from '../../../lib/api-client';
 
 const AddAFuzzyQueryBuilderPage51 = dynamic(
-  () => import('../../add-a-fuzzy-query-builder-page-51'),
+  () => import('../../../features/misc/add-a-fuzzy-query-builder-page-51'),
   { ssr: false }
 );
 

@@ -1,4 +1,4 @@
-import type { FuzzingRun } from "./types";
+import type { FuzzingRun } from "../../app/types";
 
 export type SideBySideDataState = "loading" | "error" | "success";
 

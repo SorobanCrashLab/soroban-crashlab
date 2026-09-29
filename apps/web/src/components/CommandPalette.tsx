@@ -37,6 +37,13 @@ export default function CommandPalette() {
   const dialogRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const closePalette = useCallback(() => {
+    setIsOpen(false);
+    setQuery('');
+    setResults([]);
+    abortRef.current?.abort();
+  }, []);
+
   useFocusTrap({
     containerRef: dialogRef,
     active: isOpen,
@@ -98,13 +105,6 @@ export default function CommandPalette() {
     setRecentIds(getRecents());
     setQuery('');
     setIsOpen(true);
-  }, []);
-
-  const closePalette = useCallback(() => {
-    setIsOpen(false);
-    setQuery('');
-    setResults([]);
-    abortRef.current?.abort();
   }, []);
 
   const executeEntry = useCallback(

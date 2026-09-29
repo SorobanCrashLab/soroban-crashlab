@@ -27,7 +27,7 @@ export {
 } from './schedule-store';
 export { evaluateTick, type TickInput, type TickOutcome } from './tick-evaluator';
 export {
-  CronLock,
+  type CronLock,
   createCronLock,
   createInMemoryCronLock,
   getCronLock,

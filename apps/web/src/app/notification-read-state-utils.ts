@@ -1,4 +1,4 @@
-import { safeStorage } from "@/lib/local-storage";
+import { safeStorage } from "../lib/local-storage";
 
 /**
  * Notification read-state persistence and cross-tab merge (#1359).

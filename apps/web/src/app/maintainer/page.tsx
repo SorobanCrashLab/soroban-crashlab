@@ -17,21 +17,21 @@ import { FuzzingRun } from "../types";
 import { fetchRuns as fetchRunsFromApi } from "../../lib/api-client";
 
 const CrossRunBoardWidgets = dynamic(
-  () => import("../implement-cross-run-board-widgets-component"),
+  () => import("../../features/runs/implement-cross-run-board-widgets-component"),
   { ssr: false },
 );
 const CrossRunBoardCustomWidgets = dynamic(
-  () => import("../create-cross-run-board-custom-widgets-63"),
+  () => import("../../features/runs/create-cross-run-board-custom-widgets-63"),
   { ssr: false },
 );
 const AlertPresets = dynamic(() => import("../AlertPresets"), { ssr: false });
 const WidgetLayoutEditor = dynamic(
-  () => import("../implement-widget-layout-editor-component"),
+  () => import("../../features/misc/implement-widget-layout-editor-component"),
   { ssr: false },
 );
 const ResourceFeeInsightPanel = dynamic(
   () =>
-    import("../implement-resource-fee-insight-panel-component").then((mod) => ({
+    import("../../features/misc/implement-resource-fee-insight-panel-component").then((mod) => ({
       default: mod.ResourceFeeInsightPanel,
     })),
   { ssr: false },

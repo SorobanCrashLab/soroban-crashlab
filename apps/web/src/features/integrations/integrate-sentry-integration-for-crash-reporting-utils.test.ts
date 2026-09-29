@@ -8,7 +8,7 @@ import {
   SentryConfig,
   CrashReport,
 } from './integrate-sentry-integration-for-crash-reporting-utils';
-import { createSentryAdapter } from '../lib/integrations/sentry-adapter';
+import { createSentryAdapter } from '../../lib/integrations/sentry-adapter';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`Assertion failed: ${message}`);

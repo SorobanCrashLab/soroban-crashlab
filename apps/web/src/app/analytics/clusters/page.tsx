@@ -12,7 +12,7 @@ const FailureClusterView = dynamic(() => import('../../FailureClusterView'), {
   loading: () => <LoadingSpinner />,
 });
 const RunClusterVisualization = dynamic(
-  () => import('../../add-run-cluster-visualization'),
+  () => import('../../../features/runs/add-run-cluster-visualization'),
   { loading: () => <LoadingSpinner /> },
 );
 

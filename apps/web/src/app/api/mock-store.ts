@@ -12,7 +12,7 @@
  */
 
  
-const g = globalThis as Record<string, any>;
+const g = globalThis as Record<string, unknown>;
 
 function getOrCreateMap<V>(key: string): Map<string, V> {
   if (!(g[key] instanceof Map)) {

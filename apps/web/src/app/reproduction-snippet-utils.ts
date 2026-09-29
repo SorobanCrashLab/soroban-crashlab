@@ -4,7 +4,7 @@
 
 import type { FuzzingRun } from "./types";
 
-export type SnippetLanguage = "rust" | "typescript" | "bash";
+export type SnippetLanguage = "rust" | "typescript" | "bash" | "python";
 
 export function generateReproductionSnippet(
   run: FuzzingRun,
@@ -21,6 +21,8 @@ export function generateReproductionSnippet(
       return generateTypeScriptSnippet(run);
     case "bash":
       return generateBashSnippet(run);
+    case "python":
+      return generatePythonSnippet(run);
     default:
       return "";
   }
@@ -138,6 +140,76 @@ async function reproduce_${run.id.replace(/-/g, "_")}() {
 }
 
 reproduce_${run.id.replace(/-/g, "_")}();`;
+}
+
+function generatePythonSnippet(run: FuzzingRun): string {
+  const { crashDetail } = run;
+  if (!crashDetail) return "";
+
+  let payload;
+  try {
+    payload = JSON.parse(crashDetail.payload);
+  } catch {
+    payload = {};
+  }
+
+  return `#!/usr/bin/env python3
+# Reproduction snippet for ${run.id}
+# Failure: ${crashDetail.failureCategory}
+# Signature: ${crashDetail.signature}
+
+import sys
+
+from stellar_sdk import Contract, SorobanRpc, xdr
+
+RPC_URL = "https://soroban-testnet.stellar.org"
+CONTRACT_ID = "${payload.contract || 'YOUR_CONTRACT_ID'}"
+
+
+def reproduce_${run.id.replace(/-/g, "_")}() -> int:
+    server = SorobanRpc(RPC_URL)
+    contract = Contract(CONTRACT_ID)
+
+${
+  payload.method
+    ? `    # Invoke the failing method
+    operation = contract.call(
+        "${payload.method}",
+        [
+${
+  payload.args
+    ? Object.entries(payload.args)
+        .map(
+          ([key, value]) => `            xdr.ScVal.scvString("${value}"),  # ${key}`,
+        )
+        .join("\n")
+    : "            # Add your arguments here"
+}
+        ],
+    )
+
+    try:
+        result = server.simulate_transaction(operation)
+        print("Result:", result)
+    except Exception as error:
+        print(f"Expected failure: {error}")
+        # Failure category: ${crashDetail.failureCategory}`
+    : `    # Call the method that triggered the failure`
+}
+
+    # Debug information
+    print({
+        "runId": "${run.id}",
+        "seedCount": ${run.seedCount},
+        "cpuInstructions": ${run.cpuInstructions},
+        "memoryBytes": ${run.memoryBytes},
+        "signature": "${crashDetail.signature}",
+    })
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(reproduce_${run.id.replace(/-/g, "_")}())`;
 }
 
 function generateBashSnippet(run: FuzzingRun): string {

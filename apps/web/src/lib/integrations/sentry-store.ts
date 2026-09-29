@@ -8,7 +8,7 @@
 import {
   type CrashReport,
   isDsnReachable,
-} from '../../app/integrate-sentry-integration-for-crash-reporting-utils';
+} from '../../features/integrations/integrate-sentry-integration-for-crash-reporting-utils';
 
 export interface SentryConnectionTestResult {
   success: boolean;

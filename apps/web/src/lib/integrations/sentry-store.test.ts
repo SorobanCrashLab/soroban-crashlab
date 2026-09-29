@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { testSentryConnection, buildMockCrashReports } from './sentry-store';
-import { validateCrashReport } from '../../app/integrate-sentry-integration-for-crash-reporting-utils';
+import { validateCrashReport } from '../../features/integrations/integrate-sentry-integration-for-crash-reporting-utils';
 
 describe('testSentryConnection', () => {
   it('rejects an empty DSN', () => {

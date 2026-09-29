@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
 const IntegrateGrafanaDashboardAnnotationApi = dynamic(
-  () => import('../../integrate-grafana-dashboard-annotation-api'),
+  () => import('../../../features/integrations/integrate-grafana-dashboard-annotation-api'),
   { loading: () => <IntegrationPageSkeleton /> },
 );
 

@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-const ReplayEndToEndIntegrationTest = dynamic(() => import('../../integrate-replay-end-to-end-integration-test'), {
+const ReplayEndToEndIntegrationTest = dynamic(() => import('../../../features/integrations/integrate-replay-end-to-end-integration-test'), {
   loading: () => <IntegrationPageSkeleton />,
 });
 

@@ -11,7 +11,7 @@
 
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
-import { isIntegrationKeyReachable } from '../../../../integrate-pagerduty-alert-integration-utils';
+import { isIntegrationKeyReachable } from '../../../../../features/integrations/integrate-pagerduty-alert-integration-utils';
 import { PAGERDUTY_FETCH_TIMEOUT_MS } from '../../../../../lib/timeouts';
 import { httpCall, outboundErrorCode } from '../../../../../lib/http-call';
 

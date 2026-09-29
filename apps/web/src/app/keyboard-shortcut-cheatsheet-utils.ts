@@ -5,6 +5,7 @@
  */
 
 import { isEditableTarget } from "../lib/is-editable-target";
+import type { CommandEntry } from "../lib/command-palette/registry";
 
 export type ShortcutCategory = "general" | "navigation" | "dashboard";
 
@@ -171,4 +172,113 @@ export function resolveGoNavigationShortcut(
 
 export function shouldHandleGlobalShortcut(isTyping: boolean, isCheatsheetOpen: boolean): boolean {
   return !isTyping || isCheatsheetOpen;
+}
+
+// ─── Registry-driven command entries (single source of truth) ────────────────
+//
+// The cheatsheet overlay renders every command the palette registry actually
+// holds instead of a hand-maintained copy. These helpers keep that mapping
+// pure and testable: the registry snapshot → items, the search filter, and the
+// category grouping. The keyboard-shortcut model above only supplies the key
+// chords (matched per route), never the command list itself.
+
+export type CheatsheetCommandCategory = CommandEntry["category"];
+
+export interface CheatsheetCommandItem {
+  /** Registry entry id, so the overlay can execute the original command. */
+  commandId: string;
+  title: string;
+  subtitle?: string;
+  category: CheatsheetCommandCategory;
+  /** Key chord (e.g. ["G", "H"]) when the route has a registered shortcut. */
+  keys?: string[];
+  route?: string;
+  /** Search keywords carried over from the registry entry. */
+  keywords?: string[];
+}
+
+/** Maps a route to its shortcut keys, from the keyboard-shortcut model. */
+export function navigationKeysByRoute(
+  shortcuts: KeyboardShortcut[] = KEYBOARD_SHORTCUT_CHEATSHEET,
+): Map<string, string[]> {
+  const byRoute = new Map<string, string[]>();
+  for (const shortcut of shortcuts) {
+    if (shortcut.route) byRoute.set(shortcut.route, shortcut.keys);
+  }
+  return byRoute;
+}
+
+/**
+ * Snapshots registry entries into cheatsheet items. Every registered command
+ * appears — nothing is filtered out here — with its key chord attached when a
+ * navigation shortcut exists for its route.
+ */
+export function buildCheatsheetCommandItems(
+  entries: readonly CommandEntry[],
+  keysByRoute: Map<string, string[]> = navigationKeysByRoute(),
+): CheatsheetCommandItem[] {
+  return entries.map((entry) => ({
+    commandId: entry.id,
+    title: entry.title,
+    subtitle: entry.subtitle,
+    category: entry.category,
+    route: entry.route,
+    keywords: entry.keywords,
+    keys: entry.route ? keysByRoute.get(entry.route) : undefined,
+  }));
+}
+
+export function cheatsheetCommandHaystack(item: CheatsheetCommandItem): string {
+  return [item.title, item.subtitle, item.route, ...(item.keywords ?? []), ...(item.keys ?? [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+export function filterCheatsheetCommandItems(
+  items: readonly CheatsheetCommandItem[],
+  query: string,
+): CheatsheetCommandItem[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [...items];
+  return items.filter((item) => cheatsheetCommandHaystack(item).includes(needle));
+}
+
+export function shortcutSearchText(shortcut: KeyboardShortcut): string {
+  return [shortcut.description, ...shortcut.keys].filter(Boolean).join(" ").toLowerCase();
+}
+
+export function filterKeyboardShortcuts(
+  shortcuts: readonly KeyboardShortcut[],
+  query: string,
+): KeyboardShortcut[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [...shortcuts];
+  return shortcuts.filter((shortcut) => shortcutSearchText(shortcut).includes(needle));
+}
+
+export const CHEATSHEET_COMMAND_CATEGORY_ORDER: CheatsheetCommandCategory[] = [
+  "navigation",
+  "action",
+  "run",
+];
+
+export const CHEATSHEET_COMMAND_CATEGORY_LABELS: Record<CheatsheetCommandCategory, string> = {
+  navigation: "Navigation",
+  action: "Actions",
+  run: "Runs",
+};
+
+export function groupCheatsheetCommandItems(
+  items: readonly CheatsheetCommandItem[],
+): Record<CheatsheetCommandCategory, CheatsheetCommandItem[]> {
+  const grouped: Record<CheatsheetCommandCategory, CheatsheetCommandItem[]> = {
+    navigation: [],
+    action: [],
+    run: [],
+  };
+  for (const item of items) {
+    grouped[item.category].push(item);
+  }
+  return grouped;
 }

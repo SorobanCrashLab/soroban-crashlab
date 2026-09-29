@@ -64,7 +64,6 @@ describe('Sentry Client Integration', () => {
       process.env.NEXT_PUBLIC_SENTRY_DSN = 'https://mock-dsn@sentry.io/1';
       initSentryClient();
       const sentryInit = vi.mocked(Sentry.init).mock.calls.at(-1)?.[0];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return () => sentryInit?.beforeSend?.({ tags: {} } as any, {} as any);
     }
 

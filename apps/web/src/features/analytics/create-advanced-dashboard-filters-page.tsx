@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import { useState, useCallback } from 'react';
-import { RunStatus, RunArea, RunSeverity } from './types';
-import { RUN_STATUSES } from '../lib/run-status';
+import { RunStatus, RunArea, RunSeverity } from '../../app/types';
+import { RUN_STATUSES } from '../../lib/run-status';
 
 export interface DashboardFilters {
   status: RunStatus[];

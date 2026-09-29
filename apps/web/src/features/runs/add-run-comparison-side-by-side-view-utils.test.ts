@@ -10,7 +10,7 @@ import {
   selectComparableRuns,
   summarizeSideBySideRows,
 } from "./add-run-comparison-side-by-side-view-utils";
-import { buildMockRuns } from "./mockRuns";
+import { buildMockRuns } from "../../app/mockRuns";
 
 function runAssertions(): void {
   assert.equal(computeSideBySideDelta(100, 120), 20);

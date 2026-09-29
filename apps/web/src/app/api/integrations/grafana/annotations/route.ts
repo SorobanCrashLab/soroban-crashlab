@@ -9,8 +9,8 @@
 
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
-import type { GrafanaAnnotation } from '../../../../integrate-grafana-dashboard-annotation-api-utils';
-import { buildAnnotationPayload, joinGrafanaUrl } from '../../../../integrate-grafana-dashboard-annotation-api-utils';
+import type { GrafanaAnnotation } from '../../../../../features/integrations/integrate-grafana-dashboard-annotation-api-utils';
+import { buildAnnotationPayload, joinGrafanaUrl } from '../../../../../features/integrations/integrate-grafana-dashboard-annotation-api-utils';
 import { httpCall, outboundErrorCode } from '@/lib/http-call';
 import { GRAFANA_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
 

@@ -4,17 +4,27 @@
  * Writes `.lighthouseci/comment.md` for the sticky PR comment and echoes the
  * same markdown to stdout for the job summary.
  *
- * Deliberately not a JSON wall: on failure it prints one line per broken
- * assertion naming the route, the audit, the budget and the measured value.
+ * Two form-factor runs land in `.lighthouseci-desktop/` and
+ * `.lighthouseci-mobile/` (staged by the workflow); each is rendered as its
+ * own table, and the verdict line reflects both. On failure it prints one
+ * line per broken assertion naming the route, the audit, the budget and the
+ * measured value.
  *
  * Issue: #1408 - Lighthouse CI budgets on key pages with PR score comments
+ * Issue: #1652 - Lighthouse CI enforcement (mobile preset, LHR artifacts)
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 
-const LHCI_DIR = path.resolve(process.cwd(), '.lighthouseci');
-const OUT_FILE = path.join(LHCI_DIR, 'comment.md');
+const WORKSPACE = process.cwd();
+const OUT_FILE = path.join(WORKSPACE, '.lighthouseci', 'comment.md');
+
+/** Form-factor runs, newest staging convention first. */
+const RUN_DIRS = [
+  { label: 'Desktop', dir: '.lighthouseci-desktop', title: '### 🖥️ Desktop' },
+  { label: 'Mobile', dir: '.lighthouseci-mobile', title: '### 📱 Mobile' },
+];
 
 /** Reads a JSON artifact LHCI may or may not have produced. */
 function readJson(file, fallback) {
@@ -52,12 +62,29 @@ function score(value) {
   return typeof value === 'number' ? String(Math.round(value * 100)) : '—';
 }
 
-/** Green/amber/red circle on Lighthouse's own 90/50 boundaries. */
-function scoreIcon(value) {
-  if (typeof value !== 'number') return '';
-  if (value >= 0.9) return '🟢';
-  if (value >= 0.5) return '🟠';
-  return '🔴';
+/**
+ * Builds url -> (metric key -> passed|failed) from assertion-results.json.
+ *
+ * LHCI category assertions arrive as `auditId: "categories"` with the property
+ * in `auditProperty` (e.g. "performance"), while numeric audits use the audit
+ * id directly (e.g. "largest-contentful-paint"). Only FAILED assertions are
+ * recorded in assertion-results.json; every row we render is asserted on every
+ * route by both configs, so an absent entry means the budget passed.
+ */
+function assertionMap(assertions) {
+  const byUrl = new Map();
+  for (const a of assertions) {
+    if (!a.url) continue;
+    const key = a.auditProperty ? `${a.auditId}:${a.auditProperty}` : a.auditId;
+    if (!byUrl.has(a.url)) byUrl.set(a.url, new Map());
+    byUrl.get(a.url).set(key, a.passed === true);
+  }
+  return byUrl;
+}
+
+/** 🟢 when the route's assertion passed (or was not recorded), 🔴 on failure. */
+function gateIcon(assertByUrl, url, key) {
+  return assertByUrl.get(url)?.get(key) === false ? '🔴' : '🟢';
 }
 
 /** Milliseconds -> "1.80 s"; unitless metrics (CLS) keep three decimals. */
@@ -71,101 +98,129 @@ function formatValue(auditId, value) {
   return `${Math.round(value)} ms`;
 }
 
+/**
+ * Loads a run directory: medians per URL plus the assertion results.
+ * Returns null when the directory has no LHR samples.
+ */
+function loadRunDir(run) {
+  const dirPath = path.join(WORKSPACE, run.dir);
+  if (!fs.existsSync(dirPath)) return null;
+
+  const reportFiles = fs
+    .readdirSync(dirPath)
+    .filter((f) => f.startsWith('lhr-') && f.endsWith('.json'))
+    .map((f) => path.join(dirPath, f));
+
+  if (reportFiles.length === 0) return null;
+
+  const byUrl = new Map();
+  for (const file of reportFiles) {
+    const lhr = readJson(file, null);
+    if (!lhr?.requestedUrl) continue;
+    const samples = byUrl.get(lhr.requestedUrl) ?? [];
+    samples.push({
+      performance: lhr.categories?.performance?.score,
+      accessibility: lhr.categories?.accessibility?.score,
+      lcp: lhr.audits?.['largest-contentful-paint']?.numericValue,
+      cls: lhr.audits?.['cumulative-layout-shift']?.numericValue,
+    });
+    byUrl.set(lhr.requestedUrl, samples);
+  }
+
+  const assertions = readJson(path.join(dirPath, 'assertion-results.json'), []);
+  const links = readJson(path.join(dirPath, 'links.json'), {});
+  const sampleCount = Math.max(...[...byUrl.values()].map((samples) => samples.length));
+
+  return { byUrl, assertions, links, sampleCount, assertByUrl: assertionMap(assertions) };
+}
+
 const lines = [];
 lines.push('## 🚦 Lighthouse budgets');
 lines.push('');
 
-const reportFiles = fs.existsSync(LHCI_DIR)
-  ? fs
-      .readdirSync(LHCI_DIR)
-      .filter((f) => f.startsWith('lhr-') && f.endsWith('.json'))
-      .map((f) => path.join(LHCI_DIR, f))
-  : [];
+const runs = RUN_DIRS.map((run) => ({ ...run, data: loadRunDir(run) })).filter((run) => run.data !== null);
 
-function emit() {
-  const output = lines.join('\n');
-  fs.mkdirSync(LHCI_DIR, { recursive: true });
-  fs.writeFileSync(OUT_FILE, output);
-  console.log(output);
-}
-
-if (reportFiles.length === 0) {
+if (runs.length === 0) {
   lines.push('> Lighthouse produced no reports — the collect step failed before');
   lines.push('> any route was audited. Check the job log for the server startup.');
   emit();
   process.exit(0);
 }
 
-// Group every sample by the URL it audited.
-const byUrl = new Map();
-for (const file of reportFiles) {
-  const lhr = readJson(file, null);
-  if (!lhr?.requestedUrl) continue;
-  const samples = byUrl.get(lhr.requestedUrl) ?? [];
-  samples.push({
-    performance: lhr.categories?.performance?.score,
-    accessibility: lhr.categories?.accessibility?.score,
-    lcp: lhr.audits?.['largest-contentful-paint']?.numericValue,
-    cls: lhr.audits?.['cumulative-layout-shift']?.numericValue,
-  });
-  byUrl.set(lhr.requestedUrl, samples);
-}
+const totalFailures = runs.reduce((sum, run) => sum + run.data.assertions.filter((a) => !a.passed).length, 0);
 
-const assertions = readJson(path.join(LHCI_DIR, 'assertion-results.json'), []);
-const links = readJson(path.join(LHCI_DIR, 'links.json'), {});
-const sampleCount = Math.max(...[...byUrl.values()].map((s) => s.length));
-
-lines.push(
-  `Median of ${sampleCount} runs per route · desktop preset · pinned Slow-4G throttling.`,
-);
-lines.push('');
-lines.push('| Route | Perf | A11y | LCP | CLS | Report |');
-lines.push('| --- | --- | --- | --- | --- | --- |');
-
-for (const [url, samples] of byUrl) {
-  const pick = (key) => median(samples.map((s) => s[key]).filter((v) => typeof v === 'number'));
-  const perf = pick('performance');
-  const a11y = pick('accessibility');
-  const lcp = pick('lcp');
-  const cls = pick('cls');
-  const link = links[url];
-
-  lines.push(
-    `| \`${toRoute(url)}\` | ${scoreIcon(perf)} ${score(perf)} | ${scoreIcon(a11y)} ${score(a11y)} ` +
-      `| ${lcp === undefined ? '—' : formatValue('largest-contentful-paint', lcp)} ` +
-      `| ${cls === undefined ? '—' : formatValue('cumulative-layout-shift', cls)} ` +
-      `| ${link ? `[report](${link})` : '—'} |`,
-  );
-}
-
-const failures = assertions.filter((a) => !a.passed);
-
-lines.push('');
-if (failures.length === 0) {
-  lines.push('✅ **All budgets met.**');
+if (totalFailures === 0) {
+  lines.push('✅ **All budgets met** across every form factor and route.');
 } else {
-  lines.push(`❌ **${failures.length} budget ${failures.length === 1 ? 'miss' : 'misses'}.**`);
-  lines.push('');
-  lines.push('| Route | Audit | Budget | Measured |');
-  lines.push('| --- | --- | --- | --- |');
+  lines.push(`❌ **${totalFailures} budget ${totalFailures === 1 ? 'miss' : 'misses'}** across ${runs.length} form factor${runs.length === 1 ? '' : 's'}.`);
+}
+lines.push('');
 
-  for (const failure of failures) {
-    // `auditId` is absent for category assertions; `name` carries e.g.
-    // "categories:performance" in that case.
-    const auditId = failure.auditId ?? failure.name;
-    const comparator = failure.operator === '>=' ? '≥' : '≤';
+for (let index = 0; index < runs.length; index += 1) {
+  const run = runs[index];
+  const { byUrl, assertions, links, sampleCount, assertByUrl } = run.data;
+
+  if (index > 0) lines.push('');
+  lines.push(run.title);
+  lines.push('');
+  lines.push(`Median of ${sampleCount} runs per route · pinned Slow-4G throttling.`);
+  lines.push('');
+  lines.push('| Route | Perf | A11y | LCP | CLS | Report |');
+  lines.push('| --- | --- | --- | --- | --- | --- |');
+
+  for (const [url, samples] of byUrl) {
+    const pick = (key) => median(samples.map((s) => s[key]).filter((v) => typeof v === 'number'));
+    const perf = pick('performance');
+    const a11y = pick('accessibility');
+    const lcp = pick('lcp');
+    const cls = pick('cls');
+    const link = links[url];
+
     lines.push(
-      `| \`${toRoute(failure.url ?? '')}\` | \`${auditId}\` ` +
-        `| ${comparator} ${formatValue(auditId, failure.expected)} ` +
-        `| **${formatValue(auditId, failure.actual)}** |`,
+      `| \`${toRoute(url)}\` | ${gateIcon(assertByUrl, url, 'categories:performance')} ${score(perf)} ` +
+        `| ${gateIcon(assertByUrl, url, 'categories:accessibility')} ${score(a11y)} ` +
+        `| ${gateIcon(assertByUrl, url, 'largest-contentful-paint')} ${lcp === undefined ? '—' : formatValue('largest-contentful-paint', lcp)} ` +
+        `| ${gateIcon(assertByUrl, url, 'cumulative-layout-shift')} ${cls === undefined ? '—' : formatValue('cumulative-layout-shift', cls)} ` +
+        `| ${link ? `[report](${link})` : '—'} |`,
     );
+  }
+
+  const failures = assertions.filter((a) => !a.passed);
+  if (failures.length > 0) {
+    lines.push('');
+    lines.push(`_${failures.length} ${failures.length === 1 ? 'miss' : 'misses'} on this form factor._`);
+    lines.push('');
+    lines.push('| Route | Audit | Budget | Measured |');
+    lines.push('| --- | --- | --- | --- |');
+
+    for (const failure of failures) {
+      // Category assertions arrive as `auditId: "categories"` with the property
+      // (e.g. "performance") in `auditProperty`; compose them so the label and
+      // value formatter (score-hundreds vs ms) resolve correctly.
+      const auditId = failure.auditProperty
+        ? `${failure.auditId}:${failure.auditProperty}`
+        : (failure.auditId ?? failure.name);
+      const comparator = failure.operator === '>=' ? '≥' : '≤';
+      lines.push(
+        `| \`${toRoute(failure.url ?? '')}\` | \`${auditId}\` ` +
+          `| ${comparator} ${formatValue(auditId, failure.expected)} ` +
+          `| **${formatValue(auditId, failure.actual)}** |`,
+      );
+    }
   }
 }
 
 lines.push('');
 lines.push(
   '<sub>CI gate only — no dashboards, no RUM. Budgets, their derivation and the ' +
-    'variance study live in `apps/web/lighthouserc.js`.</sub>',
+    'variance study live in `apps/web/lighthouserc.js` and `lighthouserc.mobile.js`.</sub>',
 );
 
 emit();
+
+function emit() {
+  const output = lines.join('\n');
+  fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
+  fs.writeFileSync(OUT_FILE, output);
+  console.log(output);
+}

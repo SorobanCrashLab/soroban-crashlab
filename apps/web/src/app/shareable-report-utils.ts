@@ -1,4 +1,4 @@
-import type { Report } from './add-report-generator';
+import type { Report } from '../features/misc/add-report-generator';
 
 /**
  * Utility functions for generating shareable report links

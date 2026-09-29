@@ -1,14 +1,17 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { randomBytes } from 'node:crypto';
 import { WebhookConfig } from '../app/webhook-manager';
 import { WebhookDeliveryRequest } from './webhook-delivery-worker';
+import { getWebhookSigningKeyId, getWebhookSigningSecrets } from './webhook-hmac';
 import type { DlqEntry, DlqGateway } from './webhook-dlq';
 import type { RetryJob, RetryQueueGateway } from './webhook-retry-queue';
 
 /**
  * Persistent file-based store for webhook configurations, pending deliveries,
- * and delivery logs.  All mutations are write-through to a JSON file so
- * queued deliveries survive process restarts.
+ * delivery logs, and signing-secret rotation records.  All mutations are
+ * write-through to a JSON file so queued deliveries survive process
+ * restarts.
  *
  * The store is safe for single-process use (Next.js default).  It uses
  * synchronous writes to guarantee the file is up-to-date before returning.
@@ -20,6 +23,7 @@ const QUEUE_FILE = 'webhook-delivery-queue.json';
 const DELIVERY_LOG_FILE = 'webhook-delivery-log.json';
 const DLQ_FILE = 'webhook-dead-letter-queue.json';
 const RETRY_QUEUE_FILE = 'webhook-retry-queue.json';
+const SIGNING_SECRETS_FILE = 'webhook-signing-secrets.json';
 
 export interface DeliveryLogEntry {
   webhookId: string;
@@ -28,6 +32,23 @@ export interface DeliveryLogEntry {
   error?: string;
   retryCount: number;
   timestamp: string;
+  /** Public key id of the secret that signed this delivery (#1663). */
+  signingKeyId?: string;
+}
+
+export type WebhookSigningSecretStatus = 'active' | 'grace';
+
+export interface WebhookSigningSecretRecord {
+  /** Stable record id. */
+  id: string;
+  /** Public key identifier derived from the secret material (`key-…`). */
+  keyId: string;
+  /** The secret material. Server-side only; never returned to clients. */
+  secret: string;
+  status: WebhookSigningSecretStatus;
+  createdAt: string;
+  /** When a grace-period secret stops being accepted (ISO string, optional for active). */
+  expiresAt?: string;
 }
 
 export interface WebhookStoreData {
@@ -36,7 +57,11 @@ export interface WebhookStoreData {
   deliveryLog: DeliveryLogEntry[];
   deadLetterQueue: DlqEntry[];
   retryQueue: RetryJob[];
+  signingSecrets: WebhookSigningSecretRecord[];
 }
+
+/** Default grace window for a demoted signing secret (14 days). */
+export const DEFAULT_SIGNING_GRACE_TTL_DAYS = 14;
 
 export class WebhookStore {
   private dataDir: string;
@@ -45,6 +70,7 @@ export class WebhookStore {
   private deliveryLog: DeliveryLogEntry[] = [];
   private deadLetterQueue: DlqEntry[] = [];
   private retryQueue: RetryJob[] = [];
+  private signingSecrets: WebhookSigningSecretRecord[] = [];
   private maxLogSize: number;
 
   constructor(dataDir?: string, maxLogSize: number = 10000) {
@@ -217,6 +243,140 @@ export class WebhookStore {
     };
   }
 
+  // ─── Signing-secret rotation (#1663) ──────────────────────────────────
+  //
+  // Secret records (id, key-id, status active|grace, created/expires) live
+  // in the store so operators can rotate in the UI without touching env
+  // files. On first boot the store seeds itself from the deployment env
+  // (`CRASHLAB_WEBHOOK_SIGNING_SECRETS`, first entry active) so existing
+  // deployments carry their current secret forward.
+
+  /** Public records; the secret material is never included. */
+  listSigningSecretRecords(): Array<Omit<WebhookSigningSecretRecord, 'secret'>> {
+    this.pruneExpiredSigningSecrets();
+    return this.signingSecrets.map(({ secret: _secret, ...record }) => record);
+  }
+
+  /** The active secret record, if any. */
+  getActiveSigningSecretRecord(): WebhookSigningSecretRecord | undefined {
+    this.pruneExpiredSigningSecrets();
+    return this.signingSecrets.find((record) => record.status === 'active');
+  }
+
+  /** Secrets accepted for inbound verification: active + unexpired grace. */
+  getSigningSecretsForVerification(): string[] {
+    this.pruneExpiredSigningSecrets();
+    return [
+      ...this.signingSecrets.filter((record) => record.status === 'active').map((record) => record.secret),
+      ...this.signingSecrets.filter((record) => record.status === 'grace').map((record) => record.secret),
+    ];
+  }
+
+  /**
+   * Rotates the signing secret: the current active record is demoted to
+   * grace (reverification only, with a TTL) and a fresh secret becomes
+   * active for signing. The new secret is returned exactly once — the
+   * caller must surface it to the operator before it is persisted.
+   */
+  rotateSigningSecret(graceTtlDays?: number): {
+    active: WebhookSigningSecretRecord;
+    previousKeyId: string | undefined;
+  } {
+    this.pruneExpiredSigningSecrets();
+
+    const now = new Date();
+    const ttlDays = graceTtlDays ?? this.signingGraceTtlDays();
+    const previous = this.signingSecrets.find((record) => record.status === 'active');
+
+    const newSecret = randomBytes(32).toString('hex');
+    const active: WebhookSigningSecretRecord = {
+      id: `sec-${randomBytes(8).toString('hex')}`,
+      keyId: getWebhookSigningKeyId(newSecret),
+      secret: newSecret,
+      status: 'active',
+      createdAt: now.toISOString(),
+    };
+
+    if (previous) {
+      previous.status = 'grace';
+      previous.expiresAt = new Date(now.getTime() + ttlDays * 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    this.signingSecrets.push(active);
+
+    // Order records so the active secret sorts first (visual + first used for
+    // signing by the delivery worker).
+    this.signingSecrets.sort((a, b) =>
+      a.status === 'active' ? -1 : b.status === 'active' ? 1 : a.createdAt.localeCompare(b.createdAt),
+    );
+    this.saveSigningSecrets();
+
+    return { active, previousKeyId: previous?.keyId };
+  }
+
+  /** Immediately revokes a grace-period secret (terminates its window). */
+  revokeGraceSigningSecret(idOrKeyId: string): boolean {
+    this.pruneExpiredSigningSecrets();
+    const before = this.signingSecrets.length;
+    this.signingSecrets = this.signingSecrets.filter(
+      (record) => record.status !== 'grace' || (record.id !== idOrKeyId && record.keyId !== idOrKeyId),
+    );
+    if (this.signingSecrets.length !== before) {
+      this.saveSigningSecrets();
+      return true;
+    }
+    return false;
+  }
+
+  /** Drops grace secrets whose window has lapsed. Returns how many were pruned. */
+  pruneExpiredSigningSecrets(nowMs: number = Date.now()): number {
+    const before = this.signingSecrets.length;
+    this.signingSecrets = this.signingSecrets.filter((record) => {
+      if (record.status !== 'grace' || !record.expiresAt) return true;
+      return new Date(record.expiresAt).getTime() > nowMs;
+    });
+    if (this.signingSecrets.length !== before) {
+      this.saveSigningSecrets();
+    }
+    return before - this.signingSecrets.length;
+  }
+
+  private signingGraceTtlDays(): number {
+    const configured = parseInt(process.env.CRASHLAB_WEBHOOK_SIGNING_GRACE_TTL_DAYS ?? '', 10);
+    return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_SIGNING_GRACE_TTL_DAYS;
+  }
+
+  /** Seeds records from env on first boot — the store is the source of truth afterwards. */
+  private seedSigningSecretsFromEnv(): void {
+    if (this.signingSecrets.length > 0) return;
+    const envSecrets = getWebhookSigningSecrets();
+    if (envSecrets.length === 0) return;
+
+    const now = Date.now();
+    const ttlDays = this.signingGraceTtlDays();
+    envSecrets.forEach((secret, index) => {
+      const isActive = index === 0;
+      this.signingSecrets.push({
+        id: `sec-env-${index}-${randomBytes(4).toString('hex')}`,
+        keyId: getWebhookSigningKeyId(secret),
+        secret,
+        status: isActive ? 'active' : 'grace',
+        createdAt: new Date(now).toISOString(),
+        ...(isActive ? {} : { expiresAt: new Date(now + ttlDays * 24 * 60 * 60 * 1000).toISOString() }),
+      });
+    });
+    this.saveSigningSecrets();
+  }
+
+  private loadSigningSecrets(): void {
+    this.signingSecrets = this.readJson<WebhookSigningSecretRecord[]>(SIGNING_SECRETS_FILE, []);
+    this.seedSigningSecretsFromEnv();
+  }
+
+  private saveSigningSecrets(): void {
+    this.writeJson(SIGNING_SECRETS_FILE, this.signingSecrets);
+  }
+
   // ─── Bulk / startup ───────────────────────────────────────────────────
 
   loadAll(): void {
@@ -231,6 +391,7 @@ export class WebhookStore {
     this.loadDeliveryLog();
     this.loadDeadLetterQueue();
     this.loadRetryQueue();
+    this.loadSigningSecrets();
   }
 
   /**
@@ -243,6 +404,7 @@ export class WebhookStore {
       deliveryLog: [...this.deliveryLog],
       deadLetterQueue: this.getDeadLetterQueue(),
       retryQueue: this.getRetryQueue(),
+      signingSecrets: [...this.signingSecrets],
     };
   }
 

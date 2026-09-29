@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { FuzzingRun } from "./types";
+import { FuzzingRun } from "../../app/types";
 import {
   RESOURCE_THRESHOLDS,
   classifyResourceLevel,
@@ -9,8 +9,8 @@ import {
   groupRunsByContractCall,
   isExpensiveRun,
   sanitizeFeeSeries,
-} from "./resource-fee-utils";
-import { avgCpu, maxCpu, avgMemory, maxMemory, avgFee, maxFee, formatNumber } from "./run-metrics";
+} from "../../app/resource-fee-utils";
+import { avgCpu, maxCpu, avgMemory, maxMemory, avgFee, maxFee, formatNumber } from "../../app/run-metrics";
 
 export type ResourceFeeInsightDataState = "loading" | "error" | "success";
 

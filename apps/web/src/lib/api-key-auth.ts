@@ -119,22 +119,43 @@ export function getMetricsScrapeToken(): string | undefined {
 }
 
 /**
+ * Checks if unauthenticated metrics scraping is explicitly allowed via escape
+ * hatch. This should ONLY be used for local development.
+ */
+function isUnauthenticatedMetricsAllowed(): boolean {
+  const allow = process.env.CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS;
+  return allow === '1' || allow === 'true';
+}
+
+/**
  * Validates the `Authorization: Bearer <token>` header on the request against
  * the configured `CRASHLAB_METRICS_SCRAPE_TOKEN` environment variable.
  *
- * - When no scrape token is configured the request is allowed through so
- *   existing deployments without the env var are unaffected.
+ * - When no scrape token is configured the request is rejected with 503
+ *   (fail-closed) unless `CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS=1` is set
+ *   (local dev only).
  * - When a scrape token IS configured the caller must supply a matching
  *   Bearer token; mismatches or absent headers are rejected with 401.
  *
- * Returns undefined when authentication passes (or is unconfigured), or a
- * NextResponse with status 401 when it fails.
+ * Returns undefined when authentication passes, or a NextResponse with status
+ * 401 (invalid/missing token) or 503 (auth not configured) when it fails.
  */
 export function validateMetricsScrapeAuth(request: NextRequest): NextResponse | undefined {
   const configuredToken = getMetricsScrapeToken();
 
-  // No token configured — authentication is not enforced.
+  // No token configured — authenticated scraping is enforced by default
+  // (fail-closed) so an unconfigured deployment does not leak metrics.
   if (configuredToken === undefined) {
+    if (!isUnauthenticatedMetricsAllowed()) {
+      return NextResponse.json(
+        {
+          error:
+            'Metrics authentication is not configured. Set CRASHLAB_METRICS_SCRAPE_TOKEN to enable scraping, or set CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS=1 for local development only.',
+          code: 'METRICS_AUTH_NOT_CONFIGURED',
+        },
+        { status: 503 },
+      );
+    }
     return undefined;
   }
 

@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
-const IntegrationTestHarnessForUIFlows = dynamic(() => import('../../integrate-integration-test-harness-for-ui-flows'), {
+const IntegrationTestHarnessForUIFlows = dynamic(() => import('../../../features/integrations/integrate-integration-test-harness-for-ui-flows'), {
   loading: () => <IntegrationPageSkeleton />,
 });
 

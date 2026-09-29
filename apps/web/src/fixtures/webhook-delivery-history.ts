@@ -12,6 +12,8 @@ export interface WebhookDeliveryHistoryItem {
   lastAttemptedAt?: string;
   nextRetryAt?: string;
   error?: string;
+  /** Public key id of the signing secret used for this delivery (#1663). */
+  keyId?: string;
   payload: Record<string, unknown>;
   responseBody?: string;
   headers?: Record<string, string>;
@@ -41,6 +43,7 @@ export const MOCK_WEBHOOK_DELIVERY_HISTORY: WebhookDeliveryHistoryItem[] = [
     headers: {
       'Content-Type': 'application/json',
       'X-CrashLab-Signature': 'sha256=a5b4c3d2e1f0...',
+      'X-Webhook-Key-Id': 'key-a1b2c3d4e5f6a7b8',
     },
   },
   {
@@ -52,6 +55,7 @@ export const MOCK_WEBHOOK_DELIVERY_HISTORY: WebhookDeliveryHistoryItem[] = [
     statusCode: 503,
     attempts: 3,
     maxAttempts: 3,
+    keyId: 'key-a1b2c3d4e5f6a7b8',
     createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
     lastAttemptedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
     error: 'HTTP 503 Service Unavailable: Discord API Gateway undergoing maintenance',
@@ -66,6 +70,7 @@ export const MOCK_WEBHOOK_DELIVERY_HISTORY: WebhookDeliveryHistoryItem[] = [
     responseBody: '{"message": "503 Service Unavailable", "code": 0}',
     headers: {
       'Content-Type': 'application/json',
+      'X-Webhook-Key-Id': 'key-a1b2c3d4e5f6a7b8',
     },
   },
   {
@@ -77,6 +82,7 @@ export const MOCK_WEBHOOK_DELIVERY_HISTORY: WebhookDeliveryHistoryItem[] = [
     statusCode: 500,
     attempts: 1,
     maxAttempts: 3,
+    keyId: 'key-9f8e7d6c5b4a3928',
     createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
     lastAttemptedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
     nextRetryAt: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
@@ -98,6 +104,7 @@ export const MOCK_WEBHOOK_DELIVERY_HISTORY: WebhookDeliveryHistoryItem[] = [
     statusCode: 200,
     attempts: 1,
     maxAttempts: 3,
+    keyId: 'key-a1b2c3d4e5f6a7b8',
     createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
     lastAttemptedAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
     payload: {
@@ -117,6 +124,7 @@ export const MOCK_WEBHOOK_DELIVERY_HISTORY: WebhookDeliveryHistoryItem[] = [
     statusCode: 200,
     attempts: 1,
     maxAttempts: 3,
+    keyId: 'key-a1b2c3d4e5f6a7b8',
     createdAt: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
     lastAttemptedAt: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
     payload: {

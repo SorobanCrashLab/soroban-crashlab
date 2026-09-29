@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { buildMockRuns } from '../../../mockRuns';
-import AddRunReplayHistoryWithTimestamps from '../../../add-run-replay-history-with-timestamps';
+import AddRunReplayHistoryWithTimestamps from '../../../../features/runs/add-run-replay-history-with-timestamps';
 import BreadcrumbNav from '@/components/BreadcrumbNav';
 
 export const dynamic = 'force-dynamic';

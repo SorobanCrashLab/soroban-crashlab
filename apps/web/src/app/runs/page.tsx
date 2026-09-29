@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { captureRunListContext } from './swipe/run-list-context';
-import type { BulkAction } from '../add-bulk-actions-for-runs';
+import type { BulkAction } from '../../features/runs/add-bulk-actions-for-runs';
 import {
   applyBulkActionToRuns,
   getSelectedRuns,
@@ -33,11 +33,11 @@ import { PageHeader } from '../../components/PageHeader';
 import { PullToRefreshIndicator } from '../../components/PullToRefreshIndicator';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 
-const BulkActionsForRuns = dynamic(() => import('../add-bulk-actions-for-runs'), {
+const BulkActionsForRuns = dynamic(() => import('../../features/runs/add-bulk-actions-for-runs'), {
   loading: () => <LoadingSpinner />,
 });
 const VirtualizedRunTable = dynamic(
-  () => import('../implement-virtualized-run-table-component'),
+  () => import('../../features/runs/implement-virtualized-run-table-component'),
   { loading: () => <LoadingSpinner /> },
 );
 

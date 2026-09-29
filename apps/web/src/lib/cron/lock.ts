@@ -23,7 +23,7 @@ function hasPutRun(driver: RunStorageDriver): driver is RunDriverWithPutRun {
   return 'putRun' in driver && typeof driver.putRun === 'function';
 }
 
-function createLockRun(key: string, lockId: string): FuzzingRun {
+function createLockRun(key: string): FuzzingRun {
   return {
     id: key,
     status: 'running' as RunStatus,
@@ -50,7 +50,7 @@ export function createCronLock(driver: RunStorageDriver): CronLock {
           return false;
         }
 
-        const lockRun = createLockRun(key, lockId);
+        const lockRun = createLockRun(key);
 
         if (hasPutRun(driver)) {
           await driver.putRun(lockRun);

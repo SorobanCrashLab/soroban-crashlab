@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
 
 const IntegrateSmtpEmailIntegration = dynamic(
-  () => import('../../integrate-smtp-email-integration'),
+  () => import('../../../features/integrations/integrate-smtp-email-integration'),
   { loading: () => <IntegrationPageSkeleton /> },
 );
 

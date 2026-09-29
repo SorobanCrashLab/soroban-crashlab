@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { successResponse, errorResponse, status } from '@/lib/api-response-utils';
 import { readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 import { evaluateTick } from '@/lib/cron';
+import { scheduledCampaignIdempotencyKey } from '@/lib/idempotency-key';
 import { getSchedulerState, setSchedulerState } from '../_store';
 import { getCronLock, createInMemoryCronLock } from '@/lib/cron/lock';
 
@@ -89,6 +90,7 @@ export const POST = withRouteErrorHandling(
         tickCount: outcome.created.length,
         caughtUp: false,
         tags: ['system:tick'],
+        idempotencyKey: scheduledCampaignIdempotencyKey('system', now.toISOString()),
       };
 
       setSchedulerState({

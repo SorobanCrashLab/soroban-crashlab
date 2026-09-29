@@ -3,8 +3,8 @@
 import * as React from 'react';
 import { useState, useCallback } from 'react';
 import Image from 'next/image';
-import { FuzzingRun, RunIssueLink } from './types';
-import { validateIssueUrl, getIssueTypeFromUrl, getIssueFaviconUrl, addIssueLink, removeIssueLink } from './run-issue-utils';
+import { FuzzingRun, RunIssueLink } from '../../app/types';
+import { validateIssueUrl, getIssueTypeFromUrl, getIssueFaviconUrl, addIssueLink, removeIssueLink } from '../../app/run-issue-utils';
 import { parseLinearIssueUrl } from '@/lib/integrations/linear-issues';
 
 interface RunIssueLinkPageProps {

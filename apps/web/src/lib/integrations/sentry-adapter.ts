@@ -9,7 +9,7 @@ import { createAbortSignal } from './adapter-utils';
 import {
   type SentryConfig,
   type CrashReport,
-} from '../../app/integrate-sentry-integration-for-crash-reporting-utils';
+} from '../../features/integrations/integrate-sentry-integration-for-crash-reporting-utils';
 
 export interface SentryAdapterOptions {
   apiBase?: string;

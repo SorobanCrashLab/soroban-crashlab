@@ -28,6 +28,7 @@ import {
   type WebhookRetryMetricsSnapshot,
 } from './webhook-retry-queue';
 import { getWebhookStore } from './webhook-store';
+import { getWebhookSigningSecrets } from './webhook-hmac';
 
 export interface WebhookRecoveryTickResult {
   retries: RetryTickResult;
@@ -136,10 +137,16 @@ let singleton: WebhookRecovery | null = null;
 export function getWebhookRecovery(): WebhookRecovery {
   if (!singleton) {
     const store = getWebhookStore();
+    // Prefer the store's signing-secret records (active + grace) so retries and
+    // DLQ drains sign with the current active secret after an in-app rotation
+    // (#1663), falling back to env only when the store holds no records.
+    const storeSecrets = store.getSigningSecretsForVerification();
     singleton = createWebhookRecovery({
       retryGateway: store.retryQueueGateway(),
       dlqGateway: store.dlqGateway(),
-      adapter: new FetchWebhookDeliveryAdapter(),
+      adapter: new FetchWebhookDeliveryAdapter(
+        storeSecrets.length > 0 ? storeSecrets : getWebhookSigningSecrets(),
+      ),
     });
   }
   return singleton;
