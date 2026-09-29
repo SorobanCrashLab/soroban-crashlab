@@ -22,7 +22,6 @@ export const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ["recharts", "react-markdown", "remark-gfm"],
-    viewTransition: true,
   },
   headers: async () => [
     {
@@ -124,19 +123,10 @@ export default withSentryConfig(
           },
         }
       : undefined,
-    setCommits: {
-      auto: true,
-    },
     sourcemaps: {
       deleteSourcemapsAfterUpload: true,
     },
-  },
-  {
     widenClientFileUpload: true,
-    hideSourceMaps: true,
     disableLogger: true,
-    sourcemaps: {
-      deleteSourcemapsAfterUpload: true,
-    },
   },
 );
