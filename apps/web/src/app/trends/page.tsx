@@ -7,6 +7,7 @@ import { FilterBar } from "./FilterBar";
 import { AnomalySensitivityToggle } from "./AnomalySensitivityToggle";
 import { TrendsChartSkeleton } from "../../components/LoadingSkeleton";
 import { PageHeader, StatCard } from "../../components";
+import { WidgetErrorBoundary } from "../../components/WidgetErrorBoundary";
 
 // Lazy-load the recharts bundle (~90 KB gzipped). Only analytics/trends routes
 // pay the chart cost; dashboard/runs/settings pages are excluded from this chunk.
@@ -195,11 +196,13 @@ export default function CrashTrendPage() {
                   )}
                 </div>
 
-                <CrashTrendChart
-                  data={chartData}
-                  selectedSignatures={effectiveSelectedSignatures}
-                  anomalyFlags={anomalyResult.flags}
-                />
+                <WidgetErrorBoundary title="Crash Trend Chart">
+                  <CrashTrendChart
+                    data={chartData}
+                    selectedSignatures={effectiveSelectedSignatures}
+                    anomalyFlags={anomalyResult.flags}
+                  />
+                </WidgetErrorBoundary>
 
                 {/* Summary stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">

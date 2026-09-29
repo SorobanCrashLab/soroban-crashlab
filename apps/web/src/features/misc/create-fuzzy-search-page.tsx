@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { fetchRuns } from '../../lib/api-client';
 import { FuzzingRun } from '../../app/types';
-import { fuzzySearch, getSearchableFieldLabels, type FuzzySearchResult } from '../../app/fuzzy-search-utils';
+import { fuzzySearch, getSearchableFieldLabels, highlightedExcerpt, type FuzzySearchResult, type HighlightSegment } from '../../app/fuzzy-search-utils';
 import { searchRuns, usesGrammar } from '../../app/search/grammar/compiler';
 import { caretLine, type QueryError } from '../../app/search/grammar/lexer';
 import { suggestFields } from '../../app/search/grammar/fields';
@@ -16,6 +16,39 @@ function LoadingSkeleton() {
       <div className="h-10 w-full max-w-md rounded-xl bg-zinc-200 dark:bg-zinc-800" />
       <div className="h-64 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900" />
     </div>
+  );
+}
+
+/**
+ * Renders a value with its query terms marked, so a ranked result shows *why*
+ * it matched instead of a flat truncated string.
+ *
+ * Segment text is emitted as React children, never as raw markup, so a field
+ * value containing HTML is escaped rather than injected.
+ */
+function HighlightedText({
+  segments,
+  className,
+}: {
+  segments: HighlightSegment[];
+  className?: string;
+}) {
+  if (segments.length === 0) return null;
+  return (
+    <span className={className}>
+      {segments.map((segment, index) =>
+        segment.matched ? (
+          <mark
+            key={index}
+            className="bg-amber-200 text-inherit dark:bg-amber-500/40 rounded-sm px-0.5"
+          >
+            {segment.text}
+          </mark>
+        ) : (
+          <span key={index}>{segment.text}</span>
+        ),
+      )}
+    </span>
   );
 }
 
@@ -269,7 +302,7 @@ export default function CreateFuzzySearchPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-mono text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                            {result.run.id}
+                            <HighlightedText segments={highlightedExcerpt(result.run.id, query, 120)} />
                           </span>
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                             result.run.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
@@ -295,7 +328,8 @@ export default function CreateFuzzySearchPage() {
                           <div className="flex flex-wrap gap-1.5 mt-1.5">
                             {result.matchedFields.slice(0, 4).map((field) => (
                               <span key={field.field} className="text-[11px] px-2 py-0.5 rounded-full bg-[#E7F0F9] text-[#0A66C2] dark:bg-[#0A66C2]/20 dark:text-[#66B2FF] font-medium">
-                                {field.field}: {field.value.length > 30 ? field.value.slice(0, 30) + '...' : field.value}
+                                {field.field}:{' '}
+                                <HighlightedText segments={highlightedExcerpt(field.value, query, 60)} />
                               </span>
                             ))}
                             {result.matchedFields.length > 4 && (
