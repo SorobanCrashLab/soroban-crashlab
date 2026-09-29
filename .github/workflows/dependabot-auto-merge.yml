@@ -1,0 +1,85 @@
+name: Dependabot Auto-merge
+
+# Merges a Dependabot pull request once the checks the repository requires are
+# green, so a routine dependency bump lands without a maintainer round-trip.
+# This is the remaining half of #1683 — the first half, grouped updates, is in
+# .github/dependabot.yml.
+#
+# Scope is deliberately narrow, because a workflow that can merge is a workflow
+# that can merge the wrong thing:
+#
+#   * Only `dependabot[bot]` reaches the job. A human-authored PR — including
+#     one that edits dependency files — is never auto-merged here.
+#   * `gh pr merge --auto` does not merge immediately. It records an intent to
+#     merge, and GitHub merges only once the branch's required status checks
+#     have passed. Nothing in this workflow evaluates a check itself or skips
+#     one, so it cannot merge around a red gate.
+#   * `pull_request_target`, not `pull_request`: auto-merging needs a token
+#     with write access, and `pull_request` hands fork PRs a read-only token.
+#     `pull_request_target` runs this file as it exists on the base branch and
+#     never checks out or executes the pull request's code — the only values
+#     read from the event payload are the PR's URL, its author login, and its
+#     draft flag. That keeps the elevated token away from untrusted code.
+#
+# Two settings live outside the repository's files, so a workflow cannot turn
+# them on. If either is missing this job fails with a message naming it rather
+# than silently never merging — an auto-merge that quietly does nothing is the
+# same failure as having no auto-merge at all:
+#
+#   1. Settings → General → Pull Requests → "Allow auto-merge"
+#   2. Branch protection on `main` with status checks marked required.
+#
+# On (2), the two checks worth requiring for a dependency bump are
+# "Check action pins are well-formed" — an unresolvable action pin is the exact
+# defect that kept nine workflows here from running a single step — and
+# "lint-title", the conventional-subject gate the repo already enforces.
+# "placeholder" (ci.yml) should *not* be required: it echoes a retirement
+# message and always succeeds, so gating on it would merge on green nothing.
+#
+# Dependabot is currently disabled (`open-pull-requests-limit: 0` on both
+# ecosystems in .github/dependabot.yml). That is deliberate and this workflow
+# does not change it. It is prepared the same way the `groups` blocks are: the
+# machinery is in place for the day the limit is raised, so enabling Dependabot
+# later is a one-line change rather than a second round of CI work.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+# `contents: write` is what lets the merge itself land on `main`;
+# `pull-requests: write` is what lets the intent to merge be recorded. No other
+# scope is requested, and no step checks out repository or PR code.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Enable auto-merge for Dependabot
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm the repository allows auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          allowed="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.allow_auto_merge')"
+          if [ "$allowed" != "true" ]; then
+            echo "::error title=Auto-merge is disabled on this repository::Enable Settings → General → Pull Requests → \"Allow auto-merge\". Dependabot bumps cannot be queued until that is on, and this job is intentionally loud about it rather than passing while merging nothing."
+            exit 1
+          fi
+
+      - name: Queue auto-merge once required checks pass
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr merge --auto --squash "$PR_URL"
+          echo "Auto-merge queued for $PR_URL — GitHub will merge it when the required checks are green."
