@@ -264,11 +264,20 @@ pub use worker_partition::{
     WorkerPartition, WorkerPartitionError, RING_SIZE,
 };
 
+pub mod health_snapshot;
+pub use health_snapshot::{
+    append_health_snapshot, classify_failure_message, health_snapshot_path, read_health_snapshots,
+    read_latest_health_snapshot, terminal_label, BudgetSnapshot, CampaignHealth, HealthSnapshot,
+    HealthSnapshotError, DEFAULT_SNAPSHOT_INTERVAL_SEEDS, HEALTH_SNAPSHOT_FILE,
+    HEALTH_SNAPSHOT_SCHEMA_VERSION, SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS,
+};
+
 pub mod run_control;
 pub use run_control::{
     cancel_marker_path, cancel_requested, clear_cancel_request, default_state_dir, drive_run,
     drive_run_from_checkpoint, drive_run_partitioned, drive_run_partitioned_from_checkpoint,
-    request_cancel_run, CancelSignal, RunId, RunResumeError, RunSummary, RunTerminalState,
+    drive_run_with_health, request_cancel_run, CancelSignal, RunId, RunProgress, RunResumeError,
+    RunSummary, RunTerminalState,
 };
 
 pub mod rpc_envelope;
