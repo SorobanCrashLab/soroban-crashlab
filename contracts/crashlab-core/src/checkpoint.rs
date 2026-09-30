@@ -1,16 +1,32 @@
 //! Campaign run checkpoints for resuming interrupted fuzzing without redoing work.
 //!
 //! Persist [`RunCheckpoint`] as JSON and reload before continuing a campaign.
-//! The checkpoint records the next global seed index a resumed worker should
-//! examine. In single-worker runs, seeds with indices `< next_seed_index` are
-//! already completed. In partitioned runs, each worker keeps its own checkpoint
-//! file and may also skip unowned indices below the cursor.
+//! The checkpoint records two complementary pieces of progress:
+//!
+//! * `next_seed_index`, the next global seed index a resumed worker should
+//!   examine (v1 behaviour, kept for [`crate::drive_run_from_checkpoint`]); and
+//! * `ring_coverage`, the fixed-ring slots already swept by
+//!   [`crate::drive_run_partitioned_from_checkpoint`].
+//!
+//! ## Schema history
+//!
+//! * **v1** — `schema`, `campaign_id`, `next_seed_index`, `total_seeds`.
+//! * **v2** — adds `ring_coverage`. Missing `ring_coverage` in a v1 file is
+//!   read as empty coverage, so existing checkpoints load unchanged and are
+//!   upgraded to v2 when written back.
 
+use crate::worker_partition::RingCoverage;
 use crate::CaseSeed;
 use serde::{Deserialize, Serialize};
 
-/// Schema version for [`RunCheckpoint`] JSON on disk.
-pub const RUN_CHECKPOINT_SCHEMA_VERSION: u32 = 1;
+/// Current schema version for [`RunCheckpoint`] JSON on disk.
+pub const RUN_CHECKPOINT_SCHEMA_VERSION: u32 = 2;
+
+/// Schema versions [`load_run_checkpoint_json`] and [`RunCheckpoint::validate_run`] accept.
+///
+/// v1 files predate ring coverage; they are accepted and read with empty
+/// coverage, then serialized as v2 on the next save.
+pub const SUPPORTED_RUN_CHECKPOINT_SCHEMAS: &[u32] = &[1, 2];
 
 /// Serializable checkpoint for a single campaign run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,6 +39,12 @@ pub struct RunCheckpoint {
     pub next_seed_index: usize,
     /// Total seeds in the schedule when the checkpoint was written (for validation).
     pub total_seeds: usize,
+    /// Fixed-ring slots already swept by partitioned workers.
+    ///
+    /// Defaults to empty when absent, which is exactly how a v1 checkpoint
+    /// (written before ring partitioning existed) is interpreted.
+    #[serde(default)]
+    pub ring_coverage: RingCoverage,
 }
 
 /// Errors when applying a checkpoint to a seed slice.
@@ -37,6 +59,8 @@ pub enum CheckpointError {
     },
     /// Recorded `total_seeds` does not match `seeds.len()`.
     TotalMismatch { recorded: usize, actual: usize },
+    /// The checkpoint was written by an incompatible newer/unknown schema.
+    UnsupportedSchema { schema: u32 },
 }
 
 impl std::fmt::Display for CheckpointError {
@@ -57,6 +81,11 @@ impl std::fmt::Display for CheckpointError {
                 f,
                 "checkpoint total_seeds {recorded} does not match actual schedule length {actual}"
             ),
+            CheckpointError::UnsupportedSchema { schema } => write!(
+                f,
+                "checkpoint schema {schema} is not supported (supported: {supported:?})",
+                supported = SUPPORTED_RUN_CHECKPOINT_SCHEMAS
+            ),
         }
     }
 }
@@ -71,6 +100,7 @@ impl RunCheckpoint {
             campaign_id: campaign_id.into(),
             next_seed_index: 0,
             total_seeds: seeds.len(),
+            ring_coverage: RingCoverage::new(),
         }
     }
 
@@ -90,6 +120,11 @@ impl RunCheckpoint {
         campaign_id: &str,
         total_seeds: usize,
     ) -> Result<(), CheckpointError> {
+        if !SUPPORTED_RUN_CHECKPOINT_SCHEMAS.contains(&self.schema) {
+            return Err(CheckpointError::UnsupportedSchema {
+                schema: self.schema,
+            });
+        }
         if self.campaign_id != campaign_id {
             return Err(CheckpointError::CampaignMismatch {
                 recorded: self.campaign_id.clone(),
@@ -244,5 +279,45 @@ mod tests {
         let mut cp = RunCheckpoint::new_run("c", &s);
         cp.advance_by(3);
         assert!(cp.is_complete(&s));
+    }
+
+    #[test]
+    fn legacy_v1_checkpoint_loads_with_empty_coverage() {
+        // A v1 file predates ring coverage: no `ring_coverage` key. It must
+        // load with empty coverage and still validate against the run.
+        let v1_json = br#"{
+            "schema": 1,
+            "campaign_id": "campaign-legacy",
+            "next_seed_index": 2,
+            "total_seeds": 4
+        }"#;
+        let cp = load_run_checkpoint_json(v1_json).unwrap();
+        assert_eq!(cp.schema, 1);
+        assert!(cp.ring_coverage.is_empty());
+        assert!(cp.validate_run("campaign-legacy", 4).is_ok());
+    }
+
+    #[test]
+    fn unsupported_schema_rejected() {
+        let s = seeds(3);
+        let mut cp = RunCheckpoint::new_run("c", &s);
+        cp.schema = 99;
+        assert!(matches!(
+            cp.validate_run("c", s.len()),
+            Err(CheckpointError::UnsupportedSchema { schema: 99 })
+        ));
+    }
+
+    #[test]
+    fn new_run_writes_current_schema_with_empty_coverage() {
+        let s = seeds(2);
+        let cp = RunCheckpoint::new_run("c", &s);
+        assert_eq!(cp.schema, RUN_CHECKPOINT_SCHEMA_VERSION);
+        assert!(cp.ring_coverage.is_empty());
+        // The v2 field round-trips through JSON.
+        let bytes = save_run_checkpoint_json(&cp).unwrap();
+        let loaded = load_run_checkpoint_json(&bytes).unwrap();
+        assert_eq!(loaded, cp);
+        assert_eq!(loaded.ring_coverage, cp.ring_coverage);
     }
 }
