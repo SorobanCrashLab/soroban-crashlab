@@ -315,6 +315,11 @@ mod tests {
 
     #[test]
     fn roundtrip_with_large_payload() {
+        // `to_bundle` routes the seed through `mutate_seed`, whose havoc
+        // mutation caps payloads at `HavocConfig::default().max_len` (4096),
+        // so the round-trip invariant is payload fidelity, not input length:
+        // the seed comes back truncated exactly as the pipeline left it while
+        // the 10 KB `failure_payload` exercises gzip compression at scale.
         let mut bundle = to_bundle(CaseSeed {
             id: 99,
             payload: vec![0xDE; 10000],
@@ -322,8 +327,7 @@ mod tests {
         bundle.failure_payload = vec![0xAD; 10000];
         let compressed = compress_artifact(&bundle).expect("compress");
         let restored = decompress_artifact(&compressed).expect("decompress");
-        assert_eq!(restored.seed.payload.len(), 10000);
-        assert_eq!(restored.failure_payload.len(), 10000);
+        assert_eq!(restored, bundle);
     }
 
     #[test]
@@ -528,6 +532,10 @@ mod tests {
 
     #[test]
     fn very_large_bundle_compresses_successfully() {
+        // Same fidelity invariant as `roundtrip_with_large_payload`: the seed
+        // payload is capped at `max_len` by havoc mutation, while the 100 KB
+        // `failure_payload` proves the full JSON+gzip pipeline handles large
+        // bundles without loss.
         let mut bundle = to_bundle(CaseSeed {
             id: 1,
             payload: vec![0xFF; 100_000],
@@ -538,8 +546,7 @@ mod tests {
         assert!(!compressed.is_empty());
 
         let restored = decompress_artifact(&compressed).expect("decompress large");
-        assert_eq!(restored.seed.payload.len(), 100_000);
-        assert_eq!(restored.failure_payload.len(), 100_000);
+        assert_eq!(restored, bundle);
     }
 
     #[test]
