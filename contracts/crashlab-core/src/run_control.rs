@@ -166,6 +166,83 @@ pub fn clear_cancel_request(run_id: RunId, base: impl AsRef<Path>) -> io::Result
     }
 }
 
+/// Observer for a drive loop's progress (#1593).
+///
+/// The drive loops are the only place that knows where a campaign is, so they
+/// report it here rather than leaving operators blind between the start and the
+/// final summary. Implementations must not panic and should stay cheap:
+/// [`RunProgress::on_seed_processed`] runs once per completed seed.
+///
+/// [`CampaignHealth`](crate::health_snapshot::CampaignHealth) implements this to
+/// turn the callbacks into periodic, versioned health snapshots.
+pub trait RunProgress {
+    /// A seed's `work` returned `Ok`. `seeds_processed` counts the seeds this
+    /// loop completed; indices owned by another partition are not counted.
+    fn on_seed_processed(&mut self, seed_index: u64, seeds_processed: u64);
+
+    /// `work` returned `Err` for `seed_index`; the loop is about to stop.
+    fn on_failure(&mut self, seed_index: u64, message: &str);
+
+    /// The loop stopped, whatever the reason. Called exactly once per entered
+    /// loop, after the last seed callback.
+    fn on_finish(&mut self, seeds_processed: u64, terminal: &RunTerminalState);
+}
+
+/// [`drive_run`], reporting progress to `progress`.
+///
+/// The callbacks are the only signal a long campaign produces while it runs, so
+/// a panic-free, cheap implementation matters more here than elsewhere.
+pub fn drive_run_with_health<F>(
+    _run_id: RunId,
+    total_seeds: u64,
+    signal: &CancelSignal,
+    partition: Option<WorkerPartition>,
+    mut work: F,
+    progress: &mut dyn RunProgress,
+) -> RunTerminalState
+where
+    F: FnMut(u64) -> Result<(), String>,
+{
+    let mut seeds_processed = 0u64;
+    for seed_index in 0..total_seeds {
+        if signal.is_cancelled() {
+            let terminal = RunTerminalState::Cancelled {
+                summary: RunSummary {
+                    seeds_processed,
+                    cancelled_at_seed: Some(seed_index),
+                },
+            };
+            progress.on_finish(seeds_processed, &terminal);
+            return terminal;
+        }
+
+        if let Some(p) = &partition {
+            if !p.owns_seed(seed_index) {
+                continue;
+            }
+        }
+
+        if let Err(message) = work(seed_index) {
+            progress.on_failure(seed_index, &message);
+            let terminal = RunTerminalState::Failed { message };
+            progress.on_finish(seeds_processed, &terminal);
+            return terminal;
+        }
+
+        seeds_processed += 1;
+        progress.on_seed_processed(seed_index, seeds_processed);
+    }
+
+    let terminal = RunTerminalState::Completed {
+        summary: RunSummary {
+            seeds_processed,
+            cancelled_at_seed: None,
+        },
+    };
+    progress.on_finish(seeds_processed, &terminal);
+    terminal
+}
+
 /// Runs `work` for each seed index in `0..total`, stopping early when `signal` fires.
 /// If `partition` is provided, only seeds owned by that partition are processed, but
 /// `total_seeds` is evaluated completely for cancellation reasons.
