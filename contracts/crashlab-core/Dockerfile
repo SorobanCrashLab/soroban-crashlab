@@ -6,6 +6,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY crashlab-core/Cargo.toml ./crashlab-core/Cargo.toml
 COPY crashlab-core/src ./crashlab-core/src
 COPY crashlab-core/tests ./crashlab-core/tests
+COPY crashlab-core/fixtures ./crashlab-core/fixtures
 COPY soroban-example/Cargo.toml ./soroban-example/Cargo.toml
 COPY soroban-example/src ./soroban-example/src
 RUN cargo test --workspace --all-targets --release
