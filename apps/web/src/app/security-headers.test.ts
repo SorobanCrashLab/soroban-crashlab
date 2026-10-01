@@ -24,13 +24,28 @@ describe("Security Response Headers", () => {
     expect(headerMap.get("Permissions-Policy")).toContain("microphone=()");
     expect(headerMap.get("Permissions-Policy")).toContain("geolocation=()");
 
-    const csp = headerMap.get("Content-Security-Policy");
-    expect(csp).toBeDefined();
-    expect(csp).toContain("frame-ancestors 'self'");
+    // Content-Security-Policy is intentionally absent from the static headers
+    // (issue #1545). A `headers()` value is fixed at build time and therefore
+    // cannot carry a per-request nonce, so the policy is attached in
+    // src/proxy.ts. Emitting it here as well would produce a second, weaker
+    // header that the browser intersects with the real one. The policy itself
+    // is asserted in src/lib/csp.test.ts and src/proxy.test.ts.
+    expect(headerMap.has("Content-Security-Policy")).toBe(false);
+  });
+
+  it("does not ship a static CSP that would weaken the nonce policy", async () => {
+    const headersFn = nextConfig.headers;
+    const headerRules = await headersFn!();
+    const serialized = JSON.stringify(headerRules);
+
+    expect(serialized).not.toContain("'unsafe-eval'");
   });
 
   it("mirrors security headers in root vercel.json and apps/web/vercel.json", () => {
-    const rootDir = path.resolve(__dirname, "../../..");
+    // __dirname is apps/web/src/app, so the repo root is four levels up. The
+    // previous "../../.." resolved to apps/ and threw ENOENT, which went
+    // unnoticed because this file was not wired into any npm run script.
+    const rootDir = path.resolve(__dirname, "../../../..");
     const rootVercelPath = path.join(rootDir, "vercel.json");
     const webVercelPath = path.join(rootDir, "apps/web/vercel.json");
 
@@ -47,7 +62,10 @@ describe("Security Response Headers", () => {
       expect(headerMap.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
       expect(headerMap.get("Strict-Transport-Security")).toBe("max-age=63072000; includeSubDomains; preload");
       expect(headerMap.get("Permissions-Policy")).toContain("camera=()");
-      expect(headerMap.get("Content-Security-Policy")).toContain("frame-ancestors 'self'");
+      // The CSP moved to the per-request proxy (see src/proxy.ts); a static
+      // edge header cannot express a per-request nonce. See src/lib/csp.test.ts.
+      expect(headerMap.has("Content-Security-Policy")).toBe(false);
+      expect(JSON.stringify(config.headers)).not.toContain("'unsafe-eval'");
     }
   });
 });

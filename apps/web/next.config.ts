@@ -47,24 +47,15 @@ export const nextConfig: NextConfig = {
           key: "Strict-Transport-Security",
           value: "max-age=63072000; includeSubDomains; preload",
         },
-        {
-          key: "Content-Security-Policy",
-          value: [
-            "default-src 'self'",
-            // Next.js emits small inline bootstrapping scripts for hydration.
-            "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: https:",
-            // Fonts are self-hosted via next/font — no Google origins needed.
-            "font-src 'self' data:",
-            "connect-src 'self' https:",
-            "frame-ancestors 'self'",
-            "form-action 'self'",
-            "base-uri 'self'",
-            "object-src 'none'",
-            "upgrade-insecure-requests",
-          ].join("; "),
-        },
+        // Content-Security-Policy is intentionally NOT set here.
+        //
+        // A nonce must be unique per response, so a static `headers()` value
+        // cannot express it: it would either pin one nonce for the life of the
+        // deployment (replayable by anything that saw a single response) or
+        // ship none at all, which blocks Next's own hydration scripts. The
+        // policy is therefore attached per request in src/proxy.ts. Setting it
+        // here as well would emit a second, weaker header that the browser
+        // intersects with the real one. See docs/CSP.md.
       ],
     },
   ],

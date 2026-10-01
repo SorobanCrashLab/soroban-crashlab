@@ -1,6 +1,11 @@
 import { buildOpenApiSpec } from '@/lib/openapi/spec';
 
-export const dynamic = 'force-static';
+// The root layout forces dynamic rendering so the per-request CSP nonce
+// reaches the emitted markup (issue #1545, see docs/CSP.md). Re-declaring
+// `force-static` here would opt this route back out of it, so the inline
+// scripts would ship without a nonce and the strict `script-src` would block
+// hydration on /api-docs. It uses no dynamic APIs, so nothing else is lost.
+export const dynamic = 'force-dynamic';
 
 export default function ApiDocsPage() {
   const spec = buildOpenApiSpec();
