@@ -90,7 +90,15 @@ describe('self-hosted fonts', () => {
   });
 
   it('narrows the CSP now that no external font origin is used', () => {
-    expect(nextConfig).toMatch(/"font-src 'self' data:"/);
-    expect(nextConfig).toMatch(/"style-src 'self' 'unsafe-inline'"/);
+    // The CSP moved out of next.config.ts into the per-request proxy in
+    // issue #1545, because a static headers() value cannot carry a nonce.
+    // The directives themselves are asserted in src/lib/csp.test.ts.
+    const cspModule = read('src/lib/csp.ts');
+
+    expect(cspModule).toMatch(/"font-src 'self' data:"/);
+    expect(cspModule).toMatch(/"style-src 'self' 'unsafe-inline'"/);
+    // No external font origin may reappear in the policy.
+    expect(cspModule).not.toMatch(/fonts\.googleapis\.com/);
+    expect(cspModule).not.toMatch(/fonts\.gstatic\.com/);
   });
 });

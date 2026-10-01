@@ -140,6 +140,10 @@ The dashboard (both Vercel and self-hosted Docker deployments) ships the followi
 security headers. They are defined in `vercel.json` (root and `apps/web/vercel.json`)
 and in `apps/web/next.config.ts` so both deployment paths behave identically.
 
+`Content-Security-Policy` is the one exception: it is generated per request in
+`apps/web/src/proxy.ts` so it can carry a CSP nonce, and is therefore not in the
+static header lists. See [`docs/CSP.md`](CSP.md).
+
 | Header | Value | Rationale |
 |--------|-------|-----------|
 | `X-Content-Type-Options` | `nosniff` | Prevents browsers from MIME-sniffing responses away from the declared `Content-Type`, reducing drive-by download risks. |
@@ -159,6 +163,7 @@ Headers are snapshot-tested in `apps/web/src/app/security-headers.test.ts` to pr
 | Document | Purpose |
 |----------|---------|
 | [`.github/SECURITY.md`](../.github/SECURITY.md) | Authoritative reporting policy and disclosure timelines |
+| [`docs/CSP.md`](CSP.md) | How the Content-Security-Policy is built, and why rendering is forced dynamic |
 | [`docs/THREAT_MODEL_ARTIFACT_HANDLING.md`](THREAT_MODEL_ARTIFACT_HANDLING.md) | STRIDE threat model for artifact ingestion and storage |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | Contributor security checklist and PR guidelines |
 | [`MAINTAINER_WAVE_PLAYBOOK.md`](../MAINTAINER_WAVE_PLAYBOOK.md) | Operational security assumptions and known gaps |
