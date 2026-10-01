@@ -106,8 +106,6 @@ impl TokenContract {
 
     /// Nominate a new admin. Two-step so the incoming admin has to accept.
     pub fn set_admin(env: Env, admin: Address, new_admin: Address) -> Result<(), ContractError> {
-        admin.require_auth();
-
         let stored_admin: Address = env
             .storage()
             .persistent()
@@ -117,6 +115,8 @@ impl TokenContract {
         if admin != stored_admin {
             return Err(ContractError::Unauthorized);
         }
+
+        stored_admin.require_auth();
 
         env.storage()
             .persistent()
@@ -203,8 +203,6 @@ impl TokenContract {
 
     /// Mint new tokens (only admin).
     pub fn mint(env: Env, admin: Address, to: Address, amount: i128) -> Result<(), ContractError> {
-        admin.require_auth();
-
         let stored_admin: Address = env
             .storage()
             .persistent()
@@ -214,6 +212,8 @@ impl TokenContract {
         if admin != stored_admin {
             return Err(ContractError::Unauthorized);
         }
+
+        stored_admin.require_auth();
 
         if amount <= 0 {
             return Err(ContractError::InvalidAmount);
@@ -283,8 +283,6 @@ impl TokenContract {
         from: Address,
         amount: i128,
     ) -> Result<(), ContractError> {
-        admin.require_auth();
-
         let stored_admin: Address = env
             .storage()
             .persistent()
@@ -294,6 +292,8 @@ impl TokenContract {
         if admin != stored_admin {
             return Err(ContractError::Unauthorized);
         }
+
+        stored_admin.require_auth();
 
         if amount <= 0 {
             return Err(ContractError::InvalidAmount);

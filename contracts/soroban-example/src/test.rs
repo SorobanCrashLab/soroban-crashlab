@@ -92,6 +92,32 @@ fn test_set_admin_unauthorized() {
 }
 
 #[test]
+fn test_set_admin_auth_records_stored_admin_not_unauthorized_caller() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+    let unauthorized = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+
+    client.initialize(&admin, &1000);
+
+    // An unauthorized caller supplying their own address must be rejected
+    // before auth is requested for the attacker-supplied address.
+    assert_eq!(
+        client.try_set_admin(&unauthorized, &new_admin),
+        Err(Ok(ContractError::Unauthorized))
+    );
+    assert_eq!(env.auths(), std::vec::Vec::new());
+
+    // When the valid admin calls set_admin, auth is recorded for the stored admin.
+    client.set_admin(&admin, &new_admin);
+    let auths = env.auths();
+    assert_eq!(auths.len(), 1);
+    assert_eq!(auths[0].0, admin);
+}
+
+#[test]
 fn test_accept_admin_must_be_pending() {
     let env = Env::default();
     env.mock_all_auths();
@@ -223,6 +249,32 @@ fn test_mint_unauthorized() {
 }
 
 #[test]
+fn test_mint_auth_records_stored_admin_not_unauthorized_caller() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let unauthorized = Address::generate(&env);
+
+    client.initialize(&admin, &1000);
+
+    // An unauthorized caller supplying their own address must be rejected
+    // before auth is requested for the attacker-supplied address.
+    assert_eq!(
+        client.try_mint(&unauthorized, &user, &500),
+        Err(Ok(ContractError::Unauthorized))
+    );
+    assert_eq!(env.auths(), std::vec::Vec::new());
+
+    // When the valid admin calls mint, auth is recorded for the stored admin.
+    client.mint(&admin, &user, &500);
+    let auths = env.auths();
+    assert_eq!(auths.len(), 1);
+    assert_eq!(auths[0].0, admin);
+}
+
+#[test]
 fn test_mint_zero_amount() {
     let env = Env::default();
     env.mock_all_auths();
@@ -283,6 +335,33 @@ fn test_admin_burn_unauthorized() {
         client.try_admin_burn(&unauthorized, &user, &100),
         Err(Ok(ContractError::Unauthorized))
     );
+}
+
+#[test]
+fn test_admin_burn_auth_records_stored_admin_not_unauthorized_caller() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let client = TokenContractClient::new(&env, &env.register(TokenContract, ()));
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let unauthorized = Address::generate(&env);
+
+    client.initialize(&admin, &1000);
+    client.transfer(&admin, &user, &200);
+
+    // An unauthorized caller supplying their own address must be rejected
+    // before auth is requested for the attacker-supplied address.
+    assert_eq!(
+        client.try_admin_burn(&unauthorized, &user, &100),
+        Err(Ok(ContractError::Unauthorized))
+    );
+    assert_eq!(env.auths(), std::vec::Vec::new());
+
+    // When the valid admin calls admin_burn, auth is recorded for the stored admin.
+    client.admin_burn(&admin, &user, &100);
+    let auths = env.auths();
+    assert_eq!(auths.len(), 1);
+    assert_eq!(auths[0].0, admin);
 }
 
 #[test]
