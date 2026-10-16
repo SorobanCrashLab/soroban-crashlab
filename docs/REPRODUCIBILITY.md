@@ -2,6 +2,8 @@
 
 This document describes the deterministic guarantees provided by CrashLab, known limitations across environments, and troubleshooting steps for mismatched replay outcomes.
 
+> The precise contract — what reproduces, over which engine versions and platforms, with cross-platform evidence — is [reproducibility-contract.md](reproducibility-contract.md). It also has the "why did my repro fail?" decision tree.
+
 ## Deterministic Guarantees
 
 CrashLab is designed to produce identical outputs given identical inputs. The following components are fully deterministic:

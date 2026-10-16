@@ -1,0 +1,26 @@
+{
+  "reference": [
+    {
+      "engine": "0.1.0",
+      "preset": "nightly",
+      "seeds": 2000,
+      "digest": "44972c3367a6f9bd"
+    }
+  ],
+  "platforms": [
+    {
+      "os": "linux",
+      "arch": "x86_64",
+      "engine": "0.1.0",
+      "bundleSchema": 2,
+      "preset": "nightly",
+      "seeds": 2000,
+      "digest": "44972c3367a6f9bd",
+      "roundtripFailures": 0,
+      "rustc": "rustc 1.95.0",
+      "commit": "fda9f71",
+      "date": "2026-10-16",
+      "source": "local"
+    }
+  ]
+}
