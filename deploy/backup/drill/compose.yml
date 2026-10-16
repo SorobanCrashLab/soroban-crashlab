@@ -1,0 +1,51 @@
+# Local backup/restore drill stack (#1900). Started by deploy/backup/drill.sh.
+#
+# Two KV stores (source + scratch) speaking the Upstash REST protocol through
+# serverless-redis-http, and two S3-compatible stores (source artifacts +
+# isolated backup bucket with its own credentials). SeaweedFS stands in for
+# MinIO here because MinIO no longer publishes public images; the scripts only
+# speak S3, so production MinIO/S3 works unchanged.
+
+x-redis: &redis
+  image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+  command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+x-srh: &srh
+  image: hiett/serverless-redis-http:latest@sha256:5b0bb9239fce53abf87b2018a7a0deb9ec7bd900c5360738fe5fbeeb426f9150
+
+x-s3: &s3
+  image: chrislusf/seaweedfs:3.85@sha256:49312939c00c01e5ee6afbd7d728b18027821d3764c35a797a72acd4fdf3296a
+
+services:
+  redis-src: *redis
+  redis-scratch: *redis
+
+  kv-src:
+    <<: *srh
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: drill-src-token
+      SRH_CONNECTION_STRING: redis://redis-src:6379
+    ports: ["127.0.0.1:18079:80"]
+    depends_on: [redis-src]
+
+  kv-scratch:
+    <<: *srh
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: drill-scratch-token
+      SRH_CONNECTION_STRING: redis://redis-scratch:6379
+    ports: ["127.0.0.1:18078:80"]
+    depends_on: [redis-scratch]
+
+  s3-src:
+    <<: *s3
+    command: ["server", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweed/s3.json", "-dir=/data"]
+    volumes: ["./s3-src.json:/etc/seaweed/s3.json:ro"]
+    ports: ["127.0.0.1:18333:8333"]
+
+  s3-backup:
+    <<: *s3
+    command: ["server", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweed/s3.json", "-dir=/data"]
+    volumes: ["./s3-backup.json:/etc/seaweed/s3.json:ro"]
+    ports: ["127.0.0.1:18334:8333"]

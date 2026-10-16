@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "app",
+      "credentials": [{ "accessKey": "drill-app", "secretKey": "drill-app-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    },
+    {
+      "name": "backup-reader",
+      "credentials": [{ "accessKey": "drill-backup-reader", "secretKey": "drill-backup-reader-secret" }],
+      "actions": ["Read", "List"]
+    }
+  ]
+}
