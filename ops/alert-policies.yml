@@ -1,0 +1,71 @@
+# Alert routing policy (#1892).
+#
+# Policy-as-code: every alert the dispatcher receives is matched against
+# `routes` in order and the first match decides where it goes. The last route
+# must be a catch-all so no alert is ever silently dropped — the schema test in
+# apps/web/src/lib/notifications/alert-policy.test.ts enforces that, along with
+# the rest of the shape, on every test run.
+#
+# Times are minutes. Quiet hours are UTC "HH:MM" and may wrap midnight.
+# Runbook per route: docs/ops/oncall.md.
+
+version: 1
+
+defaults:
+  dedupWindowMinutes: 30
+  ackSlaMinutes: 15
+
+quietHours:
+  start: "22:00"
+  end: "07:00"
+
+routes:
+  # Nightly campaign escalations (W5-D08): a crash the nightly run could not
+  # auto-triage. Pages immediately, ignores quiet hours.
+  - id: nightly-critical
+    match:
+      source: nightly-escalation
+      severity: [critical]
+    channels: [pagerduty, slack]
+    dedupKey: [source, fingerprint]
+    ackSlaMinutes: 10
+    respectQuietHours: false
+    escalation:
+      - afterMinutes: 10
+        channels: [pagerduty, email]
+      - afterMinutes: 30
+        channels: [email]
+
+  # SLO burn-rate alerts (W5-I02). Fast burn pages, slow burn goes to chat.
+  - id: slo-fast-burn
+    match:
+      source: slo-burn
+      severity: [critical, error]
+    channels: [pagerduty, slack]
+    dedupKey: [source, fingerprint]
+    respectQuietHours: false
+    escalation:
+      - afterMinutes: 15
+        channels: [email]
+
+  - id: slo-slow-burn
+    match:
+      source: slo-burn
+      severity: [warning, info]
+    channels: [slack]
+    dedupKey: [source, fingerprint]
+    dedupWindowMinutes: 120
+    respectQuietHours: true
+    escalation: []
+
+  # Everything else: chat during working hours, never pages.
+  - id: catch-all
+    match:
+      source: "*"
+      severity: [critical, error, warning, info]
+    channels: [slack]
+    dedupKey: [source, severity, fingerprint]
+    respectQuietHours: true
+    escalation:
+      - afterMinutes: 60
+        channels: [email]
