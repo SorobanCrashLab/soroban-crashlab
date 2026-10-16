@@ -25,6 +25,12 @@ const ACTIONS: Array<AuditAction | 'all'> = [
   'upload.reject',
   'thread.resolve',
   'artifact.delete',
+  'webhook.secret.rotate',
+  'webhook.secret.revokeGrace',
+  'auth.login',
+  'auth.login.denied',
+  'auth.role.grant',
+  'tenant.access.denied',
 ];
 
 export default function AuditLogViewer() {

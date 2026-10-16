@@ -14,7 +14,7 @@
 
 import { selectRecordDriver, readPositiveIntegerEnv } from './record-driver';
 
-export type UserIdentity = 'github' | 'api-key';
+export type UserIdentity = 'github' | 'api-key' | 'oidc';
 export type UserRole = 'analyst' | 'maintainer';
 
 export interface RoleAssignment {
@@ -70,7 +70,9 @@ function parseAssignment(raw: string): RoleAssignment | null {
     const candidate = parsed as Partial<RoleAssignment>;
     if (
       typeof candidate.id !== 'string' ||
-      (candidate.identityType !== 'github' && candidate.identityType !== 'api-key') ||
+      (candidate.identityType !== 'github' &&
+        candidate.identityType !== 'api-key' &&
+        candidate.identityType !== 'oidc') ||
       typeof candidate.identityValue !== 'string' ||
       (candidate.role !== 'analyst' && candidate.role !== 'maintainer')
     ) {

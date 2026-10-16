@@ -31,7 +31,11 @@ export type AuditAction =
   | 'thread.resolve'
   | 'artifact.delete'
   | 'webhook.secret.rotate'
-  | 'webhook.secret.revokeGrace';
+  | 'webhook.secret.revokeGrace'
+  | 'auth.login'
+  | 'auth.login.denied'
+  | 'auth.role.grant'
+  | 'tenant.access.denied';
 
 /** Used when no principal could be resolved — availability over attribution. */
 export const SYSTEM_ACTOR = 'system';

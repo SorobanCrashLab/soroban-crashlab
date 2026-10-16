@@ -9,7 +9,8 @@
  * read `x-crashlab-role` (or its alias) off the request in every environment
  * except production, which means any caller who could reach the API could
  * declare itself a maintainer. Roles are now looked up by identity — a
- * verified API token or a signed GitHub session — in the persisted role store.
+ * verified API token, a signed GitHub session or a signed OIDC session — in the
+ * persisted role store.
  * A caller that presents no usable credential is the anonymous principal and
  * gets the lowest role. Nothing a caller sends can raise its own role: not a
  * header, not a query parameter, not a cookie, not a request body.
@@ -33,6 +34,7 @@ import {
   getGitHubSessionSecret,
   verifyGitHubSession,
 } from './github-session';
+import { OIDC_SESSION_COOKIE, verifyOidcSession } from './auth/oidc-session';
 import { selectRecordDriver, readPositiveIntegerEnv } from './storage/record-driver';
 import { getRoleAssignment, type UserIdentity, type UserRole } from './storage/role-store';
 import { hashTokenSecret, resolveTokenPrincipalIdByHash } from './storage/token-principal-store';
@@ -161,6 +163,18 @@ export async function resolvePrincipal(request: NextRequest): Promise<RbacPrinci
       identityType: 'github',
       identityValue: sessionLogin,
       subject: `github:${sessionLogin}`,
+      authenticated: true,
+    };
+  }
+
+  // OIDC sessions name an identity only; its role was written to the role
+  // store by the claim-mapping policy at login (#1893).
+  const oidcIdentity = await verifyOidcSession(request.cookies.get(OIDC_SESSION_COOKIE)?.value);
+  if (oidcIdentity) {
+    return {
+      identityType: 'oidc',
+      identityValue: oidcIdentity,
+      subject: `oidc:${oidcIdentity}`,
       authenticated: true,
     };
   }
