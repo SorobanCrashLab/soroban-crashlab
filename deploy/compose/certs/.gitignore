@@ -1,0 +1,3 @@
+# Mounted certificates for CRASHLAB_TLS_MODE=files — never commit keys.
+*
+!.gitignore
