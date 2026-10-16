@@ -140,12 +140,17 @@ cargo build --release --target wasm32-unknown-unknown
 | Document | Description |
 |----------|-------------|
 | [Architecture Guide](docs/ARCHITECTURE.md) | System architecture, data flow, and design decisions |
+| [Contributor Architecture Guide](docs/contributors/architecture.md) | Component map, data-flow diagrams with file anchors, and what you can change without cross-stack fallout |
+| [Where to Start](docs/contributors/where-to-start.md) | Issue batch themes, prerequisite chains, labels legend, and the PR workflow |
+| [ADR Index](docs/adr/README.md) | Architecture decisions, one line each, and when to write a new one |
 | [API Reference](docs/API.md) | HTTP API for the dashboard's Next.js routes (runs, artifacts, settings, and more) |
 | [Reproducibility Guide](docs/REPRODUCIBILITY.md) | Deterministic guarantees and troubleshooting |
 | [Roadmap](docs/ROADMAP.md) | Milestone overview and issue tracking |
 | [Environment Variables](docs/ENV.md) | Web app, API route, and deployment configuration reference (secrecy classification) |
 | [Deployment Guide](docs/DEPLOYMENT.md) | Vercel + Docker Compose paths and deploy gating |
 | [Release Process](docs/RELEASE_PROCESS.md) | Maintainer checklist for releases |
+| [Release Policy](docs/releases/policy.md) | Semver by surface, deprecation window, signed tags, upgrade notes |
+| [Backup and Restore](docs/ops/backup-restore.md) | RPO/RTO targets, restore runbook, verification and drill record |
 | [Product Vision](docs/VISION.md) | 90% done criteria and roadmap alignment |
 | [Maintainer Onboarding Checklist](docs/MAINTAINER_ONBOARDING.md) | Step-by-step guide for onboarding new maintainers |
 | [Contributing Guide](CONTRIBUTING.md) | How to contribute to CrashLab |
