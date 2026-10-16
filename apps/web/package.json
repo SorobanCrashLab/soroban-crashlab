@@ -30,6 +30,7 @@
     "test:cron": "npx vitest run src/lib/cron src/app/api/schedules",
     "test:api-client": "vitest run src/lib/api-client.test.ts",
     "test:api-error-mapper": "vitest run src/lib/api-error-mapper.test.ts",
+    "test:use-stale-data": "vitest run src/lib/use-stale-data.test.ts",
     "test:widget-layout-editor": "vitest run src/app/implement-widget-layout-editor-component.test.ts",
     "test:sentry-client": "npx vitest run src/lib/integrations/sentry-client.test.ts",
     "test:script-style": "vitest run src/test/script-style-tests.test.ts",

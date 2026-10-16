@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from './api-client';
-import { toUserMessage } from './api-error-mapper';
+import { toUserMessage, IntegrityError, integrityKindToSeverity } from './api-error-mapper';
 import { HttpError } from './request-dedup';
 
 describe('toUserMessage', () => {
@@ -39,5 +39,64 @@ describe('toUserMessage', () => {
   it('provides safe generic message for unknown error classes', () => {
     const msg = toUserMessage({ custom: 'opaque object' });
     expect(msg).toBe('An unexpected error occurred. Please try again.');
+  });
+
+  // #1885 — integrity error cases
+  describe('IntegrityError', () => {
+    it('maps corrupt kind to re-upload copy', () => {
+      const err = new IntegrityError('corrupt', 'checksum mismatch', 'artifact-abc');
+      const msg = toUserMessage(err);
+      expect(msg).toBe(
+        'Data integrity check failed. This artifact may be corrupted — please re-upload or contact support.',
+      );
+    });
+
+    it('maps verify_failed kind to re-upload copy', () => {
+      const err = new IntegrityError('verify_failed', 'verification failed');
+      const msg = toUserMessage(err);
+      expect(msg).toBe(
+        'Data integrity check failed. This artifact may be corrupted — please re-upload or contact support.',
+      );
+    });
+
+    it('maps degraded kind to storage-degraded copy', () => {
+      const err = new IntegrityError('degraded', 'storage fallback active');
+      const msg = toUserMessage(err);
+      expect(msg).toBe(
+        'Storage is currently degraded. Data may be incomplete. Please try again shortly.',
+      );
+    });
+
+    it('retains artifactId on IntegrityError', () => {
+      const err = new IntegrityError('corrupt', 'bad checksum', 'artifact-xyz');
+      expect(err.artifactId).toBe('artifact-xyz');
+      expect(err.kind).toBe('corrupt');
+    });
+  });
+
+  it('maps raw "corrupt" message string to integrity copy', () => {
+    const msg = toUserMessage(new Error('corrupt bundle detected'));
+    expect(msg).toBe(
+      'Data integrity check failed. This artifact may be corrupted — please re-upload or contact support.',
+    );
+  });
+
+  it('maps raw "checksum" message string to integrity copy', () => {
+    const msg = toUserMessage(new Error('checksum mismatch on upload'));
+    expect(msg).toBe(
+      'Data integrity check failed. This artifact may be corrupted — please re-upload or contact support.',
+    );
+  });
+});
+
+describe('integrityKindToSeverity', () => {
+  it('maps corrupt → corrupt', () => {
+    expect(integrityKindToSeverity('corrupt')).toBe('corrupt');
+  });
+  it('maps verify_failed → corrupt', () => {
+    expect(integrityKindToSeverity('verify_failed')).toBe('corrupt');
+  });
+  it('maps degraded → degraded', () => {
+    expect(integrityKindToSeverity('degraded')).toBe('degraded');
   });
 });
