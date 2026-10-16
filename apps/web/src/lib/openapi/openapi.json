@@ -43,6 +43,12 @@
       "get": { "summary": "List fuzz campaigns", "tags": ["campaigns"] },
       "post": { "summary": "Create a fuzz campaign", "tags": ["campaigns"] }
     },
+    "/api/capacity": { "get": { "summary": "Capacity report: quotas, usage, utilization, cost", "tags": ["ops"] } },
+    "/api/capacity/usage": { "post": { "summary": "Report campaign progress; returns a throttle decision", "tags": ["ops"] } },
+    "/api/integrations/ci/results": {
+      "get": { "summary": "CI regression results by commit / PR", "tags": ["integrations"] },
+      "post": { "summary": "Ingest CI regression results", "tags": ["integrations"] }
+    },
     "/api/schedules": {
       "get": { "summary": "List schedules", "tags": ["schedules"] },
       "post": { "summary": "Create a schedule", "tags": ["schedules"] }

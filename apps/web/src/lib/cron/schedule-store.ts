@@ -9,6 +9,10 @@
 import { CronParseError, cronErrorMessage, parseCron } from './parser';
 import { humanizeCronExpression } from './humanize';
 import { nextRun } from './next-run';
+import type { CampaignClass } from '../capacity/quotas';
+
+/** Class a schedule fires as when it does not name one (#1904). */
+export const DEFAULT_SCHEDULE_CLASS: CampaignClass = 'nightly';
 
 export interface Schedule {
   id: string;
@@ -24,6 +28,11 @@ export interface Schedule {
    * advances from, which is what makes evaluation idempotent.
    */
   lastRunAt: string | null;
+  /**
+   * Capacity class of the campaigns this schedule fires (#1904); decides its
+   * scheduling window and priority. Absent means {@link DEFAULT_SCHEDULE_CLASS}.
+   */
+  campaignClass?: CampaignClass;
 }
 
 /** Tag applied to every run the scheduler produces, surfaced in the runs list. */
@@ -49,12 +58,15 @@ export interface ScheduledRun {
    * run fires (#1634): a cron retry of the same slot dedupes server-side.
    */
   idempotencyKey: string;
+  /** Capacity class the run fired as (#1904). */
+  campaignClass: CampaignClass;
 }
 
 export interface ScheduleInput {
   name: string;
   cron: string;
   enabled?: boolean;
+  campaignClass?: CampaignClass;
 }
 
 export const MAX_SCHEDULE_NAME_LENGTH = 80;
@@ -95,6 +107,7 @@ export function createSchedule(input: ScheduleInput, now: string, id: string): S
     createdAt: now,
     updatedAt: now,
     lastRunAt: null,
+    ...(input.campaignClass ? { campaignClass: input.campaignClass } : {}),
   };
 }
 
@@ -102,7 +115,7 @@ export function addSchedule(list: readonly Schedule[], schedule: Schedule): Sche
   return [...list, schedule];
 }
 
-export type SchedulePatch = Partial<Pick<Schedule, 'name' | 'cron' | 'enabled'>>;
+export type SchedulePatch = Partial<Pick<Schedule, 'name' | 'cron' | 'enabled' | 'campaignClass'>>;
 
 export function updateSchedule(
   list: readonly Schedule[],
@@ -122,6 +135,7 @@ export function updateSchedule(
       if (next.cron !== schedule.cron) next.lastRunAt = null;
     }
     if (patch.enabled !== undefined) next.enabled = patch.enabled;
+    if (patch.campaignClass !== undefined) next.campaignClass = patch.campaignClass;
     next.updatedAt = now;
     return next;
   });

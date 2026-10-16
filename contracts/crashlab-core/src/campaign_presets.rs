@@ -23,6 +23,45 @@ pub enum CampaignPreset {
     Deep,
 }
 
+/// Scheduling class of a campaign (#1904).
+///
+/// Classes are ordered by priority — `Interactive` before `Nightly` before
+/// `Deep` — which decides who yields when capacity is contended and which
+/// scheduling window applies. See `docs/ops/capacity.md`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CampaignClass {
+    /// Operator-triggered, someone is waiting on the result.
+    Interactive,
+    /// Scheduled recurring runs.
+    Nightly,
+    /// Long exhaustive campaigns that should use idle capacity.
+    Deep,
+}
+
+impl CampaignClass {
+    /// All classes in priority order (highest first).
+    pub const ALL: [Self; 3] = [Self::Interactive, Self::Nightly, Self::Deep];
+
+    /// Priority rank; lower runs first.
+    pub const fn priority(self) -> u8 {
+        match self {
+            CampaignClass::Interactive => 0,
+            CampaignClass::Nightly => 1,
+            CampaignClass::Deep => 2,
+        }
+    }
+
+    /// Stable snake_case name shared with the web API.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            CampaignClass::Interactive => "interactive",
+            CampaignClass::Nightly => "nightly",
+            CampaignClass::Deep => "deep",
+        }
+    }
+}
+
 /// Parameters derived from a [`CampaignPreset`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CampaignParameters {
@@ -66,6 +105,29 @@ impl CampaignPreset {
     /// Returns a [`MutationBudget`] initialised with this preset's cap.
     pub fn to_mutation_budget(self) -> MutationBudget {
         MutationBudget::new(self.parameters().max_mutations_per_run)
+    }
+
+    /// Scheduling class: `smoke` is interactive feedback, `nightly` is the
+    /// scheduled profile, `deep` is exhaustive work for idle capacity.
+    pub const fn class(self) -> CampaignClass {
+        match self {
+            CampaignPreset::Smoke => CampaignClass::Interactive,
+            CampaignPreset::Nightly => CampaignClass::Nightly,
+            CampaignPreset::Deep => CampaignClass::Deep,
+        }
+    }
+
+    /// Relative resource units one seed of this preset costs, used for cost
+    /// attribution (seeds × units). Derived from mutation intensity — a
+    /// placeholder until measured per-seed resource units are available — so
+    /// smoke = 1, nightly = 2, deep = 4.
+    pub const fn resource_units_per_seed(self) -> u64 {
+        let units = self.parameters().mutation_intensity_bps as u64 / 2_500;
+        if units == 0 {
+            1
+        } else {
+            units
+        }
     }
 
     /// Scales `base_weights` by this preset's `mutation_intensity_bps`.
@@ -200,6 +262,29 @@ mod tests {
         for p in CampaignPreset::ALL {
             assert_eq!(p.to_string(), p.as_str());
         }
+    }
+
+    #[test]
+    fn presets_map_to_priority_ordered_classes() {
+        assert_eq!(CampaignPreset::Smoke.class(), CampaignClass::Interactive);
+        assert_eq!(CampaignPreset::Nightly.class(), CampaignClass::Nightly);
+        assert_eq!(CampaignPreset::Deep.class(), CampaignClass::Deep);
+        assert!(CampaignClass::Interactive < CampaignClass::Nightly);
+        assert!(CampaignClass::Nightly < CampaignClass::Deep);
+        let ranks: Vec<u8> = CampaignClass::ALL.iter().map(|c| c.priority()).collect();
+        assert_eq!(ranks, vec![0, 1, 2]);
+        assert_eq!(
+            serde_json::to_string(&CampaignClass::Interactive).unwrap(),
+            "\"interactive\""
+        );
+        assert_eq!(CampaignClass::Deep.as_str(), "deep");
+    }
+
+    #[test]
+    fn resource_units_scale_with_intensity() {
+        assert_eq!(CampaignPreset::Smoke.resource_units_per_seed(), 1);
+        assert_eq!(CampaignPreset::Nightly.resource_units_per_seed(), 2);
+        assert_eq!(CampaignPreset::Deep.resource_units_per_seed(), 4);
     }
 
     #[test]

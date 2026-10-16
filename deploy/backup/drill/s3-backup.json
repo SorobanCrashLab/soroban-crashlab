@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "backup-writer",
+      "credentials": [{ "accessKey": "drill-backup-writer", "secretKey": "drill-backup-writer-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

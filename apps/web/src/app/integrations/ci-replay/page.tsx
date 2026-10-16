@@ -3,6 +3,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import IntegrationPageSkeleton from '../IntegrationPageSkeleton';
+import CiRegressionResultsPanel from './CiRegressionResultsPanel';
 
 const CIIntegrationForRunReplayTests = dynamic(() => import('../../../features/integrations/integrate-ci-integration-for-run-replay-tests'), {
   loading: () => <IntegrationPageSkeleton />,
@@ -11,6 +12,7 @@ const CIIntegrationForRunReplayTests = dynamic(() => import('../../../features/i
 export default function CIReplayIntegrationPage() {
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+      <CiRegressionResultsPanel />
       <CIIntegrationForRunReplayTests />
     </div>
   );

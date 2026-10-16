@@ -117,7 +117,14 @@ pub mod scheduler;
 pub use scheduler::{Mutator, MutatorRegistry, SchedulerError, WeightedScheduler};
 
 pub mod campaign_presets;
-pub use campaign_presets::{CampaignParameters, CampaignPreset, ParseCampaignPresetError};
+pub use campaign_presets::{
+    CampaignClass, CampaignParameters, CampaignPreset, ParseCampaignPresetError,
+};
+pub mod capacity;
+pub use capacity::{
+    check_admission, QuotaGuard, QuotaLimits, QuotaResource, QuotaUsage, QuotaViolation,
+    ResourceRequest, ThrottleDecision,
+};
 pub mod replay;
 pub use replay::{
     replay_mismatch_message, replay_seed_bundle, replay_seed_bundle_json, replay_seed_bundle_path,
@@ -221,7 +228,7 @@ pub use scenario_export::{
 pub mod regression_suite;
 pub use regression_suite::{
     load_regression_suite_json, run_regression_suite, run_regression_suite_from_json,
-    RegressionCaseResult, RegressionSuiteSummary,
+    RegressionCaseResult, RegressionSuiteSummary, REGRESSION_REPORT_SCHEMA_VERSION,
 };
 
 pub mod regression_grouping;

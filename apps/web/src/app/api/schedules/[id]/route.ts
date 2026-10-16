@@ -8,6 +8,7 @@ import {
   validateScheduleName,
   type SchedulePatch,
 } from '@/lib/cron';
+import { isCampaignClass } from '@/lib/capacity/quotas';
 import { getSchedulerState, setSchedulerState } from '../_store';
 
 export const PUT = withRouteErrorHandling(
@@ -26,6 +27,12 @@ export const PUT = withRouteErrorHandling(
     if (typeof body.name === 'string') patch.name = body.name;
     if (typeof body.cron === 'string') patch.cron = body.cron;
     if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
+    if (body.campaignClass !== undefined) {
+      if (!isCampaignClass(body.campaignClass)) {
+        return jsonError('campaignClass must be interactive, nightly or deep.', 400);
+      }
+      patch.campaignClass = body.campaignClass;
+    }
 
     if (patch.name !== undefined) {
       const nameError = validateScheduleName(patch.name, state.schedules, id);

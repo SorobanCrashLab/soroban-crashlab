@@ -98,6 +98,34 @@ describe('Sentry Client Integration', () => {
       expect(beforeSend()).toMatchObject({ tags: { environment: 'production' } });
     });
 
+    it('scrubs PII deny-by-default before tagging', () => {
+      const sentryInit = (() => {
+        process.env.NEXT_PUBLIC_SENTRY_DSN = 'https://mock-dsn@sentry.io/1';
+        initSentryClient();
+        return vi.mocked(Sentry.init).mock.calls.at(-1)?.[0];
+      })();
+      const event = {
+        event_id: 'e1',
+        message: 'mail alice@example.com',
+        user: { email: 'alice@example.com' },
+        request: { method: 'GET', url: 'https://app/?q=secret', headers: { cookie: 'c' } },
+        breadcrumbs: [{ message: 'x' }],
+        tags: { userEmail: 'alice@example.com' },
+      };
+      expect(sentryInit?.beforeSend?.(event as any, {} as any)).toEqual({
+        event_id: 'e1',
+        message: 'mail [email]',
+        request: { method: 'GET' },
+        tags: { environment: 'production' },
+      });
+    });
+
+    it('does not initialise Sentry for an invalid DSN', () => {
+      process.env.NEXT_PUBLIC_SENTRY_DSN = 'not-a-dsn';
+      initSentryClient();
+      expect(Sentry.init).not.toHaveBeenCalled();
+    });
+
     it('tags mock-data sessions when the flag is readable', () => {
       vi.stubGlobal('window', {
         sessionStorage: {

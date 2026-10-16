@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { successResponse } from '@/lib/api-response-utils';
 import { jsonError, readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 import { CronParseError, addSchedule, createSchedule, validateScheduleName } from '@/lib/cron';
+import { isCampaignClass } from '@/lib/capacity/quotas';
 import { getSchedulerState, setSchedulerState } from './_store';
 
 export const GET = withRouteErrorHandling('GET /api/schedules', async () => {
@@ -17,6 +18,10 @@ export const POST = withRouteErrorHandling('POST /api/schedules', async (request
   const name = typeof body.name === 'string' ? body.name : '';
   const cron = typeof body.cron === 'string' ? body.cron : '';
   const enabled = typeof body.enabled === 'boolean' ? body.enabled : undefined;
+  if (body.campaignClass !== undefined && !isCampaignClass(body.campaignClass)) {
+    return jsonError('campaignClass must be interactive, nightly or deep.', 400);
+  }
+  const campaignClass = body.campaignClass;
 
   const state = getSchedulerState();
 
@@ -25,7 +30,7 @@ export const POST = withRouteErrorHandling('POST /api/schedules', async (request
 
   let schedule;
   try {
-    schedule = createSchedule({ name, cron, enabled }, new Date().toISOString(), `sched-${Date.now()}`);
+    schedule = createSchedule({ name, cron, enabled, campaignClass }, new Date().toISOString(), `sched-${Date.now()}`);
   } catch (error) {
     if (error instanceof CronParseError) return jsonError(error.message, 400);
     throw error;

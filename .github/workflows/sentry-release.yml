@@ -1,0 +1,75 @@
+name: Sentry Release
+
+# Builds the web app with source-map upload on, creates and finalises the
+# Sentry release (<package>@<version>+<sha>, commits attached), then proves one
+# stack frame resolves: upload → send a synthetic event → fetch → assert (#1889).
+#
+# Behind a flag until a maintainer provisions keys: the job only runs when the
+# repository variable SENTRY_UPLOAD_ENABLED is 'true'. Required:
+#   secrets.SENTRY_AUTH_TOKEN   scopes project:releases, org:read, event:read
+#   vars.SENTRY_ORG, vars.SENTRY_PROJECT, vars.NEXT_PUBLIC_SENTRY_DSN
+#   vars.SENTRY_URL             only for self-hosted Sentry
+# See docs/self-hosting/observability.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sentry-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Upload source maps and verify
+    if: vars.SENTRY_UPLOAD_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SENTRY_UPLOAD_SOURCEMAPS: 'true'
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+      SENTRY_URL: ${{ vars.SENTRY_URL }}
+      NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: production
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Full history so the release can be associated with its commits.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65 # v4.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release name
+        run: |
+          version="$(node -p "require('./apps/web/package.json').version")"
+          echo "SENTRY_RELEASE=soroban-crashlab-web@${version}+${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Build with source-map upload
+        run: pnpm --dir apps/web run build
+
+      - name: Verify a stack frame resolves
+        working-directory: apps/web
+        run: |
+          pnpm exec tsc scripts/verify-sentry-sourcemaps.ts \
+            --module commonjs --target es2022 --rootDir . --outDir build/sentry-verify \
+            --esModuleInterop --skipLibCheck --types node
+          node build/sentry-verify/scripts/verify-sentry-sourcemaps.js

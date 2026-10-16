@@ -10,6 +10,7 @@ export { nextRun, nextRuns } from './next-run';
 export { humanizeCron, humanizeCronExpression } from './humanize';
 export {
   SCHEDULED_RUN_TAG,
+  DEFAULT_SCHEDULE_CLASS,
   MAX_SCHEDULE_NAME_LENGTH,
   validateScheduleName,
   validateCron,
@@ -25,7 +26,7 @@ export {
   type ScheduleInput,
   type SchedulePatch,
 } from './schedule-store';
-export { evaluateTick, type TickInput, type TickOutcome } from './tick-evaluator';
+export { evaluateTick, type DeferredSchedule, type TickInput, type TickOutcome } from './tick-evaluator';
 export {
   type CronLock,
   createCronLock,

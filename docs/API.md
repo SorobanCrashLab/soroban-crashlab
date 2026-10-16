@@ -108,7 +108,9 @@ All error responses return a standardized JSON structure with an appropriate HTT
 ### Campaigns
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/api/campaigns` | Queue a new fuzzing campaign (supports `Idempotency-Key`) |
+| `POST` | `/api/campaigns` | Queue a new fuzzing campaign (supports `Idempotency-Key`; quota- and window-checked) |
+| `GET` | `/api/capacity` | Capacity report: quotas, usage, utilization, cost attribution |
+| `POST` | `/api/capacity/usage` | Runner progress report; returns a mid-run throttle decision (`runs:write`) |
 
 ### Networks
 | Method | Path | Description |
@@ -174,6 +176,7 @@ All error responses return a standardized JSON structure with an appropriate HTT
 | `POST` | `/api/integrations/jira` | Create a new bug or task ticket in Jira |
 | `GET` `POST` | `/api/integrations/jira/{issueKey}` | Get metadata or add comment/crash details to Jira issue |
 | `GET` | `/api/integrations/linear/{issueId}` | Fetch issue metadata from Linear |
+| `GET` `POST` | `/api/integrations/ci/results` | List CI regression results by commit/PR, or ingest one (`ci:write`) — see [`REGRESSION_SUMMARY.md`](REGRESSION_SUMMARY.md) |
 
 ---
 
@@ -572,6 +575,22 @@ The dashboard's API client always sends a key and reuses it when a failed
 submission is retried with the same configuration. Scheduled runs carry a
 deterministic key, `schedule:<scheduleId>:<slot epoch ms>`, in their
 `idempotencyKey` field so a cron retry for the same slot deduplicates.
+
+**Capacity.** New campaigns (not idempotent replays) are checked against the
+class scheduling window and the scope's quotas. The class comes from
+`campaignClass` (`interactive` | `nightly` | `deep`) or `preset`; the request
+from `workers` (or `parallelism`), `seeds` and `rpcCalls`; cost attribution
+from `project`. The response adds a `capacity` object describing what was
+admitted.
+
+| Condition | Response |
+| --- | --- |
+| Class window closed | `403` `SCHEDULING_WINDOW_CLOSED`, `Retry-After` |
+| Quota exceeded | `429` `QUOTA_EXCEEDED` with `quota: { resource, limit, used, requested }`, `Retry-After` |
+| `X-CrashLab-Quota-Override: <reason>` from a maintainer | Admitted; audited as `quota.override` |
+| Override from a non-maintainer | `403` `QUOTA_OVERRIDE_FORBIDDEN` |
+
+See [`ops/capacity.md`](ops/capacity.md).
 
 ---
 

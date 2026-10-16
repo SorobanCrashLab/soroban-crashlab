@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse, status } from '@/lib/api-response-utils';
 import { readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
-import { evaluateTick } from '@/lib/cron';
+import { DEFAULT_SCHEDULE_CLASS, evaluateTick } from '@/lib/cron';
+import { readSchedulingWindows } from '@/lib/capacity/windows';
 import { scheduledCampaignIdempotencyKey } from '@/lib/idempotency-key';
 import { getSchedulerState, setSchedulerState } from '../_store';
 import { getCronLock, createInMemoryCronLock } from '@/lib/cron/lock';
@@ -75,7 +76,12 @@ export const POST = withRouteErrorHandling(
       }
 
       // 5. Evaluate tick
-      const outcome = evaluateTick({ schedules: state.schedules, history: state.history, now });
+      const outcome = evaluateTick({
+        schedules: state.schedules,
+        history: state.history,
+        now,
+        windows: readSchedulingWindows().windows,
+      });
       setSchedulerState({ schedules: outcome.schedules, history: outcome.history });
 
       // 6. Record tick execution for idempotency
@@ -91,6 +97,7 @@ export const POST = withRouteErrorHandling(
         caughtUp: false,
         tags: ['system:tick'],
         idempotencyKey: scheduledCampaignIdempotencyKey('system', now.toISOString()),
+        campaignClass: DEFAULT_SCHEDULE_CLASS,
       };
 
       setSchedulerState({
@@ -100,6 +107,7 @@ export const POST = withRouteErrorHandling(
 
       return successResponse({
         created: outcome.created,
+        deferred: outcome.deferred,
         schedules: outcome.schedules,
         history: outcome.history,
         evaluatedAt: now.toISOString(),

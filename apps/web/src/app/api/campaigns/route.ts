@@ -1,7 +1,8 @@
-import { NextRequest } from 'next/server';
+import { randomUUID } from 'node:crypto';
+import { NextRequest, NextResponse } from 'next/server';
 import { readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 import { createdResponse, successResponse } from '@/lib/api-response-utils';
-import { codedErrorResponse } from '@/lib/error-codes';
+import { codedErrorResponse, ERROR_CODES } from '@/lib/error-codes';
 import {
   IDEMPOTENCY_KEY_HEADER,
   IDEMPOTENT_REPLAYED_HEADER,
@@ -12,11 +13,33 @@ import {
   fingerprintPayload,
   selectIdempotencyStore,
 } from '@/lib/storage/idempotency-store';
+import { recordAuditEvent } from '@/lib/audit';
+import {
+  deriveCampaignRequest,
+  evaluateCampaignAdmission,
+  parseOverrideReason,
+  QUOTA_OVERRIDE_HEADER,
+  type CampaignAdmission,
+  type CampaignResourceRequest,
+} from '@/lib/capacity/campaign-admission';
+import { readQuotaLimits } from '@/lib/capacity/quotas';
+import { getCapacityLedger } from '@/lib/capacity/usage-ledger';
+import { readSchedulingWindows } from '@/lib/capacity/windows';
+import { resolvePrincipal, resolveRoleForPrincipal } from '@/lib/rbac';
 
 const IDEMPOTENCY_SCOPE = 'POST /api/campaigns';
 
 interface CampaignResponse {
   campaign: Record<string, unknown> & { id: string };
+  /** What the campaign was admitted against (#1904). */
+  capacity: {
+    scope: string;
+    project: string;
+    campaignClass: CampaignResourceRequest['campaignClass'];
+    workers: number;
+    seeds: number;
+    quotaOverride: boolean;
+  };
 }
 
 /**
@@ -29,6 +52,14 @@ interface CampaignResponse {
  *  - same key, different payload    → 422 IDEMPOTENCY_KEY_REUSED
  *  - malformed key                  → 400 IDEMPOTENCY_KEY_INVALID
  * Requests without the header behave as before (201, always a new campaign).
+ *
+ * Capacity (#1904), checked for new campaigns only (a replay was admitted
+ * already):
+ *  - class window closed            → 403 SCHEDULING_WINDOW_CLOSED (+ Retry-After)
+ *  - quota exceeded                 → 429 QUOTA_EXCEEDED with { quota } details (+ Retry-After)
+ *  - `X-CrashLab-Quota-Override: <reason>` lets a maintainer bypass both; the
+ *    bypass is written to the audit log. Non-maintainers → 403 QUOTA_OVERRIDE_FORBIDDEN.
+ * With no quotas or windows configured every campaign is admitted, as before.
  */
 export const POST = withRouteErrorHandling('POST /api/campaigns', async (request: NextRequest) => {
   const parsedKey = parseIdempotencyKey(request.headers.get(IDEMPOTENCY_KEY_HEADER));
@@ -46,13 +77,52 @@ export const POST = withRouteErrorHandling('POST /api/campaigns', async (request
     if (existing) return replayOrReject(existing.fingerprint, existing.response, payload, key);
   }
 
+  const derived = deriveCampaignRequest(payload ?? {});
+  if (!derived.ok) return codedErrorResponse('VALIDATION_ERROR', derived.error);
+  const resources = derived.request;
+
+  const override = parseOverrideReason(request.headers.get(QUOTA_OVERRIDE_HEADER));
+  if ('error' in override) return codedErrorResponse('VALIDATION_ERROR', override.error);
+
+  const ledger = getCapacityLedger();
+  const now = new Date();
+  const admission = evaluateCampaignAdmission({
+    request: resources,
+    limits: readQuotaLimits(),
+    usage: ledger.usage(resources.scope),
+    windows: readSchedulingWindows().windows,
+    now,
+  });
+
+  let overriddenBy: string | null = null;
+  if (!admission.ok) {
+    if (override.reason === null) return admissionRejected(admission);
+    const principal = await resolvePrincipal(request);
+    if ((await resolveRoleForPrincipal(principal)) !== 'maintainer') {
+      return codedErrorResponse('QUOTA_OVERRIDE_FORBIDDEN');
+    }
+    overriddenBy = principal.subject;
+  }
+
   const campaign = {
-    id: `campaign-${Date.now()}`,
+    // Random suffix: two campaigns created in the same millisecond must not
+    // share an id, or one capacity lease would overwrite the other.
+    id: `campaign-${Date.now()}-${randomUUID().slice(0, 8)}`,
     status: 'queued',
-    createdAt: new Date().toISOString(),
+    createdAt: now.toISOString(),
     ...payload,
   };
-  const response: CampaignResponse = { campaign };
+  const response: CampaignResponse = {
+    campaign,
+    capacity: {
+      scope: resources.scope,
+      project: resources.project,
+      campaignClass: resources.campaignClass,
+      workers: resources.workers,
+      seeds: resources.seeds,
+      quotaOverride: overriddenBy !== null,
+    },
+  };
 
   if (key && store) {
     const record = buildIdempotencyRecord({
@@ -69,6 +139,22 @@ export const POST = withRouteErrorHandling('POST /api/campaigns', async (request
     }
   }
 
+  ledger.admit({ campaignId: campaign.id, ...resources });
+  if (overriddenBy !== null && !admission.ok) {
+    recordAuditEvent({
+      action: 'quota.override',
+      actor: overriddenBy,
+      target: campaign.id,
+      metadata: {
+        reason: override.reason,
+        bypassed: admission.kind,
+        ...(admission.kind === 'quota' ? { violation: admission.violation } : {}),
+        campaignClass: resources.campaignClass,
+        scope: resources.scope,
+      },
+    });
+  }
+
   const created = createdResponse(response);
   if (key) {
     created.headers.set(IDEMPOTENCY_KEY_HEADER, key);
@@ -76,6 +162,28 @@ export const POST = withRouteErrorHandling('POST /api/campaigns', async (request
   }
   return created;
 });
+
+function admissionRejected(admission: Exclude<CampaignAdmission, { ok: true }>): NextResponse {
+  if (admission.kind === 'window') {
+    const closed = codedErrorResponse('SCHEDULING_WINDOW_CLOSED');
+    closed.headers.set('Retry-After', String(admission.retryAfterSeconds));
+    return closed;
+  }
+  const entry = ERROR_CODES.QUOTA_EXCEEDED;
+  const { resource, limit, used, requested } = admission.violation;
+  const exceeded = NextResponse.json(
+    {
+      error: `Quota exceeded for ${resource}: ${used} used + ${requested} requested > ${limit} allowed.`,
+      code: entry.code,
+      quota: admission.violation,
+    },
+    { status: entry.httpStatus },
+  );
+  if (admission.retryAfterSeconds !== null) {
+    exceeded.headers.set('Retry-After', String(admission.retryAfterSeconds));
+  }
+  return exceeded;
+}
 
 function replayOrReject(
   storedFingerprint: string,

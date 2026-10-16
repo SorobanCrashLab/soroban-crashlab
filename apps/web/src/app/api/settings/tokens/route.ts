@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       'runs:write',
       'settings:read',
       'settings:write',
+      'ci:write',
       '*',
     ];
 

@@ -24,6 +24,8 @@ Drift is enforced by `node scripts/audit-env.mjs` (wired into `ops-scripts-synta
 | `NEXT_PUBLIC_GITHUB_CLIENT_ID` | public | GitHub OAuth app client id | empty |
 | `NEXT_PUBLIC_GITHUB_REPOSITORY` | public | Default `owner/repo` for Actions UI | empty |
 | `NEXT_PUBLIC_SENTRY_DSN` | public | Sentry DSN (safe in client) | empty |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | public | Sentry environment name | Vercel env, else `NODE_ENV` |
+| `NEXT_PUBLIC_SENTRY_RELEASE` | public | Release name, set by `next.config.ts` at build | `soroban-crashlab-web@<version>+<sha>` |
 | `NEXT_PUBLIC_VERCEL_ENV` | public | Platform-provided Vercel env label | platform |
 | `NEXT_PUBLIC_VERCEL_ANALYTICS_ID` | public | Optional analytics id | empty |
 | `DISCORD_WEBHOOK_URL` | secret | Discord webhook notifications | empty |
@@ -102,7 +104,15 @@ Drift is enforced by `node scripts/audit-env.mjs` (wired into `ops-scripts-synta
 | `SENTRY_AUTH_TOKEN` | secret | Sentry release/source-map upload | empty |
 | `SENTRY_ORG` | server-only | Sentry org slug | empty |
 | `SENTRY_PROJECT` | server-only | Sentry project slug | empty |
-| `SENTRY_RELEASE` | server-only | Optional release override | git SHA |
+| `SENTRY_RELEASE` | server-only | Optional release override | `soroban-crashlab-web@<version>+<sha>` |
+| `SENTRY_UPLOAD_SOURCEMAPS` | server-only | Upload hidden source maps + create the release | `false` |
+| `SENTRY_TUNNEL_ROUTE` | server-only | Same-origin Sentry tunnel path | empty |
+| `CRASHLAB_CI_REPOSITORY` | server-only | `owner/repo` allowed to post CI regression results | empty (any) |
+| `CRASHLAB_QUOTA_CONCURRENT_WORKERS` | server-only | Campaign worker quota (global scope) | empty (unlimited) |
+| `CRASHLAB_QUOTA_SEEDS_PER_DAY` | server-only | Campaign seeds/day quota | empty (unlimited) |
+| `CRASHLAB_QUOTA_RPC_CALLS_PER_DAY` | server-only | Campaign RPC calls/day quota | empty (unlimited) |
+| `CRASHLAB_QUOTA_STORAGE_GB` | server-only | Artifact storage quota (GB) | empty (unlimited) |
+| `CRASHLAB_SCHEDULING_WINDOWS` | server-only | UTC windows per campaign class | empty (always open) |
 | `CRASHLAB_RUNNER` | server-only | Rust runner: `mock` \| `host` \| `rpc` | `mock` |
 | `CRASHLAB_CONTRACT_WASM` | server-only | Path to contract `.wasm` for host runner | empty |
 | `CRASHLAB_RPC_URL` | server-only | Soroban RPC URL for rpc runner | empty |
@@ -202,7 +212,9 @@ Variables prefixed with `NEXT_PUBLIC_` are bundled into the browser build. Do no
 | `NEXT_PUBLIC_ENABLE_MOCK_DATA` | No | `true` | API routes | Enables mock run data when no backend is configured. Set to `false` in production once `NEXT_PUBLIC_API_URL` points at a real backend. |
 | `NEXT_PUBLIC_VERCEL_ENV` | No | platform-provided | Settings UI | Vercel-provided deployment environment label. Local development can omit it. |
 | `NEXT_PUBLIC_VERCEL_ANALYTICS_ID` | No | empty | Hosting analytics | Optional public analytics identifier. |
-| `NEXT_PUBLIC_SENTRY_DSN` | No | empty | Web app, Sentry SDK (`apps/web/src/lib/integrations/sentry-client.ts`) | Sentry Data Source Name (DSN) for client and server-side runtime error tracking. When omitted, Sentry client initialization is skipped and error reporting falls back to console logging. Safe to expose publicly in client bundles. |
+| `NEXT_PUBLIC_SENTRY_DSN` | No | empty | Web app, Sentry SDK (`apps/web/src/lib/integrations/sentry-client.ts`, `apps/web/sentry.server.config.ts`, `apps/web/sentry.edge.config.ts`) | Sentry Data Source Name (DSN) for client, server and edge error tracking. Validated at boot: when omitted or malformed (not `https://<key>@<host>/<project id>`, or carrying a secret key) Sentry stays off and error reporting falls back to console logging. Safe to expose publicly in client bundles. |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | No | `NEXT_PUBLIC_VERCEL_ENV` / `VERCEL_ENV`, else `NODE_ENV` | Sentry SDK (all runtimes) | Environment events and sessions are filed under (e.g. `production`, `preview`, `self-hosted`). |
+| `NEXT_PUBLIC_SENTRY_RELEASE` | No | set at build | Sentry SDK (all runtimes) | Written by `apps/web/next.config.ts` from `SENTRY_RELEASE` or `soroban-crashlab-web@<package version>+<git sha>` so runtime events match the uploaded source maps. Do not set by hand. |
 
 ---
 
@@ -222,13 +234,31 @@ These variables configure source map generation, uploading, release tagging, and
 | `SENTRY_AUTH_TOKEN` | Yes (for map uploads) | *(unset)* | `@sentry/nextjs` via `withSentryConfig` in `next.config.ts` | Sentry authentication token with permissions: `project:releases` (read/write) and `org:read`. Required by the Sentry Webpack plugin at build time to upload hidden source maps and associate releases with git commits. |
 | `SENTRY_ORG` | Yes (for map uploads) | *(unset)* | `@sentry/nextjs` via `withSentryConfig` in `next.config.ts` | Sentry organization slug (e.g. `soroban-crashlab`). Must match your Sentry organization identifier. |
 | `SENTRY_PROJECT` | Yes (for map uploads) | *(unset)* | `@sentry/nextjs` via `withSentryConfig` in `next.config.ts` | Sentry project slug (e.g. `soroban-crashlab-web`). Must match your Sentry project identifier. |
-| `SENTRY_RELEASE` | No | Auto-detected git commit SHA | `@sentry/nextjs` via `withSentryConfig` in `next.config.ts` | Explicit release identifier override. If not set, `withSentryConfig` in `apps/web/next.config.ts` automatically defaults to the git commit SHA via `VERCEL_GIT_COMMIT_SHA`, `GITHUB_SHA`, or local git (`git rev-parse HEAD`). |
+| `SENTRY_RELEASE` | No | `soroban-crashlab-web@<version>+<sha>` | `apps/web/next.config.ts` | Explicit release identifier override. If not set, the release is `soroban-crashlab-web@<apps/web package.json version>+<git sha>`, with the SHA from `VERCEL_GIT_COMMIT_SHA`, `GITHUB_SHA`, or local git (`git rev-parse HEAD`). |
+| `SENTRY_UPLOAD_SOURCEMAPS` | No | `false` | `apps/web/next.config.ts` | `true` uploads hidden source maps tied to the release, creates and finalises the release and attaches commits. Requires `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (the build fails if they are missing). Off: nothing is uploaded and no credentials are needed. See [`docs/self-hosting/observability.md`](self-hosting/observability.md). |
+| `SENTRY_TUNNEL_ROUTE` | No | *(unset)* | `apps/web/next.config.ts` | Path such as `/monitoring` that proxies Sentry traffic through the app so ad blockers do not drop events. |
 
 ### API & Issue Configuration
 | Variable | Required | Default | Used by | Description |
 |----------|----------|---------|---------|-------------|
 | `RUNS_API_URL` | No | empty | Run API routes | Optional backend URL for run detail and replay requests. |
 | `ISSUES_API_URL` | No | `NEXT_PUBLIC_API_URL` | Issue-link routes | Backend URL for issue-link creation and verification. |
+
+### CI Regression Results (`apps/web/src/app/api/integrations/ci/results/route.ts`)
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `CRASHLAB_CI_REPOSITORY` | Recommended in production | *(unset)* | `owner/repo` whose workflows may post results (case-insensitive). Unset accepts any repository the `ci:write` token's holder posts for. See [`docs/REGRESSION_SUMMARY.md`](REGRESSION_SUMMARY.md). |
+
+### Campaign Capacity (`apps/web/src/lib/capacity/`)
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `CRASHLAB_QUOTA_CONCURRENT_WORKERS` | No | *(unlimited)* | Workers all running campaigns may hold at once. |
+| `CRASHLAB_QUOTA_SEEDS_PER_DAY` | No | *(unlimited)* | Seeds per UTC day across campaigns. |
+| `CRASHLAB_QUOTA_RPC_CALLS_PER_DAY` | No | *(unlimited)* | RPC calls per UTC day across campaigns. |
+| `CRASHLAB_QUOTA_STORAGE_GB` | No | *(unlimited)* | Artifact storage; at the limit no new campaign is admitted. |
+| `CRASHLAB_SCHEDULING_WINDOWS` | No | *(always open)* | UTC windows per class, e.g. `deep=00:00-06:00,nightly=20:00-08:00`. Interactive campaigns cannot be windowed. |
+
+Limits apply to the `global` scope; lower-priority classes keep headroom free for higher ones. See [`docs/ops/capacity.md`](ops/capacity.md).
 
 ### API Rate Limiting (`apps/web/src/proxy.ts`)
 | Variable | Required | Default | Description |

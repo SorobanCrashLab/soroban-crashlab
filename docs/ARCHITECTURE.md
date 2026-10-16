@@ -105,6 +105,23 @@ start campaign (preset / CLI)
 Web surfaces: run history, triage, replay controls, analytics. Artifacts land in
 the configured storage driver or `CRASHLAB_ARTIFACT_DIR`.
 
+**Capacity (#1904).** `POST /api/campaigns` admits a campaign only if its class
+window is open and the scope's quotas allow it, then records a lease in the
+capacity ledger (`apps/web/src/lib/capacity/`). Runners report progress to
+`POST /api/capacity/usage`, which renews the lease and answers a mid-run
+throttle; the engine enforces the same priority headroom in-process via
+`QuotaGuard` (`crashlab run start --seed-quota`). The schedules tick defers
+windowed classes and orders runs by priority. Known gap: the ledger is
+per-instance in memory. See [`ops/capacity.md`](ops/capacity.md).
+
+**CI regression loop (#1890, #1891).** The Regression Test Suite workflow runs
+`crashlab regression-suite --report`, classifies the report against
+`contracts/crashlab-core/regression-baseline.json` (new / recurring / fixed /
+unchanged), gates on new failures, and publishes the result to the PR (sticky
+comment + check run) and to `POST /api/integrations/ci/results`, which backs the
+per-commit view on the CI replay page. See
+[`REGRESSION_SUMMARY.md`](REGRESSION_SUMMARY.md).
+
 ---
 
 ## Fixture / corpus flow

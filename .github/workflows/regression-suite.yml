@@ -5,6 +5,11 @@ on:
     types: [opened, synchronize, reopened]
   push:
     branches: [main]
+  # Nightly replay of the shipped fixtures feeds the dashboard's
+  # recurring/new classification history (#1890).
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
 
 concurrency:
   group: regression-${{ github.workflow }}-${{ github.ref }}
@@ -18,6 +23,12 @@ jobs:
     name: Run Regression Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Sticky PR summary + check run (#1891). Fork PRs receive a read-only
+    # token regardless; publishing then degrades to a warning.
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
 
     steps:
       - name: Checkout Code
@@ -40,3 +51,80 @@ jobs:
       - name: Run Fuzz Tests (10 second timeout)
         working-directory: contracts
         run: timeout 10 cargo fuzz run fuzz_target_1 || true
+
+      # ── Structured replay → classification → summaries (#1890, #1891) ──
+
+      - name: Replay shipped fixtures
+        id: replay
+        working-directory: contracts
+        run: |
+          report="$RUNNER_TEMP/regression-report.json"
+          # Exit 1 only means "a fixture failed"; whether that blocks is decided
+          # by classifying against the baseline below.
+          cargo run --release --bin crashlab -- \
+            regression-suite crashlab-core/fixtures/regression_suite.json --report "$report" || true
+          if [ ! -s "$report" ]; then
+            echo "::error::Fixture replay produced no report."
+            exit 1
+          fi
+          echo "report=$report" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65 # v4.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Classify regression results
+        id: summary
+        env:
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          CI_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          pnpm --dir apps/web exec tsc scripts/ci-regression.ts \
+            --module commonjs --target es2022 --rootDir . --outDir build/ci-regression \
+            --esModuleInterop --skipLibCheck --types node
+          node apps/web/build/ci-regression/scripts/ci-regression.js summarize \
+            --report "${{ steps.replay.outputs.report }}" \
+            --baseline contracts/crashlab-core/regression-baseline.json \
+            --out "$RUNNER_TEMP/regression-summary"
+
+      - name: Upload regression results
+        if: always() && steps.summary.outcome == 'success'
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: regression-results
+          path: ${{ runner.temp }}/regression-summary/
+          retention-days: 30
+
+      # Report-only phase: posting failures are warnings, never gate failures.
+      # Set the repository variable CRASHLAB_CI_REPORT_STRICT=true to make a
+      # failed dashboard post fail this step (docs/REGRESSION_SUMMARY.md).
+      - name: Publish summary (PR comment, check run, dashboard)
+        if: always() && steps.summary.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CRASHLAB_API_URL: ${{ vars.CRASHLAB_API_URL }}
+          CRASHLAB_CI_TOKEN: ${{ secrets.CRASHLAB_CI_TOKEN }}
+          CRASHLAB_CI_REPORT_STRICT: ${{ vars.CRASHLAB_CI_REPORT_STRICT }}
+        run: |
+          node apps/web/build/ci-regression/scripts/ci-regression.js publish \
+            --result "$RUNNER_TEMP/regression-summary/ci-result.json"
+
+      - name: Enforce regression gate
+        if: always() && steps.summary.outcome == 'success'
+        env:
+          BLOCKING: ${{ steps.summary.outputs.blocking }}
+        run: |
+          if [ "${BLOCKING:-0}" -gt 0 ]; then
+            echo "::error::${BLOCKING} new regression signature(s). See the job summary or the PR comment; docs/REGRESSION_SUMMARY.md explains how to fix or baseline them."
+            exit 1
+          fi
+          echo "No new regression signatures."

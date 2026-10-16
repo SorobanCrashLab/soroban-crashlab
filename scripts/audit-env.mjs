@@ -74,6 +74,8 @@ const DOCKER_SKIP = new Set([
   'SENTRY_ORG',
   'SENTRY_PROJECT',
   'SENTRY_RELEASE',
+  'SENTRY_UPLOAD_SOURCEMAPS', // build-time upload flag (release pipeline)
+  'NEXT_PUBLIC_SENTRY_RELEASE', // derived by next.config.ts at build time
   'UPLOADTHING_SECRET',
   'KV_REST_API_URL',
   'KV_REST_API_TOKEN',

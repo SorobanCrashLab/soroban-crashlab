@@ -37,6 +37,7 @@ CRASHLAB_RUNNER=host crashlab run start \
 | `--progress-interval <n>` | `100` | Seeds between progress lines. |
 | `--run-id <n>` | `1` | Run identifier, used by `crashlab run cancel <id>`. |
 | `--resume` | off | Continue from the existing checkpoint instead of starting over. |
+| `--seed-quota <n>` | unlimited | Seeds left in the scope's daily quota (from `GET /api/capacity`). The run stops admitting seeds once the preset's class has used its share; lower-priority classes leave headroom for higher ones (see [`ops/capacity.md`](ops/capacity.md)). |
 | `--help` | — | Print usage and exit 0. |
 
 Both `--flag value` and `--flag=value` are accepted. Unknown options, non-numeric

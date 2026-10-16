@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 import path from "path";
+import { readFileSync } from "fs";
 import { execSync } from "child_process";
 import { withSentryConfig } from "@sentry/nextjs";
+import {
+  buildSentryBuildOptions,
+  resolveSentryRelease,
+} from "./src/lib/integrations/sentry-options";
 
 export const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -62,9 +67,6 @@ export const nextConfig: NextConfig = {
 };
 
 function getGitSha(): string | undefined {
-  if (process.env.SENTRY_RELEASE) {
-    return process.env.SENTRY_RELEASE;
-  }
   if (process.env.VERCEL_GIT_COMMIT_SHA) {
     return process.env.VERCEL_GIT_COMMIT_SHA;
   }
@@ -83,6 +85,39 @@ function getGitSha(): string | undefined {
 }
 
 const gitSha = getGitSha();
+const packageVersion = (
+  JSON.parse(readFileSync(path.join(__dirname, "package.json"), "utf8")) as { version: string }
+).version;
+
+// One release name for the build plugin and every runtime (#1889):
+// SENTRY_RELEASE, else soroban-crashlab-web@<version>+<git sha>.
+const sentryRelease = resolveSentryRelease({
+  explicit: process.env.SENTRY_RELEASE,
+  version: packageVersion,
+  gitSha,
+});
+
+// Source-map upload is behind SENTRY_UPLOAD_SOURCEMAPS=true until keys are
+// provisioned; with the flag off the plugin needs no credentials and uploads
+// nothing. A requested-but-misconfigured upload fails the build loudly.
+const sentryBuild = buildSentryBuildOptions(
+  {
+    SENTRY_UPLOAD_SOURCEMAPS: process.env.SENTRY_UPLOAD_SOURCEMAPS,
+    SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN,
+    SENTRY_ORG: process.env.SENTRY_ORG,
+    SENTRY_PROJECT: process.env.SENTRY_PROJECT,
+    SENTRY_TUNNEL_ROUTE: process.env.SENTRY_TUNNEL_ROUTE,
+    CI: process.env.CI,
+  },
+  sentryRelease,
+);
+if (sentryBuild.errors.length > 0) {
+  throw new Error(`Sentry build configuration: ${sentryBuild.errors.join(" ")}`);
+}
+
+if (sentryRelease) {
+  nextConfig.env = { ...nextConfig.env, NEXT_PUBLIC_SENTRY_RELEASE: sentryRelease };
+}
 
 let configWithPlugins: NextConfig = nextConfig;
 
@@ -99,25 +134,7 @@ if (process.env.ANALYZE === "true") {
   }
 }
 
-export default withSentryConfig(
-  configWithPlugins,
-  {
-    org: process.env.SENTRY_ORG,
-    project: process.env.SENTRY_PROJECT,
-    authToken: process.env.SENTRY_AUTH_TOKEN,
-    silent: !process.env.CI,
-    release: gitSha
-      ? {
-          name: gitSha,
-          setCommits: {
-            auto: true,
-          },
-        }
-      : undefined,
-    sourcemaps: {
-      deleteSourcemapsAfterUpload: true,
-    },
-    widenClientFileUpload: true,
-    disableLogger: true,
-  },
-);
+export default withSentryConfig(configWithPlugins, {
+  ...sentryBuild.options,
+  disableLogger: true,
+});

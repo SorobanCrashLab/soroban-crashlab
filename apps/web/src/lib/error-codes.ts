@@ -153,6 +153,44 @@ export const ERROR_CODES = Object.freeze({
     message: 'This Idempotency-Key was already used with a different request payload.',
     httpStatus: 422,
   },
+
+  // -------------------------------------------------------------------------
+  // CI regression results ingest (#1890)
+  // -------------------------------------------------------------------------
+  CI_RESULT_CONFLICT: {
+    code: 'CI_RESULT_CONFLICT',
+    message: 'A different result was already recorded for this commit and suite run.',
+    httpStatus: 409,
+  },
+  CI_REPOSITORY_NOT_ALLOWED: {
+    code: 'CI_REPOSITORY_NOT_ALLOWED',
+    message: 'Results are only accepted from the configured repository.',
+    httpStatus: 403,
+  },
+  RATE_LIMITED: {
+    code: 'RATE_LIMITED',
+    message: 'Too many requests. Retry after the window resets.',
+    httpStatus: 429,
+  },
+
+  // -------------------------------------------------------------------------
+  // Capacity: quotas and scheduling windows (#1904)
+  // -------------------------------------------------------------------------
+  QUOTA_EXCEEDED: {
+    code: 'QUOTA_EXCEEDED',
+    message: 'This request would exceed a capacity quota for its scope.',
+    httpStatus: 429,
+  },
+  SCHEDULING_WINDOW_CLOSED: {
+    code: 'SCHEDULING_WINDOW_CLOSED',
+    message: 'The scheduling window for this campaign class is closed.',
+    httpStatus: 403,
+  },
+  QUOTA_OVERRIDE_FORBIDDEN: {
+    code: 'QUOTA_OVERRIDE_FORBIDDEN',
+    message: 'Only maintainers may override capacity quotas.',
+    httpStatus: 403,
+  },
 } as const) satisfies Record<string, ErrorCatalogEntry>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

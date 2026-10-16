@@ -41,6 +41,11 @@ const SCOPE_RULES: ScopeRule[] = [
     pattern: /^\/api\/settings/,
     requiredScopes: ['settings:write', '*'],
   },
+  {
+    methods: ['POST', 'PUT', 'DELETE'],
+    pattern: /^\/api\/integrations\/ci\//,
+    requiredScopes: ['ci:write', '*'],
+  },
 ];
 
 export function getRequiredScopesForRequest(method: string, pathname: string): ApiTokenScope[] | null {

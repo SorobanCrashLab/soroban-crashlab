@@ -4,14 +4,15 @@
 //! to request cooperative cancellation for the campaign identified by `id`,
 //! `crashlab runs status <id>` to read the latest health snapshot a campaign
 //! wrote, `crashlab replay seed <bundle.json>` to replay one persisted seed
-//! bundle end to end, or `crashlab regression-suite <path>` to run all
-//! regression fixtures from a file or directory.
+//! bundle end to end, or `crashlab regression-suite <path> [--report <out.json>]`
+//! to run all regression fixtures from a file or directory (optionally writing a
+//! machine-readable report for CI summaries and dashboard ingest).
 //!
 //! See `docs/RUN_LIFECYCLE.md` for the start → checkpoint → resume → cancel
 //! lifecycle and ADR-0008 for the design rationale.
 
 use crashlab_core::{
-    CaseSeed, HealthMonitor, MutationBudget, RunId, RunTerminalState,
+    CaseSeed, HealthMonitor, MutationBudget, QuotaGuard, RunId, RunTerminalState, ThrottleDecision,
     RUN_CHECKPOINT_SCHEMA_VERSION, CampaignPreset, CancelSignal, SeededPrng, WorkerPartition,
     cancel_marker_path, cancel_requested, create_runner, default_state_dir, drive_run,
     drive_run_from_checkpoint, drive_run_partitioned_from_checkpoint, load_run_checkpoint_json,
@@ -103,7 +104,14 @@ fn main() {
                 print_usage();
                 std::process::exit(1);
             }
-            run_regression_suite_command(path);
+            run_regression_suite_command(path, None);
+        }
+        (Some("regression-suite"), Some(path), Some("--report"), Some(report_path)) => {
+            if !rest.is_empty() {
+                print_usage();
+                std::process::exit(1);
+            }
+            run_regression_suite_command(path, Some(Path::new(report_path)));
         }
         (Some("runs"), Some("list"), None, None) => {
             if !rest.is_empty() {
@@ -210,7 +218,7 @@ fn print_usage() {
                 crashlab runs list\n\
                 crashlab runs status <id> [--json]\n\
                 crashlab replay seed <bundle-json-path>\n\
-                crashlab regression-suite <suite-json-path-or-directory>\n\
+                crashlab regression-suite <suite-json-path-or-directory> [--report <report.json>]\n\
                 crashlab retention sweep [--dry-run] [--heartbeat-ttl <secs>] [--grace-period <secs>]\n\
                 \n\
                 run start options:\n\
@@ -224,6 +232,7 @@ fn print_usage() {
                 \x20 --progress-interval <n>        seeds between progress lines (default: 100)\n\
                 \x20 --run-id <n>                   run id, used by `run cancel` (default: 1)\n\
                 \x20 --resume                       resume from an existing checkpoint\n\
+                \x20 --seed-quota <n>               seeds left in the scope's daily quota (default: unlimited)\n\
                 \x20 --help                         print this message"
     );
 }
@@ -360,7 +369,7 @@ fn health_status_label(status: &HealthStatus) -> &'static str {
     }
 }
 
-fn run_regression_suite_command(path: &str) {
+fn run_regression_suite_command(path: &str, report_path: Option<&Path>) {
     let path_obj = Path::new(path);
 
     // Determine if path is a file or directory
@@ -390,6 +399,19 @@ fn run_regression_suite_command(path: &str) {
     // Run the regression suite
     match run_regression_suite_from_json(&json_bytes) {
         Ok(summary) => {
+            // Written before the exit code is decided so CI can summarise a
+            // failing run, not only a passing one.
+            if let Some(report_path) = report_path {
+                let written = summary
+                    .to_report_json()
+                    .map_err(|e| e.to_string())
+                    .and_then(|json| fs::write(report_path, json).map_err(|e| e.to_string()));
+                if let Err(e) = written {
+                    eprintln!("failed to write report {}: {}", report_path.display(), e);
+                    std::process::exit(1);
+                }
+            }
+
             println!("::group::Regression Suite Results");
             println!("Total: {}", summary.total);
             println!("Passed: {}", summary.passed);
@@ -484,6 +506,9 @@ struct RunStartOptions {
     progress_interval: u64,
     run_id: u64,
     resume: bool,
+    /// Seeds this campaign may still draw from its scope's daily quota; `None`
+    /// means unlimited.
+    seed_quota: Option<u64>,
 }
 
 /// Longest payload generated per seed, so `deep` explores wider mutations than
@@ -522,6 +547,7 @@ fn parse_run_start_options(args: &[String]) -> Result<RunStartOptions, String> {
     let mut progress_interval: u64 = 100;
     let mut run_id: u64 = 1;
     let mut resume = false;
+    let mut seed_quota: Option<u64> = None;
 
     let mut i = 0usize;
     while i < args.len() {
@@ -566,6 +592,9 @@ fn parse_run_start_options(args: &[String]) -> Result<RunStartOptions, String> {
             }
             "--run-id" => run_id = parse_u64(&take_value("--run-id")?, "--run-id")?,
             "--resume" => resume = true,
+            "--seed-quota" => {
+                seed_quota = Some(parse_u64(&take_value("--seed-quota")?, "--seed-quota")?);
+            }
             other => return Err(format!("unknown option: {other}")),
         }
         i += 1;
@@ -595,6 +624,7 @@ fn parse_run_start_options(args: &[String]) -> Result<RunStartOptions, String> {
         progress_interval,
         run_id,
         resume,
+        seed_quota,
     })
 }
 
@@ -718,6 +748,11 @@ fn run_start_command(args: &[String]) {
     let payload_len = payload_len_for(params.mutation_intensity_bps);
 
     let mut budget = MutationBudget::new(opts.budget);
+    // Mid-run throttle (#1904): stops admitting seeds once this class has used
+    // its share of the scope's remaining daily allowance.
+    let quota = opts.seed_quota.map(QuotaGuard::new);
+    let class = opts.preset.class();
+    let mut quota_throttled: u64 = 0;
     let mut health = HealthMonitor::new(opts.budget.max(1));
     let mut seen_signatures: HashSet<u64> = HashSet::new();
     let mut runner_errors: u64 = 0;
@@ -751,6 +786,23 @@ fn run_start_command(args: &[String]) {
     // `drive_run_from_checkpoint` advances its own checkpoint, so the closure
     // only records progress into `next_seed_index` and snapshots it.
     let mut work = |seed_index: u64| -> Result<(), String> {
+        // Only draw on the quota while budget remains, so a seed the budget
+        // would skip anyway does not spend shared allowance.
+        if let (Some(guard), false) = (&quota, budget.is_exhausted()) {
+            if let ThrottleDecision::Throttled { remaining, reserved } = guard.admit_seed(class) {
+                if quota_throttled == 0 {
+                    println!(
+                        "throttle: {} seed quota reached (remaining={remaining} reserved_for_higher_priority={reserved}); skipping further seeds",
+                        class.as_str()
+                    );
+                }
+                quota_throttled += 1;
+                // Like an exhausted budget: skip the work but let the driver
+                // finish so cancellation and reporting stay uniform.
+                return Ok(());
+            }
+        }
+
         if !budget.try_attempt() {
             // Budget exhausted: stop scheduling mutations but let the driver
             // finish its loop so cancellation and reporting stay uniform.
@@ -847,6 +899,15 @@ fn run_start_command(args: &[String]) {
 
     let summary = health.summary();
     println!("budget: {}", budget.report().to_cli_line());
+    if let Some(guard) = &quota {
+        println!(
+            "quota: class={} allowance={} remaining={} throttled={}",
+            class.as_str(),
+            guard.allowance(),
+            guard.remaining(),
+            quota_throttled
+        );
+    }
     if runner_errors > 0 {
         println!("runner errors: {runner_errors}");
     }

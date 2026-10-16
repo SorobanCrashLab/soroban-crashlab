@@ -1,5 +1,10 @@
 import * as Sentry from '@sentry/nextjs';
 import { safeStorage } from "../local-storage";
+import {
+  buildSentryRuntimeOptions,
+  resolveSentryEnvironment,
+  validateSentryDsn,
+} from './sentry-options';
 
 /**
  * Session key that marks the current browse as mock-data so Sentry events are
@@ -7,30 +12,46 @@ import { safeStorage } from "../local-storage";
  */
 export const MOCK_DATA_SESSION_KEY = 'crashlab:mock-data';
 
+function sentryEnabled(): boolean {
+  return validateSentryDsn(process.env.NEXT_PUBLIC_SENTRY_DSN).enabled;
+}
+
 /**
  * Initializes the Sentry client-side SDK.
- * Sentry will only be initialized if the NEXT_PUBLIC_SENTRY_DSN environment variable is provided.
+ * Sentry is only initialized when NEXT_PUBLIC_SENTRY_DSN is set and valid
+ * (an invalid DSN logs an error and leaves Sentry off). Events carry the build's
+ * release (NEXT_PUBLIC_SENTRY_RELEASE, set by next.config.ts) so stack frames
+ * resolve against the uploaded source maps, and browser sessions are tracked
+ * for release health. `NEXT_PUBLIC_*` values are read literally so Next.js can
+ * inline them into the client bundle.
  */
 export function initSentryClient(): void {
-  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  const options = buildSentryRuntimeOptions({
+    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    environment: resolveSentryEnvironment({
+      explicit: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
+      vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV,
+      nodeEnv: process.env.NODE_ENV,
+    }),
+    release: process.env.NEXT_PUBLIC_SENTRY_RELEASE,
+  });
+  if (!options) return;
 
-  if (dsn) {
-    Sentry.init({
-      dsn,
-      tracesSampleRate: 1.0,
-      beforeSend(event) {
-        const isMockData = safeStorage.getItem(MOCK_DATA_SESSION_KEY, 'session') === 'true';
-        if (!event.tags) event.tags = {};
-        event.tags.environment = isMockData ? 'mock-data' : 'production';
-        if (event.request) {
-          delete event.request.url;
-          delete event.request.query_string;
-          delete event.request.headers;
-        }
-        return event;
-      },
-    });
-  }
+  Sentry.init({
+    ...options,
+    // Release health: one session per page load, attributed to the release.
+    integrations: (defaults) =>
+      defaults.some((integration) => integration.name === 'BrowserSession')
+        ? defaults
+        : [...defaults, Sentry.browserSessionIntegration()],
+    beforeSend(event) {
+      // Deny-by-default scrubbing first; then the mock-data marker.
+      const scrubbed = options.beforeSend(event);
+      const isMockData = safeStorage.getItem(MOCK_DATA_SESSION_KEY, 'session') === 'true';
+      scrubbed.tags = { ...scrubbed.tags, environment: isMockData ? 'mock-data' : 'production' };
+      return scrubbed;
+    },
+  });
 }
 
 /**
@@ -39,9 +60,7 @@ export function initSentryClient(): void {
  */
 export const sentryAdapter = {
   captureException: (error: unknown, contexts?: Record<string, unknown>): void => {
-    const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
-
-    if (dsn) {
+    if (sentryEnabled()) {
       Sentry.captureException(error, { contexts: contexts as Sentry.Contexts });
     } else {
       console.error('[Sentry Mock] captureException:', error, contexts || '');
@@ -49,9 +68,7 @@ export const sentryAdapter = {
   },
 
   captureMessage: (message: string, level: Sentry.SeverityLevel = 'info'): void => {
-    const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
-
-    if (dsn) {
+    if (sentryEnabled()) {
       Sentry.captureMessage(message, level);
     } else {
       console.warn(`[Sentry Mock] captureMessage (${level}):`, message);

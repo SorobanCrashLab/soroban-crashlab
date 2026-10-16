@@ -223,6 +223,7 @@ export default function ApiTokenManager() {
               <option value="runs:write">Runs (write)</option>
               <option value="settings:read">Settings (read)</option>
               <option value="settings:write">Settings (write)</option>
+              <option value="ci:write">CI results (write)</option>
               <option value="*">Full access (*)</option>
             </select>
           </div>

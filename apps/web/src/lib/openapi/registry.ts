@@ -75,7 +75,16 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('GET', '/api/artifacts/{id}', 'bearer', 'Get an artifact', ['artifacts'], ['NOT_FOUND'], { scopes: ['read'] }),
   r('POST', '/api/artifacts/validate', 'bearer', 'Validate an artifact bundle', ['artifacts'], ['ARTIFACT_INVALID_BUNDLE', 'ARTIFACT_INVALID_JSON'], { scopes: ['write'] }),
   r('GET', '/api/campaigns', 'bearer-or-maintainer', 'List fuzz campaigns', ['campaigns'], ['UNAUTHORIZED'], { paginated: true, scopes: ['read'] }),
-  r('POST', '/api/campaigns', 'bearer-or-maintainer', 'Create a fuzz campaign', ['campaigns'], ['VALIDATION_ERROR', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'], { scopes: ['write'] }),
+  r('POST', '/api/campaigns', 'bearer-or-maintainer', 'Create a fuzz campaign', ['campaigns'], ['VALIDATION_ERROR', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED', 'QUOTA_EXCEEDED', 'SCHEDULING_WINDOW_CLOSED', 'QUOTA_OVERRIDE_FORBIDDEN'], {
+    scopes: ['write'],
+    description: 'Admission checks the class scheduling window and capacity quotas (429 QUOTA_EXCEEDED / 403 SCHEDULING_WINDOW_CLOSED, both with Retry-After). Maintainers may bypass with X-CrashLab-Quota-Override: <reason>; the bypass is audited.',
+  }),
+  r('GET', '/api/capacity', 'none', 'Capacity report: quotas, usage, utilization, cost', ['ops'], ['VALIDATION_ERROR'], {
+    description: 'Global scope until tenancy lands. ?windowHours=<1-840> (default 24) for utilization and cost attribution.',
+  }),
+  r('POST', '/api/capacity/usage', 'bearer', 'Report campaign progress; returns a throttle decision', ['ops'], ['VALIDATION_ERROR', 'NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN'], {
+    description: 'Runner token with runs:write. Renews the campaign capacity lease and answers { throttle } mid-run.',
+  }),
   r('GET', '/api/schedules', 'bearer-or-maintainer', 'List schedules', ['schedules'], ['UNAUTHORIZED'], { scopes: ['read'] }),
   r('POST', '/api/schedules', 'bearer-or-maintainer', 'Create a schedule', ['schedules'], ['VALIDATION_ERROR', 'FORBIDDEN'], { scopes: ['write'] }),
   r('GET', '/api/schedules/{id}', 'bearer-or-maintainer', 'Get a schedule', ['schedules'], ['NOT_FOUND'], { scopes: ['read'] }),
@@ -101,6 +110,14 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('POST', '/api/sentry/test-connection', 'bearer-or-maintainer', 'Test Sentry connection', ['integrations'], ['FORBIDDEN']),
   r('GET', '/api/integrations/slack', 'bearer-or-maintainer', 'Slack integration status', ['integrations'], ['FORBIDDEN']),
   r('POST', '/api/integrations/discord', 'bearer', 'Post to Discord', ['integrations'], ['VALIDATION_ERROR'], { scopes: ['write'] }),
+  r('GET', '/api/integrations/ci/results', 'none', 'CI regression results by commit / PR', ['integrations'], ['VALIDATION_ERROR'], {
+    paginated: true,
+    description: 'Newest first. Filters: ?sha=<40-hex>&pr=<n>&limit=<1-200>.',
+  }),
+  r('POST', '/api/integrations/ci/results', 'bearer', 'Ingest CI regression results', ['integrations'], ['VALIDATION_ERROR', 'UNAUTHORIZED', 'FORBIDDEN', 'CI_REPOSITORY_NOT_ALLOWED', 'CI_RESULT_CONFLICT', 'RATE_LIMITED'], {
+    scopes: ['write'],
+    description: 'Token scope ci:write. Idempotent by (commitSha, suiteRunId): replay 200, conflict 409. Repository pinned by CRASHLAB_CI_REPOSITORY.',
+  }),
   r('POST', '/api/integrations/github-actions', 'bearer', 'Trigger GitHub Action', ['integrations'], ['VALIDATION_ERROR'], { scopes: ['write'] }),
   r('POST', '/api/integrations/github-issue', 'bearer', 'Open a GitHub issue', ['integrations'], ['VALIDATION_ERROR'], { scopes: ['write'] }),
   r('POST', '/api/integrations/jira', 'bearer', 'Create a Jira issue', ['integrations'], ['VALIDATION_ERROR'], { scopes: ['write'] }),

@@ -1,6 +1,15 @@
 import crypto from 'node:crypto';
 
-export type ApiTokenScope = 'webhook:read' | 'webhook:write' | 'runs:read' | 'runs:write' | 'settings:read' | 'settings:write' | '*';
+export type ApiTokenScope =
+  | 'webhook:read'
+  | 'webhook:write'
+  | 'runs:read'
+  | 'runs:write'
+  | 'settings:read'
+  | 'settings:write'
+  /** CI workflows posting regression results (#1890). */
+  | 'ci:write'
+  | '*';
 
 /** Default lifetime (90 days) applied when no explicit expiry is supplied. */
 export const DEFAULT_TOKEN_TTL_MS =

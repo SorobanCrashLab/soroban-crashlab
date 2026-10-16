@@ -1,48 +1,19 @@
 # Security Policy and Vulnerability Disclosure
 
-For the authoritative reporting instructions, see [`.github/SECURITY.md`](../.github/SECURITY.md).
+For the authoritative reporting instructions, see [`SECURITY.md`](../SECURITY.md).
 
 This document provides developer-facing context: severity classification, safe handling of fuzz artifacts, and the security model contributors are expected to uphold.
 
 ---
 
-## Supported Versions
+## Supported Versions, Reporting and Response Times
 
-Only the latest commit on `main` is actively maintained. There are no versioned releases at this time.
-
-| Branch | Supported |
-|--------|-----------|
-| `main` | ✅ Yes    |
-| older  | ❌ No     |
-
----
-
-## Reporting a Vulnerability
-
-**Do not open a public GitHub issue for security vulnerabilities.**
-
-Use one of the private channels below:
-
-- **GitHub private vulnerability reporting** (preferred): [Security tab → "Report a vulnerability"](../../security/advisories/new)
-- **Email**: Contact details are in [`FUNDING.json`](../FUNDING.json) or the repository profile.
-
-### What to include
-
-- Description of the vulnerability and potential impact
-- Steps to reproduce or a minimal proof-of-concept
-- Affected component (`crashlab-core`, `apps/web`, CI scripts, etc.)
-- Suggested mitigations or patch, if available
-
-### Response timeline
-
-| Step | Target |
-|------|--------|
-| Acknowledgement | 48 hours |
-| Initial triage and severity | 5 business days |
-| Fix or mitigation plan to reporter | 14 days |
-| Public disclosure (coordinated) | 90 days from report |
-
-We follow **coordinated disclosure**. Reporters are credited in the advisory unless they prefer anonymity.
+These are defined once, in the root [`SECURITY.md`](../SECURITY.md) (mirrored
+to [`.github/SECURITY.md`](../.github/SECURITY.md)): private reporting via
+GitHub Security Advisories, acknowledgement within 48 hours, triage within 5
+business days, status updates every 10 business days, and coordinated
+disclosure within 90 days. Maintainers handle reports with the
+[disclosure runbook](security/disclosure.md).
 
 ---
 
@@ -102,7 +73,7 @@ Dependency bumps that fix a CVE are fast-tracked but still require:
 2. CI passing with the new version.
 3. Review by one unconflicted maintainer.
 
-See [CONTRIBUTING.md — Dependency updates](../CONTRIBUTING.md#dependency-updates) for the full checklist.
+See [CONTRIBUTING.md — package.json changes](../CONTRIBUTING.md#packagejson-changes) for the full checklist.
 
 ### Pre-commit secret scanning
 

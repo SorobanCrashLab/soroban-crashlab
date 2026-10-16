@@ -1,0 +1,117 @@
+name: backup-verify
+
+# Nightly backup verification (#1900). Report-only: nothing depends on this
+# check, but a scheduled failure opens (or updates) a health issue.
+#
+# - reference-drill: runs deploy/backup/drill.sh against a throwaway local
+#   stack, proving the scripts still back up, restore and detect tampering.
+# - production-verify: restores the newest real snapshot into scratch. Off
+#   until a maintainer sets the repository variable
+#   CRASHLAB_BACKUP_PROD_ENABLED=true and the CRASHLAB_BACKUP_* secrets
+#   (docs/ops/backup-restore.md#production-enablement).
+on:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'deploy/backup/**'
+      - '.github/workflows/backup-verify.yml'
+
+concurrency:
+  group: backup-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  reference-drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65 # v4.0.0
+        with:
+          node-version: 22
+      - name: Retention unit tests
+        run: node --test deploy/backup/*.test.mjs
+      - name: Backup / restore drill
+        run: deploy/backup/drill.sh | tee drill-record.json
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        if: always()
+        with:
+          name: backup-drill-record
+          path: drill-record.json
+          if-no-files-found: ignore
+
+  production-verify:
+    if: vars.CRASHLAB_BACKUP_PROD_ENABLED == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CRASHLAB_BACKUP_SRC_KV_URL: ${{ secrets.CRASHLAB_BACKUP_SRC_KV_URL }}
+      CRASHLAB_BACKUP_SRC_KV_TOKEN: ${{ secrets.CRASHLAB_BACKUP_SRC_KV_READONLY_TOKEN }}
+      CRASHLAB_BACKUP_SCRATCH_KV_URL: ${{ secrets.CRASHLAB_BACKUP_SCRATCH_KV_URL }}
+      CRASHLAB_BACKUP_SCRATCH_KV_TOKEN: ${{ secrets.CRASHLAB_BACKUP_SCRATCH_KV_TOKEN }}
+      CRASHLAB_BACKUP_SRC_S3_ENDPOINT: ${{ secrets.CRASHLAB_BACKUP_SRC_S3_ENDPOINT }}
+      CRASHLAB_BACKUP_SRC_S3_REGION: ${{ secrets.CRASHLAB_BACKUP_SRC_S3_REGION }}
+      CRASHLAB_BACKUP_SRC_S3_BUCKET: ${{ secrets.CRASHLAB_BACKUP_SRC_S3_BUCKET }}
+      CRASHLAB_BACKUP_SRC_S3_ACCESS_KEY_ID: ${{ secrets.CRASHLAB_BACKUP_SRC_S3_ACCESS_KEY_ID }}
+      CRASHLAB_BACKUP_SRC_S3_SECRET_ACCESS_KEY: ${{ secrets.CRASHLAB_BACKUP_SRC_S3_SECRET_ACCESS_KEY }}
+      CRASHLAB_BACKUP_DST_S3_ENDPOINT: ${{ secrets.CRASHLAB_BACKUP_DST_S3_ENDPOINT }}
+      CRASHLAB_BACKUP_DST_S3_REGION: ${{ secrets.CRASHLAB_BACKUP_DST_S3_REGION }}
+      CRASHLAB_BACKUP_DST_S3_BUCKET: ${{ secrets.CRASHLAB_BACKUP_DST_S3_BUCKET }}
+      CRASHLAB_BACKUP_DST_S3_ACCESS_KEY_ID: ${{ secrets.CRASHLAB_BACKUP_DST_S3_ACCESS_KEY_ID }}
+      CRASHLAB_BACKUP_DST_S3_SECRET_ACCESS_KEY: ${{ secrets.CRASHLAB_BACKUP_DST_S3_SECRET_ACCESS_KEY }}
+      CRASHLAB_BACKUP_ENCRYPTION_KEY: ${{ secrets.CRASHLAB_BACKUP_ENCRYPTION_KEY }}
+      CRASHLAB_BACKUP_REPORT: backup-verify-report.json
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65 # v4.0.0
+        with:
+          node-version: 22
+      - name: Install pinned rclone
+        run: |
+          cid="$(docker create 'rclone/rclone:1.69.1@sha256:600f51856285df1ae5d91c8bb2682cbbe31bf109ebeeef9ecead6ca8c0ff6138')"
+          mkdir -p "$RUNNER_TEMP/bin" && docker cp "$cid:/usr/local/bin/rclone" "$RUNNER_TEMP/bin/rclone" && docker rm "$cid"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Restore newest snapshot to scratch and verify
+        run: deploy/backup/verify.sh
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        if: always()
+        with:
+          name: backup-verify-report
+          path: backup-verify-report.json
+          if-no-files-found: ignore
+
+  health-issue:
+    needs: [reference-drill, production-verify]
+    if: always() && github.event_name == 'schedule' && (needs.reference-drill.result == 'failure' || needs.production-verify.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const title = 'Health: nightly backup verification failed';
+            const label = 'ci-failure';
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const body = [
+              'Nightly backup verification failed — a backup that does not restore is not a backup.',
+              '',
+              `- Workflow run (reports attached as artifacts): ${runUrl}`,
+              `- Commit: ${context.sha}`,
+              `- Triggered at: ${new Date().toISOString()}`,
+              '',
+              'Runbook: docs/ops/backup-restore.md#when-nightly-verification-fails',
+            ].join('\n');
+            const { data: open } = await github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: label, per_page: 100 });
+            const existing = open.find((issue) => issue.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body });
+            } else {
+              await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+            }

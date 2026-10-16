@@ -3,9 +3,13 @@
 
 use crate::scenario_export::FailureScenario;
 use crate::{classify, CaseSeed};
+use serde::Serialize;
+
+/// Schema version of the JSON report written by `crashlab regression-suite --report`.
+pub const REGRESSION_REPORT_SCHEMA_VERSION: u32 = 1;
 
 /// Outcome for one scenario row after replay.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RegressionCaseResult {
     pub seed_id: u64,
     /// Execution mode from the suite file (informational).
@@ -19,7 +23,7 @@ pub struct RegressionCaseResult {
 }
 
 /// Aggregated pass/fail summary for a full suite run.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RegressionSuiteSummary {
     pub total: usize,
     pub passed: usize,
@@ -30,6 +34,19 @@ pub struct RegressionSuiteSummary {
 impl RegressionSuiteSummary {
     pub fn all_passed(&self) -> bool {
         self.failed == 0 && self.total > 0
+    }
+
+    /// Machine-readable report consumed by CI (classification deltas, PR
+    /// summaries, dashboard ingest). Same fields as the summary plus `schema`.
+    pub fn to_report_json(&self) -> Result<String, serde_json::Error> {
+        let mut value = serde_json::to_value(self)?;
+        if let serde_json::Value::Object(map) = &mut value {
+            map.insert(
+                "schema".to_string(),
+                serde_json::Value::from(REGRESSION_REPORT_SCHEMA_VERSION),
+            );
+        }
+        serde_json::to_string_pretty(&value)
     }
 }
 
@@ -155,6 +172,29 @@ mod tests {
         assert_eq!(summary.failed, 1);
         assert!(summary.cases[0].error.is_some());
         assert!(summary.cases[0].actual_failure_class.is_none());
+    }
+
+    #[test]
+    fn report_json_carries_schema_and_per_case_outcomes() {
+        let scenarios = vec![
+            FailureScenario {
+                seed_id: 9,
+                input_payload: "zz".into(),
+                mode: "none".into(),
+                failure_class: "runtime-failure".into(),
+            },
+        ];
+        let summary = run_regression_suite(&scenarios);
+        let report: serde_json::Value =
+            serde_json::from_str(&summary.to_report_json().unwrap()).unwrap();
+        assert_eq!(report["schema"], REGRESSION_REPORT_SCHEMA_VERSION);
+        assert_eq!(report["total"], 1);
+        assert_eq!(report["failed"], 1);
+        assert_eq!(report["cases"][0]["seed_id"], 9);
+        assert_eq!(report["cases"][0]["mode"], "none");
+        assert_eq!(report["cases"][0]["passed"], false);
+        assert!(report["cases"][0]["actual_failure_class"].is_null());
+        assert!(report["cases"][0]["error"].is_string());
     }
 
     #[test]
