@@ -101,6 +101,8 @@ jobs:
             echo ""
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo ""
+            echo "Runbook: docs/ops/playbooks/nightly-red.md (severity and escalation: docs/ops/incident-response.md)"
+            echo ""
             echo "<details><summary>Regression suite output</summary>"
             echo ""
             echo '```'

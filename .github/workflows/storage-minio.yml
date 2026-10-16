@@ -75,6 +75,8 @@ jobs:
               `- Workflow run: ${runUrl}`,
               `- Commit: ${context.sha}`,
               `- Triggered at: ${new Date().toISOString()}`,
+              "",
+              "Runbook: docs/ops/playbooks/storage-degraded.md (severity and escalation: docs/ops/incident-response.md)",
             ].join("\n");
 
             try {
