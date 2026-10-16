@@ -1,0 +1,29 @@
+name: threat-model
+
+# Threat model traceability (#1897): every abuse case cites an existing test
+# file or an issue, every cited issue resolves, every threat_model_tests.rs
+# group is mapped.
+on:
+  pull_request:
+    paths:
+      - 'docs/security/threat-model-v2.md'
+      - 'contracts/crashlab-core/src/threat_model_tests.rs'
+      - 'scripts/check-threat-model.mjs'
+      - '.github/workflows/threat-model.yml'
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  traceability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65 # v4.0.0
+        with:
+          node-version: 22
+      - run: node scripts/check-threat-model.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
