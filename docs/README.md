@@ -20,6 +20,7 @@ Soroban CrashLab is an open source dashboard for monitoring and analyzing smart 
 | Browse all API endpoints | [API Reference](API.md) |
 | Set environment variables | [Environment Configuration](ENV.md) |
 | Contribute to the project | [Contributing Guide](../CONTRIBUTING.md) |
+| Report a security vulnerability | [Security Policy](../SECURITY.md) · maintainers: [Disclosure Runbook](security/disclosure.md) |
 | See what is planned | [Roadmap](ROADMAP.md) and [Vision](VISION.md) |
 | Troubleshoot issues | [FAQ](FAQ.md) |
 | Inspect a campaign's live health | [Health Snapshot Schema](health-snapshot-schema.md) |

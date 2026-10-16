@@ -149,7 +149,8 @@ cargo build --release --target wasm32-unknown-unknown
 | [Product Vision](docs/VISION.md) | 90% done criteria and roadmap alignment |
 | [Maintainer Onboarding Checklist](docs/MAINTAINER_ONBOARDING.md) | Step-by-step guide for onboarding new maintainers |
 | [Contributing Guide](CONTRIBUTING.md) | How to contribute to CrashLab |
-| [Security Policy](.github/SECURITY.md) | Vulnerability reporting and handling |
+| [Security Policy](SECURITY.md) | How to report a vulnerability privately, supported versions, response times (mirrored to [.github/SECURITY.md](.github/SECURITY.md)) |
+| [Disclosure Runbook](docs/security/disclosure.md) | Maintainer intake → severity → fix → advisory → release → credit, and the repository-settings checklist |
 | [Security Guide](docs/SECURITY.md) | Severity classification, contributor security model, and safe artifact handling |
 
 ---
@@ -302,6 +303,16 @@ Look for issues labeled `good-first-issue` or `help-wanted` in our [issue tracke
 - [GitHub Issues](https://github.com/SorobanCrashLab/soroban-crashlab/issues) — Bug reports and feature requests
 - [GitHub Discussions](https://github.com/SorobanCrashLab/soroban-crashlab/discussions) — Questions and community support
 - [Stellar Ecosystem](https://stellar.org) — Learn more about Stellar and Soroban
+
+---
+
+## Security
+
+Found a vulnerability? **Do not open a public issue for a security problem** —
+report it privately through [GitHub private vulnerability reporting](https://github.com/SorobanCrashLab/soroban-crashlab/security/advisories/new).
+[SECURITY.md](SECURITY.md) (also in [.github/SECURITY.md](.github/SECURITY.md))
+covers supported versions, response times, scope, credit and the
+conflict-of-interest rules maintainers follow when handling reports.
 
 ---
 
