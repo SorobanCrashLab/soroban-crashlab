@@ -1,4 +1,6 @@
 import { ApiTokenScope } from './storage/api-token-store';
+import { tenantKeyPrefix } from './tenancy/storage-keys';
+import type { TenantScope } from './tenancy/tenant-scope';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
 
@@ -71,4 +73,25 @@ export function checkScopePermission(
 
   const allowed = hasSufficientScope(tokenScopes, required);
   return { allowed, requiredScopes: required };
+}
+
+// ─── tenant dimension (#1894) ────────────────────────────────────────────────
+//
+// Token scopes say *what* a caller may do; the tenant scope says *where*. A
+// request passes only when both hold. The org/project a caller asks for is a
+// request, not a grant — `resolveTenantScope` checks it against membership.
+
+export const TENANT_ORG_HEADER = 'x-crashlab-org';
+export const TENANT_PROJECT_HEADER = 'x-crashlab-project';
+
+export function requestedTenantFromHeaders(headers: Headers): { orgId: string | null; projectId: string | null } {
+  return {
+    orgId: headers.get(TENANT_ORG_HEADER)?.trim() || null,
+    projectId: headers.get(TENANT_PROJECT_HEADER)?.trim() || null,
+  };
+}
+
+/** True only when `resourceKey` sits under the scope's storage prefix. */
+export function isResourceInTenantScope(scope: Pick<TenantScope, 'orgId' | 'projectId'>, resourceKey: string): boolean {
+  return resourceKey.startsWith(tenantKeyPrefix(scope.orgId, scope.projectId));
 }
