@@ -142,15 +142,19 @@ cargo build --release --target wasm32-unknown-unknown
 | [Architecture Guide](docs/ARCHITECTURE.md) | System architecture, data flow, and design decisions |
 | [API Reference](docs/API.md) | HTTP API for the dashboard's Next.js routes (runs, artifacts, settings, and more) |
 | [Reproducibility Guide](docs/REPRODUCIBILITY.md) | Deterministic guarantees and troubleshooting |
+| [Reproducibility Contract](docs/reproducibility-contract.md) | Exactly what reproduces, across which platforms and engine versions, with live evidence |
 | [Roadmap](docs/ROADMAP.md) | Milestone overview and issue tracking |
 | [Environment Variables](docs/ENV.md) | Web app, API route, and deployment configuration reference (secrecy classification) |
 | [Deployment Guide](docs/DEPLOYMENT.md) | Vercel + Docker Compose paths and deploy gating |
+| [Reference Deployment](docs/self-hosting/reference-deployment.md) | Hardened self-hosted compose stack: TLS, secrets, backups, restore drill, upgrades |
+| [Incident Response](docs/ops/incident-response.md) | Severity matrix, escalation, playbooks and postmortem process for running CrashLab |
 | [Release Process](docs/RELEASE_PROCESS.md) | Maintainer checklist for releases |
 | [Product Vision](docs/VISION.md) | 90% done criteria and roadmap alignment |
 | [Maintainer Onboarding Checklist](docs/MAINTAINER_ONBOARDING.md) | Step-by-step guide for onboarding new maintainers |
 | [Contributing Guide](CONTRIBUTING.md) | How to contribute to CrashLab |
 | [Security Policy](.github/SECURITY.md) | Vulnerability reporting and handling |
 | [Security Guide](docs/SECURITY.md) | Severity classification, contributor security model, and safe artifact handling |
+| [Threat Model v2](docs/security/threat-model-v2.md) | Trust boundaries, attacker profiles, abuse cases mapped to tests and issues |
 
 ---
 

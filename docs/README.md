@@ -17,6 +17,10 @@ Soroban CrashLab is an open source dashboard for monitoring and analyzing smart 
 | Connect external services | [Integrations Guide](INTEGRATIONS.md) |
 | Receive CrashLab webhooks | [Webhook Consumer Cookbook](WEBHOOKS.md) |
 | Deploy to production | [Deployment Guide](DEPLOYMENT.md) |
+| Self-host with TLS, backups and restores | [Reference Deployment](self-hosting/reference-deployment.md) |
+| Respond to an incident | [Incident Response](ops/incident-response.md) |
+| Know exactly what reproduces where | [Reproducibility Contract](reproducibility-contract.md) |
+| Review the security model | [Security docs](security/README.md) |
 | Browse all API endpoints | [API Reference](API.md) |
 | Set environment variables | [Environment Configuration](ENV.md) |
 | Contribute to the project | [Contributing Guide](../CONTRIBUTING.md) |
