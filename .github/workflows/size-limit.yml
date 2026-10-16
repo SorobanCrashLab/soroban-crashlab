@@ -77,7 +77,7 @@ jobs:
       # Upload HTML treemaps, route-sizes.json (for trend tracking), and markdown report.
       - name: Upload Bundle Analysis Artifacts
         if: always()
-        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bundle-analysis-report
           path: apps/web/.next/analyze/

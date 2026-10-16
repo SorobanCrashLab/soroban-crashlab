@@ -123,7 +123,7 @@ jobs:
             echo "- SBOM: \`sbom.spdx.json\` asset."
             echo "- Image signature: \`cosign verify\` per docs/releases/checklist.md."
           } > dist/release-notes.md
-      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-notes
           path: dist/
@@ -149,7 +149,7 @@ jobs:
           mkdir -p dist
           scripts/release/fixture-compat.sh "${{ needs.prepare.outputs.previous }}" dist/fixture-compat.md
           cat dist/fixture-compat.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: fixture-compat
@@ -192,7 +192,7 @@ jobs:
           output-file: dist/sbom.spdx.json
           upload-artifact: false
           upload-release-assets: false
-      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom
           path: dist/sbom.spdx.json
@@ -245,7 +245,7 @@ jobs:
             dist/CHANGELOG-section.md dist/fixture-compat.md dist/sbom.spdx.json
       - name: Upload draft assets (dry run)
         if: env.IS_TAG != 'true'
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-draft
           path: dist/

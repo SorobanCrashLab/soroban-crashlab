@@ -98,7 +98,7 @@ jobs:
 
       - name: Upload regression results
         if: always() && steps.summary.outcome == 'success'
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: regression-results
           path: ${{ runner.temp }}/regression-summary/

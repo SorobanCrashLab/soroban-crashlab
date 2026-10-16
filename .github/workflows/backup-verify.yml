@@ -39,7 +39,7 @@ jobs:
         run: node --test deploy/backup/*.test.mjs
       - name: Backup / restore drill
         run: deploy/backup/drill.sh | tee drill-record.json
-      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: backup-drill-record
@@ -79,7 +79,7 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Restore newest snapshot to scratch and verify
         run: deploy/backup/verify.sh
-      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: backup-verify-report
