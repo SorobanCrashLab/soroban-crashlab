@@ -2,6 +2,13 @@
 
 This guide defines the release workflow for Soroban CrashLab. Follow it when you need to cut a tagged release, publish release notes, and confirm whether the change set is backward compatible.
 
+> **Start here:** the semver-by-surface policy and deprecation window are in
+> [`docs/releases/policy.md`](releases/policy.md), the condensed checklist in
+> [`docs/releases/checklist.md`](releases/checklist.md). Tag pushes run
+> [`.github/workflows/release.yml`](../.github/workflows/release.yml), which
+> generates the changelog section, fixture-compat evidence, image + SBOM and a
+> draft GitHub release.
+
 ## Release policy at a glance
 
 - Release from `main` only.
@@ -119,12 +126,12 @@ Do not tag a release with failing checks unless you intentionally document an ex
 
 ## 5. Tag the release
 
-Create an annotated tag from the reviewed `main` commit:
+Create a signed tag from the reviewed `main` commit:
 
 ```bash
 git checkout main
 git pull upstream main
-git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git tag -s vX.Y.Z -m "Release vX.Y.Z"   # signed; see docs/releases/policy.md#tags-and-signing
 git push upstream vX.Y.Z
 ```
 
