@@ -48,6 +48,8 @@ export interface AuditEntryInput {
   actor?: string;
   /** Redacted before storage. Use before/after for edits, counts for bulk. */
   metadata?: Record<string, unknown>;
+  /** Owning org (#1894); absent for deployment-wide events and legacy entries. */
+  orgId?: string;
 }
 
 export interface AuditEntry {
@@ -58,6 +60,7 @@ export interface AuditEntry {
   action: AuditAction;
   target: string;
   metadata: Record<string, unknown>;
+  orgId?: string;
   prevHash: string;
   hash: string;
 }
@@ -65,6 +68,36 @@ export interface AuditEntry {
 export interface AuditGateway {
   load(): AuditEntry[];
   save(entries: readonly AuditEntry[]): void;
+}
+
+export class AppendOnlyViolationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AppendOnlyViolationError';
+  }
+}
+
+/**
+ * Wraps a gateway so the only accepted write is "everything already stored,
+ * unchanged, plus new entries". Updates, deletions, truncation and reordering
+ * are refused at the storage boundary, whoever the caller is (#1895).
+ */
+export function createAppendOnlyGateway(inner: AuditGateway): AuditGateway {
+  return {
+    load: () => inner.load(),
+    save: (next) => {
+      const current = inner.load();
+      if (next.length < current.length) {
+        throw new AppendOnlyViolationError('audit log entries cannot be deleted');
+      }
+      current.forEach((entry, index) => {
+        if (!next[index] || JSON.stringify(next[index]) !== JSON.stringify(entry)) {
+          throw new AppendOnlyViolationError(`audit entry ${entry.sequence} cannot be modified`);
+        }
+      });
+      inner.save(next);
+    },
+  };
 }
 
 export function createInMemoryAuditGateway(seed: readonly AuditEntry[] = []): AuditGateway {
@@ -79,10 +112,11 @@ export function createInMemoryAuditGateway(seed: readonly AuditEntry[] = []): Au
 
 /**
  * The hashed pre-image. Field order is fixed here rather than taken from the
- * object, so a re-serialised entry hashes identically.
+ * object, so a re-serialised entry hashes identically. `orgId` is appended
+ * only when present, so entries written before it existed keep their hashes.
  */
 export function entryPreimage(entry: Omit<AuditEntry, 'hash'>): string {
-  return JSON.stringify([
+  const fields: unknown[] = [
     entry.sequence,
     entry.timestamp,
     entry.actor,
@@ -90,7 +124,9 @@ export function entryPreimage(entry: Omit<AuditEntry, 'hash'>): string {
     entry.target,
     entry.metadata,
     entry.prevHash,
-  ]);
+  ];
+  if (entry.orgId !== undefined) fields.push(entry.orgId);
+  return JSON.stringify(fields);
 }
 
 export function hashEntry(entry: Omit<AuditEntry, 'hash'>): string {
@@ -155,7 +191,7 @@ export class AuditLog {
   private readonly now: () => Date;
 
   constructor(options: AuditLogOptions = {}) {
-    this.gateway = options.gateway ?? createInMemoryAuditGateway();
+    this.gateway = createAppendOnlyGateway(options.gateway ?? createInMemoryAuditGateway());
     this.now = options.now ?? (() => new Date());
   }
 
@@ -172,6 +208,7 @@ export class AuditLog {
       target: input.target,
       metadata: (redactMetadata(input.metadata ?? {}) ?? {}) as Record<string, unknown>,
       prevHash: previous?.hash ?? GENESIS_HASH,
+      ...(input.orgId !== undefined && { orgId: input.orgId }),
     };
 
     const entry: AuditEntry = { ...withoutHash, hash: hashEntry(withoutHash) };
