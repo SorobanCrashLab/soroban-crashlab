@@ -56,6 +56,20 @@ Drift is enforced by `node scripts/audit-env.mjs` (wired into `ops-scripts-synta
 | `GRAFANA_BASE_URL` | server-only | Grafana base URL | empty |
 | `GRAFANA_API_TOKEN` | secret | Grafana API token | empty |
 | `PAGERDUTY_INTEGRATION_KEY` | secret | PagerDuty Events API key | empty |
+| `PAGERDUTY_WEBHOOK_SECRET` | secret | Signing secret of the PagerDuty v3 webhook subscription; ack/resolve in PagerDuty is reflected in the dashboard (`/api/integrations/pagerduty/webhook`) | empty (webhook returns 503) |
+| `ALERT_POLICY_PATH` | server-only | Alert routing policy file (see `docs/ops/oncall.md`) | `ops/alert-policies.yml` |
+| `ALERT_SLACK_WEBHOOK_URL` | secret | Slack incoming webhook for routed alerts | empty (slack channel skipped) |
+| `ALERT_EMAIL_TO` | server-only | Recipient(s) for email-routed alerts; uses the stored SMTP config | empty (email channel skipped) |
+| `OIDC_ISSUER` | server-only | Pinned OIDC issuer; discovery must report exactly this `issuer` (ADR 0009) | empty (OIDC disabled) |
+| `OIDC_CLIENT_ID` | server-only | OIDC client id; must appear in `aud` (and `azp` for multi-aud tokens) | empty |
+| `OIDC_CLIENT_SECRET` | secret | OIDC confidential client secret | empty |
+| `OIDC_REDIRECT_URI` | server-only | Exact callback URL registered with the IdP (`…/api/auth/oidc/callback`) | empty |
+| `OIDC_SCOPES` | server-only | Requested scopes | `openid email profile` |
+| `OIDC_CLOCK_SKEW_SECONDS` | server-only | Allowed clock skew for `exp`/`iat`/`nbf` (0–300) | `60` |
+| `OIDC_ROLE_MAPPING` | server-only | JSON claim→role mapping, e.g. `{"claim":"groups","rules":[{"value":"crashlab-maintainers","role":"maintainer"}]}`; no default role (ADR 0009) | empty (OIDC disabled) |
+| `CRASHLAB_OIDC_SESSION_SECRET` | secret | HMAC secret for the `crashlab_oidc_session` cookie | empty (no OIDC sessions) |
+| `CRASHLAB_TENANCY_MEMBERSHIPS` | server-only | JSON array of org/project memberships (ADR 0010); unset = single-tenant default org | empty |
+| `CRASHLAB_AUDIT_CHECKPOINT_KEY` | secret | HMAC key signing audit-chain checkpoints; keep it out of the audit store | empty (no checkpoints) |
 | `DATADOG_ENABLED` | server-only | Enable Datadog metrics export | `false` |
 | `DATADOG_AGENT_HOST` | server-only | DogStatsD host | `localhost` |
 | `DATADOG_AGENT_PORT` | server-only | DogStatsD port | `8125` |

@@ -14,6 +14,8 @@ This directory contains Architecture Decision Records (ADRs) for Soroban CrashLa
 | [ADR-0006](0006-pluggable-artifact-storage-and-sanitization.md) | Pluggable Artifact Storage & Sanitization | Accepted | Provides a secure, trait-based storage system for handling adversarial test artifacts. |
 | [ADR-0007](0007-standalone-web-dashboard-with-mock-fallback.md) | Standalone Dashboard with Mock Fallback | Accepted | Allows frontend development without a local blockchain node or active Rust backend. |
 | [ADR-0008](0008-run-lifecycle-and-checkpoint-recovery.md) | Run Lifecycle & Checkpoint Recovery | Accepted | Ensures safe cancellation and state recovery during long-running fuzzing campaigns. |
+| [ADR-0009](0009-oidc-role-mapping.md) | OIDC External Auth & Role Mapping | Accepted | Hardened OIDC flow and an explicit, no-default claim→role mapping policy. |
+| [ADR-0010](0010-org-project-tenancy.md) | Org → Project Tenancy | Accepted | Type-enforced tenant scoping, prefixed storage keys, isolation suite and backfill plan. |
 
 ---
 
