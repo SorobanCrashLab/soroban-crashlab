@@ -4,10 +4,13 @@ on:
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
+  pull_request:
+    types: [opened, synchronized, reopened, labeled]
 
 permissions:
   contents: read
   issues: write
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -32,6 +35,7 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # 1.97.1
         with:
           toolchain: 1.97.1
+          components: rustfmt
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -95,7 +99,7 @@ jobs:
             echo "The nightly fuzz campaign's regression suite failed against a known fixture."
             echo ""
             echo "Repro:"
-            echo '```'
+            echo '```"
             echo "cd contracts/crashlab-core && cargo run --bin crashlab -- regression-suite fixtures"
             echo '```'
             echo ""
@@ -106,6 +110,110 @@ jobs:
             echo '```'
             cat "$RUNNER_TEMP/regression-suite.log"
             echo '```'
+            echo "</details>"
+          } > "$body_file"
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+            --body-file "$body_file" --label bug
+
+  diff-engine:
+    # Differential fuzzing across engine versions: runs the golden corpus on
+    # engine A and engine B and emits a signature-diff report. Report-only
+    # on PRs (the job is green); nightly runs the full corpus across releases.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: contracts/crashlab-core
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # 1.97.1
+        with:
+          toolchain: 1.97.1
+          components: rustfmt
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: contracts/crashlab-core
+
+      - name: Build diff runner
+        run: cargo build --bins --release
+
+      - name: Run differential fuzzing
+        id: diff_runner
+        env:
+          DIFF_EXPECTATIONS: ${{ github.workspace }}/contracts/crashlab-core/golden/diff-expectations.json
+        run: |
+          set +e
+          cargo run --release --bin crashlab -- diff-engine \
+            --corpus golden/corpus \
+            --engine-a golden/engine-a.json \
+            --engine-b golden/engine-b.json \
+            --expectations "$DIFF_EXPECTATIONS" \
+            --markdown "$RUNNER_TEMP/diff-report.md" \
+            --report-json "$RUNNER_TEMP/diff-report.json" \
+            | tee "$RUNNER_TEMP/diff-runner.log"
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+        shell: bash
+
+      - name: Publish diff report to step summary
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/diff-report.md" ]; then
+            cat "$RUNNER_TEMP/diff-report.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No diff report was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload diff artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: diff-engine-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/diff-report.md
+            ${{ runner.temp }}/diff-report.json
+            ${{ runner.temp }}/diff-runner.log
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Enforce diff result (nightly only)
+        if: github.event_name != 'pull_request' && steps.diff_runner.outputs.exit_code != '0'
+        run: |
+          echo "Diff engine reported unexplained deltas (exit ${{ steps.diff_runner.outputs.exit_code }})."
+          exit 1
+
+      - name: File a diff issue on unexplained deltas
+        if: github.event_name != 'pull_request' && steps.diff_runner.outputs.exit_code != '0'
+        env:
+          GHE_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          title="Diff engine: unexplained classification deltas ($(date -u +%Y-%m-%d))"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "in:title \"Diff engine: unexplained classification deltas\"" \
+            --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            echo "Open diff issue #$existing already tracks this failure mode; skipping."
+            exit 0
+          fi
+          body_file="$RUNNER_TEMP/diff-issue-body.md"
+          {
+            echo "The nightly differential fuzzing job found unexplained classification deltas between engine A and engine B."
+            echo ""
+            echo "Repro:"
+            echo '```"
+            echo "cd contracts/crashlab-core && cargo run --bin crashlab -- diff-engine --corpus golden/corpus --engine-a golden/engine-a.json --engine-b golden/engine-b.json --expectations golden/diff-expectations.json --markdown diff-report.md --report-json diff-report.json"
+            echo '```'
+            echo ""
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "<details><summary>Diff report</summary>"
+            echo ""
+            if [ -f "$RUNNER_TEMP/diff-report.md" ]; then cat "$RUNNER_TEMP/diff-report.md"; fi
             echo "</details>"
           } > "$body_file"
           gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
