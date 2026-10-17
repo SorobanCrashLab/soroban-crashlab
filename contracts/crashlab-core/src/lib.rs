@@ -227,6 +227,12 @@ pub use corpus_import::{
     import_seeds, import_seeds_with_schema, CorpusImportError, CorpusImportResult,
 };
 
+pub mod corpus_minimize;
+pub use corpus_minimize::{
+    apply_minimization, behavior_key, plan_minimization, ApplyReport, BehaviorGroup, BehaviorKey,
+    CorpusRecord, MinimizationPlan, MinimizeError, SeedId,
+};
+
 pub mod retention;
 pub use retention::{RetentionPolicy, RetentionRecord};
 
