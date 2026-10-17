@@ -3,6 +3,8 @@
 //! Failing cases are stored as portable UTF-8 JSON with a top-level **`schema`**
 //! field so future formats can be decoded explicitly (see issue #9).
 
+use crate::fixture_manifest::ShrinkLineage;
+use crate::provenance::ProvenanceRecord;
 use crate::{CaseBundle, CaseSeed, CrashSignature, EnvironmentFingerprint, RpcEnvelopeCapture};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -29,6 +31,17 @@ pub struct CaseBundleDocument {
     /// Captured RPC request/response envelopes for reproducibility auditing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rpc_envelope: Option<RpcEnvelopeCapture>,
+    /// Tamper-evident provenance preserved across export/import (#1864).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<ProvenanceRecord>,
+    /// Original (pre-shrink) seed kept alongside the minimal `seed` (#1866).
+    ///
+    /// Absent on legacy single-payload documents: then `seed` *is* the original.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_seed: Option<CaseSeed>,
+    /// Shrink delta metadata linking `original_seed` to `seed` (#1866).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shrink_lineage: Option<ShrinkLineage>,
 }
 
 /// Errors from loading or saving a bundle.
@@ -40,6 +53,8 @@ pub enum BundlePersistError {
     Io(std::io::Error),
     /// Document `schema` is not in [`SUPPORTED_BUNDLE_SCHEMAS`].
     UnsupportedSchema { found: u32 },
+    /// Provenance verification failed (#1864).
+    Provenance(String),
 }
 
 impl fmt::Display for BundlePersistError {
@@ -52,6 +67,7 @@ impl fmt::Display for BundlePersistError {
                 "unsupported bundle schema version {found} (supported: {:?})",
                 SUPPORTED_BUNDLE_SCHEMAS
             ),
+            BundlePersistError::Provenance(msg) => write!(f, "bundle provenance error: {msg}"),
         }
     }
 }
@@ -88,7 +104,47 @@ impl CaseBundleDocument {
             environment: bundle.environment.clone(),
             failure_payload: bundle.failure_payload.clone(),
             rpc_envelope: bundle.rpc_envelope.clone(),
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         }
+    }
+
+    /// Attaches a provenance block, preserving it across export/import (#1864).
+    pub fn with_provenance(mut self, provenance: ProvenanceRecord) -> Self {
+        self.provenance = Some(provenance);
+        self
+    }
+
+    /// Attaches the original (pre-shrink) seed and its shrink lineage (#1866).
+    ///
+    /// The document's `seed` remains the minimal reproduction.
+    pub fn with_pairing(mut self, original_seed: CaseSeed, lineage: ShrinkLineage) -> Self {
+        self.original_seed = Some(original_seed);
+        self.shrink_lineage = Some(lineage);
+        self
+    }
+
+    /// `true` when this document carries a shrink pairing.
+    ///
+    /// A legacy document (no `original_seed`) is *original-only*: its `seed` is
+    /// the original and there is no minimal form.
+    pub fn is_paired(&self) -> bool {
+        self.original_seed.is_some()
+    }
+
+    /// The original (pre-shrink) seed, falling back to `seed` for legacy docs (#1866).
+    pub fn original_or_minimal_seed(&self) -> &CaseSeed {
+        self.original_seed.as_ref().unwrap_or(&self.seed)
+    }
+
+    /// Verifies the attached provenance (if any) under `policy` (#1864).
+    pub fn verify_provenance(
+        &self,
+        policy: crate::provenance::ProvenancePolicy,
+    ) -> Result<crate::provenance::ProvenanceOutcome, BundlePersistError> {
+        crate::provenance::verify_optional(self.provenance.as_ref(), policy)
+            .map_err(|e| BundlePersistError::Provenance(e.to_string()))
     }
 
     /// Converts this document into a [`CaseBundle`] after validating `schema`.
@@ -120,6 +176,27 @@ pub fn save_case_bundle_json(bundle: &CaseBundle) -> Result<Vec<u8>, BundlePersi
 pub fn load_case_bundle_json(bytes: &[u8]) -> Result<CaseBundle, BundlePersistError> {
     let doc: CaseBundleDocument = serde_json::from_slice(bytes)?;
     doc.into_bundle()
+}
+
+/// Serializes a [`CaseBundleDocument`] as-is (preserving provenance, #1864).
+pub fn save_case_bundle_document_json(
+    doc: &CaseBundleDocument,
+) -> Result<Vec<u8>, BundlePersistError> {
+    Ok(serde_json::to_vec_pretty(doc)?)
+}
+
+/// Parses JSON bytes into a [`CaseBundleDocument`], validating `schema`.
+///
+/// Unlike [`load_case_bundle_json`] this keeps the provenance block and any
+/// shrink pairing intact for callers that need the full document (#1864).
+pub fn load_case_bundle_document_json(
+    bytes: &[u8],
+) -> Result<CaseBundleDocument, BundlePersistError> {
+    let doc: CaseBundleDocument = serde_json::from_slice(bytes)?;
+    if !SUPPORTED_BUNDLE_SCHEMAS.contains(&doc.schema) {
+        return Err(BundlePersistError::UnsupportedSchema { found: doc.schema });
+    }
+    Ok(doc)
 }
 
 /// Writes JSON to any [`Write`] implementation.
@@ -201,6 +278,9 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         };
         let bytes = serde_json::to_vec(&doc).unwrap();
         let err = load_case_bundle_json(&bytes).unwrap_err();
@@ -299,5 +379,102 @@ mod tests {
         assert!(s.contains("rpc_envelope"));
         assert!(s.contains("captured_at"));
         assert!(s.contains("2024-01-01T00:00:00Z"));
+    }
+
+    // ── provenance (#1864) ────────────────────────────────────────────────────
+
+    fn sample_provenance() -> crate::provenance::ProvenanceRecord {
+        crate::provenance::ProvenanceRecord::new(
+            "run-7",
+            42,
+            "0.1.0",
+            crate::provenance::sha256_hex(b"linux/x86_64/unix"),
+            "2026-01-01T00:00:00Z",
+            "runtime-failure/0000000000000001/0000000000000002",
+        )
+        .seal()
+    }
+
+    #[test]
+    fn provenance_survives_document_round_trip() {
+        let bundle = to_bundle(crate::CaseSeed {
+            id: 42,
+            payload: vec![1, 2, 3],
+        });
+        let doc = CaseBundleDocument::from_bundle(&bundle).with_provenance(sample_provenance());
+        let bytes = save_case_bundle_document_json(&doc).unwrap();
+        let loaded = load_case_bundle_document_json(&bytes).unwrap();
+        loaded.verify_provenance(crate::provenance::ProvenancePolicy::Require).unwrap();
+        assert!(loaded.provenance.is_some());
+    }
+
+    #[test]
+    fn tampered_provenance_fails_document_verification() {
+        let bundle = to_bundle(crate::CaseSeed {
+            id: 1,
+            payload: vec![],
+        });
+        let mut rec = sample_provenance();
+        rec.seed_id = 999;
+        let doc = CaseBundleDocument::from_bundle(&bundle).with_provenance(rec);
+        let err = doc
+            .verify_provenance(crate::provenance::ProvenancePolicy::Require)
+            .unwrap_err();
+        match err {
+            BundlePersistError::Provenance(_) => {}
+            other => panic!("expected Provenance error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn legacy_document_without_provenance_is_accepted_under_warn() {
+        let bundle = to_bundle(crate::CaseSeed {
+            id: 5,
+            payload: vec![7],
+        });
+        let doc = CaseBundleDocument::from_bundle(&bundle);
+        let outcome = doc
+            .verify_provenance(crate::provenance::ProvenancePolicy::WarnOnMissing)
+            .unwrap();
+        assert!(outcome.missing);
+    }
+
+    // ── shrink pairing (#1866) ────────────────────────────────────────────────
+
+    #[test]
+    fn paired_document_round_trips_both_seeds() {
+        let minimal = to_bundle(crate::CaseSeed {
+            id: 42,
+            payload: vec![0xAA, 0xBB],
+        });
+        let original_seed = crate::CaseSeed {
+            id: 42,
+            payload: vec![9, 9, 0xAA, 0xBB, 9],
+        };
+        let lineage = ShrinkLineage::new("ddmin", 5, 5, 2, 1, 1)
+            .with_preserved_field("signature");
+        let doc = CaseBundleDocument::from_bundle(&minimal)
+            .with_pairing(original_seed.clone(), lineage.clone());
+
+        let bytes = save_case_bundle_document_json(&doc).unwrap();
+        let loaded = load_case_bundle_document_json(&bytes).unwrap();
+
+        assert_eq!(loaded.original_seed, Some(original_seed));
+        assert_eq!(loaded.shrink_lineage, Some(lineage));
+        assert_eq!(loaded.seed, minimal.seed);
+        assert!(loaded.original_seed.unwrap().payload.len() > loaded.seed.payload.len());
+    }
+
+    #[test]
+    fn legacy_document_is_original_only() {
+        let bundle = to_bundle(crate::CaseSeed {
+            id: 1,
+            payload: vec![1, 2, 3],
+        });
+        let doc = CaseBundleDocument::from_bundle(&bundle);
+        assert!(doc.original_seed.is_none());
+        assert!(doc.shrink_lineage.is_none());
+        // Legacy: the minimal seed is treated as the original.
+        assert_eq!(doc.original_or_minimal_seed(), &doc.seed);
     }
 }

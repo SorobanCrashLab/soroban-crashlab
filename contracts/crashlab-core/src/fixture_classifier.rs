@@ -1,3 +1,5 @@
+use crate::fixture_manifest::{FixturePairing, ShrinkLineage};
+use crate::provenance::{verify_optional, ProvenanceError, ProvenancePolicy, ProvenanceRecord};
 use crate::{CaseSeed, CrashSignature, RegressionFixture, RegressionGroup};
 
 /// Classifies a failing case into a `RegressionGroup` based on its metadata.
@@ -58,6 +60,49 @@ pub fn classify_and_wrap_fixture(
 ) -> RegressionFixture {
     let group = classify_fixture(seed, signature);
     RegressionFixture::new(seed, signature, Some(group))
+}
+
+/// Verifies provenance **before** classifying, so a tampered (or, under
+/// [`ProvenancePolicy::Require`], missing) fixture is rejected rather than
+/// admitted to a regression baseline (#1864).
+///
+/// Returns [`ProvenanceError`] on failure; callers quarantine the fixture and
+/// never execute it as a baseline. On success the fixture is classified exactly
+/// as [`classify_and_wrap_fixture`] would.
+pub fn classify_and_wrap_verified(
+    seed: &CaseSeed,
+    signature: &CrashSignature,
+    provenance: Option<&ProvenanceRecord>,
+    policy: ProvenancePolicy,
+) -> Result<RegressionFixture, ProvenanceError> {
+    verify_optional(provenance, policy)?;
+    Ok(classify_and_wrap_fixture(seed, signature))
+}
+
+/// A classified fixture together with its shrink delta metadata (#1866).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PairedClassification {
+    /// Fixture classified from the **minimal** reproduction.
+    pub fixture: RegressionFixture,
+    /// Delta metadata linking the minimal form back to the original capture.
+    pub lineage: ShrinkLineage,
+}
+
+/// Classifies the **minimal** half of a shrunk-and-original pair (#1866).
+///
+/// The regression group is derived from the minimal payload (that is what CI
+/// replays), while the pairing's [`ShrinkLineage`] travels alongside so reports
+/// and the `fixture show` CLI can render the delta. The original capture is
+/// retained for provenance/completeness and is *not* used for classification.
+pub fn classify_paired_fixture(
+    minimal_seed: &CaseSeed,
+    signature: &CrashSignature,
+    pairing: &FixturePairing,
+) -> PairedClassification {
+    PairedClassification {
+        fixture: classify_and_wrap_fixture(minimal_seed, signature),
+        lineage: pairing.lineage.clone(),
+    }
 }
 
 #[cfg(test)]
@@ -247,5 +292,86 @@ mod tests {
         let fixture2 = classify_and_wrap_fixture(&seed, &sig);
 
         assert_eq!(fixture1.regression_group, fixture2.regression_group);
+    }
+
+    // ── verify-on-classify (#1864) ────────────────────────────────────────────
+
+    fn provenance() -> ProvenanceRecord {
+        ProvenanceRecord::new(
+            "run-1",
+            0,
+            "0.1.0",
+            crate::provenance::sha256_hex(b"env"),
+            "2026-01-01T00:00:00Z",
+            "runtime-failure/0000000000000000/0000000000000000",
+        )
+        .seal()
+    }
+
+    #[test]
+    fn verified_classification_accepts_sealed_provenance() {
+        let seed = make_seed(vec![0xA0, 0x01]);
+        let sig = make_sig("runtime-failure", 0xDEADBEEF);
+        let rec = provenance();
+
+        let fixture = classify_and_wrap_verified(
+            &seed,
+            &sig,
+            Some(&rec),
+            ProvenancePolicy::Require,
+        )
+        .unwrap();
+
+        assert!(fixture.regression_group.is_some());
+    }
+
+    #[test]
+    fn verified_classification_rejects_tampered_provenance() {
+        let seed = make_seed(vec![0xA0, 0x01]);
+        let sig = make_sig("runtime-failure", 0xDEADBEEF);
+        let mut rec = provenance();
+        rec.seed_id = 42;
+
+        let err = classify_and_wrap_verified(&seed, &sig, Some(&rec), ProvenancePolicy::Require)
+            .unwrap_err();
+        assert!(matches!(err, ProvenanceError::ContentHashMismatch { .. }));
+    }
+
+    #[test]
+    fn verified_classification_requires_provenance_under_strict_policy() {
+        let seed = make_seed(vec![0x00]);
+        let sig = make_sig("empty-input", 0x1);
+        assert_eq!(
+            classify_and_wrap_verified(&seed, &sig, None, ProvenancePolicy::Require).unwrap_err(),
+            ProvenanceError::Missing
+        );
+    }
+
+    #[test]
+    fn verified_classification_allows_legacy_under_warn_policy() {
+        let seed = make_seed(vec![0x00]);
+        let sig = make_sig("empty-input", 0x1);
+        assert!(classify_and_wrap_verified(&seed, &sig, None, ProvenancePolicy::WarnOnMissing).is_ok());
+    }
+
+    // ── paired classification (#1866) ─────────────────────────────────────────
+
+    #[test]
+    fn classifies_paired_fixture_on_minimal_payload() {
+        let sig = make_sig("runtime-failure", 0x5151);
+        let minimal = make_seed(vec![0xA0, 0x01]);
+        let pairing = FixturePairing::new(
+            &[9, 9, 0xA0, 0x01, 9],
+            &minimal.payload,
+            ShrinkLineage::new("ddmin", 4, 5, 2, 1, 1).with_preserved_field("signature"),
+        );
+
+        let classified = classify_paired_fixture(&minimal, &sig, &pairing);
+
+        // Minimal payload 0xA0 lands in the Auth area.
+        assert_eq!(classified.fixture.regression_group.unwrap().area, FailureClass::Auth);
+        assert_eq!(classified.lineage.original_bytes, 5);
+        assert_eq!(classified.lineage.minimal_bytes, 2);
+        assert!(classified.lineage.preserved_fields.contains(&"signature".to_string()));
     }
 }

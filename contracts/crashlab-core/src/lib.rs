@@ -80,15 +80,18 @@ pub use cors::{
     OriginPattern,
 };
 pub use fixture::RegressionFixture;
-pub use fixture_classifier::{classify_and_wrap_fixture, classify_fixture};
+pub use fixture_classifier::{
+    classify_and_wrap_fixture, classify_and_wrap_verified, classify_fixture,
+    classify_paired_fixture, PairedClassification,
+};
 pub use health::{
     FailureMetrics, HealthMonitor, HealthStatus, HealthSummary, QueueMetrics, ThroughputMetrics,
 };
 pub use prng::{PrngMutator, RandomizeMutator, SeededPrng};
 pub use regression_group::RegressionGroup;
 pub use reproducer::{
-    filter_ci_pack, shrink_bundle_payload, shrink_seed_preserving_signature, FlakyDetector,
-    ReproReport, StabilityVerdict,
+    filter_ci_pack, shrink_bundle_payload, shrink_bundle_with_lineage,
+    shrink_seed_preserving_signature, FlakyDetector, ReproReport, StabilityVerdict,
 };
 pub use retry::{execute_with_retry, RetryConfig, SimulationError};
 pub use signature_hash::{hash_category_payload, SignatureHasher};
@@ -150,7 +153,8 @@ pub use decimal_precision::{
 
 pub mod bundle_persist;
 pub use bundle_persist::{
-    load_case_bundle_json, read_case_bundle_json, save_case_bundle_json, write_case_bundle_json,
+    load_case_bundle_document_json, load_case_bundle_json, read_case_bundle_json,
+    save_case_bundle_document_json, save_case_bundle_json, write_case_bundle_json,
     BundlePersistError, CaseBundleDocument, CASE_BUNDLE_SCHEMA_VERSION, SUPPORTED_BUNDLE_SCHEMAS,
 };
 
@@ -174,7 +178,14 @@ pub use fixture_compat::{
 
 pub mod fixture_manifest;
 pub use fixture_manifest::{
-    FixtureManifest, FixtureMetadata, ManifestError, FIXTURE_MANIFEST_SCHEMA_VERSION,
+    FixtureManifest, FixtureMetadata, FixturePairing, ManifestError, ProvenanceReport, ShrinkLineage,
+    FIXTURE_MANIFEST_SCHEMA_VERSION, SHRINK_LINEAGE_SCHEMA_VERSION, SUPPORTED_MANIFEST_SCHEMAS,
+};
+
+pub mod provenance;
+pub use provenance::{
+    canonical_signature, sha256_hex, verify_chain, verify_optional, ProvenanceError,
+    ProvenanceOutcome, ProvenancePolicy, ProvenanceRecord, PROVENANCE_SCHEMA_VERSION,
 };
 
 pub mod fixture_linter;

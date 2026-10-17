@@ -104,7 +104,7 @@ new issues; this batch still carries them, and they mean what is written above.
    named workflow must be green and every named test must exist. Items that
    need a maintainer (keys, settings, infra) are listed as blocked in the PR.
 6. **Architectural choices** get an ADR first — see
-   [when to write an ADR](../adr/README.md#when-to-write-an-adr).
+   [when to write an ADR](../adr/README.md#how-to-create-an-adr).
 
 ## Issue map (W5 IDs)
 

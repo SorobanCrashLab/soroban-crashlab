@@ -20,7 +20,8 @@ use crashlab_core::{
     replay_success_message, request_cancel_run, run_regression_suite_from_json,
     save_run_checkpoint_json,
     HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
-    ArtifactStore, RunCheckpoint, CaseBundleDocument,
+    ArtifactStore, RunCheckpoint, CaseBundleDocument, FixtureManifest, ProvenancePolicy,
+    load_case_bundle_document_json,
 };
 use crashlab_core::worker_partition::RingCoverage;
 use std::collections::HashSet;
@@ -204,6 +205,16 @@ fn main() {
 
             sweep_retention(&policy, dry_run);
         }
+        (Some("fixture"), Some("verify"), Some(path), flag)
+            if flag.is_none() || flag == Some("--policy") =>
+        {
+            fixture_verify_command(path, flag, &rest);
+        }
+        (Some("fixture"), Some("show"), Some(path), flag)
+            if flag.is_none() || flag == Some("--json") =>
+        {
+            fixture_show_command(path, flag == Some("--json"), &rest);
+        }
         _ => {
             print_usage();
             std::process::exit(1);
@@ -219,6 +230,8 @@ fn print_usage() {
                 crashlab runs status <id> [--json]\n\
                 crashlab replay seed <bundle-json-path>\n\
                 crashlab regression-suite <suite-json-path-or-directory> [--report <report.json>]\n\
+                crashlab fixture verify <manifest-or-bundle-json> [--policy <require|warn|off>]\n\
+                crashlab fixture show <manifest-or-bundle-json> [--json]\n\
                 crashlab retention sweep [--dry-run] [--heartbeat-ttl <secs>] [--grace-period <secs>]\n\
                 \n\
                 run start options:\n\
@@ -235,6 +248,159 @@ fn print_usage() {
                 \x20 --seed-quota <n>               seeds left in the scope's daily quota (default: unlimited)\n\
                 \x20 --help                         print this message"
     );
+}
+
+/// Either a fixture manifest (many fixtures) or a single bundle document.
+enum FixtureDocument {
+    Manifest(Box<FixtureManifest>),
+    Bundle(Box<CaseBundleDocument>),
+}
+
+fn load_fixture_document(path: &str) -> Result<FixtureDocument, String> {
+    let text = fs::read_to_string(path).map_err(|e| format!("failed to read {path}: {e}"))?;
+    if let Ok(manifest) = FixtureManifest::from_json(&text) {
+        return Ok(FixtureDocument::Manifest(Box::new(manifest)));
+    }
+    load_case_bundle_document_json(text.as_bytes())
+        .map(|doc| FixtureDocument::Bundle(Box::new(doc)))
+        .map_err(|e| format!("{path} is neither a fixture manifest nor a case bundle: {e}"))
+}
+
+/// `crashlab fixture verify <path> [--policy <p>]` (#1864).
+fn fixture_verify_command(path: &str, flag: Option<&str>, rest: &[String]) {
+    let mut policy = ProvenancePolicy::WarnOnMissing;
+    match flag {
+        None => {
+            if !rest.is_empty() {
+                print_usage();
+                std::process::exit(1);
+            }
+        }
+        Some("--policy") => match rest.first().and_then(|v| ProvenancePolicy::parse(v)) {
+            Some(p) => policy = p,
+            None => {
+                eprintln!("invalid or missing --policy value (expected require|warn|off)");
+                std::process::exit(1);
+            }
+        },
+        Some(_) => {
+            print_usage();
+            std::process::exit(1);
+        }
+    }
+
+    let document = match load_fixture_document(path) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    };
+
+    match document {
+        FixtureDocument::Manifest(manifest) => match manifest.verify_all_provenance(policy) {
+            Ok(report) => {
+                for warning in &report.warnings {
+                    eprintln!("warning: {warning}");
+                }
+                for id in &report.missing {
+                    eprintln!("warning: fixture {id} has no provenance");
+                }
+                println!(
+                    "provenance: {} verified, {} missing (policy {:?})",
+                    report.verified,
+                    report.missing.len(),
+                    policy
+                );
+            }
+            Err(e) => {
+                eprintln!("provenance verification failed: {e}");
+                std::process::exit(1);
+            }
+        },
+        FixtureDocument::Bundle(doc) => match doc.verify_provenance(policy) {
+            Ok(outcome) => {
+                for warning in &outcome.warnings {
+                    eprintln!("warning: {warning}");
+                }
+                if outcome.missing {
+                    println!("provenance: missing (policy {:?})", policy);
+                } else {
+                    println!("provenance: verified");
+                }
+            }
+            Err(e) => {
+                eprintln!("provenance verification failed: {e}");
+                std::process::exit(1);
+            }
+        },
+    }
+}
+
+/// `crashlab fixture show <path> [--json]` renders shrink delta metadata (#1866).
+fn fixture_show_command(path: &str, json: bool, rest: &[String]) {
+    if !rest.is_empty() {
+        print_usage();
+        std::process::exit(1);
+    }
+
+    let document = match load_fixture_document(path) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    };
+
+    match document {
+        FixtureDocument::Manifest(manifest) => {
+            if json {
+                match manifest.to_json() {
+                    Ok(rendered) => println!("{rendered}"),
+                    Err(e) => {
+                        eprintln!("failed to render manifest: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                return;
+            }
+            let mut ids: Vec<&String> = manifest.fixtures.keys().collect();
+            ids.sort();
+            for id in ids {
+                match manifest.fixtures[id].shrink_lineage() {
+                    Some(lineage) => println!("{id}: {}", lineage.render()),
+                    None => println!("{id}: original-only (no shrink lineage)"),
+                }
+            }
+        }
+        FixtureDocument::Bundle(doc) => {
+            if json {
+                match crashlab_core::save_case_bundle_document_json(&doc) {
+                    Ok(bytes) => println!("{}", String::from_utf8_lossy(&bytes)),
+                    Err(e) => {
+                        eprintln!("failed to render document: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                return;
+            }
+            match doc.shrink_lineage.as_ref() {
+                Some(lineage) => {
+                    println!("{}", lineage.render());
+                    if let Some(original) = doc.original_seed.as_ref() {
+                        println!(
+                            "original seed id={} ({} bytes) -> minimal seed id={} ({} bytes)",
+                            original.id,
+                            original.payload.len(),
+                            doc.seed.id,
+                            doc.seed.payload.len()
+                        );
+                    }
+                }
+                None => println!("original-only document (no shrink lineage)"),
+            }
+        }
+    }
 }
 
 fn list_runs() {

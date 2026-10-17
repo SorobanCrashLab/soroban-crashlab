@@ -16,6 +16,7 @@ This directory contains Architecture Decision Records (ADRs) for Soroban CrashLa
 | [ADR-0008](0008-run-lifecycle-and-checkpoint-recovery.md) | Run Lifecycle & Checkpoint Recovery | Accepted | Ensures safe cancellation and state recovery during long-running fuzzing campaigns. |
 | [ADR-0009](0009-oidc-role-mapping.md) | OIDC External Auth & Role Mapping | Accepted | Hardened OIDC flow and an explicit, no-default claim→role mapping policy. |
 | [ADR-0010](0010-org-project-tenancy.md) | Org → Project Tenancy | Accepted | Type-enforced tenant scoping, prefixed storage keys, isolation suite and backfill plan. |
+| [ADR-0011](0011-fixture-provenance-hash-chain.md) | Fixture Provenance: Hash Chain vs. Signatures | Accepted | Tamper-evident seed → run → engine → environment provenance sealed by a SHA-256 hash chain. |
 
 ---
 
