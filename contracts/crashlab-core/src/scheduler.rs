@@ -49,6 +49,8 @@ pub trait Mutator: Send + Sync {
 pub struct MutatorStats {
     /// Total number of times this mutator was selected.
     pub selection_count: u64,
+    /// Number of selections that produced a novel signature (yield).
+    pub novelty_count: u64,
 }
 
 /// Configurable scheduler that selects mutators based on relative weights.
@@ -59,6 +61,8 @@ pub struct WeightedScheduler {
     total_weight: f64,
     stats: Vec<MutatorStats>,
     total_selections: u64,
+    /// Optional per-mutator weight snapshots for plateau-driven diversification.
+    baseline_weights: Vec<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,6 +130,7 @@ impl WeightedScheduler {
         }
 
         let stats = vec![MutatorStats::default(); mutators.len()];
+        let baseline_weights = weights.clone();
 
         Ok(Self {
             mutators,
@@ -134,6 +139,7 @@ impl WeightedScheduler {
             total_weight,
             stats,
             total_selections: 0,
+            baseline_weights,
         })
     }
 
@@ -163,6 +169,21 @@ impl WeightedScheduler {
         self.stats[index].selection_count += 1;
 
         &*self.mutators[index]
+    }
+
+    /// Records that the mutator at `index` produced a novel signature.
+    ///
+    /// Used by the plateau detector to compute per-mutator yield over a
+    /// rolling window. Out-of-range indices are ignored.
+    pub fn record_novelty(&mut self, index: usize) {
+        if let Some(stat) = self.stats.get_mut(index) {
+            stat.novelty_count += 1;
+        }
+    }
+
+    /// Returns the number of registered mutators.
+    pub fn len(&self) -> usize {
+        self.mutators.len()
     }
 
     /// Updates the weight of a mutator by index.
@@ -199,6 +220,62 @@ impl WeightedScheduler {
         Ok(())
     }
 
+    /// Forces a diversification of the mutator mix in response to a sustained
+    /// plateau. Zero-yield mutators are down-weighted while the remaining mass
+    /// is redistributed evenly, guaranteeing a different mix than the baseline.
+    ///
+    /// Returns `true` if the mix was changed, `false` if no diversification was
+    /// possible (e.g. a single mutator).
+    pub fn diversify(&mut self) -> bool {
+        if self.mutators.len() < 2 {
+            return false;
+        }
+
+        let n = self.mutators.len();
+        // Rank mutators by observed yield; give more mass to higher-yield ones.
+        let mut order: Vec<usize> = (0..n).collect();
+        order.sort_by(|&a, &b| {
+            let ya = self.stats[a].novelty_count;
+            let yb = self.stats[b].novelty_count;
+            yb.cmp(&ya).then(a.cmp(&b))
+        });
+
+        // Assign linearly decreasing weights across the ranked order so the
+        // resulting distribution differs from the configured baseline.
+        let mut new_weights = vec![0.0f64; n];
+        let mut total = 0.0f64;
+        for (rank, &idx) in order.iter().enumerate() {
+            let w = (n - rank) as f64;
+            new_weights[idx] = w;
+            total += w;
+        }
+
+        if total <= 0.0 {
+            return false;
+        }
+
+        for (i, w) in new_weights.into_iter().enumerate() {
+            self.weights[i] = w;
+        }
+        self.recompute_cumulative();
+        true
+    }
+
+    /// Restores the weights captured at construction time.
+    pub fn reset_weights(&mut self) {
+        self.weights = self.baseline_weights.clone();
+        self.recompute_cumulative();
+    }
+
+    fn recompute_cumulative(&mut self) {
+        let mut sum = 0.0;
+        for &w in &self.weights {
+            sum += w;
+            self.cumulative_weights.push(sum);
+        }
+        self.total_weight = sum;
+    }
+
     /// Returns a summary of mutator usage distribution.
     pub fn report_stats(&self) -> Vec<SchedulerStatEntry> {
         self.mutators
@@ -219,6 +296,7 @@ impl WeightedScheduler {
                     count,
                     observed_frequency,
                     configured_frequency,
+                    novelty_count: self.stats[i].novelty_count,
                 }
             })
             .collect()
@@ -307,6 +385,7 @@ pub struct SchedulerStatEntry {
     pub count: u64,
     pub observed_frequency: f64,
     pub configured_frequency: f64,
+    pub novelty_count: u64,
 }
 
 /// Simple LCG-based PRNG to produce an f64 in [0, 1).
@@ -487,6 +566,37 @@ mod tests {
         assert!(selected_names.contains("havoc"));
         assert!(selected_names.contains("enum-variant-flip"));
         assert!(selected_names.contains("prng"));
+    }
+
+    #[test]
+    fn record_novelty_tracks_yield() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![
+            (Box::new(MockMutator("a")), 1.0),
+            (Box::new(MockMutator("b")), 1.0),
+        ];
+        let mut scheduler = WeightedScheduler::new(configs).unwrap();
+        scheduler.record_novelty(0);
+        scheduler.record_novelty(0);
+        scheduler.record_novelty(1);
+        scheduler.record_novelty(99); // out of range ignored
+
+        let stats = scheduler.report_stats();
+        assert_eq!(stats[0].novelty_count, 2);
+        assert_eq!(stats[1].novelty_count, 1);
+    }
+
+    #[test]
+    fn diversify_changes_mix_and_reset_restores() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![
+            (Box::new(MockMutator("a")), 10.0),
+            (Box::new(MockMutator("b")), 10.0),
+        ];
+        let mut scheduler = WeightedScheduler::new(configs).unwrap();
+        scheduler.record_novelty(1);
+        assert!(scheduler.diversify());
+        assert_eq!(scheduler.total_weight, 3.0);
+        scheduler.reset_weights();
+        assert_eq!(scheduler.total_weight, 20.0);
     }
 }
 
