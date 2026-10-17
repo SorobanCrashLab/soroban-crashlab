@@ -9,8 +9,8 @@ on:
     - cron: '0 6 * * 1'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -25,6 +25,11 @@ jobs:
       fail-fast: false
       matrix:
         language: ['javascript-typescript', 'rust']
+        include:
+          - language: 'javascript-typescript'
+            cache-key: 'node'
+          - language: 'rust'
+            cache-key: 'cargo'
 
     steps:
       - name: Checkout repository
@@ -35,6 +40,14 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: security-extended
+
+      - name: Cache CodeQL databases
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/codeql
+          key: codeql-${{ runner.os }}-${{ matrix.cache-key }}-${{ hashFiles('**/package-lock.json', '**/Cargo.lock') }}
+          restore-keys: |
+            codeql-${{ runner.os }}-${{ matrix.cache-key }}-
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4
