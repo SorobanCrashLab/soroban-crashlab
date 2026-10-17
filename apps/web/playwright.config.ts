@@ -7,21 +7,30 @@ import { defineConfig, devices } from '@playwright/test';
 // require('dotenv').config();
 
 /**
- * Whether this run is the dedicated accessibility gate. The a11y job sets
- * A11Y=1 so the config can scope test discovery, reporters and projects to
+ * Whether this run is the dedicated accessibility gate. The a1y job sets
+ * A1Y=1 so the config can scope test discovery, reporters and projects to
  * the axe-core / keyboard specs without disturbing the main e2e suite.
  */
-const isA11yRun = process.env.A11Y === '1';
+const isA1yRun = process.env.A1Y === '1';
+
+/**
+ * Whether this run is a sharded CI run. Playwright sharding is driven by the
+ * `--shard=i/N` CLI flag; we detect it so reporter output folders and artifact
+ * names are unique per shard and do not collide when uploaded from N runners.
+ */
+const shardArg = process.argv.find((arg) => arg.startsWith('--shard='));
+const shardLabel = shardArg ? shardArg.replace('=', '-').replace('/', '-of-') : 'shard-all';
 
 export default defineConfig({
-  /* A11y job runs only the axe/keyboard specs under e2/a11y. */
-  testDir: isA11yRun ? './e2e/a11y' : './e2e',
+  /* A11y job runs only the axe/keyboard specs under e2a/a1y. */
+  testDir: isA1yRun ? './e2e/a11' : './e2e',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
+  /* Retry on CI only. The e2e gate runs with retries=1 so a flake test is
+   * retried once and trace/video are captured on the first failure. */
+  retries: process.env.CI ? 1 : 0,
   /* Opt out of parallel tests on CI */
   workers: process.env.CI ? 1 : undefined,
   /* Test timeout */
@@ -45,18 +54,20 @@ export default defineConfig({
   },
   /* Reporter to use. See https://playwright.dev/docs/test-reporters.
    * A11y runs emit a dedicated report folder so the HTML report is uploaded
-   * as an artifact without colliding with the main e2e job. */
+   * as an artifact without colliding with the main e2e job. Sharded CI runs
+   * suffix every output folder with the shard label so N runners can upload
+   * their artifacts without collision. */
   reporter: isA11yRun
     ? [
-        ['html', { open: 'never', outputFolder: 'playwright-report-a11y' }],
-        ['json', { outputFile: 'test-results-a11y/results.json' }],
-        ['junit', { outputFile: 'test-results-a11y/junit.xml' }],
+        ['html', { open: 'never', outputFolder: 'playwright-report-a11' }],
+        ['json', { outputFile: 'test-results-a11/results.json' }],
+        ['junit', { outputFile: 'test-results-a11/junit.xml' }],
         ...(process.env.CI ? [['github']] : []),
       ]
     : [
-        ['html', { open: 'never', outputFolder: 'playwright-report' }],
-        ['json', { outputFile: 'test-results/results.json' }],
-        ['junit', { outputFile: 'test-results/junit.xml' }],
+        ['html', { open: 'never', outputFolder: `playwright-report-${shardLabel}` }],
+        ['json', { outputFile: `test-results-${shardLabel}/results.json` }],
+        ['junit', { outputFile: `test-results-${shardLabel}/junit.xml` }],
         ...(process.env.CI ? [['github']] : []),
       ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -64,14 +75,17 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'http://localhost:3077',
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    trace: 'oon-first-retry',
+    /* Record video for failed tests so the e2e gate can be debugged from CI
+     * artifacts without a re-run. */
+    video: 'retain-on-failure',
     /* Screenshot on failure */
     screenshot: 'only-on-failure',
   },
 
   /* Configure projects for major browsers. The a11y gate runs a cross-browser
    * matrix on purpose: contrast and keyboard regressions can be engine-specific. */
-  projects: isA11yRun
+  projects: isA1yRun
     ? [
         {
           name: 'chromium',

@@ -75,6 +75,8 @@ The Playwright configuration is defined in `playwright.config.ts` at the root of
 - **Dev Server**: Automatically starts with `npm run dev`
 - **Screenshots**: Captured on test failure
 - **Traces**: Captured on first retry
+- **Retries**: 1 retry per spec in CI to absorb flakiness
+- **Sharding**: Suite split with `--shard=i/N` across N runners (currently N=2)
 
 ## Best Practices
 
@@ -100,10 +102,16 @@ Each test file should:
 
 ## CI/CD Integration
 
-Tests run on CI with:
-- Single worker (no parallelization)
-- 2 retries for flaky tests
-- HTML reports generated in `playwright-report/`
+All specs run on every PR as a merge gate via `.github/workflows/e2e.yml`:
+- **Sharding**: the suite is split with `--shard=i/N` across N runners (currently N=2). Shard count is derived from measured runtime to keep the full suite under a 15-minute wall budget.
+- **Retries**: 1 retry per spec in CI to absorb flakiness.
+- **Artifacts**: traces, videos, and screenshots are uploaded on failure for debugging.
+- **Boot strategy**: standalone build with seeded fixture data and a deterministic clock/test data.
+- **Reports**: HTML reports generated in `playwright-report/`.
+
+### Quarantine
+
+Flaky or known-broken specs can be quarantined via the quarantine list config. A quarantined spec is skipped with a tracking entry and an auto-expiry date. The quarantine list is published as a CI artifact and posted as an issue comment when it changes. Quarantined specs must be fixed or removed before their expiry date.
 
 ## Resources
 

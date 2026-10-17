@@ -1,3 +1,4 @@
+---
 name: e2e
 
 on:
@@ -17,6 +18,10 @@ concurrency:
 env:
   NODE_VERSION: '20'
   PNP_VERSION: '9'
+  # Number of shards for the Playwright suite. Derived from measured runtime:
+  # full suite ~12 min on 1 runner => 2 shards keeps wall time well under 15 min.
+  # Bump to 3+ once suite grows past ~20 min on a single runner.
+  E2E_SHARDS: '2'
 
 jobs:
   build:
@@ -41,10 +46,15 @@ jobs:
           retention-days: 1
 
   e2e:
-    name: e2e (chromium)
+    name: e2e (chromium, shard ${{ matrix.shard }}/${{ matrix.total }})
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+        total: [2]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v6.1.0
@@ -61,24 +71,108 @@ jobs:
           path: apps/web/.next
       - run: pnpm exec playwright install --with-deps chromium
         working-directory: apps/web
-      - name: Run e2e suite
-        run: pnpm --filter web exec playwright test
+      - name: Run e2e suite (shard ${{ matrix.shard }}/${{ matrix.total }})
+        run: pnpm --filter web exec playwright test --shard=${{ matrix.shard }}/${{ matrix.total }}
         env:
           CI: 'true'
+          PLAYWRIGHT_RETRIES: '1'
+      - name: Upload Playwright traces/videos/screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-shard-${{ matrix.shard }}-of-${{ matrix.total }}
+          path: |
+            apps/web/test-results
+            apps/web/playwright-report
+          retention-days: 7
       - name: Upload Playwright HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}-of-${{ matrix.total }}
           path: apps/web/playwright-report
           retention-days: 7
       - name: Upload test results (json/junit)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-results
+          name: playwright-results-shard-${{ matrix.shard }}-of-${{ matrix.total }}
           path: apps/web/test-results
           retention-days: 7
+
+  quarantine:
+    name: Quarantine list
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: ${{ env.PNP_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Resolve quarantine list
+        run: |
+          set -eu
+          QUARANTINE="apps/web/e2e/quarantine.json"
+          if [ ! -f "$QUARANTINE" ]; then
+            echo "No quarantine file present; nothing to publish."
+            echo "[]" > quarantine-resolved.json
+            exit 0
+          fi
+          node -e "
+            const fs = require('fs');
+            const raw = JSON.parse(fs.readFileSync('$QUARANTINE', 'utf8'));
+            const today = new Date().toISOString().slice(0, 10);
+            const entries = Array.isArray(raw) ? raw : (raw.entries ?? []);
+            const expired = entries.filter(e => e.expiresAt && e.expiresAt < today);
+            if (expired.length > 0) {
+              console.error('[quarantine] expired entries must be removed:');
+              for (const e of expired) console.error(' - ' + e.spec + ' (expired ' + e.expiresAt + ')');
+              process.exit(1);
+            }
+            fs.writeFileSync('quarantine-resolved.json', JSON.stringify(entries, null, 2));
+            console.log('[quarantine] active entries=' + entries.length);
+          "
+      - name: Upload quarantine list
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarantine-list
+          path: quarantine-resolved.json
+          retention-days: 30
+      - name: Comment quarantine changes on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let entries = [];
+            try { entries = JSON.parse(fs.readFileSync('quarantine-resolved.json', 'utf8')); } catch {}
+            const marker = '<!-- e2e-quarantine -->';
+            const body = entries.length === 0
+              ? `${marker}\n### e2e quarantine\nNo quarantined specs.`
+              : `${marker}\n### e2e quarantine (${entries.length})\n` +
+                entries.map(e => `- \`${e.spec}\` — expires ${e.expiresAt} — ${e.reason ?? 'no reason'}`).join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              if (existing.body !== body) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body,
+                });
+              }
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body,
+              });
+            }
 
   a11y:
     name: a11y gate (axe + keyboard)

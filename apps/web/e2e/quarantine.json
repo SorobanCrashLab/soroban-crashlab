@@ -1,0 +1,5 @@
+{
+  "$comment": "Quarantined Playwright specs. A key is the spec file path relative to apps/web/e2e. Each entry must have a reason, a tracking issue and an expiry date (YYYY-MM-DD). Expired entries fail the check-quarantine gate so quarantine cannot become permanent.",
+  "version": 1,
+  "specs": {}
+}
