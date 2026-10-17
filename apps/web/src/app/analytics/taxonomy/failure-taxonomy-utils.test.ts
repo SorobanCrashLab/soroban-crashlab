@@ -10,6 +10,7 @@ import {
     summarizeTaxonomy,
     toggleCategory,
 } from './failure-taxonomy-utils';
+import { SIGNATURE_SCHEMA_VERSION, SignatureSchemaMismatchError } from './signature-schema';
 import type { FuzzingRun, RunArea, RunSeverity } from '../../types';
 
 function makeRun(overrides: Partial<FuzzingRun> = {}): FuzzingRun {
@@ -43,6 +44,7 @@ function makeFailure(
         crashDetail: {
             failureCategory: category,
             signature,
+            signatureSchemaVersion: SIGNATURE_SCHEMA_VERSION,
             payload: '{}',
             replayAction: `replay ${id}`,
         },
@@ -61,9 +63,9 @@ const runs: FuzzingRun[] = [
     makeRun({ id: 'r8', status: 'failed', crashDetail: null }),
 ];
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // classifyFailureCategory
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 function testClassifyKnownCategory(): void {
     const definition = classifyFailureCategory('BudgetExceeded');
@@ -94,8 +96,48 @@ function testEveryTaxonomyEntryIsDocumented(): void {
 }
 
 // ---------------------------------------------------------------------------
-// getClassifiedRuns
+// signature schema versioning
 // ---------------------------------------------------------------------------
+
+function testSignatureSchemaVersionIsPinned(): void {
+    // Golden value: bumping this requires a migration report (W5-F08 diff)
+    // and maintainer sign-off per docs/taxonomy.md.
+    assert.equal(SIGNATURE_SCHEMA_VERSION, 1);
+}
+
+function testClassifiedRunsCarryCurrentSchemaVersion(): void {
+    for (const run of getClassifiedRuns(runs)) {
+        assert.equal(run.crashDetail?.signatureSchemaVersion, SIGNATURE_SCHEMA_VERSION);
+    }
+}
+
+function testVersionMismatchProducesMigrationHint(): void {
+    const stale = makeFailure('stale', 'Panic', 'sig:stale');
+    stale.crashDetail = { ...stale.crashDetail!, signatureSchemaVersion: SIGNATURE_SCHEMA_VERSION - 1 };
+    assert.throws(
+        () => buildCategoryBreakdown([stale]),
+        (error: unknown) => {
+            assert.ok(error instanceof SignatureSchemaMismatchError);
+            assert.match(error.message, /migration/i);
+            assert.match(error.message, /docs\/taxonomy\.md/);
+            return true;
+        },
+    );
+}
+
+function testGoldenSignaturesPinnedPerVersion(): void {
+    // Golden signatures are pinned per schema version; recomputing under a
+    // new version must produce a new golden entry, never silently re-bucket.
+    const golden: Record<number, string> = {
+        1: 'sig:a',
+    };
+    const panic = buildCategoryBreakdown(runs)[0];
+    assert.deepEqual(panic.signatures, [golden[SIGNATURE_SCHEMA_VERSION], 'sig:b']);
+}
+
+// ---------------------------------------------------------------------------
+// getClassifiedRuns
+// ----------------------------------------------------------------------------
 
 function testGetClassifiedRunsExcludesNonFailures(): void {
     assert.deepEqual(getClassifiedRuns(runs).map((run) => run.id), ['r1', 'r2', 'r3', 'r4', 'r5']);
@@ -262,6 +304,11 @@ testClassifyKnownCategory();
 testClassifyUnknownCategoryFallsBack();
 testTaxonomyCategoriesAreUnique();
 testEveryTaxonomyEntryIsDocumented();
+
+testSignatureSchemaVersionIsPinned();
+testClassifiedRunsCarryCurrentSchemaVersion();
+testVersionMismatchProducesMigrationHint();
+testGoldenSignaturesPinnedPerVersion();
 
 testGetClassifiedRunsExcludesNonFailures();
 testGetClassifiedRunsEmptyInput();

@@ -1,3 +1,4 @@
+//! Signature schema version: `SIGNATURE_SCHEMA_VERSION`.
 //! Stable crash signature hashing from category stacks and key fields.
 //!
 //! [`SignatureHasher`] accumulates a "category stack" (an ordered sequence of
@@ -33,6 +34,50 @@
 
 use std::collections::BTreeMap;
 
+/// Current signature schema version.
+///
+/// This version is mixed into every computed signature hash so that any change
+/// to the preimage (taxonomy leaves, masked fields, ordering rules) produces a
+/// distinct signature space. Historical signatures computed under a different
+/// version will never silently collide with new ones — a mismatch must be
+/// resolved via an explicit migration (see `docs/taxonomy.md`).
+///
+/// # Versioning rules
+///
+/// - **Minor bump**: additive taxonomy leaves only. Existing preimages are
+///   unchanged, so previously computed signatures remain valid.
+/// - **Major bump**: any change to the preimage (field set, ordering,
+///   separators, encoding). Requires a migration report (W5-F08 diff) mapping
+///   recurring signatures to their new identities, plus maintainer sign-off.
+///
+/// Bumping this constant without the accompanying migration evidence will fail
+/// the regression suite (golden per-version signatures are pinned).
+pub const SIGNATURE_SCHEMA_VERSION: u32 = 1;
+
+/// Error returned when a stored signature was produced under a different
+/// schema version than the one currently compiled in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchemaVersionMismatch {
+    /// Version stored alongside the historical signature.
+    pub stored: u32,
+    /// Version the current binary computes under.
+    pub current: u32,
+}
+
+impl std::fmt::Display for SchemaVersionMismatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "signature schema version mismatch: stored v{} but current is v{}. \
+             Recompute baselines under v{} and attach a W5-F08 diff report \
+             (see docs/taxonomy.md) before comparing signatures.",
+            self.stored, self.current, self.current
+        )
+    }
+}
+
+impl std::error::Error for SchemaVersionMismatch {}
+
 /// FNV-1a 64-bit offset basis.
 const FNV_OFFSET: u64 = 14695981039346656037;
 /// FNV-1a 64-bit prime.
@@ -60,12 +105,23 @@ pub struct SignatureHasher {
     category_stack: Vec<String>,
     /// Sorted key–value fields that further discriminate the failure.
     fields: BTreeMap<String, String>,
+    /// Schema version mixed into the hash preimage.
+    schema_version: u32,
 }
 
 impl SignatureHasher {
     /// Creates an empty hasher.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            category_stack: Vec::new(),
+            fields: BTreeMap::new(),
+            schema_version: SIGNATURE_SCHEMA_VERSION,
+        }
+    }
+
+    /// Returns the schema version this hasher will embed in its signature.
+    pub fn schema_version(&self) -> u32 {
+        self.schema_version
     }
 
     /// Appends `category` to the category stack.
@@ -92,15 +148,22 @@ impl SignatureHasher {
     /// Computes and returns the stable FNV-1a 64-bit hash.
     ///
     /// The hash is derived from:
-    /// 1. The category stack entries, each separated by [`FIELD_SEP`].
-    /// 2. A [`FIELD_SEP`] delimiter between the stack and the fields section.
-    /// 3. Each key–value pair (key `FIELD_SEP` value), separated by [`FIELD_SEP`],
+    /// 1. The schema version, encoded as a `FIELD_SEP`-delimited prefix.
+    /// 2. The category stack entries, each separated by [`FIELD_SEP`].
+    /// 3. A [`FIELD_SEP`] delimiter between the stack and the fields section.
+    /// 4. Each key–value pair (key `FIELD_SEP` value), separated by [`FIELD_SEP`],
     ///    iterated in ascending key order.
     ///
     /// Calling `finish` does not consume the hasher; it can be called multiple
     /// times and will always return the same value.
     pub fn finish(&self) -> u64 {
         let mut hash = FNV_OFFSET;
+
+        // Hash the schema version first so any preimage change re-buckets.
+        for byte in self.schema_version.to_le_bytes() {
+            hash = fnv1a_byte(hash, byte);
+        }
+        hash = fnv1a_byte(hash, FIELD_SEP);
 
         // Hash the category stack (order-sensitive).
         for (i, cat) in self.category_stack.iter().enumerate() {
@@ -132,6 +195,22 @@ impl SignatureHasher {
         }
 
         hash
+    }
+}
+
+/// Verifies that a stored signature's schema version matches the current one.
+///
+/// Returns [`SchemaVersionMismatch`] with a migration hint when they differ.
+/// Callers comparing historical signatures against freshly computed ones must
+/// invoke this before trusting any equality result.
+pub fn ensure_schema_version(stored: u32) -> Result<(), SchemaVersionMismatch> {
+    if stored == SIGNATURE_SCHEMA_VERSION {
+        Ok(())
+    } else {
+        Err(SchemaVersionMismatch {
+            stored,
+            current: SIGNATURE_SCHEMA_VERSION,
+        })
     }
 }
 
@@ -265,6 +344,37 @@ mod tests {
         assert_ne!(h1.finish(), h2.finish());
     }
 
+    // ── Schema versioning ──────────────────────────────────────────────────────
+
+    #[test]
+    fn schema_version_is_embedded_in_hash() {
+        let mut h = SignatureHasher::new();
+        h.push_category("auth");
+        assert_eq!(h.schema_version(), SIGNATURE_SCHEMA_VERSION);
+
+        // Same preimage under a different schema version must re-bucket.
+        let mut bumped = h.clone();
+        bumped.schema_version = SIGNATURE_SCHEMA_VERSION + 1;
+        assert_ne!(h.finish(), bumped.finish());
+    }
+
+    #[test]
+    fn matching_schema_version_is_accepted() {
+        assert!(ensure_schema_version(SIGNATURE_SCHEMA_VERSION).is_ok());
+    }
+
+    #[test]
+    fn mismatched_schema_version_returns_migration_hint() {
+        let err = ensure_schema_version(SIGNATURE_SCHEMA_VERSION + 1)
+            .expect_err("mismatched version must error");
+        assert_eq!(err.stored, SIGNATURE_SCHEMA_VERSION + 1);
+        assert_eq!(err.current, SIGNATURE_SCHEMA_VERSION);
+        let msg = err.to_string();
+        assert!(msg.contains("schema version mismatch"));
+        assert!(msg.contains("W5-F08"));
+        assert!(msg.contains("docs/taxonomy.md"));
+    }
+
     // ── Edge cases ────────────────────────────────────────────────────────────
 
     #[test]
@@ -325,5 +435,49 @@ mod tests {
         let h1 = hash_category_payload("runtime-failure", b"payload1");
         let h2 = hash_category_payload("runtime-failure", b"payload2");
         assert_ne!(h1, h2);
+    }
+
+    // ── Schema versioning ─────────────────────────────────────────────────────
+
+    #[test]
+    fn schema_version_is_embedded_in_hash() {
+        let mut h = SignatureHasher::new();
+        h.push_category("auth");
+        let with_version = h.finish();
+
+        // Simulate a preimage change by mutating the version field directly.
+        let mut bumped = h.clone();
+        bumped.schema_version = SIGNATURE_SCHEMA_VERSION + 1;
+        assert_ne!(with_version, bumped.finish());
+    }
+
+    #[test]
+    fn schema_version_mismatch_reports_migration_hint() {
+        let err = ensure_schema_version(SIGNATURE_SCHEMA_VERSION + 1)
+            .expect_err("mismatched version must error");
+        assert_eq!(err.stored, SIGNATURE_SCHEMA_VERSION + 1);
+        assert_eq!(err.current, SIGNATURE_SCHEMA_VERSION);
+        let msg = err.to_string();
+        assert!(msg.contains("mismatch"));
+        assert!(msg.contains("W5-F08"));
+        assert!(msg.contains("docs/taxonomy.md"));
+    }
+
+    #[test]
+    fn schema_version_match_is_ok() {
+        assert!(ensure_schema_version(SIGNATURE_SCHEMA_VERSION).is_ok());
+    }
+
+    #[test]
+    fn golden_signature_v1_is_pinned() {
+        // Golden signature for schema v1. If this fails, the preimage changed:
+        // bump SIGNATURE_SCHEMA_VERSION and land a migration report.
+        let mut h = SignatureHasher::new();
+        h.push_category("auth");
+        h.push_category("missing-entry");
+        h.add_field("contract", "transfer");
+        h.add_field("auth_mode", "enforce");
+        assert_eq!(h.schema_version(), 1);
+        assert_eq!(h.finish(), 0x0);
     }
 }
