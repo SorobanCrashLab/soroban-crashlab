@@ -167,7 +167,8 @@ pub use artifact_compress::{compress_artifact, decompress_artifact};
 
 pub mod artifact_storage;
 pub use artifact_storage::{
-    ArtifactMetadata, ArtifactStore, LocalArtifactStore, StorageConfig, StorageError,
+    ArtifactMetadata, ArtifactStore, LocalArtifactStore, MemoryArtifactStore, StorageConfig,
+    StorageError, StorageErrorKind, TTL_EXPIRY_SLACK_SECONDS,
 };
 
 pub mod fixture_compat;

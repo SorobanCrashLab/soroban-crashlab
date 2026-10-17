@@ -1,14 +1,15 @@
 /**
  * Shared in-memory artifact store for Next.js API routes.
  * Production should replace this module with a filesystem or Rust-backed adapter.
- * Issue #1843: Added content checksumming for corruption detection
- */
-import { createHash } from "crypto";
+ * Issue #1843: Added content checksumming for corruption detection.
  *
  * Tenant-scoped (#1894): every artifact lives under
- * `org/<org>/project/<project>/artifacts/<id>`, and every accessor takes the
- * caller's `TenantScope`. There is no unscoped accessor.
+ * `org/<org>/project/<project>/artifacts/<id>`, and the supported accessors
+ * (`putArtifact`, `getArtifact`, `deleteArtifact`, `listArtifactMetadata`) all
+ * take the caller's `TenantScope`. The integrity helpers below predate tenancy
+ * and are not part of the scoped access path.
  */
+import { createHash } from "crypto";
 import { ScopedRepository, createMapBackend } from './tenancy/scoped-repository';
 import type { TenantScope } from './tenancy/tenant-scope';
 
@@ -56,6 +57,7 @@ export function putArtifact(
     buffer: artifact.buffer,
     sizeBytes: artifact.buffer.byteLength,
     createdAt: artifact.createdAt ?? new Date().toISOString(),
+    checksum: computeChecksum(artifact.buffer),
   });
 }
 
