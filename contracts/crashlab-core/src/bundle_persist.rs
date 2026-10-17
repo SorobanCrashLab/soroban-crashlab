@@ -78,6 +78,7 @@ impl std::error::Error for BundlePersistError {
             BundlePersistError::Json(e) => Some(e),
             BundlePersistError::Io(e) => Some(e),
             BundlePersistError::UnsupportedSchema { .. } => None,
+            BundlePersistError::Provenance(_) => None,
         }
     }
 }

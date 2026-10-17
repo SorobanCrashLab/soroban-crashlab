@@ -295,6 +295,9 @@ mod threat_model_tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -323,6 +326,9 @@ mod threat_model_tests {
                 environment: None,
                 failure_payload: vec![],
                 rpc_envelope: None,
+                provenance: None,
+                original_seed: None,
+                shrink_lineage: None,
             };
 
             let bytes = serde_json::to_vec(&doc).unwrap();
@@ -344,6 +350,9 @@ mod threat_model_tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -367,6 +376,9 @@ mod threat_model_tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -741,6 +753,9 @@ mod threat_model_tests {
                     environment: None,
                     failure_payload: vec![],
                     rpc_envelope: None,
+                    provenance: None,
+                    original_seed: None,
+                    shrink_lineage: None,
                 }
             })
             .collect();

@@ -136,14 +136,6 @@ impl FixturePairing {
 }
 
 /// Metadata for a single fixture entry.
-
-/// Schema versions this crate can load.
-///
-/// Provenance (#1864) is an additive, optional block, so it does not bump the
-/// manifest schema: a v1 manifest without provenance still loads.
-pub const SUPPORTED_MANIFEST_SCHEMAS: &[u32] = &[FIXTURE_MANIFEST_SCHEMA_VERSION];
-
-/// Metadata for a single fixture entry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixtureMetadata {
     /// Unique fixture identifier.

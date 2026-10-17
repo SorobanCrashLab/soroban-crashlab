@@ -234,6 +234,9 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         }
     }
 

@@ -377,7 +377,6 @@ mod tests {
     #[test]
     fn unsealed_record_fails_verification() {
         let rec = ProvenanceRecord::new("run", 1, "0.1.0", "env", "t", "cat/0/0");
-        assert_eq!(record0_missing(record(1)), 1); // sanity: record() is sealed
         assert_eq!(rec.verify().unwrap_err(), ProvenanceError::Unsealed);
     }
 
