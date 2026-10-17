@@ -1,3 +1,4 @@
+//! Scenario driver for stateful authorization fuzzing (see `auth_scenario`).
 //! Cooperative run lifecycle and cancellation for long-running fuzz campaigns.
 //!
 //! Runs check [`CancelSignal`] between iterations so maintainers can stop work
@@ -14,6 +15,7 @@
 //! resuming with a different worker count neither re-executes covered seeds nor
 //! leaves a coverage hole.
 
+use crate::auth_scenario::{AuthScenario, ScenarioOutcome, ScenarioStepResult};
 use crate::checkpoint::{CheckpointError, RunCheckpoint};
 use crate::worker_partition::{ring_slot, WorkerPartition};
 use std::collections::HashMap;
@@ -338,6 +340,48 @@ where
             cancelled_at_seed: None,
         },
     }
+}
+
+/// Drives a stateful authorization scenario as one ledger sequence.
+///
+/// Each step is executed in order with contract state carried between steps, so
+/// role grants/revokes, upgrades, and sequence changes are observed across
+/// invocations rather than in a single-shot auth matrix. The oracle asserts the
+/// expected allow/deny per invoker mode at every step; the first divergence is
+/// reported as `auth_state_divergence` with the offending step index.
+///
+/// Cancellation is checked between steps, so a cancelled scenario reports the
+/// step index at which cancellation was observed.
+pub fn drive_auth_scenario(
+    run_id: RunId,
+    scenario: &AuthScenario,
+    signal: &CancelSignal,
+) -> ScenarioOutcome {
+    let mut state = scenario.initial_state();
+    let mut results: Vec<ScenarioStepResult> = Vec::with_capacity(scenario.steps.len());
+
+    for (step_index, step) in scenario.steps.iter().enumerate() {
+        if signal.is_cancelled() {
+            return ScenarioOutcome::Cancelled {
+                run_id,
+                step_index: step_index as u64,
+                results,
+            };
+        }
+
+        let result = step.execute(&mut state);
+        if let Some(divergence) = result.divergence(step_index as u64) {
+            results.push(result);
+            return ScenarioOutcome::Diverged {
+                run_id,
+                divergence,
+                results,
+            };
+        }
+        results.push(result);
+    }
+
+    ScenarioOutcome::Completed { run_id, results }
 }
 
 fn validate_resume_checkpoint(
@@ -683,6 +727,37 @@ mod tests {
     }
 
     #[test]
+    fn drive_auth_scenario_runs_steps_in_order_with_carried_state() {
+        let id = RunId(20);
+        let signal = CancelSignal::new(id);
+        let scenario = AuthScenario::grant_then_revoke_then_probe();
+
+        let outcome = drive_auth_scenario(id, &scenario, &signal);
+        match outcome {
+            ScenarioOutcome::Completed { run_id, results } => {
+                assert_eq!(run_id, id);
+                assert_eq!(results.len(), scenario.steps.len());
+            }
+            other => panic!("expected completed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn drive_auth_scenario_reports_divergence_with_step_index() {
+        let id = RunId(21);
+        let signal = CancelSignal::new(id);
+        let scenario = AuthScenario::upgrade_then_probe_diverging();
+
+        let outcome = drive_auth_scenario(id, &scenario, &signal);
+        match outcome {
+            ScenarioOutcome::Diverged { divergence, .. } => {
+                assert_eq!(divergence.signature, "auth_state_divergence");
+            }
+            other => panic!("expected divergence, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn drive_run_from_checkpoint_skips_completed_seeds() {
         let id = RunId(12);
         let signal = CancelSignal::new(id);
@@ -712,6 +787,25 @@ mod tests {
             }
             other => panic!("expected completed, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn drive_auth_scenario_observes_cancel_between_steps() {
+        let id = RunId(22);
+        let signal = CancelSignal::new(id);
+        let scenario = AuthScenario::grant_then_revoke_then_probe();
+        let cancel_after_first = signal.clone();
+
+        let outcome = drive_auth_scenario(id, &scenario, &signal);
+        cancel_after_first.cancel();
+
+        match outcome {
+            ScenarioOutcome::Completed { .. } => {}
+            other => panic!("expected completed, got {other:?}"),
+        }
+
+        let cancelled = drive_auth_scenario(id, &scenario, &cancel_after_first);
+        assert!(matches!(cancelled, ScenarioOutcome::Cancelled { .. }));
     }
 
     #[test]

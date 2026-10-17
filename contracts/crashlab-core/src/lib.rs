@@ -1,4 +1,5 @@
 pub mod auth_matrix;
+pub mod auth_scenario;
 pub mod cors;
 pub mod fixture;
 pub mod fixture_classifier;
@@ -74,6 +75,11 @@ mod rpc_runner_stub {
 pub use auth_matrix::{
     collect_mismatched, format_mismatch_summary, run_matrix, run_matrix_for_seeds, AuthMode,
     MatrixReport, ModeResult,
+};
+pub use auth_scenario::{
+    run_auth_scenario, run_auth_scenario_library, AuthExpectation, AuthScenario, AuthScenarioError,
+    AuthScenarioLibrary, AuthScenarioReport, AuthStep, AuthStepOutcome, AuthStepResult,
+    AUTH_STATE_DIVERGENCE_CATEGORY,
 };
 pub use cors::{
     evaluate_cors, CorsConfig, CorsError, CorsEvaluation, HttpMethod, OriginAllowlist,
@@ -236,6 +242,10 @@ pub use scenario_export::{
     export_rust_regression_fixture, export_scenario_json, export_suite_json,
     write_rust_regression_snippet, FailureScenario,
 };
+pub use scenario_export::{
+    export_auth_scenario_json, export_auth_scenario_library_json, AuthScenarioExport,
+    AuthScenarioExportError, AuthScenarioLibraryExport,
+};
 
 pub mod regression_suite;
 pub use regression_suite::{
@@ -297,6 +307,10 @@ pub use run_control::{
     drive_run_from_checkpoint, drive_run_partitioned, drive_run_partitioned_from_checkpoint,
     drive_run_with_health, request_cancel_run, CancelSignal, RunId, RunProgress, RunResumeError,
     RunSummary, RunTerminalState,
+};
+pub use run_control::{
+    drive_auth_scenario, drive_auth_scenario_library, AuthScenarioDriveError,
+    AuthScenarioDriveSummary,
 };
 
 pub mod rpc_envelope;
