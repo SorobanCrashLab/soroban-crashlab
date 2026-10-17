@@ -4,6 +4,8 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use crate::auth_scenario::AuthScenario;
+
 /// Normalized JSON scenario for cross-tool reuse.
 ///
 /// Contains all information needed to reproduce a failing test case,
@@ -77,6 +79,23 @@ pub fn export_scenario_json(
     serde_json::to_string_pretty(&scenario)
 }
 
+/// Exports a stateful authorization scenario as a normalized JSON document.
+///
+/// Unlike [`export_scenario_json`], which captures a single invocation, this
+/// exporter preserves the full ordered step chain (setup → grant/revoke →
+/// probe) together with per-step auth matrix expectations so that reports and
+/// replay harnesses can reconstruct the state transition sequence.
+///
+/// The output is deterministic for the same scenario, making it suitable for
+/// regression archives and cross-tool replay.
+///
+/// # Errors
+///
+/// Returns a [`serde_json::Error`] if JSON serialization fails.
+///
+/// # Example
+///
+/// 
 /// Exports a failing seed as a normalized JSON scenario for cross-tool reuse.
 ///
 /// This is a focused variant of [`export_scenario_json`] that explicitly
