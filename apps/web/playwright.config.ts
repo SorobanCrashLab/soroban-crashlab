@@ -7,23 +7,28 @@ import { defineConfig, devices } from '@playwright/test';
 // require('dotenv').config();
 
 /**
- * See https://playwright.dev/docs/test-configuration.
+ * Whether this run is the dedicated accessibility gate. The a11y job sets
+ * A11Y=1 so the config can scope test discovery, reporters and projects to
+ * the axe-core / keyboard specs without disturbing the main e2e suite.
  */
+const isA11yRun = process.env.A11Y === '1';
+
 export default defineConfig({
-  testDir: './e2e',
+  /* A11y job runs only the axe/keyboard specs under e2/a11y. */
+  testDir: isA11yRun ? './e2e/a11y' : './e2e',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
+  /* Opt out of parallel tests on CI */
   workers: process.env.CI ? 1 : undefined,
   /* Test timeout */
   timeout: 30000,
   /* Snapshots must be platform-agnostic: baselines generated on any OS must
    * match on the Linux CI runner. Font differences are tolerated by
-   * maxDiffPixelRatio above, so omit the default {platform} segment. */
+   * maxDiffPixelRatio below, so omit the default {platform} segment. */
   snapshotDir: 'e2e/visual.spec.ts-snapshots',
   snapshotPathTemplate: '{snapshotDir}/{arg}-{projectName}{ext}',
   /* Expect timeout */
@@ -38,13 +43,22 @@ export default defineConfig({
       maxDiffPixelRatio: 0.02,
     },
   },
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: [
-    ['html', { open: 'never', outputFolder: 'playwright-report' }],
-    ['json', { outputFile: 'test-results/results.json' }],
-    ['junit', { outputFile: 'test-results/junit.xml' }],
-    ...(process.env.CI ? [['github']] : []),
-  ],
+  /* Reporter to use. See https://playwright.dev/docs/test-reporters.
+   * A11y runs emit a dedicated report folder so the HTML report is uploaded
+   * as an artifact without colliding with the main e2e job. */
+  reporter: isA11yRun
+    ? [
+        ['html', { open: 'never', outputFolder: 'playwright-report-a11y' }],
+        ['json', { outputFile: 'test-results-a11y/results.json' }],
+        ['junit', { outputFile: 'test-results-a11y/junit.xml' }],
+        ...(process.env.CI ? [['github']] : []),
+      ]
+    : [
+        ['html', { open: 'never', outputFolder: 'playwright-report' }],
+        ['json', { outputFile: 'test-results/results.json' }],
+        ['junit', { outputFile: 'test-results/junit.xml' }],
+        ...(process.env.CI ? [['github']] : []),
+      ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -55,8 +69,24 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
 
-  /* Configure projects for major browsers */
-  projects: process.env.CI
+  /* Configure projects for major browsers. The a11y gate runs a cross-browser
+   * matrix on purpose: contrast and keyboard regressions can be engine-specific. */
+  projects: isA11yRun
+    ? [
+        {
+          name: 'chromium',
+          use: { ...devices['Desktop Chrome'] },
+        },
+        {
+          name: 'firefox',
+          use: { ...devices['Desktop Firefox'] },
+        },
+        {
+          name: 'webkit',
+          use: { ...devices['Desktop Safari'] },
+        },
+      ]
+    : process.env.CI
     ? [
         {
           name: 'chromium',
@@ -64,41 +94,41 @@ export default defineConfig({
         },
       ]
     : [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
+        {
+          name: 'chromium',
+          use: { ...devices['Desktop Chrome'] },
+        },
 
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
+        {
+          name: 'firefox',
+          use: { ...devices['Desktop Firefox'] },
+        },
 
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+        {
+          name: 'webkit',
+          use: { ...devices['Desktop Safari'] },
+        },
 
-    /* Test against mobile viewports. */
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
+        /* Test against mobile viewports. */
+        {
+          name: 'Mobile Chrome',
+          use: { ...devices['Pixel 5'] },
+        },
+        {
+          name: 'Mobile Safari',
+          use: { ...devices['iPhone 12'] },
+        },
 
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
-  ],
+        /* Test against branded browsers. */
+        // {
+        //   name: 'Microsoft Edge',
+        //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
+        // },
+        // {
+        //   name: 'Google Chrome',
+        //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+        // },
+      ],
 
   /* Run your local dev server before starting the tests.
    * CI already builds the app; use `next start` there so tests hit the

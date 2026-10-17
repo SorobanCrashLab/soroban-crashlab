@@ -1,0 +1,141 @@
+name: e2e
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # nightly run so the axe violation trend is tracked regularly.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNP_VERSION: '9'
+
+jobs:
+  build:
+    name: Build app
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNP_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: apps/web/.next
+          retention-days: 1
+
+  e2e:
+    name: e2e (chromium)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNP_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: apps/web/.next
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Run e2e suite
+        run: pnpm --filter web exec playwright test
+        env:
+          CI: 'true'
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+      - name: Upload test results (json/junit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: apps/web/test-results
+          retention-days: 7
+
+  a11y:
+    name: a11y gate (axe + keyboard)
+    needs: build
+    runs-on: ubuntu-latest
+    # Budget: job must add <= 5 min to e2e. The axe + keyboard specs
+    # are small and serialized to keep the runtime bounded.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNP_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: apps/web/.next
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Run a11y axe + config guardrails specs
+        run: pnpm --filter web exec playwright test e2e/a11y/a11y-config.spec.ts e2e/a11y/core-flows.spec.ts
+        env:
+          CI: 'true'
+      - name: Run keyboard triage spec
+        run: pnpm --filter web exec playwright test e2e/a11y/keyboard-triage.spec.ts
+        env:
+          CI: 'true'
+      - name: Upload a11y axe HTML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-axe-reports
+          path: apps/web/playwright-report
+          retention-days: 30
+      - name: Upload a11y results (json/junit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-results
+          path: apps/web/test-results
+          retention-days: 30
+      - name: Summarize a11y violation count
+        if: always()
+        run: |
+          set -eu
+          RESULTS="apps/web/test-results/results.json"
+          if [ -f "$RESULTS" ]; then
+            node -e "
+              const r = require('./$RESULTS');
+              const specs = r.suites ? r.suites.flatMap(s => s.specs ?? []) : [];
+              const failed = specs.filter(s => s.ok === false).length;
+              console.log(`[a11y] total specs=${specs.length} failed=${failed}`);
+            "
+          fi
+          echo "axe HTML reports attached as a11y-axe-reports artifact"
