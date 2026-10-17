@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
+import { withCsrfGuard } from '@/lib/csrf';
 import { createdResponse, successResponse } from '@/lib/api-response-utils';
 import { codedErrorResponse, ERROR_CODES } from '@/lib/error-codes';
 import {
@@ -61,107 +62,110 @@ interface CampaignResponse {
  *    bypass is written to the audit log. Non-maintainers → 403 QUOTA_OVERRIDE_FORBIDDEN.
  * With no quotas or windows configured every campaign is admitted, as before.
  */
-export const POST = withRouteErrorHandling('POST /api/campaigns', async (request: NextRequest) => {
-  const parsedKey = parseIdempotencyKey(request.headers.get(IDEMPOTENCY_KEY_HEADER));
-  if (!parsedKey.ok) return codedErrorResponse('IDEMPOTENCY_KEY_INVALID', parsedKey.error);
+export const POST = withCsrfGuard(
+  'POST /api/campaigns',
+  withRouteErrorHandling('POST /api/campaigns', async (request: NextRequest) => {
+    const parsedKey = parseIdempotencyKey(request.headers.get(IDEMPOTENCY_KEY_HEADER));
+    if (!parsedKey.ok) return codedErrorResponse('IDEMPOTENCY_KEY_INVALID', parsedKey.error);
 
-  const parsedBody = await readJsonBody(request);
-  if ('error' in parsedBody) return parsedBody.error;
-  const payload = parsedBody.body as Record<string, unknown>;
+    const parsedBody = await readJsonBody(request);
+    if ('error' in parsedBody) return parsedBody.error;
+    const payload = parsedBody.body as Record<string, unknown>;
 
-  const key = parsedKey.key;
-  const store = key ? selectIdempotencyStore() : null;
+    const key = parsedKey.key;
+    const store = key ? selectIdempotencyStore() : null;
 
-  if (key && store) {
-    const existing = await store.get<CampaignResponse>(IDEMPOTENCY_SCOPE, key);
-    if (existing) return replayOrReject(existing.fingerprint, existing.response, payload, key);
-  }
-
-  const derived = deriveCampaignRequest(payload ?? {});
-  if (!derived.ok) return codedErrorResponse('VALIDATION_ERROR', derived.error);
-  const resources = derived.request;
-
-  const override = parseOverrideReason(request.headers.get(QUOTA_OVERRIDE_HEADER));
-  if ('error' in override) return codedErrorResponse('VALIDATION_ERROR', override.error);
-
-  const ledger = getCapacityLedger();
-  const now = new Date();
-  const admission = evaluateCampaignAdmission({
-    request: resources,
-    limits: readQuotaLimits(),
-    usage: ledger.usage(resources.scope),
-    windows: readSchedulingWindows().windows,
-    now,
-  });
-
-  let overriddenBy: string | null = null;
-  if (!admission.ok) {
-    if (override.reason === null) return admissionRejected(admission);
-    const principal = await resolvePrincipal(request);
-    if ((await resolveRoleForPrincipal(principal)) !== 'maintainer') {
-      return codedErrorResponse('QUOTA_OVERRIDE_FORBIDDEN');
+    if (key && store) {
+      const existing = await store.get<CampaignResponse>(IDEMPOTENCY_SCOPE, key);
+      if (existing) return replayOrReject(existing.fingerprint, existing.response, payload, key);
     }
-    overriddenBy = principal.subject;
-  }
 
-  const campaign = {
-    // Random suffix: two campaigns created in the same millisecond must not
-    // share an id, or one capacity lease would overwrite the other.
-    id: `campaign-${Date.now()}-${randomUUID().slice(0, 8)}`,
-    status: 'queued',
-    createdAt: now.toISOString(),
-    ...payload,
-  };
-  const response: CampaignResponse = {
-    campaign,
-    capacity: {
-      scope: resources.scope,
-      project: resources.project,
-      campaignClass: resources.campaignClass,
-      workers: resources.workers,
-      seeds: resources.seeds,
-      quotaOverride: overriddenBy !== null,
-    },
-  };
+    const derived = deriveCampaignRequest(payload ?? {});
+    if (!derived.ok) return codedErrorResponse('VALIDATION_ERROR', derived.error);
+    const resources = derived.request;
 
-  if (key && store) {
-    const record = buildIdempotencyRecord({
-      scope: IDEMPOTENCY_SCOPE,
-      key,
-      payload,
-      resourceId: campaign.id,
-      response,
+    const override = parseOverrideReason(request.headers.get(QUOTA_OVERRIDE_HEADER));
+    if ('error' in override) return codedErrorResponse('VALIDATION_ERROR', override.error);
+
+    const ledger = getCapacityLedger();
+    const now = new Date();
+    const admission = evaluateCampaignAdmission({
+      request: resources,
+      limits: readQuotaLimits(),
+      usage: ledger.usage(resources.scope),
+      windows: readSchedulingWindows().windows,
+      now,
     });
-    const winner = await store.putIfAbsent(record);
-    // A concurrent request with the same key stored its campaign first.
-    if (winner !== record) {
-      return replayOrReject(winner.fingerprint, winner.response, payload, key);
-    }
-  }
 
-  ledger.admit({ campaignId: campaign.id, ...resources });
-  if (overriddenBy !== null && !admission.ok) {
-    recordAuditEvent({
-      action: 'quota.override',
-      actor: overriddenBy,
-      target: campaign.id,
-      metadata: {
-        reason: override.reason,
-        bypassed: admission.kind,
-        ...(admission.kind === 'quota' ? { violation: admission.violation } : {}),
-        campaignClass: resources.campaignClass,
+    let overriddenBy: string | null = null;
+    if (!admission.ok) {
+      if (override.reason === null) return admissionRejected(admission);
+      const principal = await resolvePrincipal(request);
+      if ((await resolveRoleForPrincipal(principal)) !== 'maintainer') {
+        return codedErrorResponse('QUOTA_OVERRIDE_FORBIDDEN');
+      }
+      overriddenBy = principal.subject;
+    }
+
+    const campaign = {
+      // Random suffix: two campaigns created in the same millisecond must not
+      // share an id, or one capacity lease would overwrite the other.
+      id: `campaign-${Date.now()}-${randomUUID().slice(0, 8)}`,
+      status: 'queued',
+      createdAt: now.toISOString(),
+      ...payload,
+    };
+    const response: CampaignResponse = {
+      campaign,
+      capacity: {
         scope: resources.scope,
+        project: resources.project,
+        campaignClass: resources.campaignClass,
+        workers: resources.workers,
+        seeds: resources.seeds,
+        quotaOverride: overriddenBy !== null,
       },
-    });
-  }
+    };
 
-  const created = createdResponse(response);
-  if (key) {
-    created.headers.set(IDEMPOTENCY_KEY_HEADER, key);
-    created.headers.set(IDEMPOTENT_REPLAYED_HEADER, 'false');
-  }
-  return created;
-});
+    if (key && store) {
+      const record = buildIdempotencyRecord({
+        scope: IDEMPOTENCY_SCOPE,
+        key,
+        payload,
+        resourceId: campaign.id,
+        response,
+      });
+      const winner = await store.putIfAbsent(record);
+      // A concurrent request with the same key stored its campaign first.
+      if (winner !== record) {
+        return replayOrReject(winner.fingerprint, winner.response, payload, key);
+      }
+    }
+
+    ledger.admit({ campaignId: campaign.id, ...resources });
+    if (overriddenBy !== null && !admission.ok) {
+      recordAuditEvent({
+        action: 'quota.override',
+        actor: overriddenBy,
+        target: campaign.id,
+        metadata: {
+          reason: override.reason,
+          bypassed: admission.kind,
+          ...(admission.kind === 'quota' ? { violation: admission.violation } : {}),
+          campaignClass: resources.campaignClass,
+          scope: resources.scope,
+        },
+      });
+    }
+
+    const created = createdResponse(response);
+    if (key) {
+      created.headers.set(IDEMPOTENCY_KEY_HEADER, key);
+      created.headers.set(IDEMPOTENT_REPLAYED_HEADER, 'false');
+    }
+    return created;
+  }),
+);
 
 function admissionRejected(admission: Exclude<CampaignAdmission, { ok: true }>): NextResponse {
   if (admission.kind === 'window') {
@@ -190,7 +194,7 @@ function replayOrReject(
   storedResponse: CampaignResponse,
   payload: unknown,
   key: string,
-) {
+) : NextResponse {
   if (storedFingerprint !== fingerprintPayload(payload)) {
     return codedErrorResponse('IDEMPOTENCY_KEY_REUSED');
   }

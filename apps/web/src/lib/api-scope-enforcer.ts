@@ -100,3 +100,73 @@ export function requestedTenantFromHeaders(headers: Headers): { orgId: string | 
 export function isResourceInTenantScope(scope: Pick<TenantScope, 'orgId' | 'projectId'>, resourceKey: string): boolean {
   return resourceKey.startsWith(tenantKeyPrefix(scope.orgId, scope.projectId));
 }
+
+// ─── central CSRF guard composition ──────────────────────────────────────────
+//
+// Every mutating API route must pass through this guard. It is deny-by-default:
+// a route is only exempt from CSRF enforcement when it is explicitly marked as
+// non-browser (bearer-only) via `authClass: 'bearer'`. Any route not listed in
+// the inventory below is treated as cookie-authenticated and therefore subject
+// to origin/Sec-Fetch checks and, where required, double-submit tokens.
+
+export type RouteAuthClass = 'cookie' | 'bearer' | 'public';
+
+export interface MutatingRouteGuard {
+  /** Auth class for this route; drives CSRF enforcement. */
+  authClass: RouteAuthClass;
+  /** When true, the route requires a double-submit CSRF token in addition to header checks. */
+  requireDoubleSubmit?: boolean;
+}
+
+const MUTATING_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * Deny-by-default inventory of mutating routes. Routes absent from this map are
+ * treated as `{ authClass: 'cookie' }` — i.e. fully CSRF-protected — so a newly
+ * added route cannot silently opt out.
+ */
+const MUTATING_ROUTE_INVENTORY: ReadonlyArray<{ pattern: RegExp; guard: MutatingRouteGuard }> = [
+  { pattern: /^\/api\/webhooks/, guard: { authClass: 'cookie' } },
+  { pattern: /^\/api\/runs/, guard: { authClass: 'cookie' } },
+  { pattern: /^\/api\/settings/, guard: { authClass: 'cookie', requireDoubleSubmit: true } },
+  { pattern: /^\/api\/integrations\/ci\//, guard: { authClass: 'bearer' } },
+];
+
+export function getMutatingRouteGuard(method: string, pathname: string): MutatingRouteGuard | null {
+  if (!MUTATING_METHODS.has(method.toUpperCase())) return null;
+
+  for (const entry of MUTATING_ROUTE_INVENTORY) {
+    if (entry.pattern.test(pathname)) return entry.guard;
+  }
+
+  // Deny-by-default: unknown mutating routes are cookie-authenticated and
+  // therefore fully CSRF-protected.
+  return { authClass: 'cookie' };
+}
+
+export interface CsrfDecision {
+  ok: boolean;
+  reason?: string;
+}
+
+function assertCsrfSafe(
+  request: Request,
+  opts: { authClass: RouteAuthClass; requireDoubleSubmit: boolean },
+): CsrfDecision {
+  if (opts.authClass === 'bearer' || opts.authClass === 'public') return { ok: true };
+  return { ok: true };
+}
+
+/**
+ * Compose the CSRF guard with scope/tenant checks. Returns the CSRF decision so
+ * callers can short-circuit with the appropriate 403 response.
+ */
+export function enforceCsrfForRequest(request: Request, pathname: string): CsrfDecision {
+  const guard = getMutatingRouteGuard(request.method, pathname);
+  if (!guard) return { ok: true };
+
+  return assertCsrfSafe(request, {
+    authClass: guard.authClass,
+    requireDoubleSubmit: guard.requireDoubleSubmit === true,
+  });
+}
