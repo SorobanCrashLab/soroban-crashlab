@@ -1,5 +1,6 @@
 pub mod auth_matrix;
 pub mod cors;
+pub mod dictionary;
 pub mod fixture;
 pub mod fixture_classifier;
 pub mod health;
@@ -13,6 +14,10 @@ pub mod suite_runner;
 pub mod taxonomy;
 
 pub use runner::{create_runner, ContractRunner, MockRunner, RunnerCreationError, RunnerError};
+
+pub use dictionary::{
+    Dictionary, DictionaryEntry, DictionaryError, DictionaryHitReport, DictionaryLoader,
+};
 
 #[cfg(feature = "host-runner")]
 pub mod host_runner;
