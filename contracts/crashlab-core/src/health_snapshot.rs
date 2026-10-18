@@ -11,9 +11,9 @@
 //! last line back, and the web SSE route can tail the same file instead of
 //! synthesizing events.
 //!
-//! The line format is versioned: every snapshot carries `schema_version`, and
-//! readers reject anything outside [`SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS`] rather
-//! than guessing. See `docs/health-snapshot-schema.md`.
+//! The line format is versioned: every snapshot carries `v`; readers accept
+//! current and previous versions while ignoring additive fields. See
+//! `docs/health-snapshot-schema.md`.
 
 use crate::health::{FailureMetrics, HealthMonitor, HealthStatus, QueueMetrics, ThroughputMetrics};
 use crate::run_control::{RunId, RunProgress, RunTerminalState};
@@ -25,10 +25,14 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 /// Version of the snapshot line format written by this crate.
-pub const HEALTH_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
+pub const HEALTH_SNAPSHOT_SCHEMA_VERSION: u32 = 2;
 
 /// Schema versions [`HealthSnapshot::from_json_line`] accepts.
-pub const SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS: &[u32] = &[HEALTH_SNAPSHOT_SCHEMA_VERSION];
+pub const SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS: &[u32] = &[HEALTH_SNAPSHOT_SCHEMA_VERSION, 1];
+
+/// Maximum number of malformed complete records tolerated before a log is
+/// considered too corrupt to use.
+pub const MAX_CORRUPT_HEALTH_SNAPSHOT_LINES: usize = 3;
 
 /// File name of the append-only snapshot log inside a run's state directory.
 pub const HEALTH_SNAPSHOT_FILE: &str = "health.jsonl";
@@ -62,6 +66,7 @@ impl BudgetSnapshot {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HealthSnapshot {
     /// Format version of this line; see [`HEALTH_SNAPSHOT_SCHEMA_VERSION`].
+    #[serde(rename = "v", alias = "schema_version")]
     pub schema_version: u32,
     pub run_id: u64,
     /// Campaign the run belongs to, when the caller knows it.
@@ -155,6 +160,7 @@ pub enum HealthSnapshotError {
         found: u32,
         supported: &'static [u32],
     },
+    CorruptLog { corrupt_lines: usize, threshold: usize },
 }
 
 impl std::fmt::Display for HealthSnapshotError {
@@ -165,6 +171,10 @@ impl std::fmt::Display for HealthSnapshotError {
             HealthSnapshotError::UnsupportedSchema { found, supported } => write!(
                 f,
                 "health snapshot schema version {found} is not supported (this build reads {supported:?})"
+            ),
+            HealthSnapshotError::CorruptLog { corrupt_lines, threshold } => write!(
+                f,
+                "health snapshot log has {corrupt_lines} corrupt records (maximum tolerated: {threshold})"
             ),
         }
     }
@@ -222,26 +232,66 @@ pub fn append_health_snapshot(
 
 /// Reads every snapshot in `run_id`'s log, oldest first.
 ///
-/// Fails on the first unreadable line: a caller that needs the whole history
-/// should hear about corruption rather than get a silently short list. Use
-/// [`read_latest_health_snapshot`] when only the newest snapshot matters.
+/// Skips recoverable malformed records and ignores an unterminated final line.
+/// More than [`MAX_CORRUPT_HEALTH_SNAPSHOT_LINES`] malformed records is fatal.
 pub fn read_health_snapshots(
     run_id: RunId,
     base: impl AsRef<Path>,
 ) -> Result<Vec<HealthSnapshot>, HealthSnapshotError> {
+    Ok(read_health_snapshot_log(run_id, base)?.snapshots)
+}
+
+/// A best-effort read of the log, preserving valid records and reporting any
+/// corruption so status consumers can mark partial results as degraded.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HealthSnapshotLog {
+    pub snapshots: Vec<HealthSnapshot>,
+    pub degraded: bool,
+    pub truncated_tail: bool,
+    pub corrupt_lines: usize,
+}
+
+/// Reads a JSONL log tolerantly. An unterminated final record is always treated
+/// as a torn write and ignored; malformed complete lines are skipped up to the
+/// configured threshold. Unknown schema versions count as corrupt records.
+pub fn read_health_snapshot_log(
+    run_id: RunId,
+    base: impl AsRef<Path>,
+) -> Result<HealthSnapshotLog, HealthSnapshotError> {
     let path = health_snapshot_path(run_id, base);
     let contents = match fs::read_to_string(&path) {
         Ok(contents) => contents,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(HealthSnapshotLog {
+            snapshots: Vec::new(), degraded: false, truncated_tail: false, corrupt_lines: 0,
+        }),
         Err(err) => return Err(err.into()),
     };
 
+    let truncated_tail = !contents.is_empty() && !contents.ends_with('\n');
+    let complete = if truncated_tail { contents.rsplit_once('\n').map_or("", |(prefix, _)| prefix) } else { contents.as_str() };
     let mut snapshots = Vec::new();
-    for line in contents.lines().filter(|line| !line.trim().is_empty()) {
-        snapshots.push(HealthSnapshot::from_json_line(line)?);
+    let mut corrupt_lines = 0;
+    for line in complete.lines().filter(|line| !line.trim().is_empty()) {
+        match HealthSnapshot::from_json_line(line) {
+            Ok(snapshot) => snapshots.push(snapshot),
+            Err(_) => {
+                corrupt_lines += 1;
+                if corrupt_lines > MAX_CORRUPT_HEALTH_SNAPSHOT_LINES {
+                    return Err(HealthSnapshotError::CorruptLog {
+                        corrupt_lines,
+                        threshold: MAX_CORRUPT_HEALTH_SNAPSHOT_LINES,
+                    });
+                }
+            }
+        }
     }
 
-    Ok(snapshots)
+    Ok(HealthSnapshotLog {
+        degraded: truncated_tail || corrupt_lines > 0,
+        snapshots,
+        truncated_tail,
+        corrupt_lines,
+    })
 }
 
 /// Reads the newest snapshot in `run_id`'s log, or `None` when there is none.
@@ -254,24 +304,7 @@ pub fn read_latest_health_snapshot(
     run_id: RunId,
     base: impl AsRef<Path>,
 ) -> Result<Option<HealthSnapshot>, HealthSnapshotError> {
-    let path = health_snapshot_path(run_id, base);
-    let contents = match fs::read_to_string(&path) {
-        Ok(contents) => contents,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => return Err(err.into()),
-    };
-
-    for line in contents
-        .lines()
-        .rev()
-        .filter(|line| !line.trim().is_empty())
-    {
-        if let Ok(snapshot) = HealthSnapshot::from_json_line(line) {
-            return Ok(Some(snapshot));
-        }
-    }
-
-    Ok(None)
+    Ok(read_health_snapshot_log(run_id, base)?.snapshots.into_iter().next_back())
 }
 
 /// Reads the newest snapshot line in `run_id`'s log verbatim, or `None` when
@@ -288,22 +321,20 @@ pub fn read_latest_health_snapshot_line(
     base: impl AsRef<Path>,
 ) -> Result<Option<String>, HealthSnapshotError> {
     let path = health_snapshot_path(run_id, base);
-    let contents = match fs::read_to_string(&path) {
+    let contents = match fs::read_to_string(path) {
         Ok(contents) => contents,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(err) => return Err(err.into()),
     };
-
-    for line in contents
-        .lines()
-        .rev()
-        .filter(|line| !line.trim().is_empty())
-    {
-        if HealthSnapshot::from_json_line(line).is_ok() {
-            return Ok(Some(line.to_string()));
+    let log = read_health_snapshot_log(run_id, base)?;
+    let latest_sequence = log.snapshots.last().map(|snapshot| snapshot.sequence);
+    if let Some(sequence) = latest_sequence {
+        for line in contents.lines().rev().filter(|line| !line.trim().is_empty()) {
+            if HealthSnapshot::from_json_line(line).is_ok_and(|snapshot| snapshot.sequence == sequence) {
+                return Ok(Some(line.to_string()));
+            }
         }
     }
-
     Ok(None)
 }
 
@@ -611,7 +642,7 @@ mod tests {
     fn unsupported_schema_versions_are_rejected() {
         let snapshot = HealthSnapshot::from_monitor(&monitor_with_cases(1), RunId(1), 1, 1, 1, "t");
         let line = snapshot.to_json_line().expect("serialize");
-        let bumped = line.replace("\"schema_version\":1", "\"schema_version\":99");
+        let bumped = line.replace("\"v\":2", "\"v\":99");
 
         match HealthSnapshot::from_json_line(&bumped) {
             Err(HealthSnapshotError::UnsupportedSchema { found, supported }) => {
@@ -701,9 +732,47 @@ mod tests {
             .expect("last good snapshot");
         assert_eq!(latest.sequence, 1);
 
-        // Reading the whole log, by contrast, reports the corruption.
-        assert!(read_health_snapshots(run_id, &base).is_err());
+        let recovered = read_health_snapshot_log(run_id, &base).expect("recover log");
+        assert!(recovered.degraded);
+        assert!(recovered.truncated_tail);
+        assert_eq!(recovered.snapshots.len(), 1);
+        assert!(read_health_snapshots(run_id, &base).is_ok());
 
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn version_two_writer_uses_v_and_legacy_version_one_is_readable() {
+        let snapshot = HealthSnapshot::from_monitor(&monitor_with_cases(1), RunId(8), 1, 1, 1, "t");
+        let line = snapshot.to_json_line().expect("serialize");
+        assert!(line.contains("\"v\":2"));
+        assert!(!line.contains("schema_version"));
+
+        let legacy = line.replace("\"v\":2", "\"schema_version\":1");
+        let parsed = HealthSnapshot::from_json_line(&legacy).expect("legacy v1 should be read");
+        assert_eq!(parsed.schema_version, 1);
+
+        let additive = line.replace("\"run_id\":8", "\"future_field\":true,\"run_id\":8");
+        assert!(HealthSnapshot::from_json_line(&additive).is_ok());
+    }
+
+    #[test]
+    fn tolerant_reader_skips_mid_file_corruption_and_fails_over_threshold() {
+        let base = unique_tmp();
+        let run_id = RunId(18);
+        let snapshot = HealthSnapshot::from_monitor(&monitor_with_cases(1), run_id, 1, 1, 1, "t");
+        let line = snapshot.to_json_line().expect("serialize");
+        let path = health_snapshot_path(run_id, &base);
+        fs::create_dir_all(path.parent().expect("parent")).expect("create run dir");
+        fs::write(&path, format!("{line}{{broken}}\n{}", line.trim_end())).expect("write log");
+
+        let recovered = read_health_snapshot_log(run_id, &base).expect("recover");
+        assert!(recovered.degraded);
+        assert_eq!(recovered.corrupt_lines, 1);
+        assert_eq!(recovered.snapshots.len(), 1, "unterminated final record is ignored");
+
+        fs::write(&path, format!("{}", "{broken}\n".repeat(MAX_CORRUPT_HEALTH_SNAPSHOT_LINES + 1))).expect("write corrupt log");
+        assert!(matches!(read_health_snapshot_log(run_id, &base), Err(HealthSnapshotError::CorruptLog { .. })));
         let _ = fs::remove_dir_all(&base);
     }
 

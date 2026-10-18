@@ -23,7 +23,10 @@ export default function ApiDocsPage() {
     <div className="container-full page-padding fade-in">
       <h1 className="heading-page">API reference</h1>
       <p className="text-meta mt-1 max-w-3xl">
-        Machine-readable contract: <a className="link" href="/api/openapi">openapi.json</a>. Success envelope{' '}
+        Machine-readable contract: <a className="link" href="/api/openapi">openapi.json</a> — generated from the route
+        catalog (<code className="code-text">src/lib/openapi/registry.ts</code>), so it cannot drift from the handlers.
+        Additive changes ship freely; breaking changes are gated by CI. Regenerate with{' '}
+        <code className="code-text">pnpm --dir apps/web openapi:update</code>. Success envelope{' '}
         <code className="code-text">{'{ data, total? }'}</code>; errors <code className="code-text">{'{ error, code? }'}</code>.
         Auth: <code className="code-text">Authorization: Bearer &lt;token&gt;</code> with scopes <code className="code-text">read</code>/
         <code className="code-text">write</code> (tokens look like <code className="code-text">scl_live_*</code>). Pagination is

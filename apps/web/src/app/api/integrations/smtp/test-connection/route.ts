@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
+import { withSizeLimitAndLogging } from '@/lib/route-handler';
 import {
   verifySmtpConnection,
   validateSmtpConfig,
@@ -12,7 +13,7 @@ import {
  * Verifies that the supplied SMTP configuration can authenticate with the
  * mail server, without sending an email. Body: SmtpConfig JSON.
  */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const sizeError = checkRequestSize(request);
   if (sizeError) {
     return sizeError;
@@ -41,3 +42,5 @@ export async function POST(request: NextRequest) {
   }
   return errorResponse(result.error || 'SMTP connection test failed.', 422);
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/integrations/smtp/test-connection', postHandler);

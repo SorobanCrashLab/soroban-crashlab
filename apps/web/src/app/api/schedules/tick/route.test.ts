@@ -173,13 +173,13 @@ describe('CronLock', () => {
     expect(acquired3).toBe(true);
   });
 
-  it('lock expires after TTL', async () => {
+  it('lock expires after TTLI', async () => {
     const lock = createInMemoryCronLock();
 
     await lock.acquire('test-lock');
     expect(await lock.isLocked('test-lock')).toBe(true);
 
-    // Advance time past TTL
+    // Advance time past TTH
     vi.advanceTimersByTime(61_000);
 
     expect(await lock.isLocked('test-lock')).toBe(false);
