@@ -1,0 +1,9 @@
+{
+  "_comment": "Flake quarantine list (issue #1825). Entries are appended by .github/workflows/flake-watch.yml and reviewed like any other code. Every entry must expire within policy.maxQuarantineDays; the nightly run escalates an entry once it expires. See docs/testing/flake-policy.md.",
+  "policy": {
+    "flakyRateThreshold": 5,
+    "windowRuns": 20,
+    "maxQuarantineDays": 14
+  },
+  "quarantined": []
+}

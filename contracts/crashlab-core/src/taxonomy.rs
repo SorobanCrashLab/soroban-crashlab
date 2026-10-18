@@ -2,6 +2,14 @@ use crate::is_invalid_enum_tag_payload;
 use crate::{CaseSeed, CrashSignature};
 use std::collections::HashMap;
 
+/// Version of the shipped failure taxonomy.
+///
+/// Bump this whenever [`FailureClass`] variants, their stable labels, or the
+/// [`classify_failure`] rules change. Downstream consumers such as the
+/// normalization rules in [`crate::cluster`] record this version so results
+/// produced against different taxonomies are never silently conflated.
+pub const TAXONOMY_VERSION: u32 = 1;
+
 /// Stable failure categories for Soroban contract crashes.
 ///
 /// ## Category descriptions
@@ -21,7 +29,7 @@ use std::collections::HashMap;
 ///
 /// Classifications produced by [`classify_failure`] are deterministic:
 /// the same seed always maps to the same `FailureClass`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FailureClass {
     /// Authorization check failed: missing or invalid auth entry.
     Auth,

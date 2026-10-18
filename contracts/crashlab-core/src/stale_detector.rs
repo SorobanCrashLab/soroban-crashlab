@@ -1,4 +1,5 @@
 //! Stale run detector for long-running fuzz campaigns.
+//! Stale run detector for long-running fuzz campaigns.
 //!
 //! A run is considered stale when no progress has been recorded within the
 //! configured threshold. Progress is defined as either a new unique crash
@@ -236,7 +237,7 @@ impl Drop for RunDirLock {
 }
 
 /// Checks whether a process with `pid` is currently alive.
-fn is_process_alive(pid: u32) -> bool {
+pub fn is_process_alive(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }
@@ -360,15 +361,16 @@ mod tests {
         let lock1 = RunDirLock::try_acquire(&tmp).expect("acquire lock 1");
         assert!(lock1.is_some());
 
-        // Second acquisition attempt should detect process is alive and return None
-        let lock2 = RunDirLock::try_acquire(&tmp).expect("acquire lock 2");
-        assert!(lock2.is_none());
+        // A second acquisition attempt while the first lock is held must fail,
+        // simulating lease contention between two scheduler instances.
+        let lock2 = RunDirLock::try_acquire(&tmp).expect("acquire lock 2 attempt");
+        assert!(lock2.is_none(), "second lock acquisition should be denied");
 
-        drop(lock1);
-
-        // After dropping, acquisition succeeds again
+        // Releasing the first lock allows a subsequent acquisition to succeed.
+        lock1.expect("lock1 present").release();
         let lock3 = RunDirLock::try_acquire(&tmp).expect("acquire lock 3");
-        assert!(lock3.is_some());
+        assert!(lock3.is_some(), "lock should be reacquirable after release");
+        lock3.expect("lock3 present").release();
 
         let _ = std::fs::remove_dir_all(&tmp);
     }

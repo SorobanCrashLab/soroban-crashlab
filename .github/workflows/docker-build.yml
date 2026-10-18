@@ -1,5 +1,25 @@
 name: Docker Build
 
+# Image quality gate for the web image (#1829), extending the build fix from
+# 03a39c8. A PR that touches a Dockerfile or the gate's own config runs one
+# job, in this order:
+#
+#   build (linux/amd64)
+#     -> Trivy CVE scan of the repo lockfiles and of the built image, failing
+#        on any CRITICAL/HIGH that is not accepted in .trivyignore.yaml
+#     -> image + standalone payload size against .github/docker-image-budget.json
+#     -> boot the container, wait for /api/health/liveness, assert GET / and
+#        GET /start answer 200, then kill it
+#
+# Findings are adjudicated in one gate step per concern so a red run still
+# ships its diagnostics: Trivy JSON, the size numbers, and the container logs
+# are uploaded before the final enforce step turns the job red.
+#
+# Multi-arch (amd64 + arm64) builds only run on main and on release tags so
+# PR feedback stays inside the ≤10-minute scan budget. The base image is
+# digest-pinned in apps/web/Dockerfile; the image scan below is what turns a
+# stale pin into a red build instead of a silent vulnerability.
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -9,14 +29,23 @@ on:
       - 'contracts/crashlab-core/Dockerfile'
       - 'contracts/**'
       - '.github/workflows/docker-build.yml'
+      - '.github/docker-image-budget.json'
+      - '.trivyignore.yaml'
+      - 'scripts/check-docker-image-size.mjs'
   push:
     branches: [main]
+    # Release tags get the multi-arch build below. Path filters are not
+    # evaluated for tag pushes, so a release always runs this workflow.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
     paths:
       - 'Dockerfile'
       - 'apps/web/Dockerfile'
       - 'contracts/crashlab-core/Dockerfile'
       - 'contracts/**'
       - '.github/workflows/docker-build.yml'
+      - '.github/docker-image-budget.json'
+      - '.trivyignore.yaml'
+      - 'scripts/check-docker-image-size.mjs'
 
 concurrency:
   group: docker-build-${{ github.workflow }}-${{ github.ref }}
@@ -25,11 +54,23 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  WEB_IMAGE: crashlab-web:ci
+  # Trivy is installed as a versioned, checksum-verified tarball rather than
+  # through an action: the scanner that decides red/green should be a pinned
+  # artifact. Bump both values together and re-run the gate — a newer Trivy DB
+  # can surface findings that need a fresh .trivyignore.yaml baseline.
+  TRIVY_VERSION: 0.76.0
+  TRIVY_TARBALL_SHA256: e24b1c51293c1b15e4ba8d45bbc7891ba053f90278ec2698f3562c993e145fe7
+
 jobs:
   build-web-docker:
-    name: Build Web Docker Image
+    name: Build and gate web Docker image
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Target is ≤10 minutes end to end for a PR (#1829); 15 minutes of hard
+    # timeout leaves headroom for a cold GHA build cache without hiding a real
+    # slowdown in the gate itself.
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Code
@@ -38,14 +79,269 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Build Web Docker Image
+      # linux/amd64 only: the runner is amd64, and single-arch keeps the PR
+      # gate fast. Both platforms are built on main/release tags by the job
+      # below.
+      - name: Build Web Docker Image (linux/amd64)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: apps/web/Dockerfile
+          platforms: linux/amd64
+          load: true
           push: false
+          tags: ${{ env.WEB_IMAGE }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Install Trivy (pinned, checksum verified)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/trivy"
+          curl -fsSL --retry 3 \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+            -o "$RUNNER_TEMP/trivy.tar.gz"
+          echo "${TRIVY_TARBALL_SHA256}  $RUNNER_TEMP/trivy.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP/trivy"
+          "$RUNNER_TEMP/trivy/trivy" version
+          echo "$RUNNER_TEMP/trivy" >> "$GITHUB_PATH"
+
+      # Filesystem scope: the pnpm/Cargo lockfiles — the packages that end up
+      # in the image — without installing them. Vulnerability scanner only;
+      # secret scanning is gitleaks' (.gitleaks.toml) job, not Trivy's, so a
+      # finding here is always a CVE. Dev dependencies are excluded (Trivy
+      # default) because the runner stage ships the traced production tree only.
+      - name: Trivy filesystem scan (lockfiles)
+        env:
+          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+        run: |
+          set -euo pipefail
+          trivy fs \
+            --scanners vuln \
+            --severity CRITICAL,HIGH \
+            --ignorefile .trivyignore.yaml \
+            --format json \
+            --output "$RUNNER_TEMP/trivy-fs.json" \
+            --exit-code 0 \
+            .
+
+      # Image scope: Alpine packages, the pinned Node runtime, npm's bundled
+      # dependency tree, and the app's own node_modules as shipped. Same
+      # severity floor and same baseline file as the filesystem scan.
+      - name: Trivy image scan (built image)
+        env:
+          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+        run: |
+          set -euo pipefail
+          trivy image \
+            --scanners vuln \
+            --severity CRITICAL,HIGH \
+            --ignorefile .trivyignore.yaml \
+            --format json \
+            --output "$RUNNER_TEMP/trivy-image.json" \
+            --exit-code 0 \
+            "$WEB_IMAGE"
+
+      # Trivy already applied --severity and .trivyignore.yaml when it wrote
+      # the JSON, so anything left here is an unbaselined CRITICAL/HIGH: a new
+      # CVE, an expired acceptance, or a regression. Renders the detail first,
+      # fails second — the diagnostics upload below needs the step outcome.
+      - name: Scan gate (CRITICAL/HIGH must be baselined)
+        id: scan_gate
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          total=0
+          rows="$(mktemp)"
+          for source in fs image; do
+            file="$RUNNER_TEMP/trivy-$source.json"
+            jq -r --arg s "$source" \
+              '.Results[]? | .Vulnerabilities[]? | "| \($s) | \(.VulnerabilityID) | \(.Severity) | \(.PkgName) | \(.InstalledVersion) | \(.FixedVersion // "-") |"' \
+              "$file" >> "$rows"
+            count="$(jq '[.Results[]? | .Vulnerabilities[]?] | length' "$file")"
+            total=$((total + count))
+          done
+          if [ "$total" -gt 0 ]; then
+            {
+              echo "### Trivy CVE gate (CRITICAL/HIGH, unbaselined): ${total} finding(s)"
+              echo
+              echo "| source | advisory | severity | package | installed | fixed |"
+              echo "| --- | --- | --- | --- | --- | --- |"
+              cat "$rows"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::${total} CRITICAL/HIGH finding(s) are not in .trivyignore.yaml — fix them (dependency/base-image bump) or baseline them with a statement and an expiry."
+            exit 1
+          fi
+          echo "0 unbaselined CRITICAL/HIGH findings across filesystem and image scans." >> "$GITHUB_STEP_SUMMARY"
+
+      # Two numbers, two budgets: the whole image (catches a base-image or
+      # layer blowup) and the traced Next.js standalone payload at /app (catches
+      # the app itself growing). The budget file is ratcheted against the PR's
+      # base branch, so it can only shrink unless ratchetJustification is
+      # refreshed — see scripts/check-docker-image-size.mjs.
+      - name: Size gate (image vs budget)
+        id: size_gate
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          image_bytes="$(docker image inspect --format '{{.Size}}' "$WEB_IMAGE")"
+          # busybox du reports 1024-byte blocks; scale to bytes so the budget
+          # file stays in one unit.
+          standalone_bytes="$(docker run --rm --entrypoint sh "$WEB_IMAGE" -c 'du -sk /app | cut -f1' | awk '{ print $1 * 1024 }')"
+          printf '{ "imageBytes": %s, "standaloneBytes": %s }\n' \
+            "$image_bytes" "$standalone_bytes" > "$RUNNER_TEMP/docker-image-sizes.json"
+
+          base_args=()
+          if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
+            if git fetch --quiet --depth=1 origin "${{ github.event.pull_request.base.ref }}" &&
+              git show FETCH_HEAD:.github/docker-image-budget.json > "$RUNNER_TEMP/base-docker-image-budget.json" 2>/dev/null; then
+              base_args=(--base-budget "$RUNNER_TEMP/base-docker-image-budget.json")
+            else
+              echo "note: base-branch budget unavailable, ratchet comparison skipped (first introduction of the budget file?)"
+            fi
+          fi
+          node scripts/check-docker-image-size.mjs \
+            --measured "$RUNNER_TEMP/docker-image-sizes.json" \
+            --budget .github/docker-image-budget.json \
+            "${base_args[@]}"
+
+      # Boot the image the way it ships (USER nextjs, node server.js, no dev
+      # dependencies, no host env file) and prove the two entry pages answer.
+      # A server.js that only breaks at deploy time is the failure class #1643
+      # was closed for; this is where it gets caught instead.
+      - name: Boot smoke test (GET / and GET /start must be 200)
+        id: smoke_gate
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          container=web-smoke
+          log="$RUNNER_TEMP/web-smoke-container.log"
+          capture_logs() {
+            docker logs "$container" > "$log" 2>&1 || true
+          }
+          cleanup() {
+            capture_logs
+            docker rm -f "$container" > /dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          fail() {
+            # Capture before rendering the summary: the EXIT trap has not run
+            # yet, and an empty $log would hide the reason the boot failed.
+            capture_logs
+            echo "::error::$1"
+            {
+              echo
+              echo "**Smoke failure:** $1"
+              echo
+              echo '```text'
+              tail -n 80 "$log" 2>/dev/null || echo "(container logs unavailable)"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
+
+          if ! run_out="$(docker run -d --name "$container" -p 127.0.0.1:3000:3000 "$WEB_IMAGE" 2>&1)"; then
+            fail "docker run failed: $run_out"
+          fi
+
+          code=""
+          for _ in $(seq 1 60); do
+            if [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || echo false)" != "true" ]; then
+              fail "container exited before it became healthy"
+            fi
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:3000/api/health/liveness || true)"
+            if [ "$code" = "200" ]; then
+              break
+            fi
+            sleep 1
+          done
+          if [ "$code" != "200" ]; then
+            fail "GET /api/health/liveness did not return 200 within 60s (last status: ${code:-none})"
+          fi
+
+          for path in / /start; do
+            status="$(curl -s -o "$RUNNER_TEMP/smoke-body.txt" -w '%{http_code}' --max-time 15 "http://127.0.0.1:3000$path" || true)"
+            echo "GET $path -> ${status:-no response}"
+            if [ "$status" != "200" ]; then
+              fail "GET $path returned ${status:-no response}, expected 200"
+            fi
+          done
+          echo "smoke passed: /api/health/liveness, / and /start all answered 200"
+
+      - name: Stage failure diagnostics
+        if: always() && (steps.scan_gate.outcome == 'failure' || steps.size_gate.outcome == 'failure' || steps.smoke_gate.outcome == 'failure')
+        run: |
+          set -euo pipefail
+          mkdir -p docker-gate-diagnostics
+          for f in trivy-fs.json trivy-image.json docker-image-sizes.json web-smoke-container.log; do
+            if [ -f "$RUNNER_TEMP/$f" ]; then
+              cp "$RUNNER_TEMP/$f" docker-gate-diagnostics/
+            fi
+          done
+
+      - name: Upload failure diagnostics
+        if: always() && (steps.scan_gate.outcome == 'failure' || steps.size_gate.outcome == 'failure' || steps.smoke_gate.outcome == 'failure')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docker-gate-diagnostics
+          path: docker-gate-diagnostics/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # One red gate after the evidence is preserved, so a failing PR always
+      # arrives with its scan report, size numbers, and container logs attached
+      # (same shape as size-limit.yml).
+      - name: Enforce image quality gates
+        if: always()
+        run: |
+          set -euo pipefail
+          status=0
+          if [ "${{ steps.scan_gate.outcome }}" = "failure" ]; then
+            echo "::error::CVE gate failed — see the job summary table and the docker-gate-diagnostics artifact."
+            status=1
+          fi
+          if [ "${{ steps.size_gate.outcome }}" = "failure" ]; then
+            echo "::error::Size budget failed — see the job summary (scripts/check-docker-image-size.mjs)."
+            status=1
+          fi
+          if [ "${{ steps.smoke_gate.outcome }}" = "failure" ]; then
+            echo "::error::Boot smoke test failed — container logs are in the docker-gate-diagnostics artifact."
+            status=1
+          fi
+          exit $status
+
+  # Both platforms, only where the cost is acceptable: pushes to main and
+  # release tags. QEMU is what makes linux/arm64 buildable on an amd64 runner;
+  # the PR gate above never pays for it. `push: false` — this job asserts the
+  # image *builds* for both architectures, publishing is release.yml's job.
+  build-web-docker-multiarch:
+    name: Build web image (amd64 + arm64)
+    needs: build-web-docker
+    if: success() && github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build Web Docker Image (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          # Separate cache scope so the amd64 gate and the multi-arch build
+          # stop importing each other's manifests.
+          cache-from: type=gha,scope=web-multiarch
+          cache-to: type=gha,mode=max,scope=web-multiarch
 
   build-contracts-docker:
     name: Build Contracts Docker Image
