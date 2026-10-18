@@ -62,6 +62,42 @@
     "test:e2e:settings-persistence": "playwright test e2e/settings-persistence.spec.ts",
     "test:e2e:integrations": "playwright test e2e/integrations.spec.ts",
     "test:e2e:maintainer": "playwright test e2e/maintainer.spec.ts",
-    "test:error-boundary": "npx tsc src/components/error-boundary-utils.ts src/components/error-boundary-utils.test.ts --skipLibCheck --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react && node build/test-tmp/components/error-boundary-utils.test.js"
+    "test:error-boundary": "npx tsc src/components/error-boundary-utils.ts src/components/error-boundary-utils.test.ts --skipLibCheck --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react && node build/test-tmp/components/error-boundary-utils.test.js",
+    "test:rate-limit": "vitest run src/lib/rate-limit.test.ts src/rate-limit.test.ts"
+  },
+  "dependencies": {
+    "@sentry/nextjs": "^10.75.2",
+    "@uploadthing/react": "^7.3.3",
+    "@upstash/redis": "^1.38.4",
+    "@vercel/kv": "^3.0.0",
+    "next": "16.3.5",
+    "nodemailer": "^6.10.1",
+    "react": "19.2.3",
+    "react-dom": "19.3.0",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.8.1",
+    "remark-gfm": "^4.0.1",
+    "uploadthing": "^7.7.4",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@next/bundle-analyzer": "^16.1.6",
+    "@playwright/test": "1.61.1",
+    "@size-limit/file": "^14.0.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26",
+    "@types/nodemailer": "^6.4.19",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-istanbul": "^2.1.8",
+    "babel-plugin-react-compiler": "1.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "size-limit": "^11.2.0",
+    "tailwindcss": "^4",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
   }
 }
