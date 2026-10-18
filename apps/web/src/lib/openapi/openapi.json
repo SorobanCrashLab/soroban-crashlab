@@ -3,7 +3,7 @@
   "info": {
     "title": "Soroban CrashLab API",
     "version": "1.0.0",
-    "description": "Machine-readable contract. Success envelope { data, total? }; errors { error, code?, fieldErrors? }. Auth: Authorization: Bearer <token> with scopes read/write (scl_live_*). Pagination: cursor + limit (keyset)."
+    "description": "Machine-readable contract. Success envelope { data, total? }; errors { error, code?, fieldErrors? }. Auth: Authorization: Bearer <token> with scopes read/write (scl_live_*). Pagination: cursor + limit (keyset); paginated list routes return nextCursor + hasMore. Cursors are versioned and bound to the route's sort/filter set — a mismatched cursor returns 400 CURSOR_MISMATCH; legacy offset cursors reset to page 1."
   },
   "servers": [{ "url": "/" }],
   "security": [{ "bearerAuth": [] }],
@@ -34,11 +34,12 @@
     "/api/runs/{id}/replay-history": { "get": { "summary": "Replay history for a run", "tags": ["runs"] } },
     "/api/runs/{id}/stream": { "get": { "summary": "Stream run progress (SSE)", "tags": ["runs"] } },
     "/api/artifacts": {
-      "get": { "summary": "List artifacts", "tags": ["artifacts"] },
+      "get": { "summary": "List artifacts (keyset paginated, cursor bound to sort)", "tags": ["artifacts"] },
       "post": { "summary": "Upload an artifact bundle", "tags": ["artifacts"] }
     },
     "/api/artifacts/{id}": { "get": { "summary": "Get an artifact", "tags": ["artifacts"] } },
     "/api/artifacts/validate": { "post": { "summary": "Validate an artifact bundle", "tags": ["artifacts"] } },
+    "/api/audit": { "get": { "summary": "Query the org-scoped audit log (keyset paginated, cursor bound to filters)", "tags": ["audit"] } },
     "/api/campaigns": {
       "get": { "summary": "List fuzz campaigns", "tags": ["campaigns"] },
       "post": { "summary": "Create a fuzz campaign", "tags": ["campaigns"] }
