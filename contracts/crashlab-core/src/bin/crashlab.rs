@@ -26,11 +26,37 @@ use crashlab_core::{
 use crashlab_core::worker_partition::RingCoverage;
 use std::collections::HashSet;
 use std::fs;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+macro_rules! println {
+    () => {
+        std::println!()
+    };
+    ($($argument:tt)*) => {{
+        let message = format!($($argument)*);
+        std::println!("{}", crashlab_core::redact::redact_text(&message));
+    }};
+}
+
+macro_rules! eprintln {
+    () => {
+        std::eprintln!()
+    };
+    ($($argument:tt)*) => {{
+        let message = format!($($argument)*);
+        std::eprintln!("{}", crashlab_core::redact::redact_text(&message));
+    }};
+}
+
 fn main() {
-    env_logger::init();
+    env_logger::Builder::from_env(env_logger::Env::default())
+        .format(|buffer, record| {
+            let message = crashlab_core::redact::redact_text(&record.args().to_string());
+            writeln!(buffer, "{} {} {}", buffer.timestamp(), record.level(), message)
+        })
+        .init();
     let mut args = std::env::args();
     let _prog = args.next();
 

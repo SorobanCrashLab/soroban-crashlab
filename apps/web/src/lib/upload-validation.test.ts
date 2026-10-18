@@ -131,6 +131,13 @@ describe('validateUploadContent — magic-byte sniffing', () => {
     expect(validateUploadContent('log', new Uint8Array([0xff, 0xfe, 0xfd]))).toMatchObject({ ok: false, reason: 'bad-magic' });
   });
 
+  it('rejects active markup in text artifacts', () => {
+    expect(validateUploadContent('log', encode('<!doctype html><script>alert(1)</script>'))).toMatchObject({
+      ok: false,
+      reason: 'polyglot',
+    });
+  });
+
   it('re-checks size against the real byte count', () => {
     const tooBig = new Uint8Array(DEFAULT_REQUEST_SIZE_LIMITS.maxJsonSize + 1).fill(0x20);
     expect(validateUploadContent('bundle', tooBig)).toMatchObject({ ok: false, reason: 'too-large' });
@@ -216,6 +223,23 @@ describe('ingestion gate — rejections are auditable', () => {
     expect(result.accepted).toBe(false);
     expect(d.persisted).toEqual([]);
     expect(d.deleted).toEqual(['ut-key-1']);
+  });
+
+  it('deletes text artifacts that still contain secret-like values', async () => {
+    const secretLog = encode(`authorization=Bearer ${'z'.repeat(20)}`);
+    const textArtifact = {
+      key: 'ut-key-secret',
+      name: 'trace.log',
+      size: secretLog.byteLength,
+      ufsUrl: 'https://utfs.io/f/ut-key-secret',
+    };
+    const d = deps(secretLog);
+
+    const result = await ingestUploadedArtifact(textArtifact, { artifactClass: 'log' }, d.deps);
+
+    expect(result).toMatchObject({ accepted: false, reason: 'sensitive-content' });
+    expect(d.persisted).toEqual([]);
+    expect(d.deleted).toEqual(['ut-key-secret']);
   });
 
   it('stops reading an object that is larger than its class allows', async () => {

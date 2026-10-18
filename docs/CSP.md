@@ -25,13 +25,29 @@ frame-ancestors 'self'
 form-action 'self'
 base-uri 'self'
 object-src 'none'
+report-uri /api/csp-report
+report-to csp-endpoint
 upgrade-insecure-requests
 ```
 
 The rest of the response-header set (`X-Content-Type-Options`, `X-Frame-Options`,
 `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`) still ships
 statically from `next.config.ts` and `vercel.json`, because none of them vary per
-request. See [`SECURITY.md`](SECURITY.md) for that table.
+request. `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy` are
+also set on static and proxied responses. See [`SECURITY.md`](SECURITY.md) for
+the full header table.
+
+## Report-only rollout and triage
+
+Set `CSP_MODE=report-only` to send the same nonce-bearing policy as
+`Content-Security-Policy-Report-Only` while retaining the policy on the
+forwarded request for Next.js nonce injection. The default (`enforce`) sends
+`Content-Security-Policy`. Both policies report to `/api/csp-report`; the
+bounded, rate-limited route accepts legacy and Reporting API payloads and emits
+only redacted directive/source metadata to the structured application log. Use
+those events to group violations by directive and source before switching
+report-only deployments to enforcement. The route intentionally does not log
+full document or blocked URLs, which can contain query-string credentials.
 
 ## Why the policy lives in the proxy, not `next.config.ts`
 

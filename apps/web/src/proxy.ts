@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { proxy as rateLimitProxy } from './rate-limit';
-import { CSP_HEADER, NONCE_HEADER, buildCspHeader, generateCspNonce } from './lib/csp';
+import {
+  CSP_HEADER,
+  CSP_REPORT_ONLY_HEADER,
+  NONCE_HEADER,
+  buildCspHeader,
+  generateCspNonce,
+} from './lib/csp';
 
 const CORRELATION_ID_HEADER = 'x-correlation-id';
 
@@ -44,7 +50,13 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     : NextResponse.next({ request: { headers: requestHeaders } });
 
   // Echo the policy so the browser enforces exactly what was rendered against.
-  response.headers.set(CSP_HEADER, csp);
+  const reportOnly = process.env.CSP_MODE === 'report-only';
+  response.headers.delete(CSP_HEADER);
+  response.headers.delete(CSP_REPORT_ONLY_HEADER);
+  response.headers.set(reportOnly ? CSP_REPORT_ONLY_HEADER : CSP_HEADER, csp);
+  response.headers.set('Reporting-Endpoints', 'csp-endpoint="/api/csp-report"');
+  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
   response.headers.set(CORRELATION_ID_HEADER, correlationId);
   response.headers.set('X-Correlation-ID', correlationId);
 

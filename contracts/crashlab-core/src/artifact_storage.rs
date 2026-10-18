@@ -8,7 +8,10 @@
 use crate::{CaseBundle, BundlePersistError};
 use std::path::{Path, PathBuf};
 use std::fs;
-use std::io;
+use std::io::{self, Read};
+
+/// Maximum size of an uncompressed artifact JSON document.
+pub const MAX_ARTIFACT_JSON_BYTES: usize = crate::bundle_persist::MAX_BUNDLE_JSON_BYTES;
 
 /// Configuration for artifact storage backends.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,7 +149,13 @@ impl LocalArtifactStore {
 
     /// Validates artifact ID to prevent directory traversal attacks.
     fn validate_artifact_id(id: &str) -> Result<(), StorageError> {
-        if id.is_empty() || id == ".." || id.contains("/") || id.contains("\\") {
+        if id.is_empty()
+            || id == "."
+            || id == ".."
+            || !id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
             return Err(StorageError::InvalidId {
                 artifact_id: id.to_string(),
             });
@@ -187,7 +196,12 @@ impl ArtifactStore for LocalArtifactStore {
         Self::validate_artifact_id(artifact_id)?;
 
         let path = self.artifact_path(artifact_id);
-        let json_bytes = crate::save_case_bundle_json(bundle)?;
+        let json_bytes = crate::save_sanitized_case_bundle_json(bundle)?;
+        if json_bytes.len() > MAX_ARTIFACT_JSON_BYTES {
+            return Err(StorageError::Persistence(BundlePersistError::SizeLimit {
+                limit: MAX_ARTIFACT_JSON_BYTES,
+            }));
+        }
         fs::write(&path, json_bytes)?;
 
         Self::metadata_from_file(artifact_id, &path)
@@ -203,7 +217,15 @@ impl ArtifactStore for LocalArtifactStore {
             });
         }
 
-        let bytes = fs::read(&path)?;
+        let mut bytes = Vec::new();
+        fs::File::open(&path)?
+            .take(MAX_ARTIFACT_JSON_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > MAX_ARTIFACT_JSON_BYTES {
+            return Err(StorageError::Persistence(BundlePersistError::SizeLimit {
+                limit: MAX_ARTIFACT_JSON_BYTES,
+            }));
+        }
         Ok(crate::load_case_bundle_json(&bytes)?)
     }
 

@@ -46,7 +46,15 @@ export const nextConfig: NextConfig = {
         },
         {
           key: "Permissions-Policy",
-          value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+          value: "camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=(), serial=(), xr-spatial-tracking=()",
+        },
+        {
+          key: "Cross-Origin-Opener-Policy",
+          value: "same-origin-allow-popups",
+        },
+        {
+          key: "Cross-Origin-Resource-Policy",
+          value: "same-origin",
         },
         {
           key: "Strict-Transport-Security",

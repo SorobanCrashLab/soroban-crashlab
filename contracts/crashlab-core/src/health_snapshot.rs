@@ -133,14 +133,18 @@ impl HealthSnapshot {
     /// The log is JSON Lines, so the object must never be pretty-printed: one
     /// snapshot has to occupy exactly one line.
     pub fn to_json_line(&self) -> Result<String, serde_json::Error> {
-        let mut line = serde_json::to_string(self)?;
+        let value = serde_json::to_value(self)?;
+        let (sanitized, _) = crate::redact::redact_json_value(&value);
+        let mut line = serde_json::to_string(&sanitized)?;
         line.push('\n');
         Ok(line)
     }
 
     /// Parses one log line, rejecting schema versions this build cannot read.
     pub fn from_json_line(line: &str) -> Result<Self, HealthSnapshotError> {
-        let snapshot: HealthSnapshot = serde_json::from_str(line)?;
+        let value: serde_json::Value = serde_json::from_str(line)?;
+        let (redacted, _) = crate::redact::redact_json_value(&value);
+        let snapshot: HealthSnapshot = serde_json::from_value(redacted)?;
         if !SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS.contains(&snapshot.schema_version) {
             return Err(HealthSnapshotError::UnsupportedSchema {
                 found: snapshot.schema_version,
@@ -331,7 +335,7 @@ pub fn read_latest_health_snapshot_line(
     if let Some(sequence) = latest_sequence {
         for line in contents.lines().rev().filter(|line| !line.trim().is_empty()) {
             if HealthSnapshot::from_json_line(line).is_ok_and(|snapshot| snapshot.sequence == sequence) {
-                return Ok(Some(line.to_string()));
+                return Ok(Some(crate::redact::redact_text(line)));
             }
         }
     }
