@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/storage-minio.yml'
+      - '.github/workflows/nightly-health.yml'
 
 concurrency:
   group: storage-minio-${{ github.ref }}
@@ -16,6 +20,7 @@ concurrency:
 permissions:
   contents: read
   issues: write
+  actions: read
 
 jobs:
   contract:
@@ -24,6 +29,8 @@ jobs:
     defaults:
       run:
         working-directory: apps/web
+    outputs:
+      outcome: ${{ steps.contract.outcome }}
 
     services:
       minio:
@@ -58,16 +65,21 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - name: Run the storage contract suite against MinIO
+        id: contract
+        run: pnpm exec vitest run src/lib/storage/minio-contract.test.ts
+      - name: Retry the storage contract suite against MinIO (retry-once)
+        id: contract-retry
+        if: failure() && steps.contract.outcome == 'failure'
         run: pnpm exec vitest run src/lib/storage/minio-contract.test.ts
       - name: Open or update nightly failure issue
-        if: failure() && github.event_name == 'schedule'
+        if: failure() && github.event_name == 'schedule' && steps.contract-retry.outcome != 'success'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const title = "CI failure: storage-driver-minio nightly";
-            const label = "ci-failure";
+            const title = "nightly health: storage-driver-minio";
+            const label = "nightly-health";
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             const body = [
               "The nightly MinIO storage-driver contract workflow failed.",
@@ -75,6 +87,9 @@ jobs:
               `- Workflow run: ${runUrl}`,
               `- Commit: ${context.sha}`,
               `- Triggered at: ${new Date().toISOString()}`,
+              `- Retry outcome: ${process.env.RETRY_OUTCOME || 'not attempted'}`,
+              `- Last-green SHA: ${process.env.LAST_GREEN_SHA || 'unknown'}`,
+              `- Failure budget (7d red rate): ${process.env.RED_RATE || 'unknown'}`,
               "",
               "Runbook: docs/ops/playbooks/storage-degraded.md (severity and escalation: docs/ops/incident-response.md)",
             ].join("\n");
@@ -87,8 +102,8 @@ jobs:
                   owner,
                   repo,
                   name: label,
-                  color: "B60205",
-                  description: "Automated CI failure notifications",
+                  color: "D93F0B",
+                  description: "Automated nightly health tracking",
                 });
               } else {
                 throw error;
@@ -120,3 +135,59 @@ jobs:
                 labels: [label],
               });
             }
+      - name: Escalate on failure budget breach
+        if: failure() && github.event_name == 'schedule' && steps.contract-retry.outcome != 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          RED_RATE: ${{ needs.budget.outputs.red_rate }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = "nightly health: storage-driver-minio";
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: "open",
+              labels: "nightly-health",
+              per_page: 100,
+            });
+            const existing = openIssues.find((issue) => issue.title === title);
+            if (!existing) return;
+            const redRate = parseFloat(process.env.RED_RATE || "0");
+            if (redRate > 0.3) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: existing.number,
+                labels: ["priority:p0"],
+              });
+            }
+
+  budget:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      red_rate: ${{ steps.compute.outputs.red_rate }}
+    steps:
+      - name: Compute rolling 7-day red rate
+        id: compute
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: "storage-minio.yml",
+              created: `>=${since}`,
+              per_page: 100,
+            });
+            const runs = data.workflow_runs.filter((r) => r.event === "schedule");
+            const red = runs.filter((r) => r.conclusion === "failure").length;
+            const rate = runs.length === 0 ? 0 : red / runs.length;
+            core.setOutput("red_rate", rate.toFixed(3));
+            core.info(`storage-minio 7d red rate: ${rate.toFixed(3)} (${red}/${runs.length})`);

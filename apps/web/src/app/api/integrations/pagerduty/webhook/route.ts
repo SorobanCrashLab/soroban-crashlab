@@ -1,3 +1,4 @@
+import { withSizeLimitAndLogging } from '@/lib/route-handler';
 /**
  * POST /api/integrations/pagerduty/webhook (#1892)
  *
@@ -16,7 +17,7 @@ const STATUS_BY_EVENT: Record<string, 'acknowledged' | 'resolved'> = {
   'incident.resolved': 'resolved',
 };
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const secret = process.env.PAGERDUTY_WEBHOOK_SECRET?.trim();
   if (!secret) return errorResponse('PagerDuty webhook secret is not configured', 503);
 
@@ -43,3 +44,5 @@ export async function POST(request: Request) {
   );
   return successResponse({ ignored: incident === null, incident });
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/integrations/pagerduty/webhook', postHandler);

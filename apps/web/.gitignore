@@ -20,6 +20,10 @@
 /playwright/.cache/
 /e2e/.temp-test-files/
 
+# playwright visual gate (separate config/reporters)
+/test-results-visual/
+/playwright-report-visual/
+
 # next.js
 /.next/
 /out/
@@ -55,6 +59,10 @@ next-env.d.ts
 
 # lighthouse ci
 /.lighthouseci/
+
+# stryker mutation testing
+/reports/
+/.stryker-tmp/
 /.lighthouseci-desktop/
 /.lighthouseci-mobile/
 

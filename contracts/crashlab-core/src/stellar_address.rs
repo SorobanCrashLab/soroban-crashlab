@@ -506,9 +506,22 @@ pub fn generate_address_vectors(base_id: u64, config: &AddressMutatorConfig) -> 
         );
         seeds.push(CaseSeed {
             id,
-            payload: valid_addr.into_bytes(),
+            payload: valid_addr.clone().into_bytes(),
         });
         id += 1;
+
+        // Seed deterministic key-boundary and cross-type neighbors beside each
+        // valid base address so corpus generation can exercise the local
+        // neighborhood without waiting for byte-level havoc to find it.
+        if let Some(neighbors) = crate::address_neighbors::generate_address_neighbors(&valid_addr) {
+            for neighbor in neighbors {
+                seeds.push(CaseSeed {
+                    id,
+                    payload: neighbor.address.into_bytes(),
+                });
+                id += 1;
+            }
+        }
 
         // Invalid addresses (if config allows)
         if config.include_invalid && !config.valid_only {
