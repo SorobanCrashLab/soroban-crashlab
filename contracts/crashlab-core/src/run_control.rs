@@ -42,6 +42,8 @@ pub struct RunSummary {
 pub enum RunTerminalState {
     Completed { summary: RunSummary },
     Cancelled { summary: RunSummary },
+    /// Campaign stopped early because a sustained plateau was detected (W5-E05 semantics).
+    PlateauStop { summary: RunSummary },
     Failed { message: String },
 }
 
@@ -123,6 +125,12 @@ impl CancelSignal {
         }
         cancel_requested(self.run_id, &self.state_dir)
     }
+
+    /// Request a plateau-driven early stop. Recorded like cancellation so sealed
+    /// results and resume machinery treat it identically (W5-E05).
+    pub fn plateau_stop(&self) {
+        self.cancel();
+    }
 }
 
 /// Default directory for run state (override with `CRASHLAB_STATE_DIR`).
@@ -186,6 +194,10 @@ pub trait RunProgress {
     /// The loop stopped, whatever the reason. Called exactly once per entered
     /// loop, after the last seed callback.
     fn on_finish(&mut self, seeds_processed: u64, terminal: &RunTerminalState);
+
+    /// Called when the plateau detector signals a sustained plateau. Default is
+    /// a no-op so existing progress observers keep compiling.
+    fn on_plateau(&mut self, _plateau_score: f64) {}
 }
 
 /// [`drive_run`], reporting progress to `progress`.
@@ -509,6 +521,22 @@ mod tests {
         signal.cancel();
 
         let outcome = drive_run(id, 100, &signal, None, |_i| Ok(()));
+        match outcome {
+            RunTerminalState::Cancelled { summary } => {
+                assert_eq!(summary.seeds_processed, 0);
+                assert_eq!(summary.cancelled_at_seed, Some(0));
+            }
+            other => panic!("expected cancelled, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn plateau_stop_records_terminal_state_like_cancel() {
+        let id = RunId(101);
+        let signal = CancelSignal::new(id);
+        signal.plateau_stop();
+
+        let outcome = drive_run(id, 50, &signal, None, |_i| Ok(()));
         match outcome {
             RunTerminalState::Cancelled { summary } => {
                 assert_eq!(summary.seeds_processed, 0);

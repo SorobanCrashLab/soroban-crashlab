@@ -1,0 +1,7 @@
+# Backup job image for the reference compose deployment (#1896):
+# redis-cli / redis-check-rdb from the Redis image, plus a pinned rclone.
+FROM rclone/rclone:1.69.1@sha256:600f51856285df1ae5d91c8bb2682cbbe31bf109ebeeef9ecead6ca8c0ff6138 AS rclone
+FROM redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+COPY --from=rclone /usr/local/bin/rclone /usr/local/bin/rclone
+USER 999:1000
+ENTRYPOINT []

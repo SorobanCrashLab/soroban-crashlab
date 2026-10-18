@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { getApiTokenSecretHash, revokeApiToken } from '../../../../../../lib/storage/api-token-store';
 import { unregisterTokenPrincipal } from '../../../../../../lib/storage/token-principal-store';
+import { AuditLog } from '../../../../../../lib/audit/audit-log';
 
 export async function POST(
   _request: NextRequest,
@@ -25,6 +26,8 @@ export async function POST(
   if (sha256Hash) {
     await unregisterTokenPrincipal({ sha256Hash });
   }
+
+  AuditLog.append({ action: 'token.revoke', target: id });
 
   return successResponse({ message: 'Token revoked successfully.' });
 }

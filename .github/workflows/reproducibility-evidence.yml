@@ -1,0 +1,76 @@
+name: reproducibility-evidence
+
+# Reproducibility contract evidence (#1898).
+# - check: the generated evidence section in docs/reproducibility-contract.md
+#   matches docs/reproducibility-evidence.json and no evidence is stale.
+# - probe (weekly / on demand, report-only): runs examples/repro_probe.rs on
+#   Linux, macOS and Windows and compares each digest with the reference.
+on:
+  pull_request:
+    paths:
+      - 'docs/reproducibility-contract.md'
+      - 'docs/reproducibility-evidence.json'
+      - 'scripts/reproducibility/**'
+      - 'contracts/crashlab-core/examples/repro_probe.rs'
+      - '.github/workflows/reproducibility-evidence.yml'
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65 # v4.0.0
+        with:
+          node-version: 22
+      - run: node scripts/reproducibility/evidence.mjs check
+
+  probe:
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # 1.97.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: contracts
+      - name: Run the probe
+        shell: bash
+        run: cargo run --quiet --release --manifest-path contracts/crashlab-core/Cargo.toml --example repro_probe > probe-${{ matrix.os }}.json
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: probe-${{ matrix.os }}
+          path: probe-${{ matrix.os }}.json
+
+  report:
+    needs: probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65 # v4.0.0
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          path: probes
+          merge-multiple: true
+      - name: Compare with the reference (report-only)
+        run: |
+          {
+            echo "## Reproducibility probe"
+            node scripts/reproducibility/evidence.mjs report probes/*.json
+            echo
+            echo "Record a platform: \`node scripts/reproducibility/evidence.mjs record --input probe-<os>.json --source ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} --commit ${GITHUB_SHA::7} --rustc <version>\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,130 +1,52 @@
-/**
- * GitHub Issue Link Adapter
- *
- * Small, dependency-free helper that resolves a GitHub issue link for use
- * in the UI. Works without a token, using GitHub's public REST API for
- * unauthenticated reads of public repositories. If the API is unreachable,
- * rate-limited, or the issue/repo can't be found, this falls back to a
- * canonical URL with a placeholder title rather than throwing - the caller
- * should never have to handle an exception from this module.
- */
 
-import { createAbortSignal } from './adapter-utils';
+import { getGithubClient } from "src/lib/github-client";
+import { audit } from "src/lib/audit";
+import { db } from "src/lib/db";
 
-export interface ResolvedIssueLink {
-  url: string;
-  title?: string;
-  state?: 'open' | 'closed';
-  resolved: boolean;
-}
+export async function POST(request: Request) {
+  const { clusterId, signature, count, runs, actor } = await request.json();
+  const client = getGithubClient(); // uses app-installed token or stored OAuth for the org/repo
 
-export interface ParsedGithubIssueUrl {
-  owner: string;
-  repo: string;
-  issueNumber: number;
-}
+  const marker = `<!-- crash-signature:${signature} -->`;
 
-/**
- * Parses a GitHub issue (or pull request) URL into its owner/repo/number
- * parts. Returns null if the URL isn't a recognizable GitHub issue link.
- */
-export function parseGithubIssueUrl(url: string): ParsedGithubIssueUrl | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return null;
+  // 1) Search open issues for marker
+  // Prefer search API: q="repo:owner/repo in:body \"<!-- crash-signature:...-->\" is:open"
+  const searchQuery = `repo:blockchainrafik/soroban-crashlab in:body "${marker}" is:open`;
+  const searchRes = await client.searchIssues(searchQuery); // implement wrapper or use octokit
+
+  if (searchRes.total_count > 0) {
+    const issue = searchRes.items[0];
+    // 2) Comment on existing issue
+    const commentBody = `Recurring: cluster ${clusterId}, occurrences now ${count}. Example run: ${runs[0]?.url ?? runs[0]?.id}.`;
+    await client.createIssueComment(issue.number, commentBody);
+
+    // 3) Link cluster -> issue in DB
+    await db.linkClusterToIssue(clusterId, issue.html_url);
+
+    // 4) Audit
+    await audit.record({ actor, action: "comment_on_existing_issue", signature, issueUrl: issue.html_url });
+
+    return new Response(JSON.stringify({ action: "commented", issueUrl: issue.html_url }), { status: 200 });
   }
 
-  if (parsed.hostname !== 'github.com' && parsed.hostname !== 'www.github.com') {
-    return null;
-  }
+  // 5) No open issue: create new with marker included
+  const issueTitle = `Crash: ${signature} (${/* area */ "unknown"}) — ${count} occurrences`;
+  const issueBody = `## Failure Cluster
 
-  const match = parsed.pathname.match(
-    /^\/([^/]+)\/([^/]+)\/(?:issues|pull)\/(\d+)\/?$/,
-  );
-  if (!match) return null;
+**Signature:** \`${signature}\`
+**Occurrences:** ${count}
 
-  const [, owner, repo, issueNumberStr] = match;
-  const issueNumber = Number.parseInt(issueNumberStr, 10);
-  if (!Number.isFinite(issueNumber) || issueNumber <= 0) return null;
+**Example runs:**
+${runs.map((r)=>`- ${r.url ?? r.id}`).join("\n")}
 
-  return { owner, repo, issueNumber };
+**Suggested severity:** High
+
+${marker}
+`;
+  const created = await client.createIssue(issueTitle, issueBody);
+
+  await db.linkClusterToIssue(clusterId, created.html_url);
+  await audit.record({ actor, action: "create_issue", signature, issueUrl: created.html_url });
+
+  return new Response(JSON.stringify({ action: "created", issueUrl: created.html_url }), { status: 201 });
 }
-
-function canonicalUrl(owner: string, repo: string, issueNumber: number): string {
-  return `https://github.com/${owner}/${repo}/issues/${issueNumber}`;
-}
-
-export interface GithubIssuesAdapterOptions {
-  fetchImpl?: typeof fetch;
-  timeoutMs?: number;
-}
-
-async function resolveIssueLinkImpl(
-  owner: string,
-  repo: string,
-  issueNumber: number,
-  fetchImpl: typeof fetch,
-  signal: AbortSignal | undefined,
-): Promise<ResolvedIssueLink> {
-  const url = canonicalUrl(owner, repo, issueNumber);
-  const fallback: ResolvedIssueLink = {
-    url,
-    title: `#${issueNumber}`,
-    resolved: false,
-  };
-
-  try {
-    const response = await fetchImpl(
-      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}`,
-      {
-        headers: { Accept: 'application/vnd.github+json' },
-        signal,
-      },
-    );
-
-    if (!response.ok) {
-      return fallback;
-    }
-
-    const data = (await response.json()) as { title?: unknown; state?: unknown };
-    if (typeof data.title !== 'string' || !data.title) {
-      return fallback;
-    }
-
-    return {
-      url,
-      title: data.title,
-      state: data.state === 'closed' ? 'closed' : 'open',
-      resolved: true,
-    };
-  } catch {
-    return fallback;
-  }
-}
-
-export function createGithubIssuesAdapter(options: GithubIssuesAdapterOptions = {}) {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const signal = createAbortSignal(options.timeoutMs);
-
-  return {
-    async resolveIssueLink(
-      owner: string,
-      repo: string,
-      issueNumber: number,
-    ): Promise<ResolvedIssueLink> {
-      return resolveIssueLinkImpl(owner, repo, issueNumber, fetchImpl, signal);
-    },
-
-    async resolveIssueLinkFromUrl(
-      url: string,
-    ): Promise<ResolvedIssueLink | null> {
-      const parsed = parseGithubIssueUrl(url);
-      if (!parsed) return null;
-      return resolveIssueLinkImpl(parsed.owner, parsed.repo, parsed.issueNumber, fetchImpl, signal);
-    },
-  };
-}
-
-

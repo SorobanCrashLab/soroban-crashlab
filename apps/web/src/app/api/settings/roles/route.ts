@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRbacPermission, describePrincipal } from '../../../../lib/rbac';
 import { checkRequestSize } from '../../../../lib/request-size-limits';
+import { withSizeLimitAndLogging } from '../../../../lib/route-handler';
 import { assignRole, revokeRole, listRoleAssignments } from '../../../../lib/storage/role-store';
 
 export async function GET(request: NextRequest) {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   });
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const rbacError = await checkRbacPermission(request);
   if (rbacError) return rbacError;
 
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+async function deleteHandler(request: NextRequest) {
   const rbacError = await checkRbacPermission(request);
   if (rbacError) return rbacError;
 
@@ -100,3 +101,6 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/settings/roles', postHandler);
+export const DELETE = withSizeLimitAndLogging('DELETE /api/settings/roles', deleteHandler);

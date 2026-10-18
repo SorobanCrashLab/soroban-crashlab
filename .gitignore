@@ -37,3 +37,9 @@ skills-lock.json
 IMPLEMENTATION_SUMMARY*.md
 tmp_*
 *_output.txt
+
+# flake-watch outputs
+flake-report.json
+flake-report.md
+flake-quarantine.proposed.json
+flake-attempts/

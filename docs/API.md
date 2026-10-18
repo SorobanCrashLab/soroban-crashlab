@@ -449,7 +449,7 @@ endpoint. Every file passes one ingestion gate
 | Type | Extensions | Max size | Content check |
 | --- | --- | --- | --- |
 | `wasm` | `.wasm` | 16 MiB (`MAX_MODULE_SIZE`) | `\0asm` v1 header and a full section walk |
-| `bundle`, `seed` | `.json` | 5 MiB (`MAX_JSON_SIZE`) | UTF-8 JSON document |
+| `bundle`, `seed` | `.json` | 1 MiB (`MAX_JSON_SIZE`) | UTF-8 JSON document |
 | `log` | `.log`, `.txt` | 10 MiB (`MAX_REQUEST_SIZE`) | UTF-8 text |
 | `trace` | `.jsonl`, `.log`, `.txt` | 10 MiB (`MAX_REQUEST_SIZE`) | UTF-8 text |
 

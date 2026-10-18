@@ -1,5 +1,9 @@
 # Threat Model: Artifact Handling
 
+> System-level model (RBAC, tenancy, webhooks, CI, abuse cases with control
+> traceability): [`security/threat-model-v2.md`](security/threat-model-v2.md).
+> This document remains the detailed reference for artifact-handling threats T-1…T-11.
+
 **Version**: 1.0  
 **Last Updated**: 2026-04-23  
 **Status**: Draft  
