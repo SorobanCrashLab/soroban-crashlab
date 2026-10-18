@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response-utils';
+import { safeRedirectPath } from '@/lib/safe-redirect';
 
 const GITHUB_AUTH_URL = 'https://github.com/login/oauth/authorize';
 const STATE_COOKIE_NAME = 'github_oauth_state';
 const STATE_MAX_AGE_SECONDS = 600;
+const NEXT_COOKIE_NAME = 'github_oauth_next';
 
 /**
  * GET /api/auth/github/login
@@ -13,6 +15,11 @@ const STATE_MAX_AGE_SECONDS = 600;
  * Generates a cryptographically random state parameter, stores it in a
  * short-lived httpOnly cookie, and redirects the user to GitHub's
  * authorization endpoint.
+ *
+ * An optional `?next=` parameter is validated through the shared
+ * safe-redirect validator and stashed in a short-lived cookie so the
+ * callback can resume the intended deep link. Invalid values fall back to
+ * `/` with an audit log entry.
  */
 export async function GET(request: NextRequest) {
   const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -23,6 +30,12 @@ export async function GET(request: NextRequest) {
   }
 
   const state = crypto.randomUUID();
+
+  const rawNext = request.nextUrl.searchParams.get('next');
+  const nextPath = safeRedirectPath(rawNext, {
+    fallback: '/',
+    context: 'api/auth/github/login',
+  });
 
   const { origin } = new URL(request.url);
   const callbackUrl = `${origin}/api/auth/github/callback`;
@@ -46,6 +59,16 @@ export async function GET(request: NextRequest) {
     maxAge: STATE_MAX_AGE_SECONDS,
     path: '/',
   });
+
+  if (rawNext !== null) {
+    response.cookies.set(NEXT_COOKIE_NAME, nextPath, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: STATE_MAX_AGE_SECONDS,
+      path: '/',
+    });
+  }
 
   logger.info('GET /api/auth/github/login: redirecting to GitHub with state');
 

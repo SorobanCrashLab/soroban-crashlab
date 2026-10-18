@@ -3,18 +3,33 @@ name: Lighthouse CI
 on:
   pull_request:
     branches: [main]
+  schedule:
+    # Nightly deep-verification run: 04:17 UTC daily.
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry-run: skip auto-issue creation/escalation, only log.'
+        type: boolean
+        default: false
 
 # Least privilege: read the code, write exactly one PR comment. No checks,
 # no statuses, no contents:write.
 permissions:
   contents: read
   pull-requests: write
+  issues: write
+  actions: read
 
 # A push to the same PR supersedes the in-flight audit rather than racing it
 # for the sticky comment.
 concurrency:
   group: lighthouse-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  NIGHTLY_HEALTH_LABEL: nightly-health
+  NIGHTLY_BUDGET_RED_RATE: '0.25'
 
 jobs:
   lighthouse:
@@ -24,6 +39,13 @@ jobs:
       run:
         working-directory: apps/web
     steps:
+      - name: Resolve nightly context
+        id: nightly
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "is_nightly=true" >> "$GITHUB_OUTPUT"
+          echo "workflow=lighthouse" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -66,6 +88,8 @@ jobs:
 
       - name: Collect and assert budgets (desktop + mobile)
         id: lhci
+        # Retry-once with a distinct label: first attempt is `lhci`; the
+        # retry step below runs only on failure and is labeled `lhci-retry`.
         # Pinned: a Lighthouse minor bump can move scores by more than our
         # margins, so the version is part of the contract.
         #
@@ -87,6 +111,24 @@ jobs:
           cp -r .lighthouseci .lighthouseci-mobile
           if [ $desktop -ne 0 ] || [ $mobile -ne 0 ]; then
             echo "::error::Lighthouse budgets failed — see the PR comment for the per-assertion breakdown."
+            exit 1
+          fi
+
+      - name: Retry budgets once (labeled retry)
+        id: lhci_retry
+        if: failure() && steps.lhci.outcome == 'failure'
+        run: |
+          set +e
+          echo "::warning::Lighthouse budgets failed on first attempt; retrying once (label: lhci-retry)."
+          pnpm dlx @lhci/cli@0.15.1 autorun --config=lighthouserc.js
+          desktop=$?
+          cp -r .lighthouseci .lighthouseci-desktop 2>/dev/null || true
+          rm -rf .lighthouseci
+          pnpm dlx @lhci/cli@0.15.1 autorun --config=lighthouserc.mobile.js
+          mobile=$?
+          cp -r .lighthouseci .lighthouseci-mobile 2>/dev/null || true
+          if [ $desktop -ne 0 ] || [ $mobile -ne 0 ]; then
+            echo "::error::Lighthouse budgets failed on retry — escalating to nightly health."
             exit 1
           fi
 
@@ -160,3 +202,134 @@ jobs:
         # pkill by pattern, not the recorded pid: `$!` is pnpm's pid and the
         # actual next-server runs as its child.
         run: pkill -f "next start -p 3210" || true
+
+      # Nightly-only: on final failure, auto-create/update the pinned
+      # "nightly health" issue with logs, run link, and last-green SHA.
+      # Dry-run mode (workflow_dispatch input) logs the payload instead.
+      - name: Auto-triage nightly failure
+        if: always() && steps.nightly.outputs.is_nightly == 'true' && (failure() || cancelled())
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          WORKFLOW_NAME: lighthouse
+          BUDGET_RED_RATE: ${{ env.NIGHTLY_BUDGET_RED_RATE }}
+        with:
+          script: |
+            const dryRun = process.env.DRY_RUN === 'true';
+            const wf = process.env.WORKFLOW_NAME;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = `nightly health: ${wf}`;
+            const marker = `<!-- nightly-health:${wf} -->`;
+
+            // Rolling 7-day red rate for this workflow.
+            const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: `${wf}.yml`,
+              created: `>=${since}`,
+              per_page: 100,
+            });
+            const finished = runs.filter((r) => r.conclusion);
+            const red = finished.filter((r) => r.conclusion !== 'success').length;
+            const rate = finished.length ? red / finished.length : 0;
+            const overBudget = rate > parseFloat(process.env.BUDGET_RED_RATE);
+
+            const body = [
+              marker,
+              `## 🔴 Nightly failure: \`${wf}\``,
+              '',
+              `- **Run:** ${runUrl}`,
+              `- **Conclusion:** ${context.payload?.workflow_run?.conclusion ?? 'failure'}`,
+              `- **7-day red rate:** ${(rate * 100).toFixed(0)}% (${red}/${finished.length}) — budget ${(parseFloat(process.env.BUDGET_RED_RATE) * 100).toFixed(0)}%`,
+              `- **Escalation:** ${overBudget ? '**OVER BUDGET → priority:p0**' : 'within budget'}`,
+              '',
+              '### First response',
+              '1. Open the run link above and read the failing step.',
+              '2. Classify: infra (runner/network/registry) vs product (assertion/regression).',
+              '3. Follow `docs/ops/nightly-runbook.md` for the matching class.',
+              '',
+              '_Auto-generated by nightly-health. Do not close until a green run lands._',
+            ].join('\n');
+
+            if (dryRun) {
+              core.info(`[dry-run] would upsert issue "${title}" with body:\n${body}`);
+              return;
+            }
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: process.env.NIGHTLY_HEALTH_LABEL,
+              per_page: 100,
+            });
+            const existing = issues.find((i) => i.title === title);
+            const labels = [process.env.NIGHTLY_HEALTH_LABEL];
+            if (overBudget) labels.push('priority:p0');
+
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+                labels,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+            }
+
+      # Weekly report: green/red table per nightly for the last 28 days,
+      # posted as a comment on the pinned nightly health issue.
+      - name: Weekly nightly report
+        if: github.event_name == 'schedule' && github.event.schedule == '17 4 * * *'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          WORKFLOW_NAME: lighthouse
+        with:
+          script: |
+            const wf = process.env.WORKFLOW_NAME;
+            const since = new Date(Date.now() - 28 * 24 * 3600 * 1000).toISOString();
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: `${wf}.yml`,
+              created: `>=${since}`,
+              per_page: 100,
+            });
+            const finished = runs.filter((r) => r.conclusion);
+            const green = finished.filter((r) => r.conclusion === 'success').length;
+            const red = finished.length - green;
+            const table = [
+              '## 📊 Weekly nightly report (last 28 days)',
+              '',
+              '| Nightly | Green | Red | Red rate |',
+              '| --- | --- | --- | --- |',
+              `| ${wf} | ${green} | ${red} | ${finished.length ? ((red / finished.length) * 100).toFixed(0) : 0}% |`,
+            ].join('\n');
+            core.info(table);
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: process.env.NIGHTLY_HEALTH_LABEL,
+              per_page: 100,
+            });
+            const target = issues.find((i) => i.title === `nightly health: ${wf}`);
+            if (target) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: target.number,
+                body: table,
+              });
+            } else {
+              core.info('No open nightly health issue; skipping weekly comment.');
+            }

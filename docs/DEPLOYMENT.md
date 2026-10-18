@@ -115,6 +115,7 @@ Deploy is gated by GitHub Actions — not by a GitLab trigger. Before merging to
 | E2E | Playwright e2e job | User paths still work on fresh install |
 | Storage conformance | [`storage-minio.yml`](../.github/workflows/storage-minio.yml) | S3/MinIO driver contract (nightly / on storage changes) |
 | Semantic PR title | [`semantic-pr.yml`](../.github/workflows/semantic-pr.yml) | Conventional Commits on the PR title |
+| OpenAPI contract | [`openapi-gate.yml`](../.github/workflows/openapi-gate.yml) | Committed `openapi.json` must match the generated spec; breaking API changes need maintainer approval |
 | Soroban example size | `soroban-example` in [`ci.yml`](../.github/workflows/ci.yml) | WASM budget when contract code changes |
 | Preview deploy | `vercel-preview.yml` | Optional; runs when Vercel secrets exist |
 

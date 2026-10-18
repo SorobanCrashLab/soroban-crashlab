@@ -105,11 +105,19 @@ impl RingRange {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RingCoverage {
     ranges: Vec<RingRange>,
+    /// Monotonic generation of the checkpoint this coverage was loaded from.
+    /// `0` means "not yet persisted"; the checkpoint layer bumps it on every
+    /// successful atomic swap so a stale coverage can be rejected on resume.
+    #[serde(default)]
+    generation: u64,
 }
 
 impl RingCoverage {
     pub const fn new() -> Self {
-        Self { ranges: Vec::new() }
+        Self {
+            ranges: Vec::new(),
+            generation: 0,
+        }
     }
 
     /// Builds coverage from arbitrary (possibly overlapping/unsorted) ranges.
@@ -128,6 +136,16 @@ impl RingCoverage {
     /// Normalized covered ranges, ordered by `start`.
     pub fn ranges(&self) -> &[RingRange] {
         &self.ranges
+    }
+
+    /// Monotonic generation of the checkpoint this coverage came from.
+    pub const fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// Records the generation after a successful atomic checkpoint swap.
+    pub fn set_generation(&mut self, generation: u64) {
+        self.generation = generation;
     }
 
     /// Total number of covered ring slots.

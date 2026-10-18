@@ -22,8 +22,12 @@ const shardArg = process.argv.find((arg) => arg.startsWith('--shard='));
 const shardLabel = shardArg ? shardArg.replace('=', '-').replace('/', '-of-') : 'shard-all';
 
 export default defineConfig({
-  /* A11y job runs only the axe/keyboard specs under e2a/a1y. */
-  testDir: isA1yRun ? './e2e/a11' : './e2e',
+  /* A11y job runs only the axe/keyboard specs under e2e/a11y. */
+  testDir: isA1yRun ? './e2e/a11y' : './e2e',
+  /* Visual regression lives in its own config/job so screenshots run in a
+   * pinned container and the functional e2e suite does not pay for them.
+   * See playwright.visual.config.ts and e2e/visual/README.md. */
+  testIgnore: ['visual.spec.ts', 'visual/**'],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -57,7 +61,7 @@ export default defineConfig({
    * as an artifact without colliding with the main e2e job. Sharded CI runs
    * suffix every output folder with the shard label so N runners can upload
    * their artifacts without collision. */
-  reporter: isA11yRun
+  reporter: isA1yRun
     ? [
         ['html', { open: 'never', outputFolder: 'playwright-report-a11' }],
         ['json', { outputFile: 'test-results-a11/results.json' }],

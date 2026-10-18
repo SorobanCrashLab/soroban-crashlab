@@ -1,87 +1,4608 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "Soroban CrashLab API",
-    "version": "1.0.0",
-    "description": "Machine-readable contract. Success envelope { data, total? }; errors { error, code?, fieldErrors? }. Auth: Authorization: Bearer <token> with scopes read/write (scl_live_*). Pagination: cursor + limit (keyset)."
+  "components": {
+    "schemas": {
+      "CodedErrorEnvelope": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error",
+          "code"
+        ],
+        "type": "object"
+      },
+      "CrashDetail": {
+        "properties": {
+          "failureCategory": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "string"
+          },
+          "replayAction": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "signatureHash": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "failureCategory",
+          "signature",
+          "payload",
+          "replayAction"
+        ],
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "FuzzingRun": {
+        "properties": {
+          "annotations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "area": {
+            "enum": [
+              "auth",
+              "state",
+              "budget",
+              "xdr"
+            ],
+            "type": "string"
+          },
+          "artifacts": {
+            "items": {
+              "properties": {
+                "contentType": {
+                  "enum": [
+                    "json",
+                    "text",
+                    "hex",
+                    "unknown"
+                  ],
+                  "type": "string"
+                },
+                "content_hash": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                },
+                "type": {
+                  "enum": [
+                    "seed",
+                    "log",
+                    "trace",
+                    "coverage",
+                    "bundle"
+                  ],
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "type",
+                "size",
+                "updatedAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "associatedIssues": {
+            "items": {
+              "properties": {
+                "href": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label",
+                "href"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "corpusStats": {
+            "items": {
+              "properties": {
+                "corpusSize": {
+                  "type": "number"
+                },
+                "coveragePct": {
+                  "type": "number"
+                },
+                "edgesFound": {
+                  "type": "number"
+                },
+                "execsPerSec": {
+                  "type": "number"
+                },
+                "totalEdges": {
+                  "type": "number"
+                },
+                "ts": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "ts",
+                "corpusSize",
+                "edgesFound",
+                "totalEdges",
+                "execsPerSec",
+                "coveragePct"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "cpuInstructions": {
+            "type": "number"
+          },
+          "crashDetail": {
+            "anyOf": [
+              {
+                "properties": {
+                  "failureCategory": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "string"
+                  },
+                  "replayAction": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  },
+                  "signatureHash": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "failureCategory",
+                  "signature",
+                  "payload",
+                  "replayAction"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duration": {
+            "type": "number"
+          },
+          "finishedAt": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "memoryBytes": {
+            "type": "number"
+          },
+          "minResourceFee": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "string"
+          },
+          "queuedAt": {
+            "type": "string"
+          },
+          "replayFingerprint": {
+            "properties": {
+              "components": {
+                "properties": {
+                  "contractWasmHash": {
+                    "type": "string"
+                  },
+                  "engineVersion": {
+                    "type": "string"
+                  },
+                  "networkConfigHash": {
+                    "type": "string"
+                  },
+                  "seedSet": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "seedSet",
+                  "contractWasmHash",
+                  "engineVersion",
+                  "networkConfigHash"
+                ],
+                "type": "object"
+              },
+              "composite": {
+                "type": "string"
+              },
+              "stampedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "composite",
+              "components",
+              "stampedAt"
+            ],
+            "type": "object"
+          },
+          "seedCount": {
+            "type": "number"
+          },
+          "seedList": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "area",
+          "severity",
+          "duration",
+          "seedCount",
+          "crashDetail",
+          "cpuInstructions",
+          "memoryBytes",
+          "minResourceFee"
+        ],
+        "type": "object"
+      },
+      "RunsListRequest": {
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "limit": {},
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RunsListResponse": {
+        "properties": {
+          "hasMore": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runs": {
+            "items": {
+              "properties": {
+                "annotations": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "area": {
+                  "enum": [
+                    "auth",
+                    "state",
+                    "budget",
+                    "xdr"
+                  ],
+                  "type": "string"
+                },
+                "artifacts": {
+                  "items": {
+                    "properties": {
+                      "contentType": {
+                        "enum": [
+                          "json",
+                          "text",
+                          "hex",
+                          "unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "content_hash": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "runId": {
+                        "type": "string"
+                      },
+                      "size": {
+                        "type": "number"
+                      },
+                      "type": {
+                        "enum": [
+                          "seed",
+                          "log",
+                          "trace",
+                          "coverage",
+                          "bundle"
+                        ],
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "type",
+                      "size",
+                      "updatedAt"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "associatedIssues": {
+                  "items": {
+                    "properties": {
+                      "href": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "href"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "corpusStats": {
+                  "items": {
+                    "properties": {
+                      "corpusSize": {
+                        "type": "number"
+                      },
+                      "coveragePct": {
+                        "type": "number"
+                      },
+                      "edgesFound": {
+                        "type": "number"
+                      },
+                      "execsPerSec": {
+                        "type": "number"
+                      },
+                      "totalEdges": {
+                        "type": "number"
+                      },
+                      "ts": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "ts",
+                      "corpusSize",
+                      "edgesFound",
+                      "totalEdges",
+                      "execsPerSec",
+                      "coveragePct"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "cpuInstructions": {
+                  "type": "number"
+                },
+                "crashDetail": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "failureCategory": {
+                          "type": "string"
+                        },
+                        "payload": {
+                          "type": "string"
+                        },
+                        "replayAction": {
+                          "type": "string"
+                        },
+                        "signature": {
+                          "type": "string"
+                        },
+                        "signatureHash": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "failureCategory",
+                        "signature",
+                        "payload",
+                        "replayAction"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "duration": {
+                  "type": "number"
+                },
+                "finishedAt": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "memoryBytes": {
+                  "type": "number"
+                },
+                "minResourceFee": {
+                  "type": "number"
+                },
+                "parentId": {
+                  "type": "string"
+                },
+                "queuedAt": {
+                  "type": "string"
+                },
+                "replayFingerprint": {
+                  "properties": {
+                    "components": {
+                      "properties": {
+                        "contractWasmHash": {
+                          "type": "string"
+                        },
+                        "engineVersion": {
+                          "type": "string"
+                        },
+                        "networkConfigHash": {
+                          "type": "string"
+                        },
+                        "seedSet": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "seedSet",
+                        "contractWasmHash",
+                        "engineVersion",
+                        "networkConfigHash"
+                      ],
+                      "type": "object"
+                    },
+                    "composite": {
+                      "type": "string"
+                    },
+                    "stampedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "composite",
+                    "components",
+                    "stampedAt"
+                  ],
+                  "type": "object"
+                },
+                "seedCount": {
+                  "type": "number"
+                },
+                "seedList": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "severity": {
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "critical"
+                  ],
+                  "type": "string"
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "running",
+                    "completed",
+                    "failed",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                "tags": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "area",
+                "severity",
+                "duration",
+                "seedCount",
+                "crashDetail",
+                "cpuInstructions",
+                "memoryBytes",
+                "minResourceFee"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "runs",
+          "total"
+        ],
+        "type": "object"
+      },
+      "SuccessEnvelope": {
+        "properties": {
+          "data": {},
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "description": "API token (`scl_live_*`) or scrape token. 401 { error, code } on missing/invalid; 403 on insufficient scope/role.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
   },
-  "servers": [{ "url": "/" }],
-  "security": [{ "bearerAuth": [] }],
+  "info": {
+    "description": "Machine-readable contract for the CrashLab API. Global envelope: success is { data, total? }; errors are { error, code?, fieldErrors? }. Auth: `Authorization: Bearer <token>` with scopes `read`/`write` (tokens look like `scl_live_*`); maintainer-only routes additionally require role `maintainer`. Pagination is keyset-based via opaque `cursor` + `limit`.",
+    "title": "Soroban CrashLab API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
   "paths": {
-    "/api/health": { "get": { "summary": "Service health check", "tags": ["ops"] } },
-    "/api/health/metrics": { "get": { "summary": "Scrape endpoint metrics", "tags": ["ops"] } },
+    "/api/artifacts": {
+      "get": {
+        "description": "List artifacts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List artifacts",
+        "tags": [
+          "artifacts"
+        ]
+      },
+      "post": {
+        "description": "Upload an artifact bundle",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "ARTIFACT_MISSING_BUNDLE_FIELD",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Missing \"bundle\" field in request body.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "ARTIFACT_MISSING_BUNDLE_FIELD"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "ARTIFACT_PAYLOAD_TOO_LARGE",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request body exceeds the allowed size limit.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "ARTIFACT_PAYLOAD_TOO_LARGE"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Upload an artifact bundle",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/artifacts/validate": {
+      "post": {
+        "description": "Validate an artifact bundle",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "ARTIFACT_INVALID_JSON",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Invalid JSON in request body.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "ARTIFACT_INVALID_JSON"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "ARTIFACT_INVALID_BUNDLE",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The submitted artifact bundle failed validation.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "ARTIFACT_INVALID_BUNDLE"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Validate an artifact bundle",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/artifacts/{id}": {
+      "get": {
+        "description": "Get an artifact",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Get an artifact",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/api/auth/github/callback": {
+      "get": {
+        "description": "GitHub OAuth callback",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          }
+        },
+        "security": [],
+        "summary": "GitHub OAuth callback",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/github/login": {
+      "get": {
+        "description": "Start GitHub OAuth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          }
+        },
+        "security": [],
+        "summary": "Start GitHub OAuth",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/campaigns": {
+      "get": {
+        "description": "List fuzz campaigns",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List fuzz campaigns",
+        "tags": [
+          "campaigns"
+        ]
+      },
+      "post": {
+        "description": "Admission checks the class scheduling window and capacity quotas (429 QUOTA_EXCEEDED / 403 SCHEDULING_WINDOW_CLOSED, both with Retry-After). Maintainers may bypass with X-CrashLab-Quota-Override: <reason>; the bypass is audited.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "IDEMPOTENCY_KEY_INVALID",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The Idempotency-Key header is malformed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "IDEMPOTENCY_KEY_INVALID"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "QUOTA_OVERRIDE_FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Only maintainers may override capacity quotas.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "QUOTA_OVERRIDE_FORBIDDEN"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "IDEMPOTENCY_KEY_REUSED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "This Idempotency-Key was already used with a different request payload.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "IDEMPOTENCY_KEY_REUSED"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "QUOTA_EXCEEDED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "This request would exceed a capacity quota for its scope.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "QUOTA_EXCEEDED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Create a fuzz campaign",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/capacity": {
+      "get": {
+        "description": "Global scope until tenancy lands. ?windowHours=<1-840> (default 24) for utilization and cost attribution.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          }
+        },
+        "security": [],
+        "summary": "Capacity report: quotas, usage, utilization, cost",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/api/capacity/usage": {
+      "post": {
+        "description": "Runner token with runs:write. Renews the campaign capacity lease and answers { throttle } mid-run.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Report campaign progress; returns a throttle decision",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "description": "Service health check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          }
+        },
+        "security": [],
+        "summary": "Service health check",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/api/health/metrics": {
+      "get": {
+        "description": "Bearer scrape token (CRASHLAB_METRICS_SCRAPE_TOKEN). Prometheus-compatible.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Scrape endpoint metrics",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/api/integrations/ci/results": {
+      "get": {
+        "description": "Newest first. Filters: ?sha=<40-hex>&pr=<n>&limit=<1-200>.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          }
+        },
+        "security": [],
+        "summary": "CI regression results by commit / PR",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "post": {
+        "description": "Token scope ci:write. Idempotent by (commitSha, suiteRunId): replay 200, conflict 409. Repository pinned by CRASHLAB_CI_REPOSITORY.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "CI_REPOSITORY_NOT_ALLOWED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Results are only accepted from the configured repository.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "CI_REPOSITORY_NOT_ALLOWED"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "CI_RESULT_CONFLICT",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "A different result was already recorded for this commit and suite run.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "CI_RESULT_CONFLICT"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RATE_LIMITED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Too many requests. Retry after the window resets.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RATE_LIMITED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Ingest CI regression results",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/datadog/metrics": {
+      "get": {
+        "description": "Datadog metrics proxy",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Datadog metrics proxy",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/discord": {
+      "post": {
+        "description": "Post to Discord",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Post to Discord",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/github-actions": {
+      "post": {
+        "description": "Trigger GitHub Action",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Trigger GitHub Action",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/github-issue": {
+      "post": {
+        "description": "Open a GitHub issue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Open a GitHub issue",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/jira": {
+      "post": {
+        "description": "Create a Jira issue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Create a Jira issue",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/pagerduty/trigger": {
+      "post": {
+        "description": "Trigger PagerDuty",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Trigger PagerDuty",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/prometheus/health": {
+      "get": {
+        "description": "Prometheus health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          }
+        },
+        "security": [],
+        "summary": "Prometheus health",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/slack": {
+      "get": {
+        "description": "Slack integration status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Slack integration status",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/smtp/history": {
+      "get": {
+        "description": "SMTP send history",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "SMTP send history",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/smtp/send": {
+      "post": {
+        "description": "Send via SMTP",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Send via SMTP",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/networks": {
+      "get": {
+        "description": "List Stellar networks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List Stellar networks",
+        "tags": [
+          "networks"
+        ]
+      }
+    },
+    "/api/networks/active": {
+      "get": {
+        "description": "Active network",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Active network",
+        "tags": [
+          "networks"
+        ]
+      }
+    },
+    "/api/networks/{id}": {
+      "get": {
+        "description": "Get a network",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Get a network",
+        "tags": [
+          "networks"
+        ]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "description": "List notifications",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List notifications",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/openapi": {
+      "get": {
+        "description": "This OpenAPI document (generated from the route catalog)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          }
+        },
+        "security": [],
+        "summary": "This OpenAPI document (generated from the route catalog)",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
     "/api/runs": {
-      "get": { "summary": "List fuzzing runs (keyset paginated)", "tags": ["runs"] },
-      "post": { "summary": "Create a fuzzing run", "tags": ["runs"] }
+      "get": {
+        "description": "Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20). Envelope: { data: { runs, total, nextCursor, hasMore }, total }.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List fuzzing runs (keyset paginated)",
+        "tags": [
+          "runs"
+        ]
+      },
+      "post": {
+        "description": "Create a fuzzing run",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Create a fuzzing run",
+        "tags": [
+          "runs"
+        ]
+      }
     },
     "/api/runs/{id}": {
-      "get": { "summary": "Get a single run", "tags": ["runs"] },
-      "delete": { "summary": "Delete a run (maintainer)", "tags": ["runs"] }
+      "delete": {
+        "description": "Delete a run (maintainer)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Delete a run (maintainer)",
+        "tags": [
+          "runs"
+        ]
+      },
+      "get": {
+        "description": "Get a single run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_ID_REQUIRED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run ID is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_ID_REQUIRED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Get a single run",
+        "tags": [
+          "runs"
+        ]
+      }
     },
     "/api/runs/{id}/annotations": {
-      "get": { "summary": "List run annotations", "tags": ["runs"] },
-      "post": { "summary": "Add a run annotation", "tags": ["runs"] }
+      "get": {
+        "description": "List run annotations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List run annotations",
+        "tags": [
+          "runs"
+        ]
+      },
+      "post": {
+        "description": "Add a run annotation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Add a run annotation",
+        "tags": [
+          "runs"
+        ]
+      }
     },
     "/api/runs/{id}/issues": {
-      "get": { "summary": "List issues linked to a run", "tags": ["runs"] },
-      "post": { "summary": "Link an issue to a run", "tags": ["runs"] }
+      "get": {
+        "description": "List issues linked to a run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List issues linked to a run",
+        "tags": [
+          "runs"
+        ]
+      },
+      "post": {
+        "description": "Link an issue to a run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Link an issue to a run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{id}/replay": {
+      "post": {
+        "description": "Replay a crashed run (maintainer)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Replay a crashed run (maintainer)",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{id}/replay-history": {
+      "get": {
+        "description": "Replay history for a run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Replay history for a run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{id}/stream": {
+      "get": {
+        "description": "Stream run progress (SSE)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Stream run progress (SSE)",
+        "tags": [
+          "runs"
+        ]
+      }
     },
     "/api/runs/{id}/tags": {
-      "get": { "summary": "List run tags", "tags": ["runs"] },
-      "post": { "summary": "Add tags to a run", "tags": ["runs"] }
-    },
-    "/api/runs/{id}/replay": { "post": { "summary": "Replay a crashed run (maintainer)", "tags": ["runs"] } },
-    "/api/runs/{id}/replay-history": { "get": { "summary": "Replay history for a run", "tags": ["runs"] } },
-    "/api/runs/{id}/stream": { "get": { "summary": "Stream run progress (SSE)", "tags": ["runs"] } },
-    "/api/artifacts": {
-      "get": { "summary": "List artifacts", "tags": ["artifacts"] },
-      "post": { "summary": "Upload an artifact bundle", "tags": ["artifacts"] }
-    },
-    "/api/artifacts/{id}": { "get": { "summary": "Get an artifact", "tags": ["artifacts"] } },
-    "/api/artifacts/validate": { "post": { "summary": "Validate an artifact bundle", "tags": ["artifacts"] } },
-    "/api/campaigns": {
-      "get": { "summary": "List fuzz campaigns", "tags": ["campaigns"] },
-      "post": { "summary": "Create a fuzz campaign", "tags": ["campaigns"] }
-    },
-    "/api/capacity": { "get": { "summary": "Capacity report: quotas, usage, utilization, cost", "tags": ["ops"] } },
-    "/api/capacity/usage": { "post": { "summary": "Report campaign progress; returns a throttle decision", "tags": ["ops"] } },
-    "/api/integrations/ci/results": {
-      "get": { "summary": "CI regression results by commit / PR", "tags": ["integrations"] },
-      "post": { "summary": "Ingest CI regression results", "tags": ["integrations"] }
+      "get": {
+        "description": "List run tags",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List run tags",
+        "tags": [
+          "runs"
+        ]
+      },
+      "post": {
+        "description": "Add tags to a run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Add tags to a run",
+        "tags": [
+          "runs"
+        ]
+      }
     },
     "/api/schedules": {
-      "get": { "summary": "List schedules", "tags": ["schedules"] },
-      "post": { "summary": "Create a schedule", "tags": ["schedules"] }
+      "get": {
+        "description": "List schedules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List schedules",
+        "tags": [
+          "schedules"
+        ]
+      },
+      "post": {
+        "description": "Create a schedule",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Create a schedule",
+        "tags": [
+          "schedules"
+        ]
+      }
     },
-    "/api/schedules/{id}": { "get": { "summary": "Get a schedule", "tags": ["schedules"] } },
-    "/api/schedules/tick": { "post": { "summary": "Advance due schedules", "tags": ["schedules"] } },
+    "/api/schedules/tick": {
+      "post": {
+        "description": "Advance due schedules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Advance due schedules",
+        "tags": [
+          "schedules"
+        ]
+      }
+    },
+    "/api/schedules/{id}": {
+      "get": {
+        "description": "Get a schedule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Get a schedule",
+        "tags": [
+          "schedules"
+        ]
+      }
+    },
+    "/api/sentry/config": {
+      "get": {
+        "description": "Get Sentry config",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Sentry config",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/sentry/reports": {
+      "get": {
+        "description": "List Sentry reports",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Sentry reports",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/sentry/test-connection": {
+      "post": {
+        "description": "Test Sentry connection",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Test Sentry connection",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/settings/alerting": {
+      "get": {
+        "description": "Get alerting config",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Get alerting config",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/tokens": {
+      "get": {
+        "description": "List API tokens",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List API tokens",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/tokens/{id}/revoke": {
+      "post": {
+        "description": "Revoke an API token",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Revoke an API token",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/tokens/{id}/rotate": {
+      "post": {
+        "description": "Rotate an API token",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Rotate an API token",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/uploadthing": {
+      "post": {
+        "description": "Uploadthing callback",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UPLOAD_REJECTED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The uploaded file failed ingestion validation.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UPLOAD_REJECTED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Uploadthing callback",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
     "/api/webhooks": {
-      "get": { "summary": "List webhooks", "tags": ["webhooks"] },
-      "post": { "summary": "Create a webhook", "tags": ["webhooks"] }
+      "get": {
+        "description": "List webhooks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List webhooks",
+        "tags": [
+          "webhooks"
+        ]
+      },
+      "post": {
+        "description": "Create a webhook",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Create a webhook",
+        "tags": [
+          "webhooks"
+        ]
+      }
     },
-    "/api/webhooks/history": { "get": { "summary": "Webhook delivery history", "tags": ["webhooks"] } },
-    "/api/webhooks/retry": { "post": { "summary": "Retry a webhook delivery", "tags": ["webhooks"] } },
-    "/api/webhooks/recovery": { "post": { "summary": "Run one webhook-recovery tick", "tags": ["webhooks"] } },
-    "/api/notifications": { "get": { "summary": "List notifications", "tags": ["notifications"] } },
-    "/api/networks": { "get": { "summary": "List Stellar networks", "tags": ["networks"] } },
-    "/api/networks/{id}": { "get": { "summary": "Get a network", "tags": ["networks"] } },
-    "/api/networks/active": { "get": { "summary": "Active network", "tags": ["networks"] } },
-    "/api/settings/tokens": { "get": { "summary": "List API tokens", "tags": ["settings"] } },
-    "/api/settings/tokens/{id}/revoke": { "post": { "summary": "Revoke an API token", "tags": ["settings"] } },
-    "/api/settings/tokens/{id}/rotate": { "post": { "summary": "Rotate an API token", "tags": ["settings"] } },
-    "/api/settings/alerting": { "get": { "summary": "Get alerting config", "tags": ["settings"] } },
-    "/api/auth/github/login": { "get": { "summary": "Start GitHub OAuth", "tags": ["auth"] } },
-    "/api/auth/github/callback": { "get": { "summary": "GitHub OAuth callback", "tags": ["auth"] } },
-    "/api/openapi": { "get": { "summary": "This OpenAPI document", "tags": ["ops"] } }
-  },
-  "components": {
-    "securitySchemes": {
-      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "API token (scl_live_*) or scrape token." }
+    "/api/webhooks/history": {
+      "get": {
+        "description": "Webhook delivery history",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Webhook delivery history",
+        "tags": [
+          "webhooks"
+        ]
+      }
     },
-    "schemas": {
-      "SuccessEnvelope": { "type": "object", "required": ["data"], "properties": { "data": {}, "total": { "type": "number" } } },
-      "ErrorEnvelope": { "type": "object", "required": ["error"], "properties": { "error": { "type": "string" } } },
-      "CodedErrorEnvelope": { "type": "object", "required": ["error", "code"], "properties": { "error": { "type": "string" }, "code": { "type": "string" } } }
+    "/api/webhooks/recovery": {
+      "post": {
+        "description": "Run one webhook-recovery tick",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Run one webhook-recovery tick",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
+    "/api/webhooks/retry": {
+      "post": {
+        "description": "Retry a webhook delivery",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "WEBHOOK_DELIVERY_ID_REQUIRED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Field \"id\" is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "WEBHOOK_DELIVERY_ID_REQUIRED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "WEBHOOK_DELIVERY_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Webhook delivery record not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "WEBHOOK_DELIVERY_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Retry a webhook delivery",
+        "tags": [
+          "webhooks"
+        ]
+      }
     }
-  }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "description": "Fuzzing runs, replay, tags, annotations, issues",
+      "name": "runs"
+    },
+    {
+      "description": "Artifact bundles and validation",
+      "name": "artifacts"
+    },
+    {
+      "description": "Fuzz campaigns",
+      "name": "campaigns"
+    },
+    {
+      "description": "Scheduled campaigns",
+      "name": "schedules"
+    },
+    {
+      "description": "Webhooks and delivery history",
+      "name": "webhooks"
+    },
+    {
+      "description": "Notifications",
+      "name": "notifications"
+    },
+    {
+      "description": "Stellar networks",
+      "name": "networks"
+    },
+    {
+      "description": "Tokens and alerting",
+      "name": "settings"
+    },
+    {
+      "description": "OAuth flows (no bearer required)",
+      "name": "auth"
+    },
+    {
+      "description": "Slack/Discord/GitHub/Jira/SMTP/PagerDuty/Datadog",
+      "name": "integrations"
+    },
+    {
+      "description": "Health and metrics",
+      "name": "ops"
+    }
+  ]
 }

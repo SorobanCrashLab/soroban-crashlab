@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
+import { withSizeLimitAndLogging } from '@/lib/route-handler';
 import { sendEmail, validateEmail } from '@/lib/integrations/smtp-email';
 import { getStoredSmtpConfig, recordEmailLogEntry } from '@/lib/integrations/smtp-store';
 
@@ -11,7 +12,7 @@ const TEST_SUBJECT = '[Test] SorobanCrashLab SMTP Integration';
  * Sends a test email to the given recipient using the saved SMTP
  * configuration. Body: { to: string }
  */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const sizeError = checkRequestSize(request);
   if (sizeError) {
     return sizeError;
@@ -66,3 +67,5 @@ export async function POST(request: NextRequest) {
   }
   return errorResponse(result.error || 'Failed to send test email.', 422);
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/integrations/smtp/send', postHandler);

@@ -76,8 +76,8 @@ Drift is enforced by `node scripts/audit-env.mjs` (wired into `ops-scripts-synta
 | `DATADOG_AGENT_HOST` | server-only | DogStatsD host | `localhost` |
 | `DATADOG_AGENT_PORT` | server-only | DogStatsD port | `8125` |
 | `MAX_REQUEST_SIZE` | server-only | Max request body (bytes) | `10485760` |
-| `MAX_JSON_SIZE` | server-only | Max JSON body (bytes) | `5242880` |
-| `MAX_FORM_DATA_SIZE` | server-only | Max multipart body (bytes) | `104857600` |
+| `MAX_JSON_SIZE` | server-only | Max JSON body (bytes) | `1048576` |
+| `MAX_FORM_DATA_SIZE` | server-only | Default max multipart body (bytes); artifact upload routes have an explicit larger cap | `1048576` |
 | `DATABASE_TYPE` | server-only | `sqlite` \| `postgres` \| `vercel-postgres` | `sqlite` |
 | `SQLITE_PATH` | server-only | SQLite file path | `.data/crashlab.db` |
 | `DATABASE_URL` | secret | Postgres connection URL | empty |
