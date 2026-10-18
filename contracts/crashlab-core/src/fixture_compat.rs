@@ -201,6 +201,9 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         }
     }
 
@@ -398,6 +401,9 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         };
         // Corrupt the stored hash.
         doc.signature.signature_hash = doc.signature.signature_hash.wrapping_add(1);
@@ -451,6 +457,9 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         };
         let mut bad_doc = good_doc.clone();
         bad_doc.signature.signature_hash = bad_doc.signature.signature_hash.wrapping_add(7);

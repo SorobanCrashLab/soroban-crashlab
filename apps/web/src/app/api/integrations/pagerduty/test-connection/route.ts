@@ -11,13 +11,14 @@
 
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
+import { withSizeLimitAndLogging } from '@/lib/route-handler';
 import { isIntegrationKeyReachable } from '../../../../../features/integrations/integrate-pagerduty-alert-integration-utils';
 import { PAGERDUTY_FETCH_TIMEOUT_MS } from '../../../../../lib/timeouts';
 import { httpCall, outboundErrorCode } from '../../../../../lib/http-call';
 
 const PD_EVENTS_API_URL = 'https://events.pagerduty.com/v2/enqueue';
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const sizeError = checkRequestSize(request);
   if (sizeError) {
     return sizeError;
@@ -86,3 +87,5 @@ export async function POST(request: Request) {
     return errorResponse('Failed to parse request body', 400);
   }
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/integrations/pagerduty/test-connection', postHandler);

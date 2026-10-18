@@ -39,6 +39,7 @@ const KNOWN_ROUTES = [
   'POST /api/webhooks/recovery',
   'POST /api/schedules/tick',
   'POST /api/uploadthing',
+  'GET /api/openapi',
 ];
 
 describe('openapi route registry drift', () => {

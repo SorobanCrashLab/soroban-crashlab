@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "stack": "rust",
+  "tool": "cargo-llvm-cov",
+  "generatedAt": "2026-10-17",
+  "bootstrap": true,
+  "tolerancePct": 1.0,
+  "changedLinesMinimum": 60,
+  "total": {
+    "lines": 0
+  },
+  "files": {},
+  "notes": [
+    "Bootstrap baseline: the committed numbers are intentionally empty until the first full coverage run on a healthy main.",
+    "Regenerate with: node scripts/coverage/write-baseline.mjs --format lcov --report lcov.info --root \"$PWD\" --stack rust --tool cargo-llvm-cov --out contracts/crashlab-core/coverage-baseline.json",
+    "While `bootstrap` is true the coverage workflow is report-only and does not fail the build."
+  ]
+}

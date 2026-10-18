@@ -613,6 +613,9 @@ pub fn sanitize_and_validate_bundle(
         environment: sanitized.environment.clone(),
         failure_payload: sanitized.failure_payload.clone(),
         rpc_envelope: None,
+        provenance: None,
+        original_seed: None,
+        shrink_lineage: None,
     };
     let json = serde_json::to_vec(&doc).map_err(|e| {
         SanitizationError::LoadFailed(format!("serialize: {e}"))
@@ -654,6 +657,9 @@ pub fn sanitize_bundle_document_for_sharing(bundle: &CaseBundle) -> CaseBundleDo
         environment: sanitized.environment,
         failure_payload: sanitized.failure_payload,
         rpc_envelope: None,
+        provenance: None,
+        original_seed: None,
+        shrink_lineage: None,
     }
 }
 

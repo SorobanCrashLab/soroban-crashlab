@@ -11,6 +11,8 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
+use crate::cluster::{ClusterKey, NormalizationRules};
+
 /// Stable key for a regression group: taxonomy domain + exported signature category.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RegressionGroupKey {
@@ -107,6 +109,41 @@ pub fn regression_group_keys_sorted(bundles: &[CaseBundle]) -> Vec<RegressionGro
     keys.sort();
     keys.dedup();
     keys
+}
+
+/// Derives the hierarchical cluster key for a bundle: the L1 taxonomy domain
+/// (from [`classify_failure`]) paired with an L2 normalized signature derived
+/// from the bundle's failure mode and payload.
+///
+/// Runs that share a domain and a normalized shape collapse into one key even
+/// when their raw payloads differ (e.g. differing embedded addresses).
+pub fn normalized_cluster_key(bundle: &CaseBundle, rules: &NormalizationRules) -> ClusterKey {
+    // Prefer the payload's textual form so that normalization can recognize
+    // address/amount/hash tokens embedded in the signature preimage. Binary
+    // payloads fall back to hex.
+    let payload_repr = match std::str::from_utf8(&bundle.seed.payload) {
+        Ok(text) if !text.is_empty() => text.to_string(),
+        _ => hex::encode(&bundle.seed.payload),
+    };
+    let preimage = format!("{}:{}", bundle.signature.category, payload_repr);
+    ClusterKey::new(classify_failure(&bundle.seed), &preimage, rules)
+}
+
+/// Partitions bundles by their normalized hierarchical cluster key.
+///
+/// This is the normalization-aware counterpart of
+/// [`group_bundles_by_regression_group`]: it groups by *shape* rather than by
+/// exact domain + failure mode, which is what collapses address/amount variants
+/// of the same bug into a single triage unit.
+pub fn group_bundles_by_normalized_signature<'a>(
+    bundles: &'a [CaseBundle],
+    rules: &NormalizationRules,
+) -> HashMap<ClusterKey, Vec<&'a CaseBundle>> {
+    let mut map: HashMap<ClusterKey, Vec<&CaseBundle>> = HashMap::new();
+    for b in bundles {
+        map.entry(normalized_cluster_key(b, rules)).or_default().push(b);
+    }
+    map
 }
 
 fn default_test_name(bundle: &CaseBundle) -> String {
@@ -321,5 +358,31 @@ mod tests {
             regression_group_module_ident(&k),
             "regression_budget_runtime_failure"
         );
+    }
+
+    #[test]
+    fn normalized_grouping_collapses_address_variants() {
+        let rules = NormalizationRules::v1();
+        // Same domain + structure, payloads differ only in an embedded 40-byte
+        // address token → must collapse to a single normalized cluster key.
+        let make = |id: u64, addr: &str| {
+            let payload = format!("transfer from=0x{addr:0<40}").into_bytes();
+            bundle_from_seed(CaseSeed { id, payload })
+        };
+        let bundles = vec![make(1, "aaaa"), make(2, "bbbb"), make(3, "cccc")];
+
+        let map = group_bundles_by_normalized_signature(&bundles, &rules);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.values().next().map(|v| v.len()), Some(3));
+    }
+
+    #[test]
+    fn normalized_grouping_separates_distinct_modes() {
+        let rules = NormalizationRules::v1();
+        let a = bundle_from_seed(CaseSeed { id: 1, payload: vec![0xA0, 1] });
+        let b = bundle_from_seed(CaseSeed { id: 2, payload: vec![] });
+        let bundles = [a, b];
+        let map = group_bundles_by_normalized_signature(&bundles, &rules);
+        assert_eq!(map.len(), 2);
     }
 }
