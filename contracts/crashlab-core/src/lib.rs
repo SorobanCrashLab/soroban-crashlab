@@ -1,3 +1,8 @@
+pub mod vclock;
+pub use vclock::{Monotonic, VClock};
+
+pub mod scval_mutator;
+
 pub mod auth_matrix;
 pub mod cluster;
 pub mod cors;

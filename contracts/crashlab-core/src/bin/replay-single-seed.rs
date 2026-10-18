@@ -41,14 +41,13 @@ mod tests {
     use super::*;
     use crashlab_core::{CaseSeed, save_case_bundle_json, to_bundle};
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn temp_json_path(name: &str) -> std::path::PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock should be monotonic")
-            .as_nanos();
-        std::env::temp_dir().join(format!("crashlab-{name}-{nanos}.json"))
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("crashlab-{name}-{}-{n}.json", std::process::id()))
     }
 
     #[test]

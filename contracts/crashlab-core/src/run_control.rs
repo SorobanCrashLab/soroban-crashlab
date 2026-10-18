@@ -504,14 +504,13 @@ mod tests {
     use super::*;
     use crate::worker_partition::WorkerPartition;
     use crate::CaseSeed;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn unique_tmp() -> PathBuf {
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time")
-            .as_nanos();
-        std::env::temp_dir().join(format!("crashlab-run-{n}"))
+        let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("crashlab-run-{}-{n}", std::process::id()))
     }
 
     #[test]

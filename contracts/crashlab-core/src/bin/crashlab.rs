@@ -27,7 +27,7 @@ use crashlab_core::worker_partition::RingCoverage;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use crashlab_core::vclock::VClock;
 
 fn main() {
     env_logger::init();
@@ -1308,7 +1308,8 @@ fn run_start_command(args: &[String]) {
     } else {
         0
     };
-    let started = Instant::now();
+    let clock = VClock::real();
+    let started = clock.now_monotonic();
 
     println!(
         "starting campaign {campaign_id}: preset={} seeds={} budget={} workers={} worker={} run_id={}",
@@ -1468,7 +1469,7 @@ fn run_start_command(args: &[String]) {
                 "run {} completed: seeds_processed={} elapsed={:.1}s",
                 opts.run_id,
                 summary.seeds_processed,
-                started.elapsed().as_secs_f64()
+                clock.elapsed_since(started).as_secs_f64()
             );
         }
         RunTerminalState::Cancelled { summary } => {
@@ -1587,7 +1588,7 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
                             continue;
                         }
                     };
-                    let modified = metadata.modified().unwrap_or_else(|_| std::time::SystemTime::now());
+                    let modified = metadata.modified().unwrap_or_else(|_| VClock::real().now_wall());
                     let duration = modified.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
                     let created_at = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH + duration);
 

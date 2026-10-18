@@ -123,9 +123,11 @@ pub fn calculate_backoff(
     } else {
         #[cfg(not(test))]
         {
-            use std::time::SystemTime;
-            let seed = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
+            // Seed from the VClock's wall time instead of reading SystemTime
+            // directly (#1795 grep-gate: no SystemTime::now outside vclock.rs).
+            let seed = crate::vclock::VClock::real()
+                .now_wall()
+                .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or(Duration::ZERO)
                 .as_nanos() as u64;
             let mut p = SeededPrng::new(seed);

@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 /// Predefined fuzz campaign profile (smoke, nightly, or deep).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum CampaignPreset {
     /// Fast feedback: minimal budget and low exploration intensity.
     Smoke,
@@ -57,7 +57,7 @@ impl CampaignClass {
     }
 
     /// Stable snake_case name shared with the web API.
-    pub const fn as_str(self) -> &''static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             CampaignClass::Interactive => "interactive",
             CampaignClass::Nightly => "nightly",
@@ -90,7 +90,7 @@ impl PlateauAction {
     pub const ALL: [Self; 3] = [Self::Warn, Self::Diversify, Self::StopEarly];
 
     /// Stable snake_case name for telemetry and the web API.
-    pub const fn as_str(self) -> &''static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             PlateauAction::Warn => "warn",
             PlateauAction::Diversify => "diversify",
@@ -262,7 +262,7 @@ impl CampaignPreset {
     }
 
     /// Stable snake_case name for CLI and metadata.
-    pub const fn as_str(self) -> &''static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             CampaignPreset::Smoke => "smoke",
             CampaignPreset::Nightly => "nightly",
@@ -291,7 +291,7 @@ pub struct ParseCampaignPresetError(pub String);
 
 impl fmt::Display for ParseCampaignPresetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write(
+        write!(
             f,
             "unknown campaign preset {:?}: expected smoke, nightly, or deep",
             self.0
@@ -304,7 +304,7 @@ impl std::error::Error for ParseCampaignPresetError {}
 impl FromStr for CampaignPreset {
     type Err = ParseCampaignPresetError;
 
-    fn from_str(s& str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.trim().to_ascii_lowercase().as_str() {
             "smoke" => Ok(CampaignPreset::Smoke),
             "nightly" => Ok(CampaignPreset::Nightly),

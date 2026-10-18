@@ -52,6 +52,37 @@ impl ArtifactClass {
             ArtifactClass::Audit => "audit",
         }
     }
+
+    /// Infers the artifact class from an artifact ID (e.g. a file name).
+    ///
+    /// The classification is based on well-known prefixes/suffixes so a sweep
+    /// can group artifacts without an explicit class map.
+    pub fn classify(artifact_id: &str) -> Self {
+        let lower = artifact_id.to_ascii_lowercase();
+        if lower.ends_with(".json") || lower.contains("bundle") {
+            if lower.contains("trace") {
+                ArtifactClass::Trace
+            } else if lower.contains("audit") {
+                ArtifactClass::Audit
+            } else if lower.contains("stats") || lower.contains("summary") {
+                ArtifactClass::AggregatedStats
+            } else if lower.contains("seed") {
+                ArtifactClass::RawSeed
+            } else {
+                ArtifactClass::Bundle
+            }
+        } else if lower.contains("seed") {
+            ArtifactClass::RawSeed
+        } else if lower.contains("trace") {
+            ArtifactClass::Trace
+        } else if lower.contains("audit") {
+            ArtifactClass::Audit
+        } else if lower.contains("stats") || lower.contains("summary") {
+            ArtifactClass::AggregatedStats
+        } else {
+            ArtifactClass::Bundle
+        }
+    }
 }
 
 /// Per-artifact-class retention policy.
