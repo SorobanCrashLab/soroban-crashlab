@@ -68,6 +68,10 @@ Yes. You can export campaign data from the runs page. The export includes run me
 
 ## Development
 
+### Why did my reproduction fail?
+
+Follow the decision tree in the [reproducibility contract](reproducibility-contract.md#7-why-did-my-repro-fail). It separates the cases the contract covers (report them as bugs) from known nondeterminism such as timeouts and RPC-mode runs.
+
 ### How do I run the tests?
 
 From the `apps/web` directory, run `npm test`. This runs all test suites. For individual test suites, use the specific test scripts listed in `package.json`.

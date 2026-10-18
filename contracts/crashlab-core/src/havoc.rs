@@ -8,8 +8,12 @@
 //! - [`HavocOp::BlockDelete`]: Deleting a slice of bytes, shrinking payload
 //! - [`HavocOp::ChunkRepeat`]: Repeating an existing chunk multiple times
 //! - [`HavocOp::XdrTagFlip`]: XDR/enum-tag aware flips reusing [`crate::enum_flip`] definitions
+//! - [`HavocOp::ScValMutate`]: Type-directed mutation of the ScVal/XDR tree via
+//!   [`crate::scval_mutator`], hitting numeric boundaries, size edges, and
+//!   address-type swaps instead of wasting budget on structurally invalid bytes.
 
 use crate::enum_flip::{ENUM_MARKER, INVALID_TAGS, VALID_TAGS};
+use crate::scval_mutator::{self, ScValMutatorConfig};
 use crate::scheduler::Mutator;
 use crate::CaseSeed;
 
@@ -22,17 +26,19 @@ pub enum HavocOp {
     BlockDelete,
     ChunkRepeat,
     XdrTagFlip,
+    ScValMutate,
 }
 
 impl HavocOp {
     /// All available havoc operations.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::ByteFlip,
         Self::BlockCopy,
         Self::BlockInsert,
         Self::BlockDelete,
         Self::ChunkRepeat,
         Self::XdrTagFlip,
+        Self::ScValMutate,
     ];
 }
 
@@ -57,6 +63,8 @@ pub struct HavocConfig {
     pub weight_chunk_repeat: u32,
     /// Relative weight for [`HavocOp::XdrTagFlip`] (default: 20).
     pub weight_xdr_tag_flip: u32,
+    /// Relative weight for [`HavocOp::ScValMutate`] (default: 30).
+    pub weight_scval_mutate: u32,
 }
 
 impl Default for HavocConfig {
@@ -71,6 +79,7 @@ impl Default for HavocConfig {
             weight_block_delete: 15,
             weight_chunk_repeat: 15,
             weight_xdr_tag_flip: 20,
+            weight_scval_mutate: 30,
         }
     }
 }
@@ -84,6 +93,7 @@ impl HavocConfig {
             + self.weight_block_delete
             + self.weight_chunk_repeat
             + self.weight_xdr_tag_flip
+            + self.weight_scval_mutate
     }
 }
 
@@ -142,7 +152,11 @@ pub fn select_op(config: &HavocConfig, rng_state: &mut u64) -> HavocOp {
     if pick < acc {
         return HavocOp::ChunkRepeat;
     }
-    HavocOp::XdrTagFlip
+    acc += config.weight_xdr_tag_flip;
+    if pick < acc {
+        return HavocOp::XdrTagFlip;
+    }
+    HavocOp::ScValMutate
 }
 
 fn apply_byte_flip(payload: &mut Vec<u8>, _config: &HavocConfig, rng_state: &mut u64) {
@@ -299,6 +313,25 @@ fn apply_xdr_tag_flip(payload: &mut Vec<u8>, config: &HavocConfig, rng_state: &m
     }
 }
 
+fn apply_scval_mutate(payload: &mut Vec<u8>, config: &HavocConfig, rng_state: &mut u64) {
+    // Type-directed mutation: parse the payload as an ScVal tree (tolerant),
+    // apply a type-aware operation, and re-encode to XDR. If the payload does
+    // not decode as a valid ScVal, fall back to a byte-level op so the seed
+    // still makes progress rather than becoming a no-op.
+    let scval_config = ScValMutatorConfig {
+        max_len: config.max_len,
+        max_growth: config.max_growth,
+        ..ScValMutatorConfig::default()
+    };
+    match scval_mutator::mutate_xdr_payload(payload, &scval_config, rng_state) {
+        Ok(()) => {}
+        Err(_) => {
+            // Payload was not a decodable ScVal; degrade gracefully.
+            apply_byte_flip(payload, config, rng_state);
+        }
+    }
+}
+
 /// Applies a specific havoc operation to `payload`.
 pub fn apply_specific_op(
     payload: &mut Vec<u8>,
@@ -313,6 +346,7 @@ pub fn apply_specific_op(
         HavocOp::BlockDelete => apply_block_delete(payload, config, rng_state),
         HavocOp::ChunkRepeat => apply_chunk_repeat(payload, config, rng_state),
         HavocOp::XdrTagFlip => apply_xdr_tag_flip(payload, config, rng_state),
+        HavocOp::ScValMutate => apply_scval_mutate(payload, config, rng_state),
     }
 
     // Enforce configured payload length bounds
@@ -499,7 +533,13 @@ mod tests {
         assert_eq!(p_xdr[0], ENUM_MARKER);
         assert_ne!(p_xdr[1], 0x00);
 
-        // 7. Weighted selection exercises all 6 op types
+        // 7. ScValMutate coverage (falls back to byte flip on non-ScVal payloads)
+        let mut p_scval = vec![0xAA; 16];
+        let before_scval = p_scval.clone();
+        apply_specific_op(&mut p_scval, HavocOp::ScValMutate, &config, &mut rng);
+        assert_ne!(p_scval, before_scval);
+
+        // 8. Weighted selection exercises all 7 op types
         let mut seen = std::collections::HashSet::new();
         let mut sample_rng = 42u64;
         let mut dummy = vec![1, 2, 3, 4, 5, 6, 7, 8];
@@ -509,6 +549,35 @@ mod tests {
         }
         for op in HavocOp::ALL {
             assert!(seen.contains(&op), "HavocOp::{:?} was never selected", op);
+        }
+    }
+
+    #[test]
+    fn property_scval_mutate_round_trips_xdr() {
+        // Every mutated ScVal payload must re-encode to XDR that decodes back
+        // to an ScVal. This guards against the mutator emitting structurally
+        // invalid XDR (which would be a harness bug, not a seed).
+        let config = HavocConfig::default();
+        let mut rng = 0xDEAD_BEEFu64;
+
+        // Build a small set of valid ScVal XDR payloads via the mutator's
+        // own synthesis path, then mutate each and verify round-trip.
+        let mut seeds: Vec<Vec<u8>> = Vec::new();
+        for _ in 0..16 {
+            let mut p = Vec::new();
+            if scval_mutator::synthesize_xdr_payload(&mut p, &ScValMutatorConfig::default(), &mut rng).is_ok() {
+                seeds.push(p);
+            }
+        }
+        assert!(!seeds.is_empty(), "synthesis produced no seeds");
+
+        for mut p in seeds {
+            apply_specific_op(&mut p, HavocOp::ScValMutate, &config, &mut rng);
+            assert!(
+                scval_mutator::decode_xdr_payload(&p).is_ok(),
+                "mutated payload failed XDR round-trip: {:?}",
+                p
+            );
         }
     }
 

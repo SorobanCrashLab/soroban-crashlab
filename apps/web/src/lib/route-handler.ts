@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { logger } from './logger';
-import { checkRequestSize, RequestSizeLimitConfig } from './request-size-limits';
+import {
+  checkRequestSize,
+  effectiveRequestBodyLimit,
+  limitRequestBody,
+  requestBodyErrorResponse,
+  requestBodyFailureResponse,
+  requestSizeConfigFor,
+  RequestSizeLimitConfig,
+} from './request-size-limits';
 
 function isResponseLike(value: unknown): value is Response {
   return value instanceof Response || (
@@ -27,7 +35,9 @@ export async function readJsonBody(
 ): Promise<{ body: unknown } | { error: NextResponse }> {
   try {
     return { body: await request.json() };
-  } catch {
+  } catch (error) {
+    const bodyError = requestBodyErrorResponse(error);
+    if (bodyError) return { error: bodyError };
     const requestId = request.headers.get('x-request-id') || undefined;
     return { error: jsonError('Request body must be valid JSON.', 400, requestId) };
   }
@@ -47,9 +57,9 @@ function ensureRouteResponse(value: unknown, fallbackMessage: string, requestId?
  * into a consistent 500 { error } response instead of an unhandled
  * exception (which Next.js would otherwise render as an opaque HTML page).
  *
- * When `enforceSizeLimit` is true (default), requests whose `content-length`
- * exceeds the configured limits are rejected with a standardized 413 before
- * the handler runs, giving every wrapped route uniform body-size enforcement.
+ * When `enforceSizeLimit` is true (default), declared lengths are rejected
+ * before the handler runs and unknown-length streams are counted as the route
+ * consumes them. Body reads also have idle and total deadlines.
  */
 export function withRouteErrorHandling<Args extends unknown[]>(
   routeLabel: string,
@@ -59,20 +69,36 @@ export function withRouteErrorHandling<Args extends unknown[]>(
 ): (...args: Args) => Promise<Response> {
   return async (...args: Args) => {
     let requestId: string | undefined = undefined;
+    let guarded: ReturnType<typeof limitRequestBody> | undefined;
+    let guardedRequest: Request | undefined;
     try {
       const request = args[0];
       if (request instanceof Request) {
         requestId = request.headers.get('x-request-id') || undefined;
         if (enforceSizeLimit) {
-          const sizeError = checkRequestSize(request);
+          const sizeConfig = requestSizeConfigFor(request);
+          const sizeError = checkRequestSize(request, sizeConfig);
           if (sizeError) {
             return sizeError;
           }
+          guarded = limitRequestBody(request, sizeConfig);
+          guardedRequest = guarded.request;
         }
       }
-      const response = await handler(...args);
+      const handlerArgs = guardedRequest ? [guardedRequest, ...args.slice(1)] as Args : args;
+      const response = await handler(...handlerArgs);
+      const bodyFailure = requestBodyFailureResponse(
+        guarded?.failure() ?? null,
+        guardedRequest ? effectiveRequestBodyLimit(guardedRequest, requestSizeConfigFor(guardedRequest)) : undefined,
+      );
+      if (bodyFailure) return bodyFailure;
       return ensureRouteResponse(response, fallbackMessage, requestId);
     } catch (error) {
+      const bodyFailure = requestBodyFailureResponse(
+        guarded?.failure() ?? null,
+        guardedRequest ? effectiveRequestBodyLimit(guardedRequest, requestSizeConfigFor(guardedRequest)) : undefined,
+      );
+      if (bodyFailure) return bodyFailure;
       logger.error(`${routeLabel} failed`, { error });
       return jsonError(fallbackMessage, 500, requestId);
     }
@@ -93,11 +119,14 @@ export function withSizeLimitAndLogging<Args extends unknown[]>(
     const request = args[0] as Request | undefined;
     const startTime = Date.now();
     const requestId = request?.headers.get('x-request-id') || undefined;
+    let guarded: ReturnType<typeof limitRequestBody> | undefined;
+    let effectiveConfig: RequestSizeLimitConfig | undefined;
 
     try {
       // Check request size limits
       if (request) {
-        const sizeCheckError = checkRequestSize(request, sizeConfig);
+        effectiveConfig = { ...requestSizeConfigFor(request), ...sizeConfig };
+        const sizeCheckError = checkRequestSize(request, effectiveConfig);
         if (sizeCheckError) {
           const duration = Date.now() - startTime;
           logger.info(`${routeLabel} rejected (size limit)`, {
@@ -107,6 +136,18 @@ export function withSizeLimitAndLogging<Args extends unknown[]>(
           });
           return sizeCheckError;
         }
+        guarded = limitRequestBody(request, effectiveConfig);
+        const handlerArgs = [guarded.request, ...args.slice(1)] as Args;
+        const response = ensureRouteResponse(await handler(...handlerArgs), fallbackMessage, requestId);
+        const bodyFailure = requestBodyFailureResponse(
+          guarded.failure(),
+          effectiveRequestBodyLimit(request, effectiveConfig),
+        );
+        const duration = Date.now() - startTime;
+        if (bodyFailure) return bodyFailure;
+
+        logger.info(`${routeLabel} completed`, { status: response.status, duration_ms: duration });
+        return response;
       }
 
       const response = ensureRouteResponse(await handler(...args), fallbackMessage, requestId);
@@ -119,6 +160,11 @@ export function withSizeLimitAndLogging<Args extends unknown[]>(
 
       return response;
     } catch (error) {
+      const bodyFailure = requestBodyFailureResponse(
+        guarded?.failure() ?? null,
+        request && effectiveConfig ? effectiveRequestBodyLimit(request, effectiveConfig) : undefined,
+      );
+      if (bodyFailure) return bodyFailure;
       const duration = Date.now() - startTime;
       logger.error(`${routeLabel} failed`, {
         error,
@@ -157,9 +203,11 @@ export function createRouteHandler<
     context: { params?: Promise<Params> | Params }
   ): Promise<Response> => {
     const startTime = Date.now();
+    let guarded: ReturnType<typeof limitRequestBody> | undefined;
+    let sizeConfig: RequestSizeLimitConfig | undefined;
     try {
       if (config.sizeLimit !== false) {
-        const sizeConfig = typeof config.sizeLimit === 'object' ? config.sizeLimit : undefined;
+        sizeConfig = { ...requestSizeConfigFor(request), ...(typeof config.sizeLimit === 'object' ? config.sizeLimit : {}) };
         const sizeCheckError = checkRequestSize(request, sizeConfig);
         if (sizeCheckError) {
           logger.info(`${config.label} rejected (size limit)`, {
@@ -169,11 +217,13 @@ export function createRouteHandler<
           });
           return sizeCheckError;
         }
+        guarded = limitRequestBody(request, sizeConfig);
       }
+      const routeRequest = guarded?.request ?? request;
 
       let parsedBody: unknown = undefined;
       if (config.bodySchema) {
-        const bodyResult = await readJsonBody(request);
+        const bodyResult = await readJsonBody(routeRequest);
         if ('error' in bodyResult) return bodyResult.error as Response;
         
         const parseResult = config.bodySchema.safeParse(bodyResult.body);
@@ -190,13 +240,18 @@ export function createRouteHandler<
         ? context.params 
         : Promise.resolve(context?.params ?? ({} as Params));
 
-      const response = await handler(request, {
+      const response = await handler(routeRequest, {
         params: paramsPromise,
         body: parsedBody as z.infer<BodySchema>,
       });
 
       const fallbackMsg = config.fallbackMessage || 'An unexpected error occurred.';
       const ensRes = ensureRouteResponse(response, fallbackMsg);
+      const bodyFailure = requestBodyFailureResponse(
+        guarded?.failure() ?? null,
+        sizeConfig ? effectiveRequestBodyLimit(request, sizeConfig) : undefined,
+      );
+      if (bodyFailure) return bodyFailure;
 
       logger.info(`${config.label} completed`, {
         status: ensRes.status,
@@ -205,6 +260,11 @@ export function createRouteHandler<
 
       return ensRes;
     } catch (error) {
+      const bodyFailure = requestBodyFailureResponse(
+        guarded?.failure() ?? null,
+        sizeConfig ? effectiveRequestBodyLimit(request, sizeConfig) : undefined,
+      );
+      if (bodyFailure) return bodyFailure;
       logger.error(`${config.label} failed`, {
         error,
         duration_ms: Date.now() - startTime,

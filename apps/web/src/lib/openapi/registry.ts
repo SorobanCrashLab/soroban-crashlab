@@ -126,4 +126,5 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('POST', '/api/integrations/pagerduty/trigger', 'bearer', 'Trigger PagerDuty', ['integrations'], ['VALIDATION_ERROR'], { scopes: ['write'] }),
   r('GET', '/api/integrations/datadog/metrics', 'bearer', 'Datadog metrics proxy', ['integrations'], ['UNAUTHORIZED'], { scopes: ['read'] }),
   r('GET', '/api/integrations/prometheus/health', 'none', 'Prometheus health', ['integrations']),
+  r('GET', '/api/openapi', 'none', 'This OpenAPI document (generated from the route catalog)', ['ops']),
 ];

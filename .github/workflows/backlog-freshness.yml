@@ -4,17 +4,76 @@ on:
   schedule:
     - cron: "0 9 * * 1"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run: skip auto-issue creation/update and escalation"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  issues: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: nightly-health-${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
   report:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      WORKFLOW_NAME: ${{ github.workflow }}
+      WORKFLOW_FILE: backlog-freshness.yml
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Run backlog freshness report
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash scripts/backlog-freshness-review.sh --repo "${{ github.repository }}"
+      - name: Run backlog freshness report (attempt 1)
+        id: run1
+        continue-on-error: true
+        run: bash scripts/backlog-freshness-review.sh --repo "$REPO"
+      - name: Retry backlog freshness report (attempt 2, distinct label)
+        id: run2
+        if: steps.run1.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          echo "::warning title=nightly-retry::Retrying backlog-freshness after first-attempt failure (label: nightly-retry)"
+          bash scripts/backlog-freshness-review.sh --repo "$REPO"
+      - name: Record nightly outcome
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.run2.outcome }}" = "success" ] || { [ "${{ steps.run1.outcome }}" = "success" ] && [ "${{ steps.run2.outcome }}" != "failure" ]; }; then
+            echo "NIGHTLY_STATUS=green" >> "$GITHUB_ENV"
+          else
+            echo "NIGHTLY_STATUS=red" >> "$GITHUB_ENV"
+          fi
+      - name: Auto-triage on final failure
+        if: always() && env.NIGHTLY_STATUS == 'red'
+        run: |
+          set -euo pipefail
+          bash scripts/nightly-health.sh triage \
+            --repo "$REPO" \
+            --workflow "$WORKFLOW_NAME" \
+            --workflow-file "$WORKFLOW_FILE" \
+            --run-id "${{ github.run_id }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --sha "${{ github.sha }}" \
+            --dry-run "$DRY_RUN"
+      - name: Enforce failure budget
+        if: always()
+        run: |
+          set -euo pipefail
+          bash scripts/nightly-health.sh budget \
+            --repo "$REPO" \
+            --workflow "$WORKFLOW_NAME" \
+            --workflow-file "$WORKFLOW_FILE" \
+            --window-days 7 \
+            --dry-run "$DRY_RUN"
+      - name: Fail job if nightly stayed red
+        if: always() && env.NIGHTLY_STATUS == 'red'
+        run: |
+          echo "::error title=nightly-red::Backlog freshness review failed after retry; see nightly health issue."
+          exit 1

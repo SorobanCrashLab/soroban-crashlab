@@ -16,6 +16,10 @@ const isA11yRun = process.env.A11Y === '1';
 export default defineConfig({
   /* A11y job runs only the axe/keyboard specs under e2/a11y. */
   testDir: isA11yRun ? './e2e/a11y' : './e2e',
+  /* Visual regression lives in its own config/job so screenshots run in a
+   * pinned container and the functional e2e suite does not pay for them.
+   * See playwright.visual.config.ts and e2e/visual/README.md. */
+  testIgnore: ['visual.spec.ts', 'visual/**'],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

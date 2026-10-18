@@ -21,6 +21,10 @@ pub struct HealthSummary {
     /// `#[serde(default)]` keeps summaries written before this field existed readable.
     #[serde(default)]
     pub failure_classes: BTreeMap<String, u64>,
+    /// Cost telemetry and plateau metrics, versioned so older summaries remain
+    /// readable via `#[serde(default)]`.
+    #[serde(default)]
+    pub plateau: PlateauMetrics,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -45,6 +49,44 @@ pub struct QueueMetrics {
     pub utilization: f64,
 }
 
+/// Version tag for the plateau/cost telemetry schema. Bump when fields change
+/// meaning so downstream consumers (W5-A12 fee data, W5-J08 capacity model) can
+/// detect incompatible snapshots.
+pub const PLATEAU_METRICS_VERSION: u32 = 1;
+
+/// Cost-aware plateau telemetry exposed in health snapshots.
+///
+/// All fields are `#[serde(default)]`-friendly so summaries produced before
+/// plateau detection existed still deserialize.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlateauMetrics {
+    /// Schema version of this telemetry block.
+    pub version: u32,
+    /// Current plateau score in `[0.0, 1.0]`; higher means more plateaued.
+    pub plateau_score: f64,
+    /// Whether the detector currently considers the campaign plateaued.
+    pub plateaued: bool,
+    /// Seeds executed per second (cost telemetry).
+    pub seeds_per_second: f64,
+    /// Distinct signatures discovered per hour (cost telemetry).
+    pub distinct_signatures_per_hour: f64,
+    /// Estimated resource cost accrued so far (arbitrary cost units).
+    pub estimated_cost: f64,
+}
+
+impl Default for PlateauMetrics {
+    fn default() -> Self {
+        Self {
+            version: PLATEAU_METRICS_VERSION,
+            plateau_score: 0.0,
+            plateaued: false,
+            seeds_per_second: 0.0,
+            distinct_signatures_per_hour: 0.0,
+            estimated_cost: 0.0,
+        }
+    }
+}
+
 pub fn export_health_summary_json(summary: &HealthSummary) -> Result<String, serde_json::Error> {
     serde_json::to_string_pretty(summary)
 }
@@ -61,6 +103,7 @@ pub struct HealthMonitor {
     degraded_throughput_threshold: f64,
     unhealthy_failure_rate_threshold: f64,
     failure_classes: BTreeMap<String, u64>,
+    plateau: PlateauMetrics,
 }
 
 impl HealthMonitor {
@@ -76,6 +119,7 @@ impl HealthMonitor {
             degraded_throughput_threshold: 10.0,
             unhealthy_failure_rate_threshold: 0.5,
             failure_classes: BTreeMap::new(),
+            plateau: PlateauMetrics::default(),
         }
     }
 
@@ -95,6 +139,7 @@ impl HealthMonitor {
             degraded_throughput_threshold,
             unhealthy_failure_rate_threshold,
             failure_classes: BTreeMap::new(),
+            plateau: PlateauMetrics::default(),
         }
     }
 
@@ -127,6 +172,19 @@ impl HealthMonitor {
     pub fn update_queue(&mut self, pending: u64, in_progress: u64) {
         self.queue_pending = pending;
         self.queue_in_progress = in_progress;
+    }
+
+    /// Updates the plateau/cost telemetry block reported in health snapshots.
+    ///
+    /// The detector (see `mutation_budget.rs`) computes the score and cost
+    /// figures; the monitor only stores and exports them.
+    pub fn update_plateau(&mut self, plateau: PlateauMetrics) {
+        self.plateau = plateau;
+    }
+
+    /// Current plateau/cost telemetry.
+    pub fn plateau(&self) -> &PlateauMetrics {
+        &self.plateau
     }
 
     pub fn summary(&self) -> HealthSummary {
@@ -178,6 +236,7 @@ impl HealthMonitor {
             failures,
             queue,
             failure_classes: self.failure_classes.clone(),
+            plateau: self.plateau.clone(),
         }
     }
 
@@ -224,6 +283,7 @@ impl HealthMonitor {
         self.queue_pending = 0;
         self.queue_in_progress = 0;
         self.failure_classes.clear();
+        self.plateau = PlateauMetrics::default();
     }
 }
 

@@ -1,0 +1,18 @@
+# cargo-mutants configuration (issue #1821).
+#
+# cargo-mutants generates one mutant per small edit and asks whether the test
+# suite kills it. The exclusions below are code where a surviving mutant says
+# nothing useful: CLI wiring, and the threat-model traceability test module
+# (assertions over documentation, not behaviour).
+#
+# The critical module set the gate actually cares about is listed in
+# mutation-baseline.json (`criticalModules`) and in .github/workflows/mutation.yml.
+
+exclude_globs = [
+  "src/bin/*",
+  "src/threat_model_tests.rs",
+]
+
+# Rust builds in CI are slow; give each mutant test run room before the
+# baseline is declared flaky. See docs/testing/mutation-testing.md.
+timeout_multiplier = 2.0

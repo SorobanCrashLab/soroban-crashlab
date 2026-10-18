@@ -62,6 +62,12 @@ pub struct MutatorStats {
     pub selection_count: u64,
     /// Sum of energy scores observed for seeds produced by this mutator.
     pub energy_contribution: f64,
+    /// Applications that decoded into a valid ScVal.
+    pub decode_success_count: u64,
+    /// Applications that reached the contract instead of failing in decode.
+    pub contract_reached_count: u64,
+    /// Number of selections that produced a novel signature (yield).
+    pub novelty_count: u64,
 }
 
 /// Configurable scheduler that selects mutators based on relative weights.
@@ -76,6 +82,11 @@ pub struct WeightedScheduler {
     energy_bias: Vec<f64>,
     /// Decay factor applied to accumulated energy each selection round.
     energy_decay: f64,
+    /// Optional per-mutator weight snapshots for plateau-driven diversification.
+    baseline_weights: Vec<f64>,
+    dead_mutator_threshold: Option<u64>,
+    demotion_factor: f64,
+    demoted: Vec<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -148,6 +159,8 @@ impl WeightedScheduler {
         }
 
         let stats = vec![MutatorStats::default(); mutators.len()];
+        let baseline_weights = weights.clone();
+        let demoted = vec![false; mutators.len()];
 
         Ok(Self {
             mutators,
@@ -158,6 +171,10 @@ impl WeightedScheduler {
             total_selections: 0,
             energy_bias: vec![0.0; mutators.len()],
             energy_decay: 0.95,
+            baseline_weights,
+            dead_mutator_threshold: None,
+            demotion_factor: 0.05,
+            demoted,
         })
     }
 
@@ -185,6 +202,16 @@ impl WeightedScheduler {
 
         self.total_selections += 1;
         self.stats[index].selection_count += 1;
+        if let Some(threshold) = self.dead_mutator_threshold {
+            if !self.demoted[index]
+                && self.stats[index].selection_count >= threshold
+                && self.stats[index].novelty_count == 0
+            {
+                self.demoted[index] = true;
+                self.weights[index] = self.baseline_weights[index] * self.demotion_factor;
+                self.recompute_cumulative();
+            }
+        }
 
         &*self.mutators[index]
     }
@@ -250,6 +277,62 @@ impl WeightedScheduler {
         Ok(())
     }
 
+    /// Records that the mutator at `index` produced a novel signature.
+    ///
+    /// Used by the plateau detector to compute per-mutator yield over a
+    /// rolling window. Out-of-range indices are ignored.
+    pub fn record_novelty(&mut self, index: usize) {
+        if let Some(stat) = self.stats.get_mut(index) {
+            stat.novelty_count += 1;
+        }
+        if self.demoted.get(index).copied().unwrap_or(false) {
+            self.demoted[index] = false;
+            self.weights[index] = self.baseline_weights[index];
+            self.recompute_cumulative();
+        }
+    }
+
+    /// Records a successful ScVal decode for the selected mutator.
+    pub fn record_decode_success(&mut self, index: usize) {
+        if let Some(stat) = self.stats.get_mut(index) {
+            stat.decode_success_count += 1;
+        }
+    }
+
+    /// Records that a generated value reached contract execution.
+    pub fn record_contract_reached(&mut self, index: usize) {
+        if let Some(stat) = self.stats.get_mut(index) {
+            stat.contract_reached_count += 1;
+        }
+    }
+
+    /// Enable a reversible dead-mutator policy. After `threshold` selections
+    /// with no novel signature, a mutator remains in rotation at a small rate;
+    /// a later yield restores its configured weight.
+    pub fn set_dead_mutator_policy(&mut self, threshold: u64, demotion_factor: f64) {
+        self.dead_mutator_threshold = (threshold > 0).then_some(threshold);
+        self.demotion_factor = if demotion_factor.is_finite() {
+            demotion_factor.clamp(0.01, 1.0)
+        } else {
+            0.05
+        };
+    }
+
+    fn recompute_cumulative(&mut self) {
+        self.cumulative_weights.clear();
+        let mut sum = 0.0;
+        for weight in self.weights.iter().copied() {
+            sum += weight;
+            self.cumulative_weights.push(sum);
+        }
+        self.total_weight = sum;
+    }
+
+    /// Returns the number of registered mutators.
+    pub fn len(&self) -> usize {
+        self.mutators.len()
+    }
+
     /// Updates the weight of a mutator by index.
     ///
     /// Recomputes the cumulative distribution.
@@ -284,6 +367,54 @@ impl WeightedScheduler {
         Ok(())
     }
 
+    /// Forces a diversification of the mutator mix in response to a sustained
+    /// plateau. Zero-yield mutators are down-weighted while the remaining mass
+    /// is redistributed evenly, guaranteeing a different mix than the baseline.
+    ///
+    /// Returns `true` if the mix was changed, `false` if no diversification was
+    /// possible (e.g. a single mutator).
+    pub fn diversify(&mut self) -> bool {
+        if self.mutators.len() < 2 {
+            return false;
+        }
+
+        let n = self.mutators.len();
+        // Rank mutators by observed yield; give more mass to higher-yield ones.
+        let mut order: Vec<usize> = (0..n).collect();
+        order.sort_by(|&a, &b| {
+            let ya = self.stats[a].novelty_count;
+            let yb = self.stats[b].novelty_count;
+            yb.cmp(&ya).then(a.cmp(&b))
+        });
+
+        // Assign linearly decreasing weights across the ranked order so the
+        // resulting distribution differs from the configured baseline.
+        let mut new_weights = vec![0.0f64; n];
+        let mut total = 0.0f64;
+        for (rank, &idx) in order.iter().enumerate() {
+            let w = (n - rank) as f64;
+            new_weights[idx] = w;
+            total += w;
+        }
+
+        if total <= 0.0 {
+            return false;
+        }
+
+        for (i, w) in new_weights.into_iter().enumerate() {
+            self.weights[i] = w;
+        }
+        self.recompute_cumulative();
+        true
+    }
+
+    /// Restores the weights captured at construction time.
+    pub fn reset_weights(&mut self) {
+        self.weights = self.baseline_weights.clone();
+        self.demoted.fill(false);
+        self.recompute_cumulative();
+    }
+
     /// Returns a summary of mutator usage distribution.
     pub fn report_stats(&self) -> Vec<SchedulerStatEntry> {
         self.mutators
@@ -302,9 +433,14 @@ impl WeightedScheduler {
                     name: m.name(),
                     weight: self.weights[i],
                     count,
+                    applications: count,
+                    decode_success_count: self.stats[i].decode_success_count,
+                    contract_reached_count: self.stats[i].contract_reached_count,
                     observed_frequency,
                     configured_frequency,
                     energy_contribution: self.stats[i].energy_contribution,
+                    novelty_count: self.stats[i].novelty_count,
+                    demoted: self.demoted[i],
                 }
             })
             .collect()
@@ -391,9 +527,14 @@ pub struct SchedulerStatEntry {
     pub name: &'static str,
     pub weight: f64,
     pub count: u64,
+    pub applications: u64,
+    pub decode_success_count: u64,
+    pub contract_reached_count: u64,
     pub observed_frequency: f64,
     pub configured_frequency: f64,
     pub energy_contribution: f64,
+    pub novelty_count: u64,
+    pub demoted: bool,
 }
 
 /// Simple LCG-based PRNG to produce an f64 in [0, 1).
@@ -558,6 +699,32 @@ mod tests {
     }
 
     #[test]
+    fn zero_yield_mutator_is_demoted_and_a_later_yield_revives_it() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![(Box::new(MockMutator("dead")), 1.0)];
+        let mut scheduler = WeightedScheduler::new(configs).unwrap();
+        scheduler.set_dead_mutator_policy(1, 0.05);
+        let mut rng = 42;
+        scheduler.select_mutator(&mut rng);
+        let dead_index = scheduler
+            .mutators
+            .iter()
+            .position(|m| m.name() == "dead")
+            .unwrap();
+        assert_eq!(scheduler.select_mutator(&mut rng).name(), "dead");
+        assert!(scheduler.report_stats()[dead_index].demoted);
+        assert!(scheduler.report_stats()[dead_index].weight > 0.0);
+
+        scheduler.record_decode_success(dead_index);
+        scheduler.record_contract_reached(dead_index);
+        scheduler.record_novelty(dead_index);
+        let revived = scheduler.report_stats()[dead_index].clone();
+        assert!(!revived.demoted);
+        assert_eq!(revived.decode_success_count, 1);
+        assert_eq!(revived.contract_reached_count, 1);
+        assert_eq!(revived.novelty_count, 1);
+    }
+
+    #[test]
     fn default_registry_builds_and_selects_successfully() {
         let registry = MutatorRegistry::default_registry();
         assert!(registry.len() >= 6);
@@ -607,5 +774,35 @@ mod tests {
         );
         assert!(scheduler.set_energy_decay(0.9).is_ok());
     }
-}
 
+    #[test]
+    fn record_novelty_tracks_yield() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![
+            (Box::new(MockMutator("a")), 1.0),
+            (Box::new(MockMutator("b")), 1.0),
+        ];
+        let mut scheduler = WeightedScheduler::new(configs).unwrap();
+        scheduler.record_novelty(0);
+        scheduler.record_novelty(0);
+        scheduler.record_novelty(1);
+        scheduler.record_novelty(99); // out of range ignored
+
+        let stats = scheduler.report_stats();
+        assert_eq!(stats[0].novelty_count, 2);
+        assert_eq!(stats[1].novelty_count, 1);
+    }
+
+    #[test]
+    fn diversify_changes_mix_and_reset_restores() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![
+            (Box::new(MockMutator("a")), 10.0),
+            (Box::new(MockMutator("b")), 10.0),
+        ];
+        let mut scheduler = WeightedScheduler::new(configs).unwrap();
+        scheduler.record_novelty(1);
+        assert!(scheduler.diversify());
+        assert_eq!(scheduler.total_weight, 3.0);
+        scheduler.reset_weights();
+        assert_eq!(scheduler.total_weight, 20.0);
+    }
+}
