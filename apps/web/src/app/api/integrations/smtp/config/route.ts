@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
+import { withSizeLimitAndLogging } from '@/lib/route-handler';
 import { validateSmtpConfig, type SmtpConfig } from '@/lib/integrations/smtp-email';
 import { getStoredSmtpConfig, setStoredSmtpConfig } from '@/lib/integrations/smtp-store';
 
@@ -20,7 +21,7 @@ export async function GET() {
  * POST /api/integrations/smtp/config
  * Validates and persists an SMTP configuration. Body: SmtpConfig JSON.
  */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const sizeError = checkRequestSize(request);
   if (sizeError) {
     return sizeError;
@@ -46,3 +47,5 @@ export async function POST(request: NextRequest) {
   setStoredSmtpConfig(candidate);
   return successResponse(candidate);
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/integrations/smtp/config', postHandler);

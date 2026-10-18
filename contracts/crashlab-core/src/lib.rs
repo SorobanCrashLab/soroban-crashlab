@@ -1,4 +1,5 @@
 pub mod auth_matrix;
+pub mod cluster;
 pub mod cors;
 pub mod diff_engine;
 pub mod fixture;
@@ -9,6 +10,7 @@ pub mod regression_group;
 pub mod reproducer;
 pub mod retry;
 pub mod runner;
+pub mod shrink;
 pub mod signature_hash;
 pub mod suite_runner;
 pub mod taxonomy;
@@ -81,7 +83,10 @@ pub use cors::{
     OriginPattern,
 };
 pub use fixture::RegressionFixture;
-pub use fixture_classifier::{classify_and_wrap_fixture, classify_fixture};
+pub use fixture_classifier::{
+    classify_and_wrap_fixture, classify_and_wrap_verified, classify_fixture,
+    classify_paired_fixture, PairedClassification,
+};
 pub use diff_engine::{
     classify_delta, diff_engines, render_diff_report_json, render_diff_report_markdown,
     DeltaKind, DiffEngineError, DiffReport, EngineRun, ExpectedDelta, ExpectedDeltaSet,
@@ -93,8 +98,8 @@ pub use health::{
 pub use prng::{PrngMutator, RandomizeMutator, SeededPrng};
 pub use regression_group::RegressionGroup;
 pub use reproducer::{
-    filter_ci_pack, shrink_bundle_payload, shrink_seed_preserving_signature, FlakyDetector,
-    ReproReport, StabilityVerdict,
+    filter_ci_pack, shrink_bundle_payload, shrink_bundle_with_lineage,
+    shrink_seed_preserving_signature, FlakyDetector, ReproReport, StabilityVerdict,
 };
 pub use retry::{execute_with_retry, RetryConfig, SimulationError};
 pub use signature_hash::{hash_category_payload, SignatureHasher};
@@ -120,7 +125,9 @@ pub mod havoc;
 pub use havoc::{apply_havoc_mutation, derive_seed_state, HavocConfig, HavocMutator, HavocOp};
 
 pub mod scheduler;
-pub use scheduler::{Mutator, MutatorRegistry, SchedulerError, WeightedScheduler};
+pub use scheduler::{
+    Mutator, MutatorRegistry, MutatorStats, SchedulerError, SchedulerStatEntry, WeightedScheduler,
+};
 
 pub mod campaign_presets;
 pub use campaign_presets::{
@@ -156,7 +163,8 @@ pub use decimal_precision::{
 
 pub mod bundle_persist;
 pub use bundle_persist::{
-    load_case_bundle_json, read_case_bundle_json, save_case_bundle_json, write_case_bundle_json,
+    load_case_bundle_document_json, load_case_bundle_json, read_case_bundle_json,
+    save_case_bundle_document_json, save_case_bundle_json, write_case_bundle_json,
     BundlePersistError, CaseBundleDocument, CASE_BUNDLE_SCHEMA_VERSION, SUPPORTED_BUNDLE_SCHEMAS,
 };
 
@@ -180,7 +188,14 @@ pub use fixture_compat::{
 
 pub mod fixture_manifest;
 pub use fixture_manifest::{
-    FixtureManifest, FixtureMetadata, ManifestError, FIXTURE_MANIFEST_SCHEMA_VERSION,
+    FixtureManifest, FixtureMetadata, FixturePairing, ManifestError, ProvenanceReport, ShrinkLineage,
+    FIXTURE_MANIFEST_SCHEMA_VERSION, SHRINK_LINEAGE_SCHEMA_VERSION, SUPPORTED_MANIFEST_SCHEMAS,
+};
+
+pub mod provenance;
+pub use provenance::{
+    canonical_signature, sha256_hex, verify_chain, verify_optional, ProvenanceError,
+    ProvenanceOutcome, ProvenancePolicy, ProvenanceRecord, PROVENANCE_SCHEMA_VERSION,
 };
 
 pub mod fixture_linter;
@@ -192,6 +207,11 @@ pub mod signature_comparison;
 pub use signature_comparison::{
     compare_signatures, ComparisonError, ComparisonMetrics, SignatureComparisonResult,
     SignatureInfo, SignatureSnapshot,
+};
+
+pub mod baseline;
+pub use baseline::{
+    Baseline, BaselineEntry, BaselineError, Classification, EntryStatus, ObservedSignature,
 };
 
 pub mod fixture_sanitize;
@@ -212,7 +232,8 @@ pub use checkpoint::{
 
 pub mod corpus;
 pub use corpus::{
-    corpus_archive_from_seeds, export_corpus_json, import_corpus_json, CorpusArchive, CorpusError,
+    corpus_archive_from_seeds, export_corpus_json, import_corpus_json, verify_corpus_integrity,
+    CorpusArchive, CorpusError, CorpusVerifyStatus, AddressedSeed,
     CORPUS_ARCHIVE_SCHEMA_VERSION,
 };
 
@@ -237,10 +258,20 @@ pub use regression_suite::{
     RegressionCaseResult, RegressionSuiteSummary, REGRESSION_REPORT_SCHEMA_VERSION,
 };
 
+pub mod rust_repro;
+pub use rust_repro::{render_rust_test, ReproExportError};
+
 pub mod regression_grouping;
 pub use regression_grouping::{
-    export_rust_regression_suite, group_bundles_by_regression_group, regression_group_key,
+    export_rust_regression_suite, group_bundles_by_normalized_signature,
+    group_bundles_by_regression_group, normalized_cluster_key, regression_group_key,
     regression_group_keys_sorted, regression_group_module_ident, RegressionGroupKey,
+};
+
+pub use cluster::{
+    cluster_observations, normalize_signature, ClusterKey, ClusterMember, ClusterSnapshot,
+    ClusterStore, FailureCluster, FailureObservation, NormalizationRules, NormalizedSignature,
+    DEFAULT_AMOUNT_MIN_DIGITS, NORMALIZATION_RULES_VERSION,
 };
 
 pub mod simulation;
@@ -280,6 +311,7 @@ pub use worker_partition::{
 pub mod health_snapshot;
 pub use health_snapshot::{
     append_health_snapshot, classify_failure_message, health_snapshot_path, read_health_snapshots,
+    read_health_snapshot_log,
     read_latest_health_snapshot, read_latest_health_snapshot_line, terminal_label, BudgetSnapshot, CampaignHealth, HealthSnapshot,
     HealthSnapshotError, DEFAULT_SNAPSHOT_INTERVAL_SEEDS, HEALTH_SNAPSHOT_FILE,
     HEALTH_SNAPSHOT_SCHEMA_VERSION, SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS,
@@ -297,6 +329,8 @@ pub mod rpc_envelope;
 pub use rpc_envelope::{RpcEnvelopeCapture, RpcRequestEnvelope, RpcResponseEnvelope};
 
 pub mod stellar_address;
+pub mod address_neighbors;
+pub use address_neighbors::{generate_address_neighbors, AddressNeighbor, AddressNeighborStrategy};
 
 // Re-enable threat model tests (compile-only pass). Obsolete cases can be
 // ignored or updated as follow-ups (see ROADMAP-004).

@@ -98,6 +98,9 @@ pub struct BudgetReport {
     pub skipped: u64,
     /// `true` when `attempts_made >= budget`.
     pub exhausted: bool,
+    /// `true` when the campaign was stopped early due to a sustained plateau.
+    #[serde(default)]
+    pub plateau_stop: bool,
 }
 
 impl BudgetReport {

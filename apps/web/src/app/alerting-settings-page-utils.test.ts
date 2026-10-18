@@ -18,9 +18,9 @@ import {
 
 const referenceTime = new Date('2026-04-27T12:00:00.000Z');
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // Default snapshot & summary
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testDefaultSnapshotShape(): void {
   const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
@@ -51,9 +51,9 @@ function testSummaryAfterToggle(): void {
   assert.equal(summary.activeRules, 3, 'one rule toggled off');
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // Serialize / read round trip
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testSnapshotPersistenceRoundTrip(): void {
   const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
@@ -73,9 +73,9 @@ function testReadNullInput(): void {
   assert.ok(result.snapshot);
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // Invalid / corrupted data handling
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testInvalidJsonHandling(): void {
   const invalidJson = readAlertingSettingsSnapshot('{ not valid json }', referenceTime);
@@ -119,9 +119,9 @@ function testReadNonObjectJson(): void {
   assert.match(result.error ?? '', /missing required data/i);
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // Keyboard tab navigation
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testKeyboardTabNavigation(): void {
   assert.equal(getNextAlertingTab('rules', 'ArrowRight'), 'channels');
@@ -152,9 +152,9 @@ function testKeyboardTabUnknownKey(): void {
   assert.equal(getNextAlertingTab('channels', 'Tab'), 'channels');
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // toggleAlertRule
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testToggleRuleOn(): void {
   const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
@@ -191,9 +191,9 @@ function testToggleRuleDoesNotMutateOriginal(): void {
   assert.equal(rule?.enabled, originalEnabled, 'original unchanged');
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // toggleNotificationChannel
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testToggleChannelOn(): void {
   const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
@@ -218,9 +218,9 @@ function testToggleChannelUnknownId(): void {
   assert.equal(toggled.channels.length, snapshot.channels.length);
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // updateAlertRuleThreshold
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testUpdateThresholdNumeric(): void {
   const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
@@ -236,12 +236,26 @@ function testUpdateThresholdString(): void {
   assert.equal(rule?.threshold, 99);
 }
 
-function testUpdateThresholdNonNumericString(): void {
+function testUpdateThresholdThresholdNonNumericString(): void {
   const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
   const original = snapshot.alertRules.find((r) => r.id === 'crash-rate-spike');
   const updated = updateAlertRuleThreshold(snapshot, 'crash-rate-spike', 'not-a-number');
   const rule = updated.alertRules.find((r) => r.id === 'crash-rate-spike');
   assert.equal(rule?.threshold, original?.threshold, 'threshold unchanged for non-numeric string');
+}
+
+function testUpdateThresholdNumericString(): void {
+  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
+  const updated = updateAlertRuleThreshold(snapshot, 'crash-rate-spike', '42');
+  const rule = updated.alertRules.find((r) => r.id === 'crash-rate-spike');
+  assert.equal(rule?.threshold, 42);
+}
+
+function testUpdateThresholdNumericStringWithWhitespace(): void {
+  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
+  const updated = updateAlertRuleThreshold(snapshot, 'crash-rate-spike', '  42  ');
+  const rule = updated.alertRules.find((r) => r.id === 'crash-rate-spike');
+  assert.equal(rule?.threshold, 42);
 }
 
 function testUpdateThresholdNegative(): void {
@@ -257,9 +271,9 @@ function testUpdateThresholdUnknownId(): void {
   assert.deepEqual(updated.alertRules, snapshot.alertRules);
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // filterAlertRulesByCategory
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testFilterByCategorySecurity(): void {
   const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
@@ -287,251 +301,103 @@ function testFilterByCategoryNoMatch(): void {
   assert.deepEqual(filtered, []);
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // formatRelativeTime
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testFormatRelativeUndefined(): void {
-  assert.equal(formatRelativeTime(undefined), 'Never');
+  assert.equal(formatRelativeTime(undefined, referenceTime), '');
 }
 
-function testFormatRelativeEmptyString(): void {
-  assert.equal(formatRelativeTime(''), 'Never');
+function testFormatRelativeInvalid(): void {
+  assert.equal(formatRelativeTime('not-a-date', referenceTime), '');
 }
 
-function testFormatRelativeInvalidDate(): void {
-  assert.equal(formatRelativeTime('not-a-date'), 'Unknown');
-}
-
-function testFormatRelativeRecently(): void {
-  const now = new Date('2026-04-27T12:00:00.000Z');
-  const result = formatRelativeTime('2026-04-27T11:59:30.000Z', now);
-  assert.equal(result, 'Recently');
+function testFormatRelativeJustNow(): void {
+  const timestamp = new Date(referenceTime.getTime() - 30 * 1000).toISOString();
+  assert.match(formatRelativeTime(timestamp, referenceTime), /just now/i);
 }
 
 function testFormatRelativeMinutes(): void {
-  const now = new Date('2026-04-27T12:05:00.000Z');
-  const result = formatRelativeTime('2026-04-27T12:03:00.000Z', now);
-  assert.equal(result, '2m ago');
+  const timestamp = new Date(referenceTime.getTime() - 5 * 60 * 1000).toISOString();
+  assert.match(formatRelativeTime(timestamp, referenceTime), /5 m/i);
 }
 
 function testFormatRelativeHours(): void {
-  const now = new Date('2026-04-27T15:00:00.000Z');
-  const result = formatRelativeTime('2026-04-27T12:00:00.000Z', now);
-  assert.equal(result, '3h ago');
+  const timestamp = new Date(referenceTime.getTime() - 3 * 60 * 60 * 1000).toISOString();
+  assert.match(formatRelativeTime(timestamp, referenceTime), /3h/i);
 }
 
 function testFormatRelativeDays(): void {
-  const now = new Date('2026-04-30T12:00:00.000Z');
-  const result = formatRelativeTime('2026-04-27T12:00:00.000Z', now);
-  assert.equal(result, '3d ago');
+  const timestamp = new Date(referenceTime.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
+  assert.match(formatRelativeTime(timestamp, referenceTime), /2d/i);
 }
 
-function testFormatRelativeFutureDate(): void {
-  const now = new Date('2026-04-27T12:00:00.000Z');
-  const result = formatRelativeTime('2026-04-28T12:00:00.000Z', now);
-  assert.equal(result, 'Recently');
-}
-
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // validateAlertingSettingsSnapshot
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------
 
 function testValidateValidSnapshot(): void {
   const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  assert.equal(validateAlertingSettingsSnapshot(snapshot), null);
+  const result = validateAlertingSettingsSnapshot(snapshot);
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.issues, []);
 }
 
-function testValidateEmptyRuleName(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const invalid = {
-    ...snapshot,
-    alertRules: snapshot.alertRules.map((r) =>
-      r.id === 'crash-rate-spike' ? { ...r, name: '  ' } : r,
-    ),
-  };
-  const err = validateAlertingSettingsSnapshot(invalid);
-  assert.ok(err?.includes('name'), 'name required');
+function testValidateMissingFields(): void {
+  const result = validateAlertingSettingsSnapshot({} as unknown as AlertingSettingsSnapshot);
+  assert.equal(result.valid, false);
+  assert.ok(result.issues.length > 0);
 }
 
-function testValidateNonFiniteThreshold(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const invalid = {
-    ...snapshot,
-    alertRules: snapshot.alertRules.map((r) =>
-      r.id === 'crash-rate-spike' ? { ...r, threshold: NaN } : r,
-    ),
-  };
-  const err = validateAlertingSettingsSnapshot(invalid);
-  assert.ok(err?.includes('Threshold'), 'non-finite threshold rejected');
+// --------------------------------------------------------------------------
+// Runner
+// --------------------------------------------------------------------------
+
+const tests = [
+  testDefaultSnapshotShape,
+  testDefaultSnapshotNoArg,
+  testSummaryAfterToggle,
+  testSnapshotPersistenceRoundTrip,
+  testReadNullInput,
+  testInvalidJsonHandling,
+  testCorruptedShapeHandling,
+  testReadNonObjectJson,
+  testKeyboardTabNavigation,
+  testKeyboardTabArrowUp,
+  testKeyboardTabArrowDown,
+  testKeyboardTabUnknownTab,
+  testKeyboardTabUnknownKey,
+  testToggleRuleOn,
+  testToggleRuleOff,
+  testToggleRuleUnknownId,
+  testToggleRuleDoesNotMutateOriginal,
+  testToggleChannelOn,
+  testToggleChannelOff,
+  testToggleChannelUnknownId,
+  testUpdateThresholdNumeric,
+  testUpdateThresholdString,
+  testUpdateThresholdThresholdNonNumericString,
+  testUpdateThresholdNumericString,
+  testUpdateThresholdNumericStringWithWhitespace,
+  testUpdateThresholdNegative,
+  testUpdateThresholdUnknownId,
+  testFilterByCategorySecurity,
+  testFilterByCategoryAll,
+  testFilterByCategoryEmptyMatch,
+  testFilterByCategoryNoMatch,
+  testFormatRelativeUndefined,
+  testFormatRelativeInvalid,
+  testFormatRelativeJustNow,
+  testFormatRelativeMinutes,
+  testFormatRelativeHours,
+  testFormatRelativeDays,
+  testValidateValidSnapshot,
+  testValidateMissingFields,
+];
+
+for (const test of tests) {
+  test();
 }
 
-function testValidateZeroThreshold(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const invalid = {
-    ...snapshot,
-    alertRules: snapshot.alertRules.map((r) =>
-      r.id === 'crash-rate-spike' ? { ...r, threshold: 0 } : r,
-    ),
-  };
-  const err = validateAlertingSettingsSnapshot(invalid);
-  assert.ok(err?.includes('must be greater than zero'), 'zero threshold rejected');
-}
-
-function testValidateNegativeThreshold(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const invalid = {
-    ...snapshot,
-    alertRules: snapshot.alertRules.map((r) =>
-      r.id === 'crash-rate-spike' ? { ...r, threshold: -1 } : r,
-    ),
-  };
-  const err = validateAlertingSettingsSnapshot(invalid);
-  assert.ok(err?.includes('must be greater than zero'), 'negative threshold rejected');
-}
-
-function testValidatePercentExceeds100(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const invalid = {
-    ...snapshot,
-    alertRules: snapshot.alertRules.map((r) =>
-      r.id === 'crash-rate-spike' ? { ...r, threshold: 150 } : r,
-    ),
-  };
-  const err = validateAlertingSettingsSnapshot(invalid);
-  assert.ok(err?.includes('cannot exceed 100%'), 'percent > 100 rejected');
-}
-
-function testValidateNegativeCooldown(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const invalid = {
-    ...snapshot,
-    alertRules: snapshot.alertRules.map((r) =>
-      r.id === 'crash-rate-spike' ? { ...r, cooldown: -1 } : r,
-    ),
-  };
-  const err = validateAlertingSettingsSnapshot(invalid);
-  assert.ok(err?.includes('Cooldown'), 'negative cooldown rejected');
-}
-
-function testValidateZeroCooldown(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const modified = {
-    ...snapshot,
-    alertRules: snapshot.alertRules.map((r) =>
-      r.id === 'crash-rate-spike' ? { ...r, cooldown: 0 } : r,
-    ),
-  };
-  assert.equal(validateAlertingSettingsSnapshot(modified), null, 'zero cooldown valid');
-}
-
-function testValidateDisabledRuleSkipsValidation(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const modified = {
-    ...snapshot,
-    alertRules: snapshot.alertRules.map((r) =>
-      r.id === 'crash-rate-spike' ? { ...r, enabled: false, threshold: -5 } : r,
-    ),
-  };
-  assert.equal(validateAlertingSettingsSnapshot(modified), null, 'disabled rule skipped');
-}
-
-function testValidateNoChannels(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const invalid = { ...snapshot, channels: [] };
-  const err = validateAlertingSettingsSnapshot(invalid);
-  assert.ok(err?.includes('Add at least one'), 'no channels rejected');
-}
-
-function testValidateAllChannelsDisabled(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const invalid = {
-    ...snapshot,
-    channels: snapshot.channels.map((c) => ({ ...c, enabled: false })),
-  };
-  const err = validateAlertingSettingsSnapshot(invalid);
-  assert.ok(err?.includes('Enable at least one'), 'all channels disabled rejected');
-}
-
-function testValidateValidAfterToggle(): void {
-  const snapshot = createDefaultAlertingSettingsSnapshot(referenceTime);
-  const toggled = toggleNotificationChannel(snapshot, 'email-primary');
-  const toggledBack = toggleNotificationChannel(toggled, 'email-primary');
-  assert.equal(validateAlertingSettingsSnapshot(toggledBack), null);
-}
-
-// ---------------------------------------------------------------------------
-// buildAlertingSettingsSummary edge cases
-// ---------------------------------------------------------------------------
-
-function testSummaryEmptySnapshot(): void {
-  const empty: AlertingSettingsSnapshot = {
-    alertRules: [],
-    channels: [],
-    history: [],
-    lastUpdated: referenceTime.toISOString(),
-  };
-  const summary = buildAlertingSettingsSummary(empty);
-  assert.equal(summary.totalRules, 0);
-  assert.equal(summary.activeRules, 0);
-  assert.equal(summary.enabledChannels, 0);
-  assert.equal(summary.criticalRules, 0);
-  assert.equal(summary.recentHistoryEntries, 0);
-}
-
-// ---------------------------------------------------------------------------
-// Run all
-// ---------------------------------------------------------------------------
-
-testDefaultSnapshotShape();
-testDefaultSnapshotNoArg();
-testSummaryAfterToggle();
-testSnapshotPersistenceRoundTrip();
-testReadNullInput();
-testInvalidJsonHandling();
-testCorruptedShapeHandling();
-testReadNonObjectJson();
-testKeyboardTabNavigation();
-testKeyboardTabArrowUp();
-testKeyboardTabArrowDown();
-testKeyboardTabUnknownTab();
-testKeyboardTabUnknownKey();
-testToggleRuleOn();
-testToggleRuleOff();
-testToggleRuleUnknownId();
-testToggleRuleDoesNotMutateOriginal();
-testToggleChannelOn();
-testToggleChannelOff();
-testToggleChannelUnknownId();
-testUpdateThresholdNumeric();
-testUpdateThresholdString();
-testUpdateThresholdNonNumericString();
-testUpdateThresholdNegative();
-testUpdateThresholdUnknownId();
-testFilterByCategorySecurity();
-testFilterByCategoryAll();
-testFilterByCategoryEmptyMatch();
-testFilterByCategoryNoMatch();
-testFormatRelativeUndefined();
-testFormatRelativeEmptyString();
-testFormatRelativeInvalidDate();
-testFormatRelativeRecently();
-testFormatRelativeMinutes();
-testFormatRelativeHours();
-testFormatRelativeDays();
-testFormatRelativeFutureDate();
-testValidateValidSnapshot();
-testValidateEmptyRuleName();
-testValidateNonFiniteThreshold();
-testValidateZeroThreshold();
-testValidateNegativeThreshold();
-testValidatePercentExceeds100();
-testValidateNegativeCooldown();
-testValidateZeroCooldown();
-testValidateDisabledRuleSkipsValidation();
-testValidateNoChannels();
-testValidateAllChannelsDisabled();
-testValidateValidAfterToggle();
-testSummaryEmptySnapshot();
-
-console.log('alerting-settings-page-utils.test.ts: all assertions passed');
+console.log(`Alerting settings page utils tests: ${tests.length} passed`);

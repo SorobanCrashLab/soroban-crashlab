@@ -1,5 +1,7 @@
+use crate::fixture_manifest::ShrinkLineage;
 use crate::retry::{execute_with_retry, RetryConfig, SimulationError};
 use crate::{CaseBundle, CaseSeed, CrashSignature};
+use std::cell::Cell;
 
 /// Verdict from stability analysis.
 ///
@@ -308,6 +310,52 @@ where
     let mut shrunk = bundle.clone();
     shrunk.seed = shrink_seed_preserving_signature(&bundle.seed, &bundle.signature, reproducer)?;
     Ok(shrunk)
+}
+
+/// Shrinks `bundle` and records delta metadata for a fixture pairing (#1866).
+///
+/// Runs the same deterministic shrink as [`shrink_bundle_payload`], but counts
+/// candidate evaluations and returns a [`ShrinkLineage`] describing the change:
+/// strategy, iterations, bytes before/after, reproduction steps, and the
+/// `signature` field the shrink guarantees to preserve.
+///
+/// Reproduction *steps* are the number of seed invocations required; shrinking
+/// keeps a single-step reproducer, so they are `1` before and after. The byte
+/// deltas carry the real signal.
+///
+/// # Errors
+///
+/// Returns [`SimulationError`] under the same conditions as
+/// [`shrink_seed_preserving_signature`].
+pub fn shrink_bundle_with_lineage<F>(
+    bundle: &CaseBundle,
+    strategy: &str,
+    mut reproducer: F,
+) -> Result<(CaseBundle, ShrinkLineage), SimulationError>
+where
+    F: FnMut(&CaseSeed) -> Result<CrashSignature, SimulationError>,
+{
+    let original_bytes = bundle.seed.payload.len();
+    let evaluations = Cell::new(0u32);
+
+    let shrunk = shrink_bundle_payload(bundle, |seed| {
+        evaluations.set(evaluations.get() + 1);
+        reproducer(seed)
+    })?;
+
+    let minimal_bytes = shrunk.seed.payload.len();
+    let lineage = ShrinkLineage::new(
+        strategy,
+        evaluations.get(),
+        original_bytes,
+        minimal_bytes,
+        1,
+        1,
+    )
+    .with_preserved_field("signature")
+    .with_preserved_field("seed.id");
+
+    Ok((shrunk, lineage))
 }
 
 #[cfg(test)]
@@ -688,5 +736,50 @@ mod tests {
             }
         }).unwrap();
         assert_eq!(shrunk.payload, vec![0xAA]);
+    }
+
+    // ── shrink lineage (#1866) ────────────────────────────────────────────────
+
+    #[test]
+    fn shrink_bundle_with_lineage_records_delta() {
+        let seed = CaseSeed {
+            id: 42,
+            payload: vec![9, 9, 0xAA, 0xBB, 9, 9],
+        };
+        let bundle = CaseBundle {
+            seed: seed.clone(),
+            signature: anchor_signature(&seed).unwrap(),
+            environment: None,
+            failure_payload: vec![],
+            rpc_envelope: None,
+        };
+
+        let (shrunk, lineage) = shrink_bundle_with_lineage(&bundle, "ddmin", anchor_signature).unwrap();
+
+        assert_eq!(anchor_signature(&shrunk.seed).unwrap(), bundle.signature);
+        assert_eq!(lineage.strategy, "ddmin");
+        assert_eq!(lineage.original_bytes, 6);
+        assert_eq!(lineage.minimal_bytes, shrunk.seed.payload.len());
+        assert_eq!(lineage.removed_bytes, 6 - shrunk.seed.payload.len());
+        assert!(lineage.iterations > 0);
+        assert!(lineage.preserved_fields.contains(&"signature".to_string()));
+    }
+
+    #[test]
+    fn shrink_bundle_with_lineage_reports_no_reduction_for_minimal_input() {
+        let seed = CaseSeed { id: 7, payload: vec![0xAA, 0xBB] };
+        let bundle = CaseBundle {
+            seed: seed.clone(),
+            signature: anchor_signature(&seed).unwrap(),
+            environment: None,
+            failure_payload: vec![],
+            rpc_envelope: None,
+        };
+
+        let (shrunk, lineage) = shrink_bundle_with_lineage(&bundle, "ddmin", anchor_signature).unwrap();
+
+        assert_eq!(shrunk.seed.payload, seed.payload);
+        assert_eq!(lineage.removed_bytes, 0);
+        assert!((lineage.reduction_ratio() - 0.0).abs() < f64::EPSILON);
     }
 }

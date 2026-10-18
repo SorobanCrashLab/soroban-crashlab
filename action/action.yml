@@ -1,0 +1,121 @@
+name: "CrashLab Regression Gate"
+description: >-
+  Install the pinned CrashLab CLI, replay committed fixtures and classify
+  new-signature failures against a baseline as a blocking check.
+author: "SorobanCrashLab"
+
+branding:
+  icon: "shield"
+  color: "purple"
+
+inputs:
+  fixtures:
+    description: "Path to the regression suite JSON (or a directory of fixture JSON)."
+    required: false
+    default: "crashlab-core/fixtures/regression_suite.json"
+  baseline:
+    description: "Path to the baseline JSON listing known failures."
+    required: false
+    default: "crashlab-core/regression-baseline.json"
+  fail-on:
+    description: "Gate policy: `new-signatures` (default), `any`, or `never`."
+    required: false
+    default: "new-signatures"
+  version:
+    description: "CrashLab CLI release tag to install, e.g. `v0.1.0`."
+    required: false
+    default: "v0.1.0"
+  expected-sha256:
+    description: >-
+      SHA-256 of the release archive. Required unless `build-from-source` is
+      `true`; a download without a checksum is refused.
+    required: false
+    default: ""
+  build-from-source:
+    description: >-
+      Build the CLI from the checked-out source instead of downloading a
+      release. Used by this repository's dogfood self-test.
+    required: false
+    default: "false"
+  source-dir:
+    description: "Cargo workspace directory, used when `build-from-source` is `true`."
+    required: false
+    default: "contracts"
+  expected-schema:
+    description: >-
+      Regression report schema version the action supports. Guards against a
+      CLI/action version skew with a clear startup error.
+    required: false
+    default: "1"
+  report:
+    description: "Where to write the report JSON (default: `$RUNNER_TEMP`)."
+    required: false
+    default: ""
+  working-directory:
+    description: "Directory the fixture/baseline paths are resolved against."
+    required: false
+    default: "."
+
+outputs:
+  total:
+    description: "Fixtures replayed."
+    value: ${{ steps.classify.outputs.total }}
+  passed:
+    description: "Fixtures that reproduced their expected class."
+    value: ${{ steps.classify.outputs.passed }}
+  failed:
+    description: "Fixtures that did not reproduce their expected class."
+    value: ${{ steps.classify.outputs.failed }}
+  new-signatures:
+    description: "New-signature failures (blocking under `new-signatures`)."
+    value: ${{ steps.classify.outputs.new-signatures }}
+  blocking:
+    description: "Number of failures the configured policy blocks on."
+    value: ${{ steps.classify.outputs.blocking }}
+  report:
+    description: "Absolute path to the written report JSON."
+    value: ${{ steps.replay.outputs.report }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve CLI (download + checksum, or build from source)
+      id: cli
+      shell: bash
+      env:
+        CRASHLAB_VERSION: ${{ inputs.version }}
+        CRASHLAB_EXPECTED_SHA256: ${{ inputs.expected-sha256 }}
+        CRASHLAB_BUILD_FROM_SOURCE: ${{ inputs.build-from-source }}
+        CRASHLAB_SOURCE_DIR: ${{ inputs.source-dir }}
+        CRASHLAB_ACTION_PATH: ${{ github.action_path }}
+      run: bash "$CRASHLAB_ACTION_PATH/scripts/install-cli.sh"
+
+    - name: Replay fixtures
+      id: replay
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CRASHLAB_FIXTURES: ${{ inputs.fixtures }}
+        CRASHLAB_REPORT_PATH: ${{ inputs.report }}
+        CRASHLAB_CLI: ${{ steps.cli.outputs.cli }}
+      run: |
+        report="${CRASHLAB_REPORT_PATH:-$RUNNER_TEMP/crashlab-regression-report.json}"
+        # A non-zero exit only means "a fixture failed"; the gate decision is
+        # the baseline classification below, so the raw run is non-fatal.
+        "$CRASHLAB_CLI" regression-suite "$CRASHLAB_FIXTURES" --report "$report" || true
+        if [ ! -s "$report" ]; then
+          echo "::error::CrashLab produced no report at '$report'; check the fixtures path."
+          exit 1
+        fi
+        echo "report=$report" >> "$GITHUB_OUTPUT"
+
+    - name: Classify against baseline
+      id: classify
+      shell: bash
+      env:
+        CRASHLAB_REPORT_PATH: ${{ steps.replay.outputs.report }}
+        CRASHLAB_BASELINE: ${{ inputs.baseline }}
+        CRASHLAB_FAIL_ON: ${{ inputs.fail-on }}
+        CRASHLAB_EXPECTED_SCHEMA: ${{ inputs.expected-schema }}
+        CRASHLAB_ACTION_PATH: ${{ github.action_path }}
+      run: node "$CRASHLAB_ACTION_PATH/scripts/classify.mjs"

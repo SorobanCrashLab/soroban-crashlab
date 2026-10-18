@@ -8,6 +8,12 @@
 //! validates that specific mitigations are effective and that residual
 //! risks are understood.
 //!
+//! The system-level model is `docs/security/threat-model-v2.md`; its
+//! "Code-side tests → model" table maps each `tN_*` group here to an abuse
+//! case (T-1 → AC-10; T-2/T-3/T-4 → AC-11; T-5/T-6 → AC-15; T-8/T-10 → AC-14;
+//! T-9 → AC-12). `scripts/check-threat-model.mjs` fails CI if a new group is
+//! added here without being mapped there.
+//!
 //! ## Organization
 //!
 //! - **T-1**: Path Traversal Prevention
@@ -295,6 +301,9 @@ mod threat_model_tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -323,6 +332,9 @@ mod threat_model_tests {
                 environment: None,
                 failure_payload: vec![],
                 rpc_envelope: None,
+                provenance: None,
+                original_seed: None,
+                shrink_lineage: None,
             };
 
             let bytes = serde_json::to_vec(&doc).unwrap();
@@ -344,6 +356,9 @@ mod threat_model_tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -367,6 +382,9 @@ mod threat_model_tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -741,6 +759,9 @@ mod threat_model_tests {
                     environment: None,
                     failure_payload: vec![],
                     rpc_envelope: None,
+                    provenance: None,
+                    original_seed: None,
+                    shrink_lineage: None,
                 }
             })
             .collect();
