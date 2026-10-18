@@ -3,8 +3,8 @@
 //! Presets bundle a **runtime mutation budget** (maximum mutation attempts per
 //! campaign) and **mutation intensity** (how aggressively the engine explores the
 //! mutation space). Values are fixed so CI and operators get predictable
-//! behaviour: [`CampaignPreset::Smoke] for quick checks, [`CampaignPreset::Nightly`]
-//! for scheduled runs, and [`CampaignPreset::Deep] for exhaustive campaigns.
+//! behaviour: [`CampaignPreset::Smoke`] for quick checks, [`CampaignPreset::Nightly`]
+//! for scheduled runs, and [`CampaignPreset::Deep`] for exhaustive campaigns.
 //!
 //! Each preset also carries a plateau detection policy (rolling window, score
 //! threshold, and response action) so cost-aware budgeting behaviour is configured
@@ -57,7 +57,7 @@ impl CampaignClass {
     }
 
     /// Stable snake_case name shared with the web API.
-    pub const fn as_str(self) -> &'27 str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             CampaignClass::Interactive => "interactive",
             CampaignClass::Nightly => "nightly",
@@ -69,7 +69,7 @@ impl CampaignClass {
 /// Action taken when a campaign sustains a plateau (no new signatures or
 /// coverage within the rolling window).
 ///
-/// The default is [`PlateaultAction::Warn`], which records the plateau but
+/// The default is [`PlateauAction::Warn`], which records the plateau but
 /// lets the campaign run to its configured budget. [`PlateauAction::Diversify`]
 /// forces a dictionary/mutator mix change to escape the plateau, and
 /// [`PlateauAction::StopEarly`] terminates the campaign in the terminal
@@ -90,7 +90,7 @@ impl PlateauAction {
     pub const ALL: [Self; 3] = [Self::Warn, Self::Diversify, Self::StopEarly];
 
     /// Stable snake_case name for telemetry and the web API.
-    pub const fn as_str(self) -> &'27 str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             PlateauAction::Warn => "warn",
             PlateauAction::Diversify => "diversify",
@@ -112,7 +112,7 @@ impl PlateauAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlateauPolicy {
     /// Number of seeds per rolling observation window.
-    public window_seeds: u64,
+    pub window_seeds: u64,
     /// Plateau score threshold in basis points (0-10_000). At or below
     /// this score the window is considered plateaued.
     pub score_threshold_bps: u32,
@@ -135,7 +135,7 @@ impl PlateauPolicy {
 
     /// Classifies a plateau score (in basis points) against this policy's
     /// threshold.
-    pub const fn is/plateaued(&self, score_bps: u32) -> bool {
+    pub const fn is_plateaued(&self, score_bps: u32) -> bool {
         score_bps <= self.score_threshold_bps
     }
 }
@@ -262,7 +262,7 @@ impl CampaignPreset {
     }
 
     /// Stable snake_case name for CLI and metadata.
-    pub const fn as_str(self) -> &'27 str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             CampaignPreset::Smoke => "smoke",
             CampaignPreset::Nightly => "nightly",
@@ -341,15 +341,15 @@ mod tests {
 
     #[test]
     fn parse_roundtrip() {
-        assert_eq(
+        assert_eq!(
             "smoke".parse::<CampaignPreset>().unwrap(),
             CampaignPreset::Smoke
         );
-        assert_eq(
-            "NIGHTLY"'.parse::<CampaignPreset>().unwrap(),
+        assert_eq!(
+            "NIGHTLY".parse::<CampaignPreset>().unwrap(),
             CampaignPreset::Nightly
         );
-        assert_eq(
+        assert_eq!(
             " Deep ".parse::<CampaignPreset>().unwrap(),
             CampaignPreset::Deep
         );
@@ -360,7 +360,7 @@ mod tests {
     fn serde_roundtrip() {
         let json = serde_json::to_string(&CampaignPreset::Nightly).unwrap();
         assert_eq!(json, "\"nightly\"");
-        let back: CampaignPreset = serde_json::from_str(&ajson).unwrap();
+        let back: CampaignPreset = serde_json::from_str(&json).unwrap();
         assert_eq!(back, CampaignPreset::Nightly);
     }
 
@@ -498,7 +498,7 @@ mod tests {
     fn plateau_policy_serde_roundtrip() {
         let policy = CampaignPreset::Deep.plateau_policy();
         let json = serde_json::to_string(&policy).unwrap();
-        let back: PlateauPolicy = serde_json::from_str(&ajson).unwrap();
+        let back: PlateauPolicy = serde_json::from_str(&json).unwrap();
         assert_eq!(back, policy);
     }
 }
