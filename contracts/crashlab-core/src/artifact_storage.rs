@@ -115,6 +115,20 @@ pub trait ArtifactStore: Send + Sync {
 
     /// Checks if an artifact exists in storage.
     fn artifact_exists(&self, artifact_id: &str) -> bool;
+
+    /// Returns the artifact class for retention policy purposes.
+    ///
+    /// Defaults to `ArtifactClass::Raw` for backends that do not track classes.
+    fn artifact_class(&self, _artifact_id: &str) -> crate::retention::ArtifactClass {
+        crate::retention::ArtifactClass::Raw
+    }
+
+    /// Returns the last-modified timestamp (epoch seconds) for an artifact.
+    ///
+    /// Used by lease-based retention sweeps to compute artifact age.
+    fn artifact_modified_epoch(&self, _artifact_id: &str) -> Option<i64> {
+        None
+    }
 }
 
 /// Local filesystem-based artifact storage.
@@ -243,6 +257,23 @@ impl ArtifactStore for LocalArtifactStore {
     fn artifact_exists(&self, artifact_id: &str) -> bool {
         Self::validate_artifact_id(artifact_id).is_ok()
             && self.artifact_path(artifact_id).exists()
+    }
+
+    fn artifact_class(&self, artifact_id: &str) -> crate::retention::ArtifactClass {
+        crate::retention::ArtifactClass::classify(artifact_id)
+    }
+
+    fn artifact_modified_epoch(&self, artifact_id: &str) -> Option<i64> {
+        if Self::validate_artifact_id(artifact_id).is_err() {
+            return None;
+        }
+        let path = self.artifact_path(artifact_id);
+        let metadata = fs::metadata(&path).ok()?;
+        let modified = metadata.modified().ok()?;
+        let duration = modified
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        Some(duration.as_secs() as i64)
     }
 }
 

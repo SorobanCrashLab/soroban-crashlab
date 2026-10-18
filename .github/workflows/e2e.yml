@@ -9,6 +9,11 @@ on:
     # nightly run so the axe violation trend is tracked regularly.
     - cron: '0 6 * * *'
   workflow_dispatch:
+    inputs:
+      update-visual-baselines:
+        description: 'Regenerate the visual baselines and upload them as an artifact'
+        type: boolean
+        default: false
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -17,6 +22,10 @@ concurrency:
 env:
   NODE_VERSION: '20'
   PNP_VERSION: '9'
+  # Visual gate ships report-only until the committed baselines have had a run
+  # in the pinned container. Set the repository variable VISUAL_ENFORCE=true to
+  # turn a screenshot diff into a red build.
+  VISUAL_ENFORCE: ${{ vars.VISUAL_ENFORCE }}
 
 jobs:
   build:
@@ -25,7 +34,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.1.0
         with:
           version: ${{ env.PNP_VERSION }}
       - uses: actions/setup-node@v4
@@ -47,7 +56,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.1.0
         with:
           version: ${{ env.PNP_VERSION }}
       - uses: actions/setup-node@v4
@@ -89,7 +98,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6.1.0
         with:
           version: ${{ env.PNP_VERSION }}
       - uses: actions/setup-node@v4
@@ -139,3 +148,85 @@ jobs:
             "
           fi
           echo "axe HTML reports attached as a11y-axe-reports artifact"
+
+  visual:
+    name: visual regression (chromium)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Screenshot baselines are only reproducible against a pinned renderer:
+    # the browser build, fonts and antialiasing all have to match. The image
+    # tag tracks the pinned @playwright/test version in apps/web/package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - name: Install dependencies
+        # Bootstrap is report-only: a workspace that cannot install must not
+        # turn the visual gate red before it can report anything.
+        continue-on-error: true
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: apps/web/.next
+      - name: Run visual suite
+        id: visual
+        # Report-only during bootstrap; the "Enforce visual gate" step below is
+        # what turns a diff into a red build once VISUAL_ENFORCE=true.
+        continue-on-error: true
+        run: pnpm --filter web exec playwright test --config playwright.visual.config.ts
+        env:
+          CI: 'true'
+      - name: Update visual baselines (manual re-bless)
+        if: github.event.inputs.update-visual-baselines == 'true'
+        continue-on-error: true
+        run: pnpm --filter web exec playwright test --config playwright.visual.config.ts --update-snapshots
+        env:
+          CI: 'true'
+      - name: Enforce visual gate
+        if: env.VISUAL_ENFORCE == 'true'
+        run: |
+          set -eu
+          RESULTS="apps/web/test-results-visual/results.json"
+          if [ ! -f "$RESULTS" ]; then
+            echo "[visual] no results produced; nothing to enforce"
+            exit 0
+          fi
+          node -e "
+            const r = require('./$RESULTS');
+            let failed = 0, total = 0;
+            const walk = (suite) => {
+              for (const spec of suite.specs ?? []) { total++; if (!spec.ok) failed++; }
+              for (const child of suite.suites ?? []) walk(child);
+            };
+            for (const suite of r.suites ?? []) walk(suite);
+            console.log('[visual] total=' + total + ' failed=' + failed);
+            if (failed > 0) process.exit(1);
+          "
+      - name: Upload side-by-side visual diffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: apps/web/test-results-visual
+          retention-days: 14
+      - name: Upload re-blessed baselines
+        if: github.event.inputs.update-visual-baselines == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: apps/web/e2e/visual.spec.ts-snapshots
+          retention-days: 14
+      - name: Upload visual HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-report
+          path: apps/web/playwright-report-visual
+          retention-days: 7

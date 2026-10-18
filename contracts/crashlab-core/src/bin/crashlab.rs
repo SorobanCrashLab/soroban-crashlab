@@ -16,12 +16,12 @@ use crashlab_core::{
     RUN_CHECKPOINT_SCHEMA_VERSION, CampaignPreset, CancelSignal, SeededPrng, WorkerPartition,
     cancel_marker_path, cancel_requested, create_runner, default_state_dir, drive_run,
     drive_run_from_checkpoint, drive_run_partitioned_from_checkpoint, load_run_checkpoint_json,
-    read_latest_health_snapshot, read_latest_health_snapshot_line, replay_mismatch_message, replay_seed_bundle_path,
+    read_health_snapshot_log, read_latest_health_snapshot_line, replay_mismatch_message, replay_seed_bundle_path,
     replay_success_message, request_cancel_run, run_regression_suite_from_json,
     save_run_checkpoint_json,
     HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
     ArtifactStore, RunCheckpoint, CaseBundleDocument, FixtureManifest, ProvenancePolicy,
-    load_case_bundle_document_json,
+    load_case_bundle_document_json, import_corpus_json, verify_corpus_integrity,
 };
 use crashlab_core::worker_partition::RingCoverage;
 use std::collections::HashSet;
@@ -48,11 +48,26 @@ fn main() {
         return;
     }
 
+    // `bundle export-rust` takes flags (`-o`, `--force`), so like `run start` it
+    // is dispatched before positional arity is resolved.
+    if a.as_deref() == Some("bundle") && b.as_deref() == Some("export-rust") {
+        let rest: Vec<String> = args.collect();
+        bundle_export_rust_command(&rest);
+        return;
+    }
+
     let c = args.next();
     let d = args.next();
 
     // Trailing arguments for the positional subcommands, which take none.
     let rest: Vec<String> = args.collect();
+
+    // `regression baseline <set|compare> <observed.json> <baseline.json>` needs
+    // five positionals, so it is dispatched before the four-slot match below.
+    if a.as_deref() == Some("regression") && b.as_deref() == Some("baseline") {
+        regression_baseline_command(c.as_deref(), d.as_deref(), &rest);
+        return;
+    }
 
     match (a.as_deref(), b.as_deref(), c.as_deref(), d.as_deref()) {
         (Some("run"), Some("cancel"), Some(id_str), None) => {
@@ -215,6 +230,20 @@ fn main() {
         {
             fixture_show_command(path, flag == Some("--json"), &rest);
         }
+        (Some("corpus"), Some("verify"), Some(path), None) => {
+            if !rest.is_empty() {
+                print_usage();
+                std::process::exit(1);
+            }
+            corpus_verify_command(path);
+        }
+        (Some("shrink"), Some(path), Some(out_path), None) => {
+            if !rest.is_empty() {
+                print_usage();
+                std::process::exit(1);
+            }
+            shrink_command(path, out_path);
+        }
         _ => {
             print_usage();
             std::process::exit(1);
@@ -229,7 +258,12 @@ fn print_usage() {
                 crashlab runs list\n\
                 crashlab runs status <id> [--json]\n\
                 crashlab replay seed <bundle-json-path>\n\
+                crashlab bundle export-rust <bundle-json-path> -o <file.rs> [--force]\n\
                 crashlab regression-suite <suite-json-path-or-directory> [--report <report.json>]\n\
+                crashlab regression baseline set <observed-suite.json> <baseline.json>\n\
+                crashlab regression baseline compare <observed-suite.json> <baseline.json>\n\
+                crashlab corpus verify <corpus-json-path>\n\
+                crashlab shrink <bundle-json-path> <out-bundle-json-path>\n\
                 crashlab fixture verify <manifest-or-bundle-json> [--policy <require|warn|off>]\n\
                 crashlab fixture show <manifest-or-bundle-json> [--json]\n\
                 crashlab retention sweep [--dry-run] [--heartbeat-ttl <secs>] [--grace-period <secs>]\n\
@@ -403,6 +437,222 @@ fn fixture_show_command(path: &str, json: bool, rest: &[String]) {
     }
 }
 
+/// `crashlab bundle export-rust <bundle.json> -o <file.rs> [--force]` (#1862).
+///
+/// Writes a cargo-test source file that replays the bundle. Refuses to replace
+/// an existing file unless `--force` is given.
+fn bundle_export_rust_command(args: &[String]) {
+    let mut bundle_path: Option<&str> = None;
+    let mut out_path: Option<&str> = None;
+    let mut force = false;
+
+    let mut i = 0usize;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-o" => {
+                i += 1;
+                match args.get(i) {
+                    Some(v) => out_path = Some(v.as_str()),
+                    None => {
+                        eprintln!("missing value for -o");
+                        std::process::exit(1);
+                    }
+                }
+            }
+            "--force" => force = true,
+            other if !other.starts_with('-') && bundle_path.is_none() => {
+                bundle_path = Some(other);
+            }
+            _ => {
+                print_usage();
+                std::process::exit(1);
+            }
+        }
+        i += 1;
+    }
+
+    let (Some(bundle_path), Some(out_path)) = (bundle_path, out_path) else {
+        print_usage();
+        std::process::exit(1);
+    };
+
+    let bytes = match fs::read(bundle_path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("failed to read {bundle_path}: {e}");
+            std::process::exit(1);
+        }
+    };
+    let bundle = match crashlab_core::load_case_bundle_json(&bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("failed to parse bundle {bundle_path}: {e}");
+            std::process::exit(1);
+        }
+    };
+    let source = match crashlab_core::render_rust_test(&bundle) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("failed to render reproducer: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let written: std::io::Result<()> = if force {
+        fs::write(out_path, source.as_bytes())
+    } else {
+        use std::io::Write as _;
+        // `create_new` makes the no-overwrite check atomic with the write.
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(out_path)
+            .and_then(|mut f| f.write_all(source.as_bytes()))
+    };
+
+    match written {
+        Ok(()) => println!("wrote reproducer to {out_path}"),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            eprintln!("refusing to overwrite {out_path} (pass --force to replace it)");
+            std::process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("failed to write {out_path}: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Verify corpus integrity: scan seeds and report corrupt/missing entries (#1802).
+fn corpus_verify_command(path: &str) {
+    let bytes = match fs::read(path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("failed to read corpus file: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    match serde_json::from_slice::<crashlab_core::CorpusArchive>(&bytes) {
+        Ok(archive) => {
+            let issues = verify_corpus_integrity(&archive);
+            if issues.is_empty() {
+                println!("corpus verified: {} seeds, all valid", archive.seeds.len());
+            } else {
+                eprintln!("corpus integrity check failed: {} issue(s)", issues.len());
+                for issue in &issues {
+                    match issue {
+                        crashlab_core::CorpusVerifyStatus::Corrupt { seed_id, reason } => {
+                            eprintln!("  corrupt seed {}: {}", seed_id, reason);
+                        }
+                        crashlab_core::CorpusVerifyStatus::Missing { seed_id } => {
+                            eprintln!("  missing seed {}", seed_id);
+                        }
+                        crashlab_core::CorpusVerifyStatus::Orphaned { seed_id } => {
+                            eprintln!("  orphaned seed {}", seed_id);
+                        }
+                        _ => {}
+                    }
+                }
+                std::process::exit(1);
+            }
+        }
+        Err(e) => {
+            eprintln!("failed to parse corpus: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Iteration cap for `crashlab shrink`; each iteration is one replay check.
+const SHRINK_MAX_ITERATIONS: u32 = 10_000;
+
+/// `crashlab shrink <bundle> <out>` (#1849): ddmin the bundle seed payload while
+/// preserving its full signature under the replay check (`classify` plus
+/// `signatures_match`). The shrunk bundle keeps the original seed and a
+/// [`ShrinkLineage`] in its `original_seed` / `shrink_lineage` fields.
+fn shrink_command(path: &str, out_path: &str) {
+    let bytes = match fs::read(path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("failed to read {path}: {e}");
+            std::process::exit(1);
+        }
+    };
+    let doc = match load_case_bundle_document_json(&bytes) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("{path} is not a case bundle: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let original = doc.original_or_minimal_seed().clone();
+    let expected = doc.signature.clone();
+    let seed_id = original.id;
+
+    let outcome = crashlab_core::shrink::shrink_payload(
+        &original.payload,
+        crashlab_core::shrink::ShrinkBudget::new(SHRINK_MAX_ITERATIONS),
+        |candidate: &[u8]| {
+            let probe = CaseSeed {
+                id: seed_id,
+                payload: candidate.to_vec(),
+            };
+            crashlab_core::shrink::preserve_check(
+                crashlab_core::shrink::PreserveMode::FullSignature,
+                &expected,
+                &crashlab_core::classify(&probe),
+            )
+        },
+    );
+
+    if outcome.budget_exhausted {
+        eprintln!(
+            "warning: shrink budget ({SHRINK_MAX_ITERATIONS} iterations) exhausted; result may not be minimal"
+        );
+    }
+
+    let lineage = crashlab_core::ShrinkLineage::new(
+        "ddmin-payload",
+        outcome.iterations,
+        original.payload.len(),
+        outcome.payload.len(),
+        1,
+        1,
+    )
+    .with_preserved_field("signature");
+
+    let minimal = CaseSeed {
+        id: seed_id,
+        payload: outcome.payload.clone(),
+    };
+    let mut shrunk = doc.clone();
+    shrunk.seed = minimal;
+    shrunk.provenance = None;
+    let shrunk = shrunk.with_pairing(original.clone(), lineage);
+
+    let rendered = match crashlab_core::save_case_bundle_document_json(&shrunk) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("failed to render shrunk bundle: {e}");
+            std::process::exit(1);
+        }
+    };
+    if let Err(e) = fs::write(out_path, &rendered) {
+        eprintln!("failed to write {out_path}: {e}");
+        std::process::exit(1);
+    }
+
+    println!(
+        "shrunk {} -> {} bytes in {} iterations ({})",
+        original.payload.len(),
+        outcome.payload.len(),
+        outcome.iterations,
+        out_path
+    );
+}
+
 fn list_runs() {
     let base = default_state_dir();
     let runs_dir = base.join("runs");
@@ -447,11 +697,33 @@ fn report_run_status(id: u64, as_json: bool) {
         // campaign wrote. The line is printed verbatim rather than
         // re-serialized: float parse/print is not string-stable, so a
         // re-serialized snapshot can differ from the stored bytes.
-        match read_latest_health_snapshot_line(run_id, &base) {
-            Ok(Some(line)) => println!("{line}"),
-            // A run without snapshots has not started, or ran before
-            // snapshots existed. That is a normal state, not a failure.
-            Ok(None) => println!("null"),
+        match read_health_snapshot_log(run_id, &base) {
+            Ok(log) => {
+                let latest = log.snapshots.last();
+                if !log.degraded {
+                    match read_latest_health_snapshot_line(run_id, &base) {
+                        Ok(Some(line)) => println!("{line}"),
+                        Ok(None) => println!("null"),
+                        Err(e) => {
+                            eprintln!("failed to read health snapshot for run {id}: {e}");
+                            std::process::exit(1);
+                        }
+                    }
+                } else {
+                    let mut value = latest
+                        .and_then(|snapshot| serde_json::to_value(snapshot).ok())
+                        .unwrap_or(serde_json::Value::Null);
+                    if let Some(object) = value.as_object_mut() {
+                        object.insert("degraded".into(), serde_json::Value::Bool(true));
+                        object.insert("truncated_tail".into(), serde_json::Value::Bool(log.truncated_tail));
+                        object.insert("corrupt_lines".into(), serde_json::json!(log.corrupt_lines));
+                    } else {
+                        value = serde_json::json!({"snapshot": null, "degraded": true,
+                            "truncated_tail": log.truncated_tail, "corrupt_lines": log.corrupt_lines});
+                    }
+                    println!("{value}");
+                }
+            }
             Err(e) => {
                 eprintln!("failed to read health snapshot for run {id}: {e}");
                 std::process::exit(1);
@@ -460,18 +732,23 @@ fn report_run_status(id: u64, as_json: bool) {
         return;
     }
 
-    match read_latest_health_snapshot(run_id, &base) {
-        Ok(Some(snapshot)) => {
-            print_snapshot_summary(&snapshot);
-        }
-        // A run without snapshots has not started, or ran before snapshots
-        // existed. That is a normal state, not a failure.
-        Ok(None) => {
-            println!("no health snapshot for run {id}");
-        }
+    let log = match read_health_snapshot_log(run_id, &base) {
+        Ok(log) => log,
         Err(e) => {
             eprintln!("failed to read health snapshot for run {id}: {e}");
             std::process::exit(1);
+        }
+    };
+    if log.degraded {
+        eprintln!("warning: health snapshot log is degraded ({} corrupt line(s), truncated tail: {})",
+            log.corrupt_lines, log.truncated_tail);
+    }
+    match log.snapshots.last() {
+        Some(snapshot) => print_snapshot_summary(snapshot),
+        // A run without snapshots has not started, or ran before snapshots
+        // existed. That is a normal state, not a failure.
+        None => {
+            println!("no health snapshot for run {id}");
         }
     }
 }
@@ -533,6 +810,105 @@ fn health_status_label(status: &HealthStatus) -> &'static str {
         HealthStatus::Degraded => "degraded",
         HealthStatus::Unhealthy => "unhealthy",
     }
+}
+
+fn regression_baseline_command(action: Option<&str>, observed_path: Option<&str>, rest: &[String]) {
+    use crashlab_core::baseline::{
+        classify as classify_baseline, exit_code, observe_scenarios, BASELINE_SCHEMA_VERSION,
+    };
+    use crashlab_core::{Baseline, Classification};
+
+    let (action, observed_path) = match (action, observed_path, rest.len()) {
+        (Some(action @ ("set" | "compare")), Some(observed), 1) => (action, observed),
+        _ => {
+            print_usage();
+            std::process::exit(1);
+        }
+    };
+    let baseline_path = Path::new(&rest[0]);
+
+    let scenario_bytes = match fs::read(observed_path) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            eprintln!("failed to read {observed_path}: {e}");
+            std::process::exit(1);
+        }
+    };
+    let scenarios = match crashlab_core::load_regression_suite_json(&scenario_bytes) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("failed to parse observed suite {observed_path}: {e}");
+            std::process::exit(1);
+        }
+    };
+    let observed = match observe_scenarios(&scenarios) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    };
+
+    if action == "set" {
+        let label = format!("baseline-v{BASELINE_SCHEMA_VERSION}");
+        let baseline = Baseline::from_observed(&observed, &label);
+        let json = match baseline.to_json() {
+            Ok(j) => j,
+            Err(e) => {
+                eprintln!("failed to serialize baseline: {e}");
+                std::process::exit(1);
+            }
+        };
+        if let Err(e) = fs::write(baseline_path, json) {
+            eprintln!("failed to write baseline {}: {e}", baseline_path.display());
+            std::process::exit(1);
+        }
+        println!(
+            "wrote baseline {} ({} entries)",
+            baseline_path.display(),
+            baseline.entries.len()
+        );
+        return;
+    }
+
+    // compare: any load or integrity failure maps to exit code 2.
+    let loaded: Option<Baseline> = match fs::read_to_string(baseline_path) {
+        Ok(text) => match Baseline::from_json(&text) {
+            Ok(b) => Some(b),
+            Err(e) => {
+                eprintln!("baseline rejected: {e}");
+                None
+            }
+        },
+        Err(e) => {
+            eprintln!("failed to read baseline {}: {e}", baseline_path.display());
+            None
+        }
+    };
+
+    let (classification, baseline_ok) = match &loaded {
+        Some(b) => (classify_baseline(b, &observed), true),
+        None => (Classification::default(), false),
+    };
+
+    if baseline_ok {
+        println!("::group::Baseline classification");
+        println!("new: {}", classification.new.len());
+        for o in &classification.new {
+            println!("  + {} {}", o.signature_hash, o.category);
+        }
+        println!("recurring: {}", classification.recurring.len());
+        for o in &classification.recurring {
+            println!("  = {} {}", o.signature_hash, o.category);
+        }
+        println!("fixed: {}", classification.fixed.len());
+        for e in &classification.fixed {
+            println!("  - {} {}", e.signature_hash, e.category);
+        }
+        println!("::endgroup::");
+    }
+
+    std::process::exit(exit_code(&classification, baseline_ok));
 }
 
 fn run_regression_suite_command(path: &str, report_path: Option<&Path>) {

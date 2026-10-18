@@ -2,6 +2,8 @@
 
 This document describes the deterministic guarantees provided by CrashLab, known limitations across environments, and troubleshooting steps for mismatched replay outcomes.
 
+> The precise contract — what reproduces, over which engine versions and platforms, with cross-platform evidence — is [reproducibility-contract.md](reproducibility-contract.md). It also has the "why did my repro fail?" decision tree.
+
 ## Deterministic Guarantees
 
 CrashLab is designed to produce identical outputs given identical inputs. The following components are fully deterministic:
@@ -190,6 +192,20 @@ cargo test my_contract_regression::regression_auth_runtime_failure
 ```
 
 Use `crashlab_core::group_bundles_by_regression_group` or `regression_group_module_ident` if you need the same grouping in tooling without emitting Rust source.
+
+### Rust reproducer export (single bundle)
+
+To turn one failing bundle into a standalone cargo test:
+
+```bash
+cargo run --bin crashlab -- bundle export-rust failing_bundle.json -o tests/repro_failing.rs
+CRASHLAB_CONTRACT_WASM=path/to/contract.wasm cargo test --test repro_failing
+```
+
+- The generated test needs `crashlab-core` with the `host-runner` feature.
+- `-o` refuses to overwrite an existing file; pass `--force` to replace it.
+- A bundle does not record the contract wasm, function, arguments, or auth mode. The test replays the seed through `HostContractRunner`, which derives the call from the payload, and asserts the recorded category, digest and signature hash.
+- The generated text is covered by golden tests. Compiling and running it is not checked in CI.
 
 ## Troubleshooting Mismatched Replays
 

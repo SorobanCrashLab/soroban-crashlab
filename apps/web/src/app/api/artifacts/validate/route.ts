@@ -1,3 +1,4 @@
+import { withSizeLimitAndLogging } from '@/lib/route-handler';
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { successResponse } from "@/lib/api-response-utils";
@@ -240,7 +241,7 @@ export function validateCaseBundle(data: unknown): ValidationResult {
  *           400 Bad Request if body is not valid JSON or missing bundle field
  *           413 Payload Too Large if body exceeds 1 MiB
  */
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function postHandler(request: NextRequest): Promise<NextResponse> {
   // Size guard: reject bodies > 1 MiB to prevent memory exhaustion
   const contentLength = request.headers.get("content-length");
   if (contentLength) {
@@ -289,3 +290,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const status = result.valid ? 200 : 422;
   return successResponse(result, { status });
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/artifacts/validate', postHandler);

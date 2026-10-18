@@ -7,6 +7,7 @@ import {
   getGitHubSessionMaxAgeSeconds,
   issueGitHubSession,
 } from '@/lib/github-session';
+import { safeRedirectPath } from '@/lib/safe-redirect';
 
 const STATE_COOKIE_NAME = 'github_oauth_state';
 
@@ -58,6 +59,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Resolve the post-auth redirect target from the 'next' query param, validated
+  // against the shared safe-redirect allowlist. Invalid/unknown values fall
+  // back to '/' and are audit-logged by the validator.
+  const nextParam = sanitizedParams.get('next');
+  const safeNext = safeRedirectPath(nextParam ?? null, {
+    context: 'api/auth/github/callback',
+  });
+
   try {
     logger.info('GET /api/auth/github/callback: exchanging code for access token', { code });
 
@@ -73,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     logger.info('GET /api/auth/github/callback: authenticated user', { login: mockUser.login });
 
-    const response = NextResponse.redirect(new URL('/', request.url), {
+    const response = NextResponse.redirect(new URL(safeNext, request.url), {
       status: 302,
     });
 

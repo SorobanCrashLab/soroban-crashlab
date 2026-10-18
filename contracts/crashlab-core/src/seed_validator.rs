@@ -1,5 +1,7 @@
 use crate::CaseSeed;
 
+use crate::scval_mutator::ScValDecodeError;
+
 /// Schema for validating fuzzing seeds before execution.
 ///
 /// Ensures seeds meet the technical requirements of the Soroban CrashLab
@@ -69,6 +71,7 @@ pub enum SeedValidationError {
     IdTooLarge { actual: u64, maximum: u64 },
     InsufficientEntropy { payload_len: usize },
     MalformedEncoding { message: String },
+    ScValDecode { error: ScValDecodeError },
 }
 
 impl std::fmt::Display for SeedValidationError {
@@ -95,6 +98,9 @@ impl std::fmt::Display for SeedValidationError {
             }
             SeedValidationError::MalformedEncoding { message } => {
                 write!(f, "malformed encoding: {}", message)
+            }
+            SeedValidationError::ScValDecode { error } => {
+                write!(f, "scval decode failed: {}", error)
             }
         }
     }
@@ -165,6 +171,39 @@ pub fn validate_seed(seed: &CaseSeed) -> Result<(), Vec<SeedValidationError>> {
 pub fn validate_seeds(seeds: &[CaseSeed], schema: &SeedSchema) -> Result<(), (usize, u64, Vec<SeedValidationError>)> {
     for (i, seed) in seeds.iter().enumerate() {
         if let Err(errors) = seed.validate(schema) {
+            return Err((i, seed.id, errors));
+        }
+    }
+    Ok(())
+}
+
+/// Validates that a seed's payload decodes as a Soroban `ScVal` XDR tree.
+///
+/// Distinguishes decode failures (harness/seed-encoding bugs) from
+/// contract-level rejections. A seed that fails to decode never reaches
+/// contract execution and should be reported separately from a seed that
+/// decodes but is rejected by the contract.
+pub fn validate_seed_scval(seed: &CaseSeed) -> Result<(), SeedValidationError> {
+    match crate::scval_mutator::decode_scval(&seed.payload) {
+        Ok(_) => Ok(()),
+        Err(error) => Err(SeedValidationError::ScValDecode { error }),
+    }
+}
+
+/// Validates a list of seeds, checking both schema bounds and ScVal decoding.
+pub fn validate_seeds_scval(
+    seeds: &[CaseSeed],
+    schema: &SeedSchema,
+) -> Result<(), (usize, u64, Vec<SeedValidationError>)> {
+    for (i, seed) in seeds.iter().enumerate() {
+        let mut errors = Vec::new();
+        if let Err(mut schema_errors) = seed.validate(schema) {
+            errors.append(&mut schema_errors);
+        }
+        if let Err(error) = validate_seed_scval(seed) {
+            errors.push(error);
+        }
+        if !errors.is_empty() {
             return Err((i, seed.id, errors));
         }
     }

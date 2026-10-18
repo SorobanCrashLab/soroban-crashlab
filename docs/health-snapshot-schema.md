@@ -28,7 +28,7 @@ stream and a partial last line is the worst a kill can leave behind.
 
 ```json
 {
-  "schema_version": 1,
+  "v": 2,
   "run_id": 41,
   "campaign_id": "campaign-41",
   "sequence": 3,
@@ -47,7 +47,7 @@ stream and a partial last line is the worst a kill can leave behind.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `schema_version` | `u32` | Format version of this line. Currently `1`. |
+| `v` | `u32` | Format version of this line. Writers emit `2`; readers accept `2` and the previous version `1`. |
 | `run_id` | `u64` | Matches the run directory name. |
 | `campaign_id` | `string?` | Present when the caller knows the campaign. |
 | `sequence` | `u64` | 1-based order within this run's log. Monotonic, gaps mean lost lines. |
@@ -75,25 +75,23 @@ messages.
 
 ## Reader rules
 
-Versioned on purpose: a reader that meets a schema it does not understand must
-not guess.
+Versioned on purpose: readers accept the current and immediately previous
+version, ignore additive fields, and never guess at an unknown version.
 
-1. **Skip unknown versions.** `read_latest_health_snapshot` accepts only
-   `SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS` (`[1]`) and skips lines outside it, so an
-   older binary reads a newer line as "no snapshot" instead of misreporting it.
-2. **Tolerate a half-written tail.** The newest line may be truncated by a kill.
-   `read_latest_health_snapshot` walks lines backwards and returns the newest one
-   that parses, so `crashlab runs status <id>` still reports the last good
-   snapshot.
-3. **Be strict about history.** `read_health_snapshots` fails on the first
-   unreadable line: a caller asking for the whole timeline should hear about
-   corruption rather than receive a silently short list.
+1. **Read versions 1 and 2.** New records use `v: 2`; old `schema_version: 1`
+   records remain readable. Other versions produce a typed
+   `UnsupportedSchema` error naming the received and supported versions.
+2. **Ignore additive fields.** Unknown JSON object fields do not invalidate a
+   record. A future incompatible format must increment `v`.
+3. **Recover partial logs.** An unterminated final line is ignored and counted
+   as a truncated tail. Malformed complete lines are skipped and counted; more
+   than three malformed lines makes the log unusable. `runs status --json`
+   includes `degraded: true` and recovery counters when it returns partial data.
 4. **Missing file is not an error.** It reads as `None` / an empty list.
 
 ## Adding a field
 
-Additive optional fields keep `schema_version` at `1` when they are
-`#[serde(default)]` and readers can ignore them, which is how `failure_classes`
-was introduced. Bump `schema_version`, register the version in
+Additive optional fields keep `v` at `2` when they are `#[serde(default)]` and
+readers can ignore them. Bump `v`, register the version in
 `SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS`, and update this document when a change
 alters the meaning of an existing field or removes one.

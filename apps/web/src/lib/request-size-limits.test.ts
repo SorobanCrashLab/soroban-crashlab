@@ -1,5 +1,13 @@
-import { checkRequestSize, standardSizeLimitResponse, RequestSizeLimitConfig } from './request-size-limits';
-import { describe, it, expect } from 'vitest';
+import {
+  checkRequestSize,
+  effectiveRequestBodyLimit,
+  limitRequestBody,
+  requestBodyFailureResponse,
+  requestSizeConfigFor,
+  standardSizeLimitResponse,
+  RequestSizeLimitConfig,
+} from './request-size-limits';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('checkRequestSize', () => {
   const createRequest = (contentLength: number, contentType = 'application/json') => {
@@ -107,5 +115,60 @@ describe('standardSizeLimitResponse', () => {
     const body = await res.json();
     expect(body).toEqual({ error: 'too big', code: 'PAYLOAD_TOO_LARGE' });
     expect(Object.keys(body)).not.toContain('limit');
+  });
+});
+
+describe('streaming request body limits', () => {
+  it('aborts an unknown-length body as soon as its byte limit is crossed', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"x":'));
+        controller.enqueue(new TextEncoder().encode('123}'));
+        controller.close();
+      },
+    });
+    const request = new Request('http://localhost/api/test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' });
+    const guarded = limitRequestBody(request, { maxBodySize: 64, maxJsonSize: 8 });
+
+    await expect(guarded.request.json()).rejects.toThrow(/maximum allowed size/);
+    expect(guarded.failure()).toBe('too-large');
+    expect(requestBodyFailureResponse(guarded.failure(), 8)?.status).toBe(413);
+  });
+
+  it('uses explicit larger form limits for artifact uploads and keeps JSON capped', () => {
+    const upload = new Request('http://localhost/api/artifacts', {
+      method: 'POST', headers: { 'content-type': 'multipart/form-data; boundary=x' },
+    });
+    const config = requestSizeConfigFor(upload);
+    expect(effectiveRequestBodyLimit(upload, config)).toBe(20 * 1024 * 1024);
+
+    const json = new Request('http://localhost/api/campaigns', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+    });
+    expect(effectiveRequestBodyLimit(json, requestSizeConfigFor(json))).toBe(1024 * 1024);
+  });
+
+  it('aborts an idle upload with a request timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const body = new ReadableStream<Uint8Array>({ start() {} });
+      const request = new Request('http://localhost/api/test', {
+        method: 'POST', body, duplex: 'half',
+      } as RequestInit & { duplex: 'half' });
+      const guarded = limitRequestBody(request, { maxBodySize: 64 });
+      const read = guarded.request.text();
+      await vi.advanceTimersByTimeAsync(10_001);
+
+      await expect(read).rejects.toThrow(/idle too long/);
+      expect(guarded.failure()).toBe('idle-timeout');
+      expect(requestBodyFailureResponse(guarded.failure())?.status).toBe(408);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

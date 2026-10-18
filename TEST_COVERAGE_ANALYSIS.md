@@ -9,6 +9,46 @@ This document provides a comprehensive analysis of test coverage for:
 
 ---
 
+## CI coverage ratchet (living)
+
+A committed baseline and a ratchet gate now back this document (issue #1822).
+The narrative below is the historical deep-dive; the numbers that matter are in
+the baselines and are enforced by CI.
+
+| Stack | Tool | Report | Baseline |
+| --- | --- | --- | --- |
+| `apps/web` | Vitest (istanbul v8) | `apps/web/coverage/lcov.info` | `apps/web/coverage-baseline.json` |
+| `contracts/crashlab-core` | `cargo-llvm-cov` | `contracts/crashlab-core/lcov.info` | `contracts/crashlab-core/coverage-baseline.json` |
+
+`scripts/coverage/check-coverage-ratchet.mjs` compares a fresh report against
+the baseline:
+
+- the **repo total** may not drop by more than `tolerancePct` (default 1pp);
+- **no file** may drop by more than `tolerancePct` — the failure names the file
+  and the drop, not just the headline number;
+- on PRs, the **changed lines** must be at least `changedLinesMinimum` covered.
+
+`.github/workflows/coverage.yml` runs this on both stacks per PR, nightly, and
+on manual dispatch. It also uploads the LCOV/HTML reports to Codecov-compatible
+artifacts (self-hosted: download the `web-coverage` / `rust-coverage`
+artifacts).
+
+**Bootstrap status.** The committed baselines are intentionally empty
+(`"bootstrap": true`) until a full run lands on a healthy `main`, so the gate is
+report-only. Refresh them with:
+
+```bash
+node scripts/coverage/write-baseline.mjs --format lcov \
+  --report apps/web/coverage/lcov.info --root "$PWD" \
+  --stack web --tool "vitest (istanbul v8)" --out apps/web/coverage-baseline.json
+```
+
+then set the repository variable `COVERAGE_ENFORCE=true` to enforce. The
+nightly job keeps a trend so ratchet games (deleting tests) surface even when a
+single PR keeps the total flat.
+
+---
+
 ## 1. Network Configuration Validation
 
 ### Implementation File

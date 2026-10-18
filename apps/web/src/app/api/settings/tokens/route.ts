@@ -7,6 +7,7 @@ import {
 } from '../../../../lib/storage/api-token-store';
 import { registerTokenPrincipal } from '../../../../lib/storage/token-principal-store';
 import { checkRequestSize } from '../../../../lib/request-size-limits';
+import { withSizeLimitAndLogging } from '../../../../lib/route-handler';
 import { errorResponse, createdResponse, successResponse } from '../../../../lib/api-response-utils';
 
 export async function GET() {
@@ -14,7 +15,7 @@ export async function GET() {
   return successResponse({ tokens });
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const sizeError = checkRequestSize(request);
   if (sizeError) {
     return sizeError;
@@ -79,3 +80,5 @@ export async function POST(request: NextRequest) {
     return errorResponse('Failed to process token creation request.', 400);
   }
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/settings/tokens', postHandler);

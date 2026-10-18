@@ -1,7 +1,9 @@
 /**
- * lib/openapi/spec — OpenAPI 3.1 document builder (#1670).
+ * lib/openapi/spec — OpenAPI 3.1 document builder (#1670, #1831).
  * Pure function of ROUTE_REGISTRY + zod schemas; rendered statically by
  * app/api-docs/page.tsx and served as JSON by app/api/openapi/route.ts.
+ * scripts/generate-openapi.ts serializes this output into the committed
+ * openapi.json that the CI gate diffs against.
  */
 
 import { ROUTE_REGISTRY } from './registry';
@@ -137,3 +139,30 @@ export function buildOpenApiSpec() {
 }
 
 export type OpenApiSpec = ReturnType<typeof buildOpenApiSpec>;
+
+/**
+ * Recursively sort object keys so serialization is deterministic regardless
+ * of construction order — regeneration without a semantic change must be
+ * byte-identical (#1831).
+ */
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value && typeof value === 'object') {
+    const src = value as Record<string, unknown>;
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(src).sort()) {
+      sorted[key] = sortKeysDeep(src[key]);
+    }
+    return sorted;
+  }
+  return value;
+}
+
+/**
+ * Canonical JSON rendering of the spec: 2-space indent, sorted keys,
+ * trailing newline. The committed openapi.json, the /api/openapi response
+ * and the CI gate all compare these bytes (#1831).
+ */
+export function serializeOpenApiSpec(spec: OpenApiSpec = buildOpenApiSpec()): string {
+  return `${JSON.stringify(sortKeysDeep(spec), null, 2)}\n`;
+}

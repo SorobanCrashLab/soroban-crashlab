@@ -16,6 +16,9 @@ pub const CASE_BUNDLE_SCHEMA_VERSION: u32 = 2;
 /// Schema versions this crate can load.
 pub const SUPPORTED_BUNDLE_SCHEMAS: &[u32] = &[1, CASE_BUNDLE_SCHEMA_VERSION];
 
+/// Artifact class used by lease-based retention policies.
+pub const BUNDLE_ARTIFACT_CLASS: &str = "bundle";
+
 /// Wire/document shape written to JSON. The `schema` field versions the layout.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaseBundleDocument {
@@ -134,6 +137,14 @@ impl CaseBundleDocument {
         self.original_seed.is_some()
     }
 
+    /// Retention artifact class for this document.
+    ///
+    /// Bundles are retained under the `bundle` class; lease-based sweeps use
+    /// this to apply per-class TTL and pin policies.
+    pub fn artifact_class(&self) -> &'static str {
+        BUNDLE_ARTIFACT_CLASS
+    }
+
     /// The original (pre-shrink) seed, falling back to `seed` for legacy docs (#1866).
     pub fn original_or_minimal_seed(&self) -> &CaseSeed {
         self.original_seed.as_ref().unwrap_or(&self.seed)
@@ -177,6 +188,14 @@ pub fn save_case_bundle_json(bundle: &CaseBundle) -> Result<Vec<u8>, BundlePersi
 pub fn load_case_bundle_json(bytes: &[u8]) -> Result<CaseBundle, BundlePersistError> {
     let doc: CaseBundleDocument = serde_json::from_slice(bytes)?;
     doc.into_bundle()
+}
+
+/// Returns the retention artifact class for a serialized bundle document.
+///
+/// Used by the lease-based retention sweeper to select the per-class policy
+/// (TTL, min-count floor, pin list) when planning deletions.
+pub fn bundle_artifact_class() -> &'static str {
+    BUNDLE_ARTIFACT_CLASS
 }
 
 /// Serializes a [`CaseBundleDocument`] as-is (preserving provenance, #1864).
@@ -477,5 +496,16 @@ mod tests {
         assert!(doc.shrink_lineage.is_none());
         // Legacy: the minimal seed is treated as the original.
         assert_eq!(doc.original_or_minimal_seed(), &doc.seed);
+    }
+
+    #[test]
+    fn bundle_documents_report_bundle_artifact_class() {
+        let bundle = to_bundle(crate::CaseSeed {
+            id: 1,
+            payload: vec![0],
+        });
+        let doc = CaseBundleDocument::from_bundle(&bundle);
+        assert_eq!(doc.artifact_class(), BUNDLE_ARTIFACT_CLASS);
+        assert_eq!(bundle_artifact_class(), "bundle");
     }
 }
