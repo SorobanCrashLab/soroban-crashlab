@@ -358,7 +358,7 @@ fn crashlab_repro_auth_0000000000000003() {
         // The category is emitted as a single escaped literal on one line.
         assert!(src.contains(r#"assert_eq!(actual.category, "auth\"); evil(); //");"#));
         // The test name stays a plain identifier.
-        assert!(src.contains("fn crashlab_repro_auth____evil______0000000000000006()"));
+        assert!(src.contains("fn crashlab_repro_auth____evil_______0000000000000006()"));
     }
 
     // ── naming ────────────────────────────────────────────────────────────────

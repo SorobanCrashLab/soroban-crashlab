@@ -271,7 +271,7 @@ pub fn append_health_snapshot(
 ) -> Result<PathBuf, HealthSnapshotError> {
     use std::io::Write as _;
 
-    let path = health_snapshot_path(run_id, base);
+    let path = health_snapshot_path(run_id, &base);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -314,7 +314,7 @@ pub fn read_health_snapshot_log(
     run_id: RunId,
     base: impl AsRef<Path>,
 ) -> Result<HealthSnapshotLog, HealthSnapshotError> {
-    let path = health_snapshot_path(run_id, base);
+    let path = health_snapshot_path(run_id, &base);
     let contents = match fs::read_to_string(&path) {
         Ok(contents) => contents,
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
