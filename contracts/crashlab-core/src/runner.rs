@@ -227,6 +227,83 @@ pub fn create_runner() -> Result<Box<dyn ContractRunner>, RunnerCreationError> {
     }
 }
 
+/// Result of comparing two [`CrashSignature`] outcomes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutcomeComparison {
+    /// Whether category and signature hash agree.
+    pub matches: bool,
+    /// Names of the fields that differ (subset of `category`, `signature_hash`).
+    pub differing_fields: Vec<String>,
+}
+
+/// Compares two runner outcomes after normalizing diagnostics.
+///
+/// Only `category` and `signature_hash` are compared; `digest` is
+/// runner-local metadata and is ignored.
+pub fn compare_outcomes(
+    a: &CrashSignature,
+    b: &CrashSignature,
+) -> OutcomeComparison {
+    let mut differing_fields = Vec::new();
+    if a.category != b.category {
+        differing_fields.push("category".to_string());
+    }
+    if a.signature_hash != b.signature_hash {
+        differing_fields.push("signature_hash".to_string());
+    }
+    OutcomeComparison {
+        matches: differing_fields.is_empty(),
+        differing_fields,
+    }
+}
+
+/// Actionable divergence between two runners for a single seed.
+#[derive(Debug, Clone)]
+pub struct DivergenceReport {
+    /// Seed that diverged.
+    pub seed_id: u64,
+    /// Category observed on the first runner.
+    pub left_category: String,
+    /// Category observed on the second runner.
+    pub right_category: String,
+    /// First differing field, for triage without re-running.
+    pub first_differing_field: String,
+}
+
+impl std::fmt::Display for DivergenceReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "divergence for seed {}: left='{}' right='{}' first_diff='{}'",
+            self.seed_id, self.left_category, self.right_category, self.first_differing_field
+        )
+    }
+}
+
+/// Runs `seed` on both runners and returns a [`DivergenceReport`] on mismatch.
+pub fn check_seed_parity(
+    left: &mut dyn ContractRunner,
+    right: &mut dyn ContractRunner,
+    seed: &CaseSeed,
+) -> Result<Option<DivergenceReport>, RunnerError> {
+    let a = left.run_seed(seed)?;
+    let b = right.run_seed(seed)?;
+    let cmp = compare_outcomes(&a, &b);
+    if cmp.matches {
+        return Ok(None);
+    }
+    Ok(Some(DivergenceReport {
+        seed_id: seed.id,
+        left_category: a.category,
+        right_category: b.category,
+        first_differing_field: cmp
+            .differing_fields
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| "unknown".to_string()),
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

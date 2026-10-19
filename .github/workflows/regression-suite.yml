@@ -128,3 +128,27 @@ jobs:
             exit 1
           fi
           echo "No new regression signatures."
+
+  differential-parity:
+    name: Differential Parity (mock vs host)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # 1.97.1
+        with:
+          toolchain: 1.97.1
+
+      - name: Cache Rust Dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: contracts
+
+      - name: Run differential harness (mock vs host)
+        working-directory: contracts
+        run: cargo test -p crashlab-core --all-features --test differential_runner
