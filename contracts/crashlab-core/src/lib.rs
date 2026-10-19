@@ -14,6 +14,8 @@ pub mod shrink;
 pub mod signature_hash;
 pub mod suite_runner;
 pub mod taxonomy;
+pub mod trace;
+pub use trace::{SeedTrace, TraceEvent, MAX_TRACE_BYTES, MAX_TRACE_EVENTS, TRACE_SCHEMA_VERSION};
 
 pub use runner::{create_runner, ContractRunner, MockRunner, RunnerCreationError, RunnerError};
 
