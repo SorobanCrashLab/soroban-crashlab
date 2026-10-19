@@ -1,6 +1,7 @@
 use crate::{
-    BundlePersistError, CaseBundle, CrashSignature, FailureClass,
-    bundle_persist::load_case_bundle_json, classify, classify_failure, signatures_match,
+    BundlePersistError, CaseBundle, CrashSignature, EnvironmentFingerprint, FailureClass,
+    ReplayEnvironmentReport, bundle_persist::load_case_bundle_json,
+    check_bundle_replay_environment, classify, classify_failure, signatures_match,
     stable_failure_class_for_bundle,
 };
 use std::fmt;
@@ -17,6 +18,12 @@ pub struct ReplayResult {
     pub class_matches: bool,
     pub signature_matches: bool,
     pub matches: bool,
+    /// Comparison of the bundle's recorded environment with this host (#1799).
+    ///
+    /// Empty when the bundle carries no fingerprint. Populated even on a
+    /// matching replay so a legitimate platform difference is warned about by
+    /// axis instead of passing silently.
+    pub environment: ReplayEnvironmentReport,
 }
 
 /// Errors raised when replaying a persisted bundle.
@@ -57,6 +64,10 @@ impl From<BundlePersistError> for ReplayError {
 }
 
 /// Re-runs classification from the bundle seed and compares signatures.
+///
+/// The bundle's recorded [`EnvironmentFingerprint`] (when present) is also
+/// compared with this host, so the result can name every axis on which the two
+/// platforms differ (#1799).
 pub fn replay_seed_bundle(bundle: &CaseBundle) -> ReplayResult {
     let actual = classify(&bundle.seed);
     let actual_class = classify_failure(&bundle.seed);
@@ -65,6 +76,7 @@ pub fn replay_seed_bundle(bundle: &CaseBundle) -> ReplayResult {
     let class_matches = expected_class == actual_class;
     let signature_matches = signatures_match(&expected, &actual);
     let matches = class_matches && signature_matches;
+    let environment = check_bundle_replay_environment(bundle, &EnvironmentFingerprint::capture());
     ReplayResult {
         expected_class,
         actual_class,
@@ -73,6 +85,7 @@ pub fn replay_seed_bundle(bundle: &CaseBundle) -> ReplayResult {
         class_matches,
         signature_matches,
         matches,
+        environment,
     }
 }
 
@@ -88,21 +101,35 @@ pub fn replay_seed_bundle_path(path: impl AsRef<Path>) -> Result<ReplayResult, R
     replay_seed_bundle_json(&bytes)
 }
 
+/// Appends the recorded-vs-current environment differences to a replay line.
+///
+/// Empty when the bundle carries no fingerprint or agrees with this host on
+/// every recorded axis; otherwise one warning per differing axis, so a
+/// legitimate platform difference is always named (#1799).
+fn environment_note(result: &ReplayResult) -> String {
+    if result.environment.warnings.is_empty() {
+        String::new()
+    } else {
+        format!("; {}", result.environment.warnings.join("; "))
+    }
+}
+
 /// Formats a success line for CLI output.
 pub fn replay_success_message(result: &ReplayResult) -> String {
     format!(
-        "replay matched: class='{}' category='{}' digest={} signature_hash={}",
+        "replay matched: class='{}' category='{}' digest={} signature_hash={}{}",
         result.actual_class,
         result.actual.category,
         result.actual.digest,
-        result.actual.signature_hash
+        result.actual.signature_hash,
+        environment_note(result)
     )
 }
 
 /// Formats a mismatch line for CLI output.
 pub fn replay_mismatch_message(result: &ReplayResult) -> String {
     format!(
-        "replay mismatch: expected class='{}' category='{}' digest={} signature_hash={}, got class='{}' category='{}' digest={} signature_hash={}",
+        "replay mismatch: expected class='{}' category='{}' digest={} signature_hash={}, got class='{}' category='{}' digest={} signature_hash={}{}",
         result.expected_class,
         result.expected.category,
         result.expected.digest,
@@ -110,14 +137,15 @@ pub fn replay_mismatch_message(result: &ReplayResult) -> String {
         result.actual_class,
         result.actual.category,
         result.actual.digest,
-        result.actual.signature_hash
+        result.actual.signature_hash,
+        environment_note(result)
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CaseBundle, CaseSeed, save_case_bundle_json, to_bundle};
+    use crate::{CaseBundle, CaseSeed, EnvironmentFingerprint, ReplayAxis, save_case_bundle_json, to_bundle};
 
     #[test]
     fn replay_matches_original_bundle_signature() {
@@ -188,5 +216,63 @@ mod tests {
         assert_eq!(result.expected_class, classify_failure(&bundle.seed));
         assert_eq!(result.actual_class, classify_failure(&bundle.seed));
         assert!(result.class_matches);
+    }
+
+    #[test]
+    fn replay_names_the_differing_environment_axis() {
+        let mut bundle = to_bundle(CaseSeed {
+            id: 42,
+            payload: vec![1, 2, 3, 4],
+        });
+        // A value no host can report for its path separator: the axis always
+        // differs, on every platform this test runs on.
+        let mut recorded = EnvironmentFingerprint::capture();
+        recorded.path_separator = "<foreign>".to_string();
+        bundle.environment = Some(recorded);
+
+        let result = replay_seed_bundle(&bundle);
+        assert!(result.matches, "environment must not change the signature");
+        assert_eq!(
+            result.environment.differing_axes,
+            vec![ReplayAxis::PathSeparator]
+        );
+        assert!(!result.environment.material_mismatch);
+
+        // The axis is named in the CLI output rather than dropped silently.
+        let message = replay_success_message(&result);
+        assert!(message.starts_with("replay matched"), "{message}");
+        assert!(message.contains("path_separator"), "{message}");
+        assert!(message.contains("<foreign>"), "{message}");
+    }
+
+    #[test]
+    fn replay_on_a_foreign_os_is_reported_as_material_by_axis() {
+        let mut bundle = to_bundle(CaseSeed {
+            id: 7,
+            payload: vec![0xA0, 0x01],
+        });
+        let mut recorded = EnvironmentFingerprint::capture();
+        recorded.os = "<foreign-os>".to_string();
+        bundle.environment = Some(recorded);
+
+        let result = replay_seed_bundle(&bundle);
+        assert!(result.matches);
+        assert!(result.environment.material_mismatch);
+        assert_eq!(result.environment.differing_axes, vec![ReplayAxis::Os]);
+
+        let message = replay_success_message(&result);
+        assert!(message.contains("recorded os '<foreign-os>'"), "{message}");
+    }
+
+    #[test]
+    fn replay_without_a_recorded_environment_stays_quiet() {
+        let bundle = to_bundle(CaseSeed {
+            id: 42,
+            payload: vec![1, 2, 3, 4],
+        });
+        let result = replay_seed_bundle(&bundle);
+        assert!(result.environment.warnings.is_empty());
+        assert!(result.environment.differing_axes.is_empty());
+        assert!(!replay_success_message(&result).contains("environment"));
     }
 }

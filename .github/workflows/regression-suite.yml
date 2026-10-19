@@ -128,3 +128,48 @@ jobs:
             exit 1
           fi
           echo "No new regression signatures."
+
+  # ── Cross-platform replay equivalence matrix (#1799) ──
+  #
+  # The golden signatures in contracts/crashlab-core/tests/golden/
+  # replay_equivalence.json must be byte-identical on every OS: replaying a
+  # persisted seed yields the same failure class and signature regardless of
+  # host. A mismatch here means serialization, iteration order, path handling
+  # or hashing leaked host details into the signature — a silent
+  # cross-platform drift bug.
+  #
+  # Until the toolchain is pinned on every OS (#1590), only the Ubuntu leg is
+  # blocking: the macOS and Windows legs run in report-only mode, emitting a
+  # ::warning:: annotation with the first differing line. Set the repository
+  # variable CRASHLAB_REPLAY_GOLDEN_STRICT=true to make every leg blocking
+  # (recommended once #1590 lands).
+  replay-equivalence:
+    name: Replay equivalence (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # 1.97.1
+        with:
+          toolchain: 1.97.1
+
+      - name: Cache Rust Dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: contracts
+
+      - name: Compare golden replay signatures
+        working-directory: contracts
+        # Bash keeps the test's ::warning:: annotations and paths uniform on
+        # every OS, including Windows.
+        shell: bash
+        env:
+          CRASHLAB_REPLAY_GOLDEN_MODE: ${{ (matrix.os == 'ubuntu-latest' || vars.CRASHLAB_REPLAY_GOLDEN_STRICT == 'true') && 'strict' || 'report' }}
+        run: cargo test --release -p crashlab-core --test replay_equivalence -- --nocapture

@@ -892,12 +892,12 @@ mod threat_model_tests {
     #[test]
     fn replay_environment_mismatch_detected() {
         let mut bundle = to_bundle(CaseSeed { id: 1, payload: vec![1] });
-        bundle.environment = Some(EnvironmentFingerprint {
-            os: "fictional-os".to_string(),
-            arch: "fictional-arch".to_string(),
-            family: "fictional-family".to_string(),
-            tool_version: "0.0.0".to_string(),
-        });
+        bundle.environment = Some(EnvironmentFingerprint::new(
+            "fictional-os",
+            "fictional-arch",
+            "fictional-family",
+            "0.0.0",
+        ));
 
         let current = EnvironmentFingerprint::capture();
         // Verify that the environment can be captured and compared
