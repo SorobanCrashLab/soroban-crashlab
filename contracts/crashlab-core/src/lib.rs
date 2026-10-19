@@ -20,6 +20,8 @@ pub mod host_coverage;
 pub use host_coverage::{HostCoverage, HOST_FUNCTION_SURFACE};
 pub mod canon;
 pub use canon::{format_f64_canonical, is_byte_identical_round_trip, parse_canonical_line, write_canonical_line, PERSISTED_FORMATS_WITH_ROUND_TRIP_TEST};
+pub mod sandbox;
+pub use sandbox::{SandboxConfig, SandboxKill, DEFAULT_SEED_DEADLINE, MAX_HOST_RECURSION_DEPTH, MAX_XDR_DECODE_BYTES};
 
 pub use runner::{create_runner, ContractRunner, MockRunner, RunnerCreationError, RunnerError};
 
