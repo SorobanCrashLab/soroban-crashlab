@@ -116,6 +116,40 @@ pub fn export_failing_seed_json(
     export_scenario_json(bundle, mode)
 }
 
+/// Exports an executed multi-step chain as a replayable scenario (#1858).
+///
+/// A multi-invocation seed has no single failing payload, so instead of
+/// [`FailureScenario`] this emits a [`crate::SequenceScenario`]: one row per
+/// step (hex payload, auth mode, expectation), the observed outcome per step,
+/// and the aggregate verdict with the first-divergence step index.
+///
+/// Reload the chain with [`crate::import_sequence_json`] and re-run it through
+/// [`crate::drive_sequence`] to replay the same call sequence.
+///
+/// # Example
+///
+/// ```rust
+/// use crashlab_core::scenario_export::export_sequence_scenario_json;
+/// use crashlab_core::sequence::{
+///     SequenceSeed, SequenceStep, StepExpectation, StepOutcome,
+/// };
+/// use crashlab_core::{AuthMode, CaseSeed};
+///
+/// let seed = SequenceSeed::from_case_seed(&CaseSeed { id: 42, payload: vec![1, 2] });
+/// let observed = vec![StepOutcome::Success];
+/// let json = export_sequence_scenario_json(&seed, &observed).unwrap();
+/// let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+/// assert_eq!(parsed["seed_id"], 42);
+/// assert_eq!(parsed["verdict"], "matched");
+/// let _ = SequenceStep::new(vec![], AuthMode::Enforce, StepExpectation::Any);
+/// ```
+pub fn export_sequence_scenario_json(
+    seed: &crate::SequenceSeed,
+    observed: &[crate::sequence::StepOutcome],
+) -> Result<String, serde_json::Error> {
+    crate::sequence::export_sequence_json(seed, observed)
+}
+
 /// Exports a collection of bundles as a deterministically ordered JSON suite.
 ///
 /// Scenarios are sorted by `(seed_id, failure_class)` before serialization so
@@ -873,5 +907,44 @@ mod tests {
 
         let _ = fs::remove_file(&written_path1);
         let _ = fs::remove_file(&written_path2);
+    }
+
+    // ── sequence export (#1858) ───────────────────────────────────────────────
+
+    #[test]
+    fn sequence_scenario_export_round_trips_through_import() {
+        use crate::sequence::{import_sequence_json, SequenceSeed, StepExpectation, StepOutcome};
+
+        let seed = SequenceSeed::new(
+            42,
+            vec![
+                crate::sequence::SequenceStep::new(
+                    vec![0x0A],
+                    crate::AuthMode::Enforce,
+                    StepExpectation::Success,
+                ),
+                crate::sequence::SequenceStep::new(
+                    vec![0x0B],
+                    crate::AuthMode::Enforce,
+                    StepExpectation::Success,
+                ),
+            ],
+        );
+        let observed = vec![
+            StepOutcome::Success,
+            StepOutcome::Failure {
+                class: "auth".to_string(),
+            },
+        ];
+
+        let json = export_sequence_scenario_json(&seed, &observed).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["seed_id"], 42);
+        assert_eq!(parsed["verdict"], "diverged@1");
+        assert_eq!(parsed["divergence_step"], 1);
+        assert_eq!(parsed["steps"].as_array().unwrap().len(), 2);
+
+        let replayed = import_sequence_json(json.as_bytes()).unwrap();
+        assert_eq!(replayed, seed, "export/import preserves the chain");
     }
 }

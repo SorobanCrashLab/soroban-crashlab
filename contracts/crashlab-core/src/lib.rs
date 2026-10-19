@@ -157,9 +157,11 @@ pub use decimal_precision::{
 
 pub mod bundle_persist;
 pub use bundle_persist::{
-    load_case_bundle_document_json, load_case_bundle_json, read_case_bundle_json,
-    save_case_bundle_document_json, save_case_bundle_json, write_case_bundle_json,
-    BundlePersistError, CaseBundleDocument, CASE_BUNDLE_SCHEMA_VERSION, SUPPORTED_BUNDLE_SCHEMAS,
+    load_case_bundle_document_json, load_case_bundle_json, load_sequence_bundle_json,
+    read_case_bundle_json, save_case_bundle_document_json, save_case_bundle_json,
+    save_sequence_bundle_json, write_case_bundle_json, BundlePersistError, CaseBundleDocument,
+    SequenceBundleDocument, CASE_BUNDLE_SCHEMA_VERSION, SEQUENCE_BUNDLE_ARTIFACT_CLASS,
+    SEQUENCE_BUNDLE_SCHEMA_VERSION, SUPPORTED_BUNDLE_SCHEMAS, SUPPORTED_SEQUENCE_BUNDLE_SCHEMAS,
 };
 
 pub mod run_metadata;
@@ -242,8 +244,19 @@ pub use retention::{RetentionPolicy, RetentionRecord};
 pub mod scenario_export;
 pub use scenario_export::{
     derive_test_name, export_crash_report_markdown, export_failing_seed_json,
-    export_rust_regression_fixture, export_scenario_json, export_suite_json,
-    write_rust_regression_snippet, FailureScenario,
+    export_rust_regression_fixture, export_scenario_json, export_sequence_scenario_json,
+    export_suite_json, write_rust_regression_snippet, FailureScenario,
+};
+
+pub mod sequence;
+pub use sequence::{
+    apply_structural, drive_sequence, evaluate_sequence, expectation_met, export_sequence_json,
+    import_sequence_json, mutate_step_payload, sequence_crash_signature, shrink_sequence,
+    structural_mutation, SequenceConfig, SequenceError, SequenceRun, SequenceScenario,
+    SequenceSeed, SequenceStep, SequenceVerdict, StepExecutor, StepExpectation, StepOutcome,
+    StepScenario, StructuralOp, DEFAULT_SEQUENCE_MAX_STEPS, DEFAULT_SEQUENCE_MIN_STEPS,
+    PRESET_SEQUENCE_MAX_STEPS, PRESET_SEQUENCE_MIN_STEPS, SEQUENCE_SCHEMA_VERSION,
+    SUPPORTED_SEQUENCE_SCHEMAS,
 };
 
 pub mod regression_suite;
@@ -315,8 +328,8 @@ pub mod run_control;
 pub use run_control::{
     cancel_marker_path, cancel_requested, clear_cancel_request, default_state_dir, drive_run,
     drive_run_from_checkpoint, drive_run_partitioned, drive_run_partitioned_from_checkpoint,
-    drive_run_with_health, request_cancel_run, CancelSignal, RunId, RunProgress, RunResumeError,
-    RunSummary, RunTerminalState,
+    drive_run_with_health, drive_sequence_batch, request_cancel_run, CancelSignal, RunId,
+    RunProgress, RunResumeError, RunSummary, RunTerminalState,
 };
 
 pub mod rpc_envelope;

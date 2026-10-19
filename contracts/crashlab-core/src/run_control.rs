@@ -15,6 +15,7 @@
 //! leaves a coverage hole.
 
 use crate::checkpoint::{CheckpointError, RunCheckpoint};
+use crate::sequence::{SequenceRun, SequenceSeed, StepExecutor};
 use crate::worker_partition::{ring_slot, WorkerPartition};
 use std::collections::HashMap;
 use std::fs;
@@ -499,6 +500,44 @@ where
     })
 }
 
+/// Drives a batch of multi-step chains (#1858), one cancellation point per chain.
+///
+/// Unlike [`drive_run`], work is expressed as whole [`SequenceSeed`]s instead of
+/// seed indices: each chain runs to completion through `executor`, which carries
+/// ledger state from step N to step N+1, and yields a [`SequenceRun`] with
+/// first-divergence attribution. Cancellation is checked *between* chains, so a
+/// chain is never left half-executed.
+///
+/// Divergence is a finding, not a driver failure, so it never stops the batch —
+/// filter the returned runs by `run.verdict` afterwards.
+pub fn drive_sequence_batch(
+    signal: &CancelSignal,
+    chains: &[SequenceSeed],
+    executor: &mut dyn StepExecutor,
+) -> (RunTerminalState, Vec<SequenceRun>) {
+    let mut runs: Vec<SequenceRun> = Vec::with_capacity(chains.len());
+    for (index, chain) in chains.iter().enumerate() {
+        if signal.is_cancelled() {
+            let terminal = RunTerminalState::Cancelled {
+                summary: RunSummary {
+                    seeds_processed: runs.len() as u64,
+                    cancelled_at_seed: Some(index as u64),
+                },
+            };
+            return (terminal, runs);
+        }
+        runs.push(crate::sequence::drive_sequence(chain, executor));
+    }
+
+    let terminal = RunTerminalState::Completed {
+        summary: RunSummary {
+            seeds_processed: runs.len() as u64,
+            cancelled_at_seed: None,
+        },
+    };
+    (terminal, runs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -902,5 +941,103 @@ mod tests {
         combined.sort_unstable();
         combined.dedup();
         assert_eq!(combined, vec![1, 2, 7, 8, 9, 10, 11]);
+    }
+
+    // ── sequence driver (#1858) ───────────────────────────────────────────────
+
+    use crate::sequence::{StepExpectation, StepOutcome};
+
+    struct Succeed;
+    impl StepExecutor for Succeed {
+        fn execute(
+            &mut self,
+            step: &crate::sequence::SequenceStep,
+            state: &mut Vec<u8>,
+        ) -> StepOutcome {
+            state.extend_from_slice(&step.invocation);
+            StepOutcome::Success
+        }
+    }
+
+    fn chain(id: u64, payloads: &[&[u8]]) -> SequenceSeed {
+        SequenceSeed::new(
+            id,
+            payloads
+                .iter()
+                .map(|p| {
+                    crate::sequence::SequenceStep::new(
+                        p.to_vec(),
+                        crate::AuthMode::Enforce,
+                        StepExpectation::Any,
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn sequence_batch_runs_every_chain_and_completes() {
+        let chains = vec![chain(1, &[&[1], &[2]]), chain(2, &[&[3]])];
+        let (terminal, runs) =
+            drive_sequence_batch(&CancelSignal::new(RunId(7)), &chains, &mut Succeed);
+
+        match terminal {
+            RunTerminalState::Completed { summary } => {
+                assert_eq!(summary.seeds_processed, 2);
+                assert_eq!(summary.cancelled_at_seed, None);
+            }
+            other => panic!("expected Completed, got {other:?}"),
+        }
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0].seed_id, 1);
+        assert!(runs.iter().all(|r| r.verdict.divergence_step().is_none()));
+    }
+
+    #[test]
+    fn sequence_batch_stops_between_chains_on_cancellation() {
+        let chains = vec![chain(1, &[&[1]]), chain(2, &[&[2]]), chain(3, &[&[3]])];
+
+        // Already cancelled: nothing runs at all.
+        let signal = CancelSignal::new(RunId(1));
+        signal.cancel();
+        let (terminal, runs) = drive_sequence_batch(&signal, &chains, &mut Succeed);
+        match terminal {
+            RunTerminalState::Cancelled { summary } => {
+                assert_eq!(summary.seeds_processed, 0);
+                assert_eq!(summary.cancelled_at_seed, Some(0));
+            }
+            other => panic!("expected Cancelled, got {other:?}"),
+        }
+        assert!(runs.is_empty(), "no chain starts after cancellation");
+
+        // Cancelled *during* the first chain: that chain still finishes (no
+        // half-executed chains), and the batch stops before the second.
+        struct CancelDuringFirstStep<'a> {
+            signal: &'a CancelSignal,
+        }
+        impl StepExecutor for CancelDuringFirstStep<'_> {
+            fn execute(
+                &mut self,
+                step: &crate::sequence::SequenceStep,
+                state: &mut Vec<u8>,
+            ) -> StepOutcome {
+                self.signal.cancel();
+                state.extend_from_slice(&step.invocation);
+                StepOutcome::Success
+            }
+        }
+
+        let signal = CancelSignal::new(RunId(2));
+        let mut executor = CancelDuringFirstStep { signal: &signal };
+        let (terminal, runs) = drive_sequence_batch(&signal, &chains, &mut executor);
+        match terminal {
+            RunTerminalState::Cancelled { summary } => {
+                assert_eq!(summary.seeds_processed, 1, "first chain completed");
+                assert_eq!(summary.cancelled_at_seed, Some(1), "stopped before chain 2");
+            }
+            other => panic!("expected Cancelled, got {other:?}"),
+        }
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].seed_id, 1);
     }
 }

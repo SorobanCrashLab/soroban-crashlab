@@ -5,6 +5,7 @@
 
 use crate::fixture_manifest::ShrinkLineage;
 use crate::provenance::ProvenanceRecord;
+use crate::sequence::{SequenceRun, SequenceSeed, StepOutcome, SUPPORTED_SEQUENCE_SCHEMAS};
 use crate::{CaseBundle, CaseSeed, CrashSignature, EnvironmentFingerprint, RpcEnvelopeCapture};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -18,6 +19,15 @@ pub const SUPPORTED_BUNDLE_SCHEMAS: &[u32] = &[1, CASE_BUNDLE_SCHEMA_VERSION];
 
 /// Artifact class used by lease-based retention policies.
 pub const BUNDLE_ARTIFACT_CLASS: &str = "bundle";
+
+/// Current on-disk schema version for [`SequenceBundleDocument`].
+pub const SEQUENCE_BUNDLE_SCHEMA_VERSION: u32 = 1;
+
+/// Sequence-bundle schema versions this crate can load.
+pub const SUPPORTED_SEQUENCE_BUNDLE_SCHEMAS: &[u32] = &[1, SEQUENCE_BUNDLE_SCHEMA_VERSION];
+
+/// Artifact class for retained chain failures (#1858).
+pub const SEQUENCE_BUNDLE_ARTIFACT_CLASS: &str = "sequence-bundle";
 
 /// Wire/document shape written to JSON. The `schema` field versions the layout.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,6 +68,8 @@ pub enum BundlePersistError {
     UnsupportedSchema { found: u32 },
     /// Provenance verification failed (#1864).
     Provenance(String),
+    /// A sequence (multi-step chain) inside a document is invalid (#1858).
+    Sequence(String),
 }
 
 impl fmt::Display for BundlePersistError {
@@ -71,6 +83,7 @@ impl fmt::Display for BundlePersistError {
                 SUPPORTED_BUNDLE_SCHEMAS
             ),
             BundlePersistError::Provenance(msg) => write!(f, "bundle provenance error: {msg}"),
+            BundlePersistError::Sequence(msg) => write!(f, "sequence bundle error: {msg}"),
         }
     }
 }
@@ -82,6 +95,7 @@ impl std::error::Error for BundlePersistError {
             BundlePersistError::Io(e) => Some(e),
             BundlePersistError::UnsupportedSchema { .. } => None,
             BundlePersistError::Provenance(_) => None,
+            BundlePersistError::Sequence(_) => None,
         }
     }
 }
@@ -234,6 +248,99 @@ pub fn read_case_bundle_json<R: Read>(reader: &mut R) -> Result<CaseBundle, Bund
     let mut buf = Vec::new();
     reader.read_to_end(&mut buf)?;
     load_case_bundle_json(&buf)
+}
+
+/// A failure bundle that stores the **full chain** plus per-step diagnostics (#1858).
+///
+/// The inner [`CaseBundleDocument`] keeps the divergent step's usual evidence
+/// (signature, environment, provenance), while `sequence` preserves every
+/// invocation that had to run — in order — to reach it, and `observations`
+/// records what each step actually did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SequenceBundleDocument {
+    /// Format discriminator for this wrapper.
+    pub schema: u32,
+    /// The full multi-step chain (seed schema v2).
+    pub sequence: SequenceSeed,
+    /// Bundle evidence for the failing step (W5-A09 per-step context).
+    pub bundle: CaseBundleDocument,
+    /// One observed outcome per step, in execution order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub observations: Vec<StepOutcome>,
+    /// Index of the first divergent step, when the chain produced one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub divergence_step: Option<usize>,
+}
+
+impl SequenceBundleDocument {
+    /// Builds a chain failure document from an executed run (#1858).
+    pub fn from_run(
+        sequence: &SequenceSeed,
+        run: &SequenceRun,
+        bundle: CaseBundleDocument,
+    ) -> Self {
+        Self {
+            schema: SEQUENCE_BUNDLE_SCHEMA_VERSION,
+            sequence: sequence.clone(),
+            bundle,
+            observations: run.observations.clone(),
+            divergence_step: run.verdict.divergence_step(),
+        }
+    }
+
+    /// Number of invocations stored in the chain.
+    pub fn step_count(&self) -> usize {
+        self.sequence.steps.len()
+    }
+
+    /// Retention artifact class for chain failures.
+    pub fn artifact_class(&self) -> &'static str {
+        SEQUENCE_BUNDLE_ARTIFACT_CLASS
+    }
+
+    /// Drops the chain context and returns the single-step failure document.
+    pub fn into_bundle_document(self) -> CaseBundleDocument {
+        self.bundle
+    }
+
+    /// Validates both schema layers and the chain itself.
+    pub fn validate(&self) -> Result<(), BundlePersistError> {
+        if !SUPPORTED_SEQUENCE_BUNDLE_SCHEMAS.contains(&self.schema) {
+            return Err(BundlePersistError::UnsupportedSchema { found: self.schema });
+        }
+        if !SUPPORTED_SEQUENCE_SCHEMAS.contains(&self.sequence.schema) {
+            return Err(BundlePersistError::Sequence(format!(
+                "unsupported sequence schema {} (supported: {SUPPORTED_SEQUENCE_SCHEMAS:?})",
+                self.sequence.schema
+            )));
+        }
+        if self.sequence.steps.is_empty() {
+            return Err(BundlePersistError::Sequence(
+                "chain has no steps".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Serializes a chain failure document to pretty-printed JSON bytes.
+pub fn save_sequence_bundle_json(
+    doc: &SequenceBundleDocument,
+) -> Result<Vec<u8>, BundlePersistError> {
+    doc.validate()?;
+    Ok(serde_json::to_vec_pretty(doc)?)
+}
+
+/// Parses JSON bytes into a [`SequenceBundleDocument`], validating both schemas.
+///
+/// A plain single-step bundle document still loads: the caller can migrate it
+/// with [`SequenceSeed::from_bundle_document`](crate::SequenceSeed::from_bundle_document).
+pub fn load_sequence_bundle_json(
+    bytes: &[u8],
+) -> Result<SequenceBundleDocument, BundlePersistError> {
+    let doc: SequenceBundleDocument = serde_json::from_slice(bytes)?;
+    doc.validate()?;
+    Ok(doc)
 }
 
 #[cfg(test)]
@@ -507,5 +614,125 @@ mod tests {
         let doc = CaseBundleDocument::from_bundle(&bundle);
         assert_eq!(doc.artifact_class(), BUNDLE_ARTIFACT_CLASS);
         assert_eq!(bundle_artifact_class(), "bundle");
+    }
+
+    // ── sequence bundles (#1858) ──────────────────────────────────────────────
+
+    /// Three-step chain whose middle step carries the divergent payload.
+    fn sample_chain_run() -> (crate::sequence::SequenceSeed, crate::sequence::SequenceRun) {
+        use crate::sequence::{StepExecutor, StepExpectation, StepOutcome};
+
+        struct Marking;
+        impl StepExecutor for Marking {
+            fn execute(
+                &mut self,
+                step: &crate::sequence::SequenceStep,
+                state: &mut Vec<u8>,
+            ) -> StepOutcome {
+                if step.invocation.contains(&0xFF) {
+                    StepOutcome::Failure {
+                        class: "auth".to_string(),
+                    }
+                } else {
+                    state.extend_from_slice(&step.invocation);
+                    StepOutcome::Success
+                }
+            }
+        }
+
+        let seed = crate::sequence::SequenceSeed::new(
+            42,
+            vec![
+                crate::sequence::SequenceStep::new(
+                    vec![1],
+                    crate::AuthMode::Enforce,
+                    StepExpectation::Success,
+                ),
+                crate::sequence::SequenceStep::new(
+                    vec![0xFF],
+                    crate::AuthMode::Enforce,
+                    StepExpectation::Success,
+                ),
+                crate::sequence::SequenceStep::new(
+                    vec![3],
+                    crate::AuthMode::Enforce,
+                    StepExpectation::Success,
+                ),
+            ],
+        );
+        let run = crate::sequence::drive_sequence(&seed, &mut Marking);
+        assert_eq!(run.verdict.divergence_step(), Some(1));
+        (seed, run)
+    }
+
+    #[test]
+    fn sequence_bundle_round_trip_preserves_chain_and_diagnostics() {
+        let (seed, run) = sample_chain_run();
+        let bundle = CaseBundleDocument::from_bundle(&to_bundle(crate::CaseSeed {
+            id: 42,
+            payload: vec![0xFF],
+        }));
+        let doc = SequenceBundleDocument::from_run(&seed, &run, bundle.clone());
+
+        let bytes = save_sequence_bundle_json(&doc).expect("serialize");
+        let loaded = load_sequence_bundle_json(&bytes).expect("deserialize");
+
+        assert_eq!(loaded.schema, SEQUENCE_BUNDLE_SCHEMA_VERSION);
+        assert_eq!(loaded.sequence, seed, "full chain survives the round trip");
+        assert_eq!(loaded.bundle, bundle, "failing-step evidence survives");
+        assert_eq!(loaded.observations, run.observations);
+        assert_eq!(loaded.divergence_step, Some(1));
+        assert_eq!(loaded.step_count(), 3);
+        assert_eq!(loaded.artifact_class(), SEQUENCE_BUNDLE_ARTIFACT_CLASS);
+        assert_eq!(bundle_artifact_class(), "bundle");
+    }
+
+    #[test]
+    fn sequence_bundle_rejects_unsupported_wrapper_schema() {
+        let (seed, run) = sample_chain_run();
+        let bundle = CaseBundleDocument::from_bundle(&to_bundle(crate::CaseSeed {
+            id: 42,
+            payload: vec![0xFF],
+        }));
+        let mut doc = SequenceBundleDocument::from_run(&seed, &run, bundle);
+        doc.schema = 999;
+        let bytes = serde_json::to_vec(&doc).unwrap();
+        match load_sequence_bundle_json(&bytes).unwrap_err() {
+            BundlePersistError::UnsupportedSchema { found } => assert_eq!(found, 999),
+            other => panic!("expected UnsupportedSchema, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn sequence_bundle_rejects_empty_chain() {
+        let (mut seed, run) = sample_chain_run();
+        seed.steps.clear();
+        let bundle = CaseBundleDocument::from_bundle(&to_bundle(crate::CaseSeed {
+            id: 42,
+            payload: vec![0xFF],
+        }));
+        let doc = SequenceBundleDocument::from_run(&seed, &run, bundle);
+        match save_sequence_bundle_json(&doc).unwrap_err() {
+            BundlePersistError::Sequence(msg) => assert!(msg.contains("no steps")),
+            other => panic!("expected Sequence error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn legacy_bundle_document_still_loads_and_migrates_to_one_step() {
+        let json = r#"{
+            "schema": 1,
+            "seed": {"id": 1, "payload": [1, 2, 3]},
+            "signature": {"category": "runtime-failure", "digest": 1, "signature_hash": 2}
+        }"#;
+        let doc = load_case_bundle_document_json(json.as_bytes()).expect("v1 loads");
+        let seq = crate::SequenceSeed::from_bundle_document(&doc);
+        assert!(seq.is_single_step());
+        assert_eq!(
+            seq.steps[0].expectation,
+            crate::sequence::StepExpectation::Failure {
+                class: "runtime-failure".to_string(),
+            }
+        );
     }
 }
