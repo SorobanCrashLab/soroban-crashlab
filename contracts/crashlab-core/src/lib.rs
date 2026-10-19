@@ -18,6 +18,8 @@ pub mod trace;
 pub use trace::{SeedTrace, TraceEvent, MAX_TRACE_BYTES, MAX_TRACE_EVENTS, TRACE_SCHEMA_VERSION};
 pub mod host_coverage;
 pub use host_coverage::{HostCoverage, HOST_FUNCTION_SURFACE};
+pub mod canon;
+pub use canon::{format_f64_canonical, is_byte_identical_round_trip, parse_canonical_line, write_canonical_line, PERSISTED_FORMATS_WITH_ROUND_TRIP_TEST};
 
 pub use runner::{create_runner, ContractRunner, MockRunner, RunnerCreationError, RunnerError};
 
