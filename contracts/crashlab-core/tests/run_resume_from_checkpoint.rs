@@ -1,4 +1,4 @@
-use crashlab_core:{
+use crashlab_core::{
     drive_run_from_checkpoint, load_checkpoint_file, load_run_checkpoint_json,
     save_run_checkpoint_json, verify_checkpoint_generation, write_checkpoint_file,
     CancelSignal, CaseSeed, CheckpointError, RunCheckpoint, RunId, RunTerminalState,
@@ -18,7 +18,7 @@ fn temp_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "crashlab-resume-{}",
         std::time::SystemTime::now()
-            .duration_since(Std::UNIX)
+            .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos()
     ));

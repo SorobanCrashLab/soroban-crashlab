@@ -120,7 +120,7 @@ pub trait ArtifactStore: Send + Sync {
     ///
     /// Defaults to `ArtifactClass::Raw` for backends that do not track classes.
     fn artifact_class(&self, _artifact_id: &str) -> crate::retention::ArtifactClass {
-        crate::retention::ArtifactClass::Raw
+        crate::retention::ArtifactClass::RawSeed
     }
 
     /// Returns the last-modified timestamp (epoch seconds) for an artifact.
@@ -259,8 +259,8 @@ impl ArtifactStore for LocalArtifactStore {
             && self.artifact_path(artifact_id).exists()
     }
 
-    fn artifact_class(&self, artifact_id: &str) -> crate::retention::ArtifactClass {
-        crate::retention::ArtifactClass::classify(artifact_id)
+    fn artifact_class(&self, _artifact_id: &str) -> crate::retention::ArtifactClass {
+        crate::retention::ArtifactClass::RawSeed
     }
 
     fn artifact_modified_epoch(&self, artifact_id: &str) -> Option<i64> {

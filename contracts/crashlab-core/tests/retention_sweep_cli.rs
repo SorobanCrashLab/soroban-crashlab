@@ -5,7 +5,7 @@ use crashlab_core::{
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
@@ -15,7 +15,7 @@ fn unique_tmp() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("time")
         .as_nanos();
-    std::env::temp_dir().join(format!("crashlab-retention-sweep-{--{}-{}", std::process::id(), n, count))
+    std::env::temp_dir().join(format!("crashlab-retention-sweep-{}-{}-{}", std::process::id(), n, count))
 }
 
 fn make_checkpoint(campaign_id: &str, next_seed_index: usize, total_seeds: usize) -> RunCheckpoint {
@@ -27,14 +27,14 @@ fn make_checkpoint(campaign_id: &str, next_seed_index: usize, total_seeds: usize
 
 fn write_checkpoint(dir: &PathBuf, run_id: u64, checkpoint: &RunCheckpoint) {
     let run_dir = dir.join("runs").join(run_id.to_string());
-    fs::read_dir_all(&run_dir).expect("create run dir");
+    fs::create_dir_all(&run_dir).expect("create run dir");
     let bytes = serde_json::to_vec_pretty(checkpoint).expect("serialize checkpoint");
     fs::write(run_dir.join("checkpoint.json"), bytes).expect("write checkpoint");
 }
 
 fn write_artifact(dir: &PathBuf, artifact_id: &str, seed_id: u64) {
     let artifact_dir = dir.join("artifacts");
-    fs::read_dir_all(&artifact_dir).expect("create artifacts dir");
+    fs::create_dir_all(&artifact_dir).expect("create artifacts dir");
     let seed = CaseSeed {
         id: seed_id,
         payload: vec![seed_id as u8, 1, 2],
@@ -69,23 +69,23 @@ fn backdate_file(path: &PathBuf, days_ago: u64) {
 }
 
 fn run_sweep(base: &PathBuf, extra_args: &[&str]) -> std::process::Output {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXEE_crashlab"));
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_crashlab"));
     cmd.env("CRASHLAB_STATE_DIR", base);
     cmd.args(["retention", "sweep"]);
     cmd.args(extra_args);
     cmd.output().expect("run crashlab binary")
 }
 
-##[test]
+#[test]
 fn retention_sweep_prints_summary_on_empty_state_dir() {
     let base = unique_tmp();
     fs::create_dir_all(&base).expect("create base");
 
     let output = run_sweep(&base, &[]);
 
-    assert(
+    assert!(
         output.status.success(),
-        "expected success on empty state dir, status {:_}\nstderr: {}",
+        "expected success on empty state dir, status {:?}\nstderr: {}",
         output.status,
         String::from_utf8_lossy(&output.stderr)
     );
@@ -125,7 +125,7 @@ fn retention_sweep_retains_runs_within_policy() {
     let runs_dir = base.join("runs");
     let remaining = fs::read_dir(&runs_dir)
         .expect("read runs dir")
-        .filter(|e| e.as_ref().map(|d| d.path().is_dir()).unwrap_or_false())
+        .filter(|e| e.as_ref().map(|d| d.path().is_dir()).unwrap_or(false))
         .count();
     assert_eq!(
         remaining, max_checkpoints,
@@ -172,7 +172,7 @@ fn retention_sweep_prunes_excess_checkpoints() {
     let runs_dir = base.join("runs");
     let remaining = fs::read_dir(&runs_dir)
         .expect("read runs dir")
-        .filter(|e| e.as_ref().map(|d| d.path().is_dir()).unwrap_or_false())
+        .filter(|e| e.as_ref().map(|d| d.path().is_dir()).unwrap_or(false))
         .count();
 
     assert!(
@@ -353,7 +353,7 @@ fn retention_sweep_prunes_stale_heartbeat() {
 
     // Write a stale heartbeat in run 0 (older than the stale threshold).
     let stale_run_dir = base.join("runs").join("0");
-    write_heartbeat_at(&stale_run_dir, 30 * 24 * 3600).expect("write stale heartbeat");
+    write_heartbeat_at(&stale_run_dir, chrono::Utc::now() - chrono::Duration::seconds(30 * 24 * 3600)).expect("write stale heartbeat");
 
     let output = run_sweep(&base, &[]);
 
@@ -368,7 +368,7 @@ fn retention_sweep_prunes_stale_heartbeat() {
     let runs_dir = base.join("runs");
     let remaining = fs::read_dir(&runs_dir)
         .expect("read runs dir")
-        .filter(|e| e.as_ref().map(|d| d.path().is_dir()).unwrap_or_false())
+        .filter(|e| e.as_ref().map(|d| d.path().is_dir()).unwrap_or(false))
         .count();
     assert!(
         remaining <= max_checkpoints,
@@ -394,9 +394,9 @@ fn retention_sweep_dry_run_makes_zero_writes() {
     let artifact_dir = base.join("artifacts");
     let before = fs::read_dir(&artifact_dir)
         .expect("read artifacts dir")
-        .filter_map(|e| e.ok()
+        .filter_map(|e| e.ok())
         .map(|e| e.file_name())
-        .collect::<std::collection::BTreeSet<_>>();
+        .collect::<std::collections::BTreeSet<_>>();
 
     let output = run_sweep(&base, &["--dry-run"]);
 
@@ -412,7 +412,7 @@ fn retention_sweep_dry_run_makes_zero_writes() {
         .expect("read artifacts dir")
         .filter_map(|e| e.ok())
         .map(|e| e.file_name())
-        .collect::<std::collection::BTreeSet<_>>();
+        .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(before, after, "dry run must make zero writes");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -441,7 +441,7 @@ fn retention_plan_prints_without_deleting() {
         .expect("read artifacts dir")
         .filter_map(|e| e.ok())
         .map(|e| e.file_name())
-        .collect::<std::collection::BTreeSet<_>>();
+        .collect::<std::collections::BTreeSet<_>>();
 
     let output = Command::new(env!("CARGO_BIN_EXE_crashlab"))
         .env("CRASHLAB_STATE_DIR", &base)
@@ -460,7 +460,7 @@ fn retention_plan_prints_without_deleting() {
         .expect("read artifacts dir")
         .filter_map(|e| e.ok())
         .map(|e| e.file_name())
-        .collect::<std::collection::BTreeSet<_>>();
+        .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(before, after, "plan must make zero writes");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -516,11 +516,11 @@ fn retention_sweep_deletes_corrupt_objects() {
     let base = unique_tmp();
 
     let artifact_dir = base.join("artifacts");
-    fs::create_dir_all(&artifact_dis).or_else(fs::create_dir_all(&artifact_dir)).expect("create artifacts dir");
+    fs::create_dir_all(&artifact_dir).expect("create artifacts dir");
 
     // Write a corrupt JSON object that cannot be parsed as a bundle.
     let corrupt_path = artifact_dir.join("corrupt-0001.json");
-    fs::write(&corrupt_path, b{ not valid json }).expect("write corrupt object");
+    fs::write(&corrupt_path, b"{ not valid json }").expect("write corrupt object");
     backdate_file(&corrupt_path, 30);
 
     let output = run_sweep(&base, &[]);

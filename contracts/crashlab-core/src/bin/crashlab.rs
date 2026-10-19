@@ -21,7 +21,7 @@ use crashlab_core::{
     save_run_checkpoint_json,
     HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
     ArtifactStore, RunCheckpoint, CaseBundleDocument, FixtureManifest, ProvenancePolicy,
-    load_case_bundle_document_json, import_corpus_json, verify_corpus_integrity,
+    load_case_bundle_document_json, verify_corpus_integrity,
 };
 use crashlab_core::worker_partition::RingCoverage;
 use std::collections::HashSet;
@@ -1189,12 +1189,19 @@ fn parse_u32(raw: &str, flag: &str) -> Result<u32, String> {
 /// ring partitioning has been swept yet" and is exactly how a v1 checkpoint is
 /// interpreted on load.
 fn snapshot_checkpoint(campaign_id: &str, next_seed_index: u64, total_seeds: usize) -> RunCheckpoint {
-    RunCheckpoint {
+    let cp = RunCheckpoint {
         schema: RUN_CHECKPOINT_SCHEMA_VERSION,
         campaign_id: campaign_id.to_string(),
         next_seed_index: next_seed_index as usize,
         total_seeds,
         ring_coverage: RingCoverage::new(),
+        generation: 1,
+        crc32: 0,
+    };
+    // Compute the CRC after all fields are set.
+    RunCheckpoint {
+        crc32: cp.compute_crc32(),
+        ..cp
     }
 }
 
@@ -1475,6 +1482,12 @@ fn run_start_command(args: &[String]) {
             println!(
                 "run {} cancelled at seed {:?}: seeds_processed={}",
                 opts.run_id, summary.cancelled_at_seed, summary.seeds_processed
+            );
+        }
+        RunTerminalState::PlateauStop { summary } => {
+            println!(
+                "run {} stopped early (plateau detected): seeds_processed={}",
+                opts.run_id, summary.seeds_processed
             );
         }
         RunTerminalState::Failed { message } => {

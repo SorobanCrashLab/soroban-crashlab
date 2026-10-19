@@ -320,13 +320,13 @@ pub fn read_latest_health_snapshot_line(
     run_id: RunId,
     base: impl AsRef<Path>,
 ) -> Result<Option<String>, HealthSnapshotError> {
-    let path = health_snapshot_path(run_id, base);
+    let path = health_snapshot_path(run_id, &base);
     let contents = match fs::read_to_string(path) {
         Ok(contents) => contents,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(err) => return Err(err.into()),
     };
-    let log = read_health_snapshot_log(run_id, base)?;
+    let log = read_health_snapshot_log(run_id, &base)?;
     let latest_sequence = log.snapshots.last().map(|snapshot| snapshot.sequence);
     if let Some(sequence) = latest_sequence {
         for line in contents.lines().rev().filter(|line| !line.trim().is_empty()) {
@@ -546,6 +546,7 @@ pub fn terminal_label(terminal: &RunTerminalState) -> &'static str {
     match terminal {
         RunTerminalState::Completed { .. } => "completed",
         RunTerminalState::Cancelled { .. } => "cancelled",
+        RunTerminalState::PlateauStop { .. } => "plateau_stop",
         RunTerminalState::Failed { .. } => "failed",
     }
 }
