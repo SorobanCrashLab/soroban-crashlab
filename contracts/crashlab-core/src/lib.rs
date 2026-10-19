@@ -82,7 +82,9 @@ pub use cors::{
     evaluate_cors, CorsConfig, CorsError, CorsEvaluation, HttpMethod, OriginAllowlist,
     OriginPattern,
 };
-pub use fixture::RegressionFixture;
+pub use fixture::{
+    load_bundled_fixture_wasm, resolve_fixture_wasm, verify_wasm_sha256, RegressionFixture,
+};
 pub use fixture_classifier::{
     classify_and_wrap_fixture, classify_and_wrap_verified, classify_fixture,
     classify_paired_fixture, PairedClassification,
