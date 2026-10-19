@@ -208,7 +208,25 @@ pub fn create_runner() -> Result<Box<dyn ContractRunner>, RunnerCreationError> {
                     })?;
                 
                 crate::RpcContractRunner::with_contract(rpc_url, contract_id)
-                    .map(|runner| Box::new(runner) as Box<dyn ContractRunner>)
+                    .map(|runner| {
+                        // CRASHLAB_RPC_MODE=submit opts into network writes;
+                        // anything else (including unset) stays read-only.
+                        let mode = match std::env::var("CRASHLAB_RPC_MODE")
+                            .unwrap_or_default()
+                            .trim()
+                            .to_ascii_lowercase()
+                            .as_str()
+                        {
+                            "submit" => crate::RpcMode::Submit,
+                            _ => crate::RpcMode::Simulate,
+                        };
+                        match runner.with_mode(mode) {
+                            Ok(runner) => Ok(Box::new(runner) as Box<dyn ContractRunner>),
+                            Err(e) => Err(RunnerCreationError::InvalidRunnerType {
+                                runner_type: format!("rpc (mode error: {})", e),
+                            }),
+                        }
+                    })
                     .map_err(|e| RunnerCreationError::InvalidRunnerType {
                         runner_type: format!("rpc (config error: {})", e),
                     })

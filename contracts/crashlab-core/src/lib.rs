@@ -110,7 +110,7 @@ pub use taxonomy::{
 pub use host_runner::HostContractRunner;
 
 #[cfg(feature = "rpc-runner")]
-pub use rpc_runner::{RpcConfigError, RpcContractRunner};
+pub use rpc_runner::{batch_seeds_per_ledger, RpcConfigError, RpcContractRunner, RpcMode};
 
 #[cfg(not(feature = "rpc-runner"))]
 pub use rpc_runner_stub::{RpcConfigError, RpcContractRunner};
