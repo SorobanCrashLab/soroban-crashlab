@@ -48,8 +48,8 @@ on:
       - 'scripts/check-docker-image-size.mjs'
 
 concurrency:
-  group: docker-build-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-docker-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -91,8 +91,8 @@ jobs:
           load: true
           push: false
           tags: ${{ env.WEB_IMAGE }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=web-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json', 'package-lock.json') }}
+          cache-to: type=gha,mode=max,scope=web-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json', 'package-lock.json') }}
 
       - name: Install Trivy (pinned, checksum verified)
         run: |
@@ -350,16 +350,16 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.4.1
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build Contracts Docker Image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: contracts
           file: contracts/crashlab-core/Dockerfile
           push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=contracts-${{ runner.os }}-${{ hashFiles('contracts/Cargo.lock', 'contracts/**/Cargo.lock') }}
+          cache-to: type=gha,mode=max,scope=contracts-${{ runner.os }}-${{ hashFiles('contracts/Cargo.lock', 'contracts/**/Cargo.lock') }}
