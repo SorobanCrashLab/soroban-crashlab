@@ -4,6 +4,8 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use crate::auth_scenario::AuthScenario;
+
 /// Normalized JSON scenario for cross-tool reuse.
 ///
 /// Contains all information needed to reproduce a failing test case,
@@ -77,6 +79,23 @@ pub fn export_scenario_json(
     serde_json::to_string_pretty(&scenario)
 }
 
+/// Exports a stateful authorization scenario as a normalized JSON document.
+///
+/// Unlike [`export_scenario_json`], which captures a single invocation, this
+/// exporter preserves the full ordered step chain (setup → grant/revoke →
+/// probe) together with per-step auth matrix expectations so that reports and
+/// replay harnesses can reconstruct the state transition sequence.
+///
+/// The output is deterministic for the same scenario, making it suitable for
+/// regression archives and cross-tool replay.
+///
+/// # Errors
+///
+/// Returns a [`serde_json::Error`] if JSON serialization fails.
+///
+/// # Example
+///
+/// 
 /// Exports a failing seed as a normalized JSON scenario for cross-tool reuse.
 ///
 /// This is a focused variant of [`export_scenario_json`] that explicitly
@@ -768,21 +787,25 @@ mod tests {
 
     // ── write_rust_regression_snippet ────────────────────────────────────────
 
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static SNIPPETP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn snippet_n() -> u64 {
+        SNIPPETP_COUNTER.fetch_add(1, Ordering::Relaxed)
+    }
+
     #[test]
     fn write_snippet_creates_file_with_valid_rust_code() {
         use std::fs;
-        use std::time::{SystemTime, UNIX_EPOCH};
 
         let bundle = to_bundle(CaseSeed {
             id: 77,
             payload: vec![0x10, 0x20, 0x30],
         });
 
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let tmp_path = std::env::temp_dir().join(format!("test_snippet_{}.rs", n));
+        let n = snippet_n();
+        let tmp_path = std::env::temp_dir().join(format!("test_snippet_{}_{n}.rs", std::process::id()));
 
         let written_path = write_rust_regression_snippet(&bundle, &tmp_path).unwrap();
 
@@ -801,18 +824,14 @@ mod tests {
     #[test]
     fn write_snippet_adds_rs_extension_if_missing() {
         use std::fs;
-        use std::time::{SystemTime, UNIX_EPOCH};
 
         let bundle = to_bundle(CaseSeed {
             id: 88,
             payload: vec![0xAA],
         });
 
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let tmp_path = std::env::temp_dir().join(format!("test_snippet_{}", n));
+        let n = snippet_n();
+        let tmp_path = std::env::temp_dir().join(format!("test_snippet_{}_{n}", std::process::id()));
 
         let written_path = write_rust_regression_snippet(&bundle, &tmp_path).unwrap();
 
@@ -824,18 +843,14 @@ mod tests {
     #[test]
     fn write_snippet_preserves_rs_extension() {
         use std::fs;
-        use std::time::{SystemTime, UNIX_EPOCH};
 
         let bundle = to_bundle(CaseSeed {
             id: 99,
             payload: vec![0xFF],
         });
 
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let tmp_path = std::env::temp_dir().join(format!("test_snippet_{}.rs", n));
+        let n = snippet_n();
+        let tmp_path = std::env::temp_dir().join(format!("test_snippet_{}_{n}.rs", std::process::id()));
 
         let written_path = write_rust_regression_snippet(&bundle, &tmp_path).unwrap();
 
@@ -849,19 +864,15 @@ mod tests {
     #[test]
     fn write_snippet_output_is_deterministic() {
         use std::fs;
-        use std::time::{SystemTime, UNIX_EPOCH};
 
         let bundle = to_bundle(CaseSeed {
             id: 111,
             payload: vec![0x11, 0x22],
         });
 
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let tmp_path1 = std::env::temp_dir().join(format!("test_snippet_{}a.rs", n));
-        let tmp_path2 = std::env::temp_dir().join(format!("test_snippet_{}b.rs", n));
+        let n = snippet_n();
+        let tmp_path1 = std::env::temp_dir().join(format!("test_snippet_{}_{n}a.rs", std::process::id()));
+        let tmp_path2 = std::env::temp_dir().join(format!("test_snippet_{}_{n}b.rs", std::process::id()));
 
         let written_path1 = write_rust_regression_snippet(&bundle, &tmp_path1).unwrap();
         let written_path2 = write_rust_regression_snippet(&bundle, &tmp_path2).unwrap();

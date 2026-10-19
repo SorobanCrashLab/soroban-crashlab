@@ -6,6 +6,10 @@
  *
  * Issue: #1408 - Lighthouse CI budgets on key pages with PR score comments
  *
+ * Budgets are loaded from `perf-budgets.json` (the single source of truth
+ * shared with size-limit). `pnpm budget:update` regenerates that file from a
+ * measured run, so increases are reviewed in the PR diff like code.
+ *
  * Run locally against a production build (the server must already be up and
  * warmed — see the "no startServerCommand" note below):
  *
@@ -23,11 +27,16 @@
  * dist directory could not serve the dynamic segment or the `/api/runs` calls
  * the dashboard makes on mount.
  */
+const budgets = require("./perf-budgets.json");
+
+/**
+ * Map a budget entry's `path` to the absolute URL LHCI collects against.
+ * Budgets are keyed by route path so the same file drives size-limit.
+ */
+const urlFor = (path) => `http://127.0.0.1:3210${path}`;
+
 const ROUTES = [
-  "http://127.0.0.1:3210/",
-  "http://127.0.0.1:3210/runs",
-  "http://127.0.0.1:3210/runs/run-1024",
-  "http://127.0.0.1:3210/analytics",
+  ...budgets.routes.map((route) => urlFor(route.path)),
 ];
 
 /**
@@ -110,59 +119,36 @@ module.exports = {
        * (observed samples 6.0-6.2s). Upstream a11y work (issue #1586) will
        * ratchet these back up once it lands.
        */
-      assertMatrix: [
-        {
-          // Dashboard. perf 0.70 · a11y 0.83 (no variance) · LCP max 5.0s
-          matchingUrlPattern: "^http://127\\.0\\.0\\.1:3210/$",
-          assertions: {
-            "categories:performance": ["error", { minScore: 0.25 }],
-            "categories:accessibility": ["error", { minScore: 0.8 }],
-            "largest-contentful-paint": ["error", { maxNumericValue: 6000 }],
-            "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
-            "categories:best-practices": "off",
-            "categories:seo": "off",
-          },
+      /*
+       * Per-route budgets are generated from `perf-budgets.json` by
+       * `pnpm budget:update`. Each entry carries the measured baseline for
+       * performance, accessibility, LCP and CLS; the script applies the
+       * ratchet margins (perf/a11y floor = baseline - margin, LCP ceiling =
+       * baseline + margin) so the committed numbers are the enforced ones.
+       */
+      assertMatrix: budgets.routes.map((route) => ({
+        matchingUrlPattern: `^${urlFor(route.path).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+        assertions: {
+          "categories:performance": [
+            "error",
+            { minScore: route.lighthouse.performance },
+          ],
+          "categories:accessibility": [
+            "error",
+            { minScore: route.lighthouse.accessibility },
+          ],
+          "largest-contentful-paint": [
+            "error",
+            { maxNumericValue: route.lighthouse.lcpMs },
+          ],
+          "cumulative-layout-shift": [
+            "error",
+            { maxNumericValue: route.lighthouse.cls },
+          ],
+          "categories:best-practices": "off",
+          "categories:seo": "off",
         },
-        {
-          // Runs list. perf 0.70 · a11y 0.80 (no variance) · LCP up to 6.2s
-          matchingUrlPattern: "^http://127\\.0\\.0\\.1:3210/runs$",
-          assertions: {
-            "categories:performance": ["error", { minScore: 0.45 }],
-            "categories:accessibility": ["error", { minScore: 0.77 }],
-            "largest-contentful-paint": ["error", { maxNumericValue: 6500 }],
-            "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
-            "categories:best-practices": "off",
-            "categories:seo": "off",
-          },
-        },
-        {
-          // Run detail — the noisiest route: perf 0.68 · a11y 0.82 (no variance) · LCP 5.9s
-          matchingUrlPattern: "^http://127\\.0\\.0\\.1:3210/runs/run-1024$",
-          assertions: {
-            "categories:performance": ["error", { minScore: 0.25 }],
-            "categories:accessibility": ["error", { minScore: 0.79 }],
-            "largest-contentful-paint": ["error", { maxNumericValue: 6500 }],
-            "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
-            "categories:best-practices": "off",
-            "categories:seo": "off",
-          },
-        },
-        {
-          // Analytics. perf 0.70 · a11y 0.85 (no variance) · LCP 5.7s
-          matchingUrlPattern: "^http://127\\.0\\.0\\.1:3210/analytics$",
-          assertions: {
-            "categories:performance": ["error", { minScore: 0.35 }],
-            "categories:accessibility": ["error", { minScore: 0.82 }],
-            // 2026-09-29 re-ratchet: CI measured 6.1-6.4s under the pinned
-            // Slow-4G preset on the blacksmith runner; 6000 was one shake
-            // too tight. 6750 keeps the gate honest at baseline + ~0.4s.
-            "largest-contentful-paint": ["error", { maxNumericValue: 6750 }],
-            "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
-            "categories:best-practices": "off",
-            "categories:seo": "off",
-          },
-        },
-      ],
+      })),
     },
     upload: {
       // Public temporary storage: gives the PR comment permanent report links

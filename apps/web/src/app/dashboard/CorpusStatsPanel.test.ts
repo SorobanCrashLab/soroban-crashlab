@@ -28,4 +28,17 @@ describe('CorpusStatsPanel logic and degradation paths', () => {
     expect(latest.execsPerSec).toBe(4750);
     expect(latest.coveragePct).toBe(88.9);
   });
+
+  it('preserves energy metadata fields when present in corpus stats', () => {
+    const series: CorpusStatPoint[] = fixtureData.corpusStats as CorpusStatPoint[];
+    const downsampled = downsampleCorpusStats(series, 10);
+
+    // Downsampling must not introduce undefined or non-numeric energy scores.
+    for (const point of downsampled) {
+      if (point.energyScore !== undefined) {
+        expect(typeof point.energyScore).toBe('number');
+        expect(Number.isFinite(point.energyScore as number)).toBe(true);
+      }
+    }
+  });
 });

@@ -114,17 +114,31 @@ impl HostContractRunner {
 
     /// Resolves which wasm to deploy, in priority order: explicit bytes >
     /// `CRASHLAB_CONTRACT_WASM` file > bundled fixture.
+    ///
+    /// When `CRASHLAB_CONTRACT_WASM_SHA256` is set, the loaded bytes are
+    /// hash-verified and a mismatch is reported as [`RunnerError::Misconfigured`]
+    /// (a genuine deploy/setup failure) rather than executing anything.
     fn resolve_wasm(&self) -> Result<Vec<u8>, RunnerError> {
         if let Some(wasm) = &self.wasm {
             return Ok(wasm.clone());
         }
         match std::env::var("CRASHLAB_CONTRACT_WASM") {
-            Ok(path) if !path.trim().is_empty() => std::fs::read(path.trim()).map_err(|e| {
-                RunnerError::Misconfigured {
-                    message: format!("could not read CRASHLAB_CONTRACT_WASM '{}': {e}", path.trim()),
+            Ok(path) if !path.trim().is_empty() => {
+                let bytes = std::fs::read(path.trim()).map_err(|e| {
+                    RunnerError::Misconfigured {
+                        message: format!("could not read CRASHLAB_CONTRACT_WASM '{}': {e}", path.trim()),
+                    }
+                })?;
+                if let Ok(expected) = std::env::var("CRASHLAB_CONTRACT_WASM_SHA256") {
+                    crate::fixture::verify_wasm_sha256(&bytes, expected.trim()).map_err(|message| {
+                        RunnerError::Misconfigured { message }
+                    })?;
                 }
+                Ok(bytes)
+            }
+            _ => crate::fixture::load_bundled_fixture_wasm().map_err(|message| {
+                RunnerError::Misconfigured { message }
             }),
-            _ => Ok(DEFAULT_CONTRACT_WASM.to_vec()),
         }
     }
 

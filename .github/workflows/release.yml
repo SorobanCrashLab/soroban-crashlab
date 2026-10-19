@@ -26,8 +26,8 @@ on:
         default: v0.0.0-dryrun
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  group: ci-release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 permissions:
   contents: read
@@ -141,6 +141,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: contracts/crashlab-core
+          key: ${{ runner.os }}-rust-1.97.1-${{ hashFiles('contracts/crashlab-core/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-rust-1.97.1-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
@@ -159,12 +162,13 @@ jobs:
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      CACHE_SCOPE: ${{ github.event_name == 'push' && github.ref || format('pr-{0}', github.run_id) }}
     permissions:
       contents: read
       packages: write
       id-token: write
-    env:
-      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -179,6 +183,8 @@ jobs:
           file: apps/web/Dockerfile
           load: true
           push: false
+          cache-from: type=gha,scope=${{ env.CACHE_SCOPE }}
+          cache-to: ${{ github.event_name == 'push' && format('type=gha,mode=max,scope={0}', env.CACHE_SCOPE) || '' }}
           tags: ${{ env.IMAGE }}:${{ env.VERSION }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -230,7 +236,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true

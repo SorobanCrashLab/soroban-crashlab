@@ -12,7 +12,13 @@
     "test:e2e:quarantine:json": "node scripts/check-quarantine.mjs --json",
     "build": "next build",
     "analyze": "ANALYZE=true next build --webpack",
-    "lhci": "pnpm dlx @/hci/cli@0.15.1 autorun --config=lighthouserconfig.js",
+<<<<<<< HEAD
+
+=======
+    "lhci": "pnpm dlx @lhci/cli@0.15.1 autorun --config=lighthouserconfig.js",
+    "budget:update": "node scripts/update-perf-budgets.mjs",
+    "budget:update": "node scripts/update-perf-budgets.mjs",
+>>>>>>> origin/main
     "start": "next start",
     "lint": "eslint .",
     "openapi:generate": "pnpm exec tsc scripts/generate-openapi.ts --module commonjs --target es2022 --rootDir . --outDir build/openapi --esModuleInterop --skipLibCheck --types node && node build/openapi/scripts/generate-openapi.js",

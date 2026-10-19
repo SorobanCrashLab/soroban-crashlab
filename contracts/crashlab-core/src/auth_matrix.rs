@@ -1,4 +1,5 @@
 use crate::retry::{execute_with_retry, RetryConfig, SimulationError};
+use crate::auth_scenario::{run_scenario, ScenarioReport, ScenarioSeed, AuthStateDivergence};
 use crate::taxonomy::{stable_failure_class_for_bundle, FailureClass};
 use crate::{CaseSeed, CrashSignature};
 
@@ -154,6 +155,38 @@ where
     F: FnMut(&CaseSeed, AuthMode) -> Result<CrashSignature, SimulationError>,
 {
     seeds.iter().map(|seed| run_matrix(seed, &mut runner)).collect()
+}
+
+/// Runs a stateful authorization scenario across all [`AuthMode`]s, carrying
+/// contract state across ordered steps (setup → grant/revoke → probe).
+///
+/// Unlike [`run_matrix`], which exercises a single invocation, this driver
+/// executes each step of `scenario` in order under one ledger sequence per
+/// mode, so state-transition auth flaws (TOCTOU on roles, privilege
+/// persistence after revoke, post-upgrade auth drift) become reachable.
+///
+/// `runner` receives the scenario, the current step index, and the mode, and
+/// must return the [`CrashSignature`] observed for that step under that mode.
+///
+/// # Errors
+///
+/// Returns [`SimulationError`] if any step fails after all retry attempts or
+/// if a non-transient error is encountered.
+pub fn run_stateful_matrix<F>(
+    scenario: &ScenarioSeed,
+    mut runner: F,
+) -> Result<ScenarioReport, SimulationError>
+where
+    F: FnMut(&ScenarioSeed, usize, AuthMode) -> Result<CrashSignature, SimulationError>,
+{
+    let config = RetryConfig::default();
+    run_scenario(scenario, &config, |scenario, step, mode| runner(scenario, step, mode))
+}
+
+/// Returns the step-indexed auth-state divergences across modes for a scenario
+/// report, for use by signature emitters (`auth_state_divergence`).
+pub fn stateful_divergences(report: &ScenarioReport) -> Vec<AuthStateDivergence> {
+    report.divergences.clone()
 }
 
 /// A human-readable mismatch summary for a MatrixReport, including FailureClass
@@ -491,6 +524,85 @@ mod tests {
         for (r1, r2) in report1.results.iter().zip(report2.results.iter()) {
             assert_eq!(r1.mode, r2.mode);
             assert_eq!(r1.signature, r2.signature);
+        }
+    }
+
+    // ── stateful scenario library ─────────────────────────────────────────────
+
+    #[test]
+    fn stateful_grant_revoke_attempt_passes_when_oracle_matches() {
+        use crate::auth_scenario::{ScenarioSeed, ScenarioStep, ExpectedAuth};
+
+        let scenario = ScenarioSeed {
+            id: 1,
+            steps: vec![
+                ScenarioStep { label: "setup".into(), expected: ExpectedAuth::Allow },
+                ScenarioStep { label: "grant".into(), expected: ExpectedAuth::Allow },
+                ScenarioStep { label: "revoke".into(), expected: ExpectedAuth::Allow },
+                ScenarioStep { label: "attempt".into(), expected: ExpectedAuth::Deny },
+            ],
+        };
+
+        let report = run_stateful_matrix(&scenario, |_, step, _| {
+            let digest = if step == 3 { 0xDEAD } else { 0xBEEF };
+            Ok(sig(digest))
+        })
+        .unwrap();
+
+        assert!(report.divergences.is_empty());
+    }
+
+    #[test]
+    fn stateful_upgrade_attempt_flags_divergence_with_step_index() {
+        use crate::auth_scenario::{ScenarioSeed, ScenarioStep, ExpectedAuth};
+
+        let scenario = ScenarioSeed {
+            id: 2,
+            steps: vec![
+                ScenarioStep { label: "setup".into(), expected: ExpectedAuth::Allow },
+                ScenarioStep { label: "upgrade".into(), expected: ExpectedAuth::Allow },
+                ScenarioStep { label: "attempt".into(), expected: ExpectedAuth::Deny },
+            ],
+        };
+
+        let report = run_stateful_matrix(&scenario, |_, step, mode| {
+            if step == 2 && mode == AuthMode::Enforce {
+                Ok(sig(0x01))
+            } else {
+                Ok(sig(0x02))
+            }
+        })
+        .unwrap();
+
+        assert!(!report.divergences.is_empty());
+        assert_eq!(report.divergences[0].step_index, 2);
+    }
+
+    #[test]
+    fn stateful_sequence_replay_is_deterministic() {
+        use crate::auth_scenario::{ScenarioSeed, ScenarioStep, ExpectedAuth};
+
+        let scenario = ScenarioSeed {
+            id: 3,
+            steps: vec![
+                ScenarioStep { label: "setup".into(), expected: ExpectedAuth::Allow },
+                ScenarioStep { label: "probe".into(), expected: ExpectedAuth::Deny },
+            ],
+        };
+
+        let run = |s: &ScenarioSeed| {
+            run_stateful_matrix(s, |_, step, mode| {
+                Ok(sig(step as u64 + mode as u64))
+            })
+            .unwrap()
+        };
+
+        let r1 = run(&scenario);
+        let r2 = run(&scenario);
+        assert_eq!(r1.divergences.len(), r2.divergences.len());
+        assert_eq!(r1.steps.len(), r2.steps.len());
+        for (a, b) in r1.steps.iter().zip(r2.steps.iter()) {
+            assert_eq!(a.step_index, b.step_index);
         }
     }
 

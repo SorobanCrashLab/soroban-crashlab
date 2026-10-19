@@ -8,7 +8,10 @@
 use crate::{CaseBundle, BundlePersistError};
 use std::path::{Path, PathBuf};
 use std::fs;
-use std::io;
+use std::io::{self, Read};
+
+/// Maximum size of an uncompressed artifact JSON document.
+pub const MAX_ARTIFACT_JSON_BYTES: usize = crate::bundle_persist::MAX_BUNDLE_JSON_BYTES;
 
 /// Configuration for artifact storage backends.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,9 +121,9 @@ pub trait ArtifactStore: Send + Sync {
 
     /// Returns the artifact class for retention policy purposes.
     ///
-    /// Defaults to `ArtifactClass::Raw` for backends that do not track classes.
+    /// Defaults to `ArtifactClass::RawSeed` for backends that do not track classes.
     fn artifact_class(&self, _artifact_id: &str) -> crate::retention::ArtifactClass {
-        crate::retention::ArtifactClass::Raw
+        crate::retention::ArtifactClass::RawSeed
     }
 
     /// Returns the last-modified timestamp (epoch seconds) for an artifact.
@@ -146,7 +149,13 @@ impl LocalArtifactStore {
 
     /// Validates artifact ID to prevent directory traversal attacks.
     fn validate_artifact_id(id: &str) -> Result<(), StorageError> {
-        if id.is_empty() || id == ".." || id.contains("/") || id.contains("\\") {
+        if id.is_empty()
+            || id == "."
+            || id == ".."
+            || !id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
             return Err(StorageError::InvalidId {
                 artifact_id: id.to_string(),
             });
@@ -187,7 +196,12 @@ impl ArtifactStore for LocalArtifactStore {
         Self::validate_artifact_id(artifact_id)?;
 
         let path = self.artifact_path(artifact_id);
-        let json_bytes = crate::save_case_bundle_json(bundle)?;
+        let json_bytes = crate::save_sanitized_case_bundle_json(bundle)?;
+        if json_bytes.len() > MAX_ARTIFACT_JSON_BYTES {
+            return Err(StorageError::Persistence(BundlePersistError::SizeLimit {
+                limit: MAX_ARTIFACT_JSON_BYTES,
+            }));
+        }
         fs::write(&path, json_bytes)?;
 
         Self::metadata_from_file(artifact_id, &path)
@@ -203,7 +217,15 @@ impl ArtifactStore for LocalArtifactStore {
             });
         }
 
-        let bytes = fs::read(&path)?;
+        let mut bytes = Vec::new();
+        fs::File::open(&path)?
+            .take(MAX_ARTIFACT_JSON_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > MAX_ARTIFACT_JSON_BYTES {
+            return Err(StorageError::Persistence(BundlePersistError::SizeLimit {
+                limit: MAX_ARTIFACT_JSON_BYTES,
+            }));
+        }
         Ok(crate::load_case_bundle_json(&bytes)?)
     }
 
@@ -280,15 +302,14 @@ impl ArtifactStore for LocalArtifactStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::sync::atomic::{AtomicU64, Ordering};
     use crate::{to_bundle, CaseSeed};
 
+    static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
     fn unique_tmp() -> PathBuf {
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time")
-            .as_nanos();
-        std::env::temp_dir().join(format!("crashlab-artifacts-{n}"))
+        let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("crashlab-artifacts-{}-{n}", std::process::id()))
     }
 
     #[test]

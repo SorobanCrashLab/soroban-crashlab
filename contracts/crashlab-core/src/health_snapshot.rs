@@ -18,6 +18,7 @@
 use crate::health::{FailureMetrics, HealthMonitor, HealthStatus, QueueMetrics, ThroughputMetrics};
 use crate::run_control::{RunId, RunProgress, RunTerminalState};
 use crate::taxonomy::FailureClass;
+use crate::vclock::VClock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -133,14 +134,18 @@ impl HealthSnapshot {
     /// The log is JSON Lines, so the object must never be pretty-printed: one
     /// snapshot has to occupy exactly one line.
     pub fn to_json_line(&self) -> Result<String, serde_json::Error> {
-        let mut line = serde_json::to_string(self)?;
+        let value = serde_json::to_value(self)?;
+        let (sanitized, _) = crate::redact::redact_json_value(&value);
+        let mut line = serde_json::to_string(&sanitized)?;
         line.push('\n');
         Ok(line)
     }
 
     /// Parses one log line, rejecting schema versions this build cannot read.
     pub fn from_json_line(line: &str) -> Result<Self, HealthSnapshotError> {
-        let snapshot: HealthSnapshot = serde_json::from_str(line)?;
+        let value: serde_json::Value = serde_json::from_str(line)?;
+        let (redacted, _) = crate::redact::redact_json_value(&value);
+        let snapshot: HealthSnapshot = serde_json::from_value(redacted)?;
         if !SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS.contains(&snapshot.schema_version) {
             return Err(HealthSnapshotError::UnsupportedSchema {
                 found: snapshot.schema_version,
@@ -320,6 +325,7 @@ pub fn read_latest_health_snapshot_line(
     run_id: RunId,
     base: impl AsRef<Path>,
 ) -> Result<Option<String>, HealthSnapshotError> {
+    let base = base.as_ref();
     let path = health_snapshot_path(run_id, base);
     let contents = match fs::read_to_string(path) {
         Ok(contents) => contents,
@@ -331,7 +337,7 @@ pub fn read_latest_health_snapshot_line(
     if let Some(sequence) = latest_sequence {
         for line in contents.lines().rev().filter(|line| !line.trim().is_empty()) {
             if HealthSnapshot::from_json_line(line).is_ok_and(|snapshot| snapshot.sequence == sequence) {
-                return Ok(Some(line.to_string()));
+                return Ok(Some(crate::redact::redact_text(line)));
             }
         }
     }
@@ -390,6 +396,7 @@ pub struct CampaignHealth {
     emit_every_seeds: u64,
     state_dir: Option<PathBuf>,
     monitor: HealthMonitor,
+    clock: VClock,
     sequence: u64,
     snapshots_emitted: u64,
     snapshot_write_failures: u64,
@@ -403,6 +410,14 @@ impl CampaignHealth {
     /// Without [`CampaignHealth::with_state_dir`] snapshots are still produced
     /// (and readable via [`CampaignHealth::last_snapshot`]) but not persisted.
     pub fn new(run_id: RunId, total_seeds: u64) -> Self {
+        Self::with_clock(run_id, total_seeds, VClock::real())
+    }
+
+    /// Creates a reporter backed by an explicit [`VClock`].
+    ///
+    /// Tests and replay pass a virtual clock so snapshot timestamps are
+    /// deterministic (#1795).
+    pub fn with_clock(run_id: RunId, total_seeds: u64, clock: VClock) -> Self {
         Self {
             run_id,
             campaign_id: None,
@@ -411,7 +426,8 @@ impl CampaignHealth {
             state_dir: None,
             // A campaign's queue holds at most one pending seed per slot, so the
             // requested seed count is the natural capacity for utilization.
-            monitor: HealthMonitor::new(total_seeds.max(1)),
+            monitor: HealthMonitor::with_clock(total_seeds.max(1), clock.clone()),
+            clock,
             sequence: 0,
             snapshots_emitted: 0,
             snapshot_write_failures: 0,
@@ -433,7 +449,7 @@ impl CampaignHealth {
 
     /// Overrides the queue capacity used for utilization metrics.
     pub fn with_queue_capacity(mut self, capacity: u64) -> Self {
-        self.monitor = HealthMonitor::new(capacity);
+        self.monitor = HealthMonitor::with_clock(capacity, self.clock.clone());
         self
     }
 
@@ -488,13 +504,18 @@ impl CampaignHealth {
     pub fn emit_snapshot(&mut self, seeds_processed: u64) -> &HealthSnapshot {
         self.sequence += 1;
 
+        // Use the injected VClock for the timestamp so snapshots are
+        // deterministic under replay (#1795). chrono::DateTime::from(SystemTime)
+        // converts the wall time to an RFC 3339 string.
+        let emitted_at = chrono::DateTime::<chrono::Utc>::from(self.clock.now_wall()).to_rfc3339();
+
         let mut snapshot = HealthSnapshot::from_monitor(
             &self.monitor,
             self.run_id,
             self.sequence,
             self.total_seeds,
             seeds_processed,
-            chrono::Utc::now().to_rfc3339(),
+            emitted_at,
         );
         if let Some(campaign_id) = &self.campaign_id {
             snapshot = snapshot.with_campaign_id(campaign_id.clone());
@@ -545,7 +566,9 @@ impl RunProgress for CampaignHealth {
 pub fn terminal_label(terminal: &RunTerminalState) -> &'static str {
     match terminal {
         RunTerminalState::Completed { .. } => "completed",
+        RunTerminalState::Cancelling { .. } => "cancelling",
         RunTerminalState::Cancelled { .. } => "cancelled",
+        RunTerminalState::PlateauStop { .. } => "plateau_stop",
         RunTerminalState::Failed { .. } => "failed",
     }
 }
@@ -556,17 +579,12 @@ mod tests {
     use crate::health::HealthStatus;
     use crate::run_control::{drive_run_with_health, CancelSignal};
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn unique_tmp() -> PathBuf {
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time")
-            .as_nanos();
-        let seq = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-        std::env::temp_dir().join(format!("crashlab-health-{n}-{seq}"))
+        let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("crashlab-health-{}-{n}", std::process::id()))
     }
 
     fn monitor_with_cases(cases: u64) -> HealthMonitor {

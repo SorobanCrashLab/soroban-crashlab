@@ -1,6 +1,7 @@
 import { ApiTokenScope } from './storage/api-token-store';
 import { tenantKeyPrefix } from './tenancy/storage-keys';
 import type { TenantScope } from './tenancy/tenant-scope';
+import { matchRouteCatalogEntry } from './route-catalog';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
 
@@ -50,6 +51,14 @@ const SCOPE_RULES: ScopeRule[] = [
 
 export function getRequiredScopesForRequest(method: string, pathname: string): ApiTokenScope[] | null {
   const upperMethod = method.toUpperCase() as HttpMethod;
+
+  // The route catalog is the source of truth for scope requirements. The
+  // pattern table below remains as a fallback for paths that have no exact
+  // catalog registration (e.g. sub-resources reached under a prefix).
+  const catalogEntry = matchRouteCatalogEntry(upperMethod, pathname);
+  if (catalogEntry?.requiredCapability?.scopes) {
+    return catalogEntry.requiredCapability.scopes;
+  }
 
   for (const rule of SCOPE_RULES) {
     if (rule.methods.includes(upperMethod) && rule.pattern.test(pathname)) {

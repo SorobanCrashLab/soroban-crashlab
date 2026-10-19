@@ -7,6 +7,9 @@
 //! bundle end to end, or `crashlab regression-suite <path> [--report <out.json>]`
 //! to run all regression fixtures from a file or directory (optionally writing a
 //! machine-readable report for CI summaries and dashboard ingest).
+//! `crashlab regression history [--json]` prints persisted regression-suite run
+//! history so operators can see which suite run fixed or regressed a fixture
+//! without archaeology through CI logs.
 //!
 //! See `docs/RUN_LIFECYCLE.md` for the start → checkpoint → resume → cancel
 //! lifecycle and ADR-0008 for the design rationale.
@@ -22,15 +25,43 @@ use crashlab_core::{
     HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
     ArtifactStore, RunCheckpoint, CaseBundleDocument, FixtureManifest, ProvenancePolicy,
     load_case_bundle_document_json, import_corpus_json, verify_corpus_integrity,
+    RegressionSuiteSelection, RegressionSuiteRunRecord, RegressionSuiteHistory,
+    load_regression_suite_history, append_regression_suite_history,
 };
 use crashlab_core::worker_partition::RingCoverage;
 use std::collections::HashSet;
 use std::fs;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use crashlab_core::vclock::VClock;
+
+macro_rules! println {
+    () => {
+        std::println!()
+    };
+    ($($argument:tt)*) => {{
+        let message = format!($($argument)*);
+        std::println!("{}", crashlab_core::redact::redact_text(&message));
+    }};
+}
+
+macro_rules! eprintln {
+    () => {
+        std::eprintln!()
+    };
+    ($($argument:tt)*) => {{
+        let message = format!($($argument)*);
+        std::eprintln!("{}", crashlab_core::redact::redact_text(&message));
+    }};
+}
 
 fn main() {
-    env_logger::init();
+    env_logger::Builder::from_env(env_logger::Env::default())
+        .format(|buffer, record| {
+            let message = crashlab_core::redact::redact_text(&record.args().to_string());
+            writeln!(buffer, "{} {} {}", buffer.timestamp(), record.level(), message)
+        })
+        .init();
     let mut args = std::env::args();
     let _prog = args.next();
 
@@ -128,6 +159,28 @@ fn main() {
                 std::process::exit(1);
             }
             run_regression_suite_command(path, Some(Path::new(report_path)));
+        }
+        (Some("regression-suite"), Some(path), flag, None)
+            if flag.is_none() || flag.as_deref() == Some("--group")
+                || flag.as_deref() == Some("--filter")
+                || flag.as_deref() == Some("--changed-since")
+                || flag.as_deref() == Some("--workers") =>
+        {
+            let mut remaining_args: Vec<String> = Vec::new();
+            if let Some(f) = flag {
+                remaining_args.push(f);
+            }
+            remaining_args.extend(rest);
+            run_regression_suite_selected_command(path, &remaining_args);
+        }
+        (Some("regression"), Some("history"), flag, None)
+            if flag.is_none() || flag.as_deref() == Some("--json") =>
+        {
+            if !rest.is_empty() {
+                print_usage();
+                std::process::exit(1);
+            }
+            regression_history_command(flag.as_deref() == Some("--json"));
         }
         (Some("runs"), Some("list"), None, None) => {
             if !rest.is_empty() {
@@ -260,6 +313,8 @@ fn print_usage() {
                 crashlab replay seed <bundle-json-path>\n\
                 crashlab bundle export-rust <bundle-json-path> -o <file.rs> [--force]\n\
                 crashlab regression-suite <suite-json-path-or-directory> [--report <report.json>]\n\
+                crashlab regression-suite <path> [--group <tag>] [--filter <tag>] [--changed-since <ref>] [--workers <n>]\n\
+                crashlab regression history [--json]\n\
                 crashlab regression baseline set <observed-suite.json> <baseline.json>\n\
                 crashlab regression baseline compare <observed-suite.json> <baseline.json>\n\
                 crashlab corpus verify <corpus-json-path>\n\
@@ -1308,7 +1363,8 @@ fn run_start_command(args: &[String]) {
     } else {
         0
     };
-    let started = Instant::now();
+    let clock = VClock::real();
+    let started = clock.now_monotonic();
 
     println!(
         "starting campaign {campaign_id}: preset={} seeds={} budget={} workers={} worker={} run_id={}",
@@ -1468,7 +1524,7 @@ fn run_start_command(args: &[String]) {
                 "run {} completed: seeds_processed={} elapsed={:.1}s",
                 opts.run_id,
                 summary.seeds_processed,
-                started.elapsed().as_secs_f64()
+                clock.elapsed_since(started).as_secs_f64()
             );
         }
         RunTerminalState::Cancelled { summary } => {
@@ -1587,7 +1643,7 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
                             continue;
                         }
                     };
-                    let modified = metadata.modified().unwrap_or_else(|_| std::time::SystemTime::now());
+                    let modified = metadata.modified().unwrap_or_else(|_| VClock::real().now_wall());
                     let duration = modified.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
                     let created_at = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH + duration);
 

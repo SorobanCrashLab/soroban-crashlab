@@ -512,7 +512,7 @@ pub fn cluster_observations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Instant;
+    use crate::vclock::VClock;
 
     fn addr(hex40: &str) -> String {
         format!("0x{hex40:0<40}")
@@ -750,7 +750,7 @@ mod tests {
         let rules = NormalizationRules::v1();
         let mut store = ClusterStore::new(rules);
 
-        let start = Instant::now();
+        let start = VClock::real().now_monotonic();
         for i in 0..TOTAL {
             let template = i % TEMPLATES;
             let raw = format!(
@@ -765,7 +765,7 @@ mod tests {
                 i as u64,
             ));
         }
-        let elapsed = start.elapsed();
+        let elapsed = crate::vclock::VClock::real().elapsed_since(start);
 
         assert_eq!(store.total_observations(), TOTAL as u64);
         assert_eq!(store.cluster_count(), TEMPLATES);

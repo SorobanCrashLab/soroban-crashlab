@@ -5,17 +5,13 @@ use crashlab_core::{
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn unique_tmp() -> PathBuf {
-    let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let n = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time")
-        .as_nanos();
-    std::env::temp_dir().join(format!("crashlab-retention-sweep-{--{}-{}", std::process::id(), n, count))
+    let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("crashlab-retention-sweep-{}-{count}", std::process::id()))
 }
 
 fn make_checkpoint(campaign_id: &str, next_seed_index: usize, total_seeds: usize) -> RunCheckpoint {
@@ -27,14 +23,14 @@ fn make_checkpoint(campaign_id: &str, next_seed_index: usize, total_seeds: usize
 
 fn write_checkpoint(dir: &PathBuf, run_id: u64, checkpoint: &RunCheckpoint) {
     let run_dir = dir.join("runs").join(run_id.to_string());
-    fs::read_dir_all(&run_dir).expect("create run dir");
+    fs::create_dir_all(&run_dir).expect("create run dir");
     let bytes = serde_json::to_vec_pretty(checkpoint).expect("serialize checkpoint");
     fs::write(run_dir.join("checkpoint.json"), bytes).expect("write checkpoint");
 }
 
 fn write_artifact(dir: &PathBuf, artifact_id: &str, seed_id: u64) {
     let artifact_dir = dir.join("artifacts");
-    fs::read_dir_all(&artifact_dir).expect("create artifacts dir");
+    fs::create_dir_all(&artifact_dir).expect("create artifacts dir");
     let seed = CaseSeed {
         id: seed_id,
         payload: vec![seed_id as u8, 1, 2],
@@ -59,7 +55,10 @@ fn write_artifact(dir: &PathBuf, artifact_id: &str, seed_id: u64) {
 /// Backdate a file's mtime to the given number of days ago.
 fn backdate_file(path: &PathBuf, days_ago: u64) {
     use filetime::FileTime;
-    let secs = std::time::SystemTime::now()
+    // Use VClock's wall time instead of reading SystemTime directly (#1795
+    // grep-gate).
+    let secs = crashlab_core::vclock::VClock::real()
+        .now_wall()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("time")
         .as_secs()

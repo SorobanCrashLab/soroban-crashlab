@@ -26,8 +26,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: action-pins-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-action-pins-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -35,7 +35,7 @@ permissions:
 jobs:
   action-pins:
     name: Check action pins are well-formed
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 5
     steps:
       - name: Checkout Code
@@ -43,3 +43,7 @@ jobs:
 
       - name: Check every action pin is a single-action 40-character SHA
         run: bash scripts/check-action-pins.sh
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]

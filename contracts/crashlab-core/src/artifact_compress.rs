@@ -2,7 +2,8 @@
 //!
 //! Wraps the JSON bytes produced by [`bundle_persist`](crate::bundle_persist) in
 //! gzip so long campaigns store significantly less data on disk while keeping
-//! artifacts fully reproducible (decompress → load → verify signature).
+//! artifacts fully reproducible for non-sensitive fixture data. Secret-like
+//! content is sanitized before it is serialized or stored.
 //!
 //! # Compression Ratios
 //!
@@ -16,7 +17,12 @@ use flate2::Compression;
 use std::io::{Read, Write};
 
 use crate::bundle_persist::load_case_bundle_json;
-use crate::{save_case_bundle_json, BundlePersistError, CaseBundle};
+use crate::{save_sanitized_case_bundle_json, BundlePersistError, CaseBundle};
+
+/// Maximum compressed artifact size accepted by this module.
+pub const MAX_COMPRESSED_ARTIFACT_BYTES: usize = 16 * 1024 * 1024;
+/// Maximum JSON size accepted after decompression.
+pub const MAX_DECOMPRESSED_ARTIFACT_BYTES: usize = crate::bundle_persist::MAX_BUNDLE_JSON_BYTES;
 
 /// Compression level configuration for artifact storage.
 ///
@@ -95,10 +101,21 @@ pub fn compress_artifact_with_level(
     bundle: &CaseBundle,
     level: CompressionLevel,
 ) -> Result<Vec<u8>, BundlePersistError> {
-    let json = save_case_bundle_json(bundle)?;
+    let json = save_sanitized_case_bundle_json(bundle)?;
+    if json.len() > MAX_DECOMPRESSED_ARTIFACT_BYTES {
+        return Err(BundlePersistError::SizeLimit {
+            limit: MAX_DECOMPRESSED_ARTIFACT_BYTES,
+        });
+    }
     let mut encoder = GzEncoder::new(Vec::new(), level.to_gzip_compression());
     encoder.write_all(&json)?;
-    Ok(encoder.finish()?)
+    let compressed = encoder.finish()?;
+    if compressed.len() > MAX_COMPRESSED_ARTIFACT_BYTES {
+        return Err(BundlePersistError::SizeLimit {
+            limit: MAX_COMPRESSED_ARTIFACT_BYTES,
+        });
+    }
+    Ok(compressed)
 }
 
 /// Decompresses gzip bytes produced by [`compress_artifact`] back into a
@@ -123,9 +140,21 @@ pub fn compress_artifact_with_level(
 /// assert_eq!(restored.seed.payload, bundle.seed.payload);
 /// ```
 pub fn decompress_artifact(compressed: &[u8]) -> Result<CaseBundle, BundlePersistError> {
+    if compressed.len() > MAX_COMPRESSED_ARTIFACT_BYTES {
+        return Err(BundlePersistError::SizeLimit {
+            limit: MAX_COMPRESSED_ARTIFACT_BYTES,
+        });
+    }
     let mut decoder = GzDecoder::new(compressed);
     let mut json = Vec::new();
-    decoder.read_to_end(&mut json)?;
+    decoder
+        .take(MAX_DECOMPRESSED_ARTIFACT_BYTES as u64 + 1)
+        .read_to_end(&mut json)?;
+    if json.len() > MAX_DECOMPRESSED_ARTIFACT_BYTES {
+        return Err(BundlePersistError::SizeLimit {
+            limit: MAX_DECOMPRESSED_ARTIFACT_BYTES,
+        });
+    }
     load_case_bundle_json(&json)
 }
 
@@ -149,7 +178,7 @@ pub fn decompress_artifact(compressed: &[u8]) -> Result<CaseBundle, BundlePersis
 /// assert!(ratio < 1.0, "compression should reduce size");
 /// ```
 pub fn measure_compression_ratio(bundle: &CaseBundle) -> Result<f64, BundlePersistError> {
-    let original_size = save_case_bundle_json(bundle)?.len() as f64;
+    let original_size = save_sanitized_case_bundle_json(bundle)?.len() as f64;
     let compressed_size = compress_artifact(bundle)?.len() as f64;
     
     if original_size == 0.0 {

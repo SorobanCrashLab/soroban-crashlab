@@ -113,14 +113,13 @@ fn compute_hash(wasm_path: &Path) -> Result<WasmHashExport, String> {
 mod tests {
     use super::*;
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn temp_wasm_path(name: &str) -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock should be monotonic")
-            .as_nanos();
-        std::env::temp_dir().join(format!("test-wasm-{name}-{nanos}.wasm"))
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("test-wasm-{name}-{}-{n}.wasm", std::process::id()))
     }
 
     /// Helper to create a temporary WASM file with test data.

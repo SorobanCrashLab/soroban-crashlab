@@ -6,6 +6,18 @@
     "limit": "50 kB"
   },
   {
+    "name": "route: / (first-load JS)",
+    "path": [".next/static/chunks/app/page-*.js"],
+    "gzip": true,
+    "limit": "200 kB"
+  },
+  {
+    "name": "route: /dashboard (first-load JS)",
+    "path": [".next/static/chunks/app/dashboard/**/*.js"],
+    "gzip": true,
+    "limit": "300 kB"
+  },
+  {
     "name": "route-group: shared-styles",
     "path": [".next/static/chunks/*.css"],
     "gzip": true,
@@ -16,5 +28,11 @@
     "path": [".next/static/chunks/*.js"],
     "gzip": true,
     "limit": "1500 kB"
+  },
+  {
+    "name": "total: all chunks",
+    "path": [".next/static/chunks/**/*.js"],
+    "gzip": true,
+    "limit": "1800 kB"
   }
 ]
