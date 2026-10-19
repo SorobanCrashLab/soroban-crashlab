@@ -10,7 +10,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts';
-import { CorpusStatPoint } from '../types';
+import { CorpusStatPoint, SeedEnergyPoint } from '../types';
 import { downsampleCorpusStats } from '../../lib/utils/downsampler';
 
 export interface CorpusStatsPanelProps {
@@ -20,18 +20,27 @@ export interface CorpusStatsPanelProps {
   uniqueCrashes?: number;
   /** Optional title header override */
   title?: string;
+  /** Optional per-seed composite energy scores from coverage-guided scheduling */
+  energySeries?: SeedEnergyPoint[];
 }
 
 export function CorpusStatsPanel({
   series,
   uniqueCrashes = 0,
   title = 'Corpus Engine Telemetry',
+  energySeries,
 }: CorpusStatsPanelProps) {
   // Downsample data BEFORE rendering chart to ensure <100ms render performance under 5k points
   const downsampledData = useMemo(() => {
     if (!series || series.length === 0) return [];
     return downsampleCorpusStats(series, 500);
   }, [series]);
+
+  // Downsample energy telemetry independently so the energy chart stays performant
+  const downsampledEnergy = useMemo(() => {
+    if (!energySeries || energySeries.length === 0) return [];
+    return downsampleCorpusStats(energySeries, 500);
+  }, [energySeries]);
 
   // Graceful degradation path when series is missing or empty
   if (!series || series.length === 0) {
@@ -68,8 +77,14 @@ export function CorpusStatsPanel({
   }
 
   const latest = series[series.length - 1];
+  const latestEnergy = energySeries && energySeries.length > 0 ? energySeries[energySeries.length - 1] : undefined;
 
   const formattedChartData = downsampledData.map((pt) => ({
+    ...pt,
+    timeFormatted: new Date(pt.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+  }));
+
+  const formattedEnergyData = downsampledEnergy.map((pt) => ({
     ...pt,
     timeFormatted: new Date(pt.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
   }));
@@ -116,6 +131,74 @@ export function CorpusStatsPanel({
           <p className="text-[10px] text-amber-300/80 mt-1">De-duplicated velocity</p>
         </div>
       </div>
+
+      {/* Composite Energy Line Chart */}
+      {energySeries && energySeries.length > 0 && (
+        <div className="pt-2" id="corpus-energy-chart-section">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-meta">
+              Coverage-Guided Seed Energy
+            </h3>
+            <span className="text-[10px] text-meta">
+              {latestEnergy
+                ? `Latest mean energy ${latestEnergy.meanEnergy.toFixed(2)}`
+                : `${downsampledEnergy.length} downsampled chart points`}
+            </span>
+          </div>
+
+          <div className="h-64 w-full" id="corpus-energy-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={formattedEnergyData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="energyGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.6} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
+
+                <XAxis
+                  dataKey="timeFormatted"
+                  stroke="#94a3b8"
+                  style={{ fontSize: '10px' }}
+                  tickLine={false}
+                />
+
+                <YAxis
+                  stroke="#94a3b8"
+                  style={{ fontSize: '10px' }}
+                  tickLine={false}
+                />
+
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    borderColor: '#334155',
+                    borderRadius: '0.375rem',
+                    color: '#f8fafc',
+                    fontSize: '12px',
+                  }}
+                  formatter={(val: unknown) => {
+                    const num = typeof val === 'number' ? val : Number(val) || 0;
+                    return [num.toFixed(2), 'Energy'];
+                  }}
+                  labelFormatter={(label) => `Time: ${label}`}
+                />
+
+                <Area
+                  type="monotone"
+                  dataKey="meanEnergy"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  fill="url(#energyGradient)"
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Coverage Line Chart */}
       <div className="pt-2">
