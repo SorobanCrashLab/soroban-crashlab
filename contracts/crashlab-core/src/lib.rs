@@ -95,7 +95,9 @@ pub use cors::{
     evaluate_cors, CorsConfig, CorsError, CorsEvaluation, HttpMethod, OriginAllowlist,
     OriginPattern,
 };
-pub use fixture::RegressionFixture;
+pub use fixture::{
+    load_bundled_fixture_wasm, resolve_fixture_wasm, verify_wasm_sha256, RegressionFixture,
+};
 pub use fixture_classifier::{
     classify_and_wrap_fixture, classify_and_wrap_verified, classify_fixture,
     classify_paired_fixture, PairedClassification,
@@ -126,7 +128,7 @@ pub use taxonomy::{
 pub use host_runner::HostContractRunner;
 
 #[cfg(feature = "rpc-runner")]
-pub use rpc_runner::{RpcConfigError, RpcContractRunner};
+pub use rpc_runner::{batch_seeds_per_ledger, RpcConfigError, RpcContractRunner, RpcMode};
 
 #[cfg(not(feature = "rpc-runner"))]
 pub use rpc_runner_stub::{RpcConfigError, RpcContractRunner};
@@ -196,7 +198,9 @@ pub use artifact_storage::{
 pub mod fixture_compat;
 pub use fixture_compat::{
     check_bundle_fixtures, check_bundle_signature_hashes, check_manifest_engine_schema,
-    check_seed_fixtures, check_seed_sanitization, CompatReport, CompatWarning,
+    check_seed_fixtures, check_seed_sanitization, load_parity_expectations,
+    missing_parity_expectations, CompatReport, CompatWarning, ParityClassExpectation,
+    ParityContract, PARITY_CONTRACT_VERSION, PARITY_EXPECTATIONS_TOML,
 };
 
 pub mod fixture_manifest;

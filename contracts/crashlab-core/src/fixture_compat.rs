@@ -469,3 +469,194 @@ mod tests {
         assert_eq!(hash_report.warnings[0].fixture_index, 1);
     }
 }
+
+// ── Versioned mock/host parity contract (#1785) ─────────────────────────────
+
+/// Contract version supported by this loader. Bump alongside
+/// `parity/expectations.toml` (see `docs/parity-contract.md`).
+pub const PARITY_CONTRACT_VERSION: u32 = 1;
+
+/// Embedded copy of `parity/expectations.toml` for tests and the harness.
+pub const PARITY_EXPECTATIONS_TOML: &str =
+    include_str!("../parity/expectations.toml");
+
+/// Per-class runner expectations from the parity contract.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParityClassExpectation {
+    /// Fixture class name (e.g. `success`, `panic`).
+    pub name: String,
+    /// Outcome categories the mock runner may produce.
+    pub mock_allowed: Vec<String>,
+    /// Outcome categories the host runner may produce.
+    pub host_allowed: Vec<String>,
+    /// Diagnostic fields both runners must populate.
+    pub required_fields: Vec<String>,
+}
+
+/// Versioned parity contract: allowed outcomes per fixture class and runner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParityContract {
+    /// Contract version from `expectations.toml`.
+    pub version: u32,
+    /// Expectations keyed by fixture class.
+    pub classes: Vec<ParityClassExpectation>,
+}
+
+impl ParityContract {
+    /// Finds the expectation entry for `class`, if present.
+    pub fn class(&self, class: &str) -> Option<&ParityClassExpectation> {
+        self.classes.iter().find(|c| c.name == class)
+    }
+
+    /// Returns true when `category` is allowed for `class` on `runner`
+    /// (`runner` is `mock` or `host`).
+    pub fn allows(&self, class: &str, runner: &str, category: &str) -> bool {
+        match self.class(class) {
+            Some(entry) => match runner {
+                "mock" => entry.mock_allowed.iter().any(|c| c == category),
+                "host" => entry.host_allowed.iter().any(|c| c == category),
+                _ => false,
+            },
+            None => false,
+        }
+    }
+}
+
+/// Names fixture classes present in `known` with no contract entry (drift).
+pub fn missing_parity_expectations(
+    contract: &ParityContract,
+    known: &[&str],
+) -> Vec<String> {
+    known
+        .iter()
+        .filter(|name| contract.class(name).is_none())
+        .map(|name| name.to_string())
+        .collect()
+}
+
+/// Loads and version-gates a parity contract from TOML text.
+///
+/// The parser accepts the restricted shape authored in
+/// `parity/expectations.toml` (`version`, `[classes.<name>]` sections with
+/// string-array keys). Unknown versions are rejected so engine upgrades,
+/// mutator changes, and taxonomy bumps fail with a precise message.
+pub fn load_parity_expectations(toml: &str) -> Result<ParityContract, String> {
+    let mut version: Option<u32> = None;
+    let mut classes: Vec<ParityClassExpectation> = Vec::new();
+
+    for raw in toml.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(section) = line.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            let name = section
+                .strip_prefix("classes.")
+                .ok_or_else(|| format!("unexpected section [{section}]"))?
+                .to_string();
+            if classes.iter().any(|c: &ParityClassExpectation| c.name == name) {
+                return Err(format!("duplicate class section [{section}]"));
+            }
+            classes.push(ParityClassExpectation {
+                name,
+                mock_allowed: Vec::new(),
+                host_allowed: Vec::new(),
+                required_fields: Vec::new(),
+            });
+            continue;
+        }
+        let (key, value) = line
+            .split_once('=')
+            .ok_or_else(|| format!("malformed line: {line}"))?;
+        let key = key.trim();
+        let value = value.trim();
+        if key == "version" {
+            let v: u32 = value
+                .parse()
+                .map_err(|_| format!("invalid version: {value}"))?;
+            version = Some(v);
+            continue;
+        }
+        let current = classes
+            .last_mut()
+            .ok_or_else(|| format!("key outside class section: {line}"))?;
+        let items = parse_string_array(value)
+            .ok_or_else(|| format!("expected string array for {key}: {value}"))?;
+        match key {
+            "mock_allowed" => current.mock_allowed = items,
+            "host_allowed" => current.host_allowed = items,
+            "required_fields" => current.required_fields = items,
+            _ => return Err(format!("unknown key {key}")),
+        }
+    }
+
+    let version = version.ok_or_else(|| "missing version".to_string())?;
+    if version != PARITY_CONTRACT_VERSION {
+        return Err(format!(
+            "unsupported parity contract version {version}: this build supports {PARITY_CONTRACT_VERSION}; re-review the contract before bumping"
+        ));
+    }
+    if classes.is_empty() {
+        return Err("parity contract defines no classes".to_string());
+    }
+    Ok(ParityContract { version, classes })
+}
+
+/// Parses `["a", "b"]` into a string vec. Returns `None` on malformed input.
+fn parse_string_array(value: &str) -> Option<Vec<String>> {
+    let inner = value.strip_prefix('[')?.strip_suffix(']')?.trim();
+    if inner.is_empty() {
+        return Some(Vec::new());
+    }
+    let mut items = Vec::new();
+    for part in inner.split(',') {
+        let item = part.trim().trim_matches('"').trim();
+        if part.trim().len() < 2 || !part.trim().starts_with('"') || !part.trim().ends_with('"') {
+            return None;
+        }
+        items.push(item.to_string());
+    }
+    Some(items)
+}
+
+#[cfg(test)]
+mod parity_contract_tests {
+    use super::*;
+
+    const KNOWN_CLASSES: [&str; 4] = ["success", "panic", "setup", "storage-error"];
+
+    #[test]
+    fn parity_contract_loads_and_gates_version() {
+        let contract =
+            load_parity_expectations(PARITY_EXPECTATIONS_TOML).expect("shipped contract loads");
+        assert_eq!(contract.version, PARITY_CONTRACT_VERSION);
+        assert_eq!(contract.classes.len(), KNOWN_CLASSES.len());
+    }
+
+    #[test]
+    fn parity_contract_rejects_version_bump_without_loader_support() {
+        let bumped = PARITY_EXPECTATIONS_TOML.replace("version = 1", "version = 2");
+        let err = load_parity_expectations(&bumped).expect_err("version 2 must fail");
+        assert!(err.contains("unsupported parity contract version 2"), "{err}");
+    }
+
+    #[test]
+    fn parity_contract_allows_documented_outcomes() {
+        let contract =
+            load_parity_expectations(PARITY_EXPECTATIONS_TOML).expect("shipped contract loads");
+        assert!(contract.allows("success", "host", "success"));
+        assert!(contract.allows("panic", "host", "trap"));
+        assert!(!contract.allows("success", "host", "trap"));
+        assert!(!contract.allows("nope", "host", "success"));
+    }
+
+    #[test]
+    fn parity_contract_drift_detector_fails_on_silent_additions() {
+        let contract =
+            load_parity_expectations(PARITY_EXPECTATIONS_TOML).expect("shipped contract loads");
+        assert!(missing_parity_expectations(&contract, &KNOWN_CLASSES).is_empty());
+        let missing =
+            missing_parity_expectations(&contract, &["success", "brand-new-class"]);
+        assert_eq!(missing, vec!["brand-new-class".to_string()]);
+    }
+}

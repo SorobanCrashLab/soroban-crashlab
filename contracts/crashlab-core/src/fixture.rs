@@ -68,6 +68,43 @@ impl RegressionFixture {
     }
 }
 
+/// Resolves the on-disk WASM fixture for a seed.
+///
+/// Resolution order: `CRASHLAB_FIXTURE_DIR/<seed-id>.wasm` when
+/// `CRASHLAB_FIXTURE_DIR` is set, otherwise the bundled
+/// `soroban-example` fixture. Returns the raw bytes; call
+/// [`verify_wasm_sha256`] when the seed carries an expected digest.
+pub fn resolve_fixture_wasm(seed: &crate::CaseSeed) -> Result<Vec<u8>, String> {
+    if let Ok(dir) = std::env::var("CRASHLAB_FIXTURE_DIR") {
+        let candidate = std::path::Path::new(dir.trim()).join(format!("{}.wasm", seed.id));
+        if candidate.is_file() {
+            return std::fs::read(&candidate)
+                .map_err(|e| format!("could not read fixture '{}': {e}", candidate.display()));
+        }
+    }
+    load_bundled_fixture_wasm()
+}
+
+/// Returns the bundled `soroban-example` WASM fixture bytes.
+pub fn load_bundled_fixture_wasm() -> Result<Vec<u8>, String> {
+    const BUNDLED: &[u8] = include_bytes!("../fixtures/soroban-example.wasm");
+    Ok(BUNDLED.to_vec())
+}
+
+/// Verifies `wasm` against an expected lowercase hex SHA-256 digest.
+/// Returns `Ok(())` on match, `Err` describing the mismatch otherwise.
+pub fn verify_wasm_sha256(wasm: &[u8], expected_hex: &str) -> Result<(), String> {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(wasm);
+    let actual = hex::encode(hasher.finalize());
+    if actual == expected_hex.trim().to_lowercase() {
+        Ok(())
+    } else {
+        Err(format!("wasm sha256 mismatch: expected {expected_hex}, got {actual}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

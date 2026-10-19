@@ -1,0 +1,32 @@
+# Mock/host parity contract (issue #1785).
+#
+# For each fixture class, the allowed outcome categories per runner and the
+# diagnostic fields both runners must populate. Any loosening of this file
+# must be called out with `// parity-contract: <reason>` in the PR
+# description and re-reviewed by a CODEOWNER.
+#
+# Evolution policy (see docs/parity-contract.md):
+# - Bump `version` on any semantic change; the loader gates on it.
+# - Never delete a class entry to unblock a PR; add the reason instead.
+
+version = 1
+
+[classes.success]
+mock_allowed = ["runtime-failure"]
+host_allowed = ["success"]
+required_fields = ["category", "signature_hash"]
+
+[classes.panic]
+mock_allowed = ["runtime-failure"]
+host_allowed = ["trap", "contract-1", "contract-2"]
+required_fields = ["category", "signature_hash"]
+
+[classes.setup]
+mock_allowed = ["runtime-failure"]
+host_allowed = ["trap", "unknown"]
+required_fields = ["category", "signature_hash"]
+
+[classes.storage-error]
+mock_allowed = ["runtime-failure"]
+host_allowed = ["state", "trap"]
+required_fields = ["category", "signature_hash"]
