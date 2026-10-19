@@ -15,14 +15,13 @@ use crashlab_core::{
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Output};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn unique_tmp(tag: &str) -> PathBuf {
-    let n = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time")
-        .as_nanos();
-    std::env::temp_dir().join(format!("crashlab-run-start-{tag}-{n}"))
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("crashlab-run-start-{tag}-{}-{n}", std::process::id()))
 }
 
 fn crashlab(args: &[&str]) -> Output {

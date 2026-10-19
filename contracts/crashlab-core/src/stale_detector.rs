@@ -24,7 +24,8 @@
 //! }
 //! ```
 
-use std::time::{Duration, Instant};
+use crate::vclock::{Monotonic, VClock};
+use std::time::Duration;
 
 /// Configuration for the stale run detector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,15 +64,25 @@ pub enum StaleStatus {
 /// Detects and marks runs that stop producing progress for too long.
 pub struct StaleRunDetector {
     config: StaleDetectorConfig,
-    last_progress: Instant,
+    clock: VClock,
+    last_progress: Monotonic,
 }
 
 impl StaleRunDetector {
     /// Creates a new detector; the progress clock starts immediately.
     pub fn new(config: StaleDetectorConfig) -> Self {
+        Self::with_clock(config, VClock::real())
+    }
+
+    /// Creates a new detector backed by an explicit [`VClock`].
+    ///
+    /// Tests and replay pass a virtual clock so staleness is deterministic (#1795).
+    pub fn with_clock(config: StaleDetectorConfig, clock: VClock) -> Self {
+        let last_progress = clock.now_monotonic();
         Self {
             config,
-            last_progress: Instant::now(),
+            clock,
+            last_progress,
         }
     }
 
@@ -80,13 +91,13 @@ impl StaleRunDetector {
     /// Call this whenever a new unique crash signature is found or the
     /// seeds-processed counter advances.
     pub fn record_progress(&mut self) {
-        self.last_progress = Instant::now();
+        self.last_progress = self.clock.now_monotonic();
     }
 
     /// Returns [`StaleStatus::Stale`] when no progress has been recorded within
     /// the configured threshold, otherwise [`StaleStatus::Ok`].
     pub fn check(&self) -> StaleStatus {
-        self.check_with_elapsed(self.last_progress.elapsed())
+        self.check_with_elapsed(self.clock.elapsed_since(self.last_progress))
     }
 
     /// Evaluates staleness for an explicit elapsed duration.
@@ -109,7 +120,7 @@ impl StaleRunDetector {
 
     /// Milliseconds elapsed since the last recorded progress event.
     pub fn elapsed_since_progress_ms(&self) -> u64 {
-        self.last_progress.elapsed().as_millis() as u64
+        self.clock.elapsed_since(self.last_progress).as_millis() as u64
     }
 }
 
@@ -260,7 +271,6 @@ pub fn is_process_alive(pid: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
     use std::time::Duration as StdDuration;
 
     #[test]
@@ -286,9 +296,11 @@ mod tests {
     #[test]
     fn record_progress_resets_stale_clock() {
         let cfg = StaleDetectorConfig::new(50);
-        let mut detector = StaleRunDetector::new(cfg);
-        thread::sleep(StdDuration::from_millis(80));
-        // Would be stale here, but we record progress first.
+        let clock = crate::vclock::VClock::manual();
+        let mut detector = StaleRunDetector::with_clock(cfg, clock.clone());
+        // Simulate 80 ms passing — would be stale.
+        clock.advance_by(StdDuration::from_millis(80));
+        // But we record progress first, resetting the clock.
         detector.record_progress();
         assert_eq!(detector.check(), StaleStatus::Ok);
     }
@@ -307,8 +319,9 @@ mod tests {
     #[test]
     fn elapsed_since_progress_increases_over_time() {
         let cfg = StaleDetectorConfig::new(5_000);
-        let detector = StaleRunDetector::new(cfg);
-        thread::sleep(StdDuration::from_millis(20));
+        let clock = crate::vclock::VClock::manual();
+        let detector = StaleRunDetector::with_clock(cfg, clock.clone());
+        clock.advance_by(StdDuration::from_millis(20));
         assert!(detector.elapsed_since_progress_ms() >= 10);
     }
 

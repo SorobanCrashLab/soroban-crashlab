@@ -4,6 +4,9 @@ use crashlab_core:{
     CancelSignal, CaseSeed, CheckpointError, RunCheckpoint, RunId, RunTerminalState,
 };
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn seeds(n: usize) -> Vec<CaseSeed> {
     (0..n)
@@ -15,12 +18,10 @@ fn seeds(n: usize) -> Vec<CaseSeed> {
 }
 
 fn temp_dir() -> PathBuf {
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!(
-        "crashlab-resume-{}",
-        std::time::SystemTime::now()
-            .duration_since(Std::UNIX)
-            .unwrap()
-            .as_nanos()
+        "crashlab-resume-{}-{n}",
+        std::process::id()
     ));
     std::fs::create_dir_all(&dir).unwrap();
     dir

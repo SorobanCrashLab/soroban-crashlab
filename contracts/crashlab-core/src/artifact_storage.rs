@@ -121,9 +121,9 @@ pub trait ArtifactStore: Send + Sync {
 
     /// Returns the artifact class for retention policy purposes.
     ///
-    /// Defaults to `ArtifactClass::Raw` for backends that do not track classes.
+    /// Defaults to `ArtifactClass::RawSeed` for backends that do not track classes.
     fn artifact_class(&self, _artifact_id: &str) -> crate::retention::ArtifactClass {
-        crate::retention::ArtifactClass::Raw
+        crate::retention::ArtifactClass::RawSeed
     }
 
     /// Returns the last-modified timestamp (epoch seconds) for an artifact.
@@ -302,15 +302,14 @@ impl ArtifactStore for LocalArtifactStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::sync::atomic::{AtomicU64, Ordering};
     use crate::{to_bundle, CaseSeed};
 
+    static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
     fn unique_tmp() -> PathBuf {
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time")
-            .as_nanos();
-        std::env::temp_dir().join(format!("crashlab-artifacts-{n}"))
+        let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("crashlab-artifacts-{}-{n}", std::process::id()))
     }
 
     #[test]
