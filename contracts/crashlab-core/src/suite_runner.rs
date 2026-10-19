@@ -108,17 +108,35 @@ impl Default for GroupSummary {
 pub struct SuiteRunnerConfig {
     /// Zero or more regression groups to filter on. If empty, all groups execute.
     pub selected_groups: Vec<RegressionGroup>,
+    /// Optional substring filter applied to the fixture's stable group string.
+    pub filter: Option<String>,
+    /// Optional set of contract identifiers; when non-empty only fixtures whose
+    /// group contract matches one of these execute (changed-contracts-only mode).
+    pub changed_contracts: Vec<String>,
 }
 
 impl SuiteRunnerConfig {
     /// Creates a new config with no group selection (execute all fixtures).
     pub fn new() -> Self {
-        Self { selected_groups: Vec::new() }
+        Self { selected_groups: Vec::new(), filter: None, changed_contracts: Vec::new() }
     }
 
     /// Creates a new config with specific group selection.
     pub fn with_groups(groups: Vec<RegressionGroup>) -> Self {
-        Self { selected_groups: groups }
+        Self { selected_groups: groups, filter: None, changed_contracts: Vec::new() }
+    }
+
+    /// Sets a substring filter applied to the fixture's stable group string.
+    pub fn with_filter(mut self, filter: impl Into<String>) -> Self {
+        let filter = filter.into();
+        self.filter = if filter.trim().is_empty() { None } else { Some(filter) };
+        self
+    }
+
+    /// Restricts execution to fixtures whose group contract is in `contracts`.
+    pub fn with_changed_contracts(mut self, contracts: Vec<String>) -> Self {
+        self.changed_contracts = contracts;
+        self
     }
 
     /// Parses group identifiers from CLI format (comma-separated stable strings).
@@ -141,7 +159,7 @@ impl SuiteRunnerConfig {
             }
         }
 
-        Ok(Self { selected_groups: groups })
+        Ok(Self { selected_groups: groups, filter: None, changed_contracts: Vec::new() })
     }
 
     /// Returns true if the fixture should be executed given the current selection.
@@ -149,13 +167,27 @@ impl SuiteRunnerConfig {
     /// If no selection is active, returns true (execute all).
     /// Otherwise, returns true only if the fixture's group matches one of the selected groups.
     pub fn should_execute(&self, fixture: &RegressionFixture) -> bool {
-        if self.selected_groups.is_empty() {
-            // No selection: execute all
-            return true;
+        let fixture_group = fixture.group_or_unknown();
+
+        if !self.selected_groups.is_empty() && !self.selected_groups.contains(&fixture_group) {
+            return false;
         }
 
-        let fixture_group = fixture.group_or_unknown();
-        self.selected_groups.contains(&fixture_group)
+        if !self.changed_contracts.is_empty() {
+            let stable = fixture_group.to_stable_string();
+            let contract = stable.split('#').next().unwrap_or("");
+            if !self.changed_contracts.iter().any(|c| c == contract) {
+                return false;
+            }
+        }
+
+        if let Some(filter) = &self.filter {
+            if !fixture_group.to_stable_string().contains(filter.as_str()) {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
