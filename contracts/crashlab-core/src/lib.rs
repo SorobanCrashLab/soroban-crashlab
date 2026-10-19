@@ -1,6 +1,7 @@
 pub mod auth_matrix;
 pub mod cluster;
 pub mod cors;
+pub mod diff_engine;
 pub mod fixture;
 pub mod fixture_classifier;
 pub mod health;
@@ -86,6 +87,11 @@ pub use fixture::RegressionFixture;
 pub use fixture_classifier::{
     classify_and_wrap_fixture, classify_and_wrap_verified, classify_fixture,
     classify_paired_fixture, PairedClassification,
+};
+pub use diff_engine::{
+    classify_delta, diff_engines, render_diff_report_json, render_diff_report_markdown,
+    DeltaKind, DiffEngineError, DiffReport, EngineRun, ExpectedDelta, ExpectedDeltaSet,
+    SeedDelta, SeedOutcome,
 };
 pub use health::{
     FailureMetrics, HealthMonitor, HealthStatus, HealthSummary, QueueMetrics, ThroughputMetrics,

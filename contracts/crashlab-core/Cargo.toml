@@ -50,3 +50,7 @@ path = "src/bin/crash-index.rs"
 [[bin]]
 name = "export-wasm-hash"
 path = "src/bin/export-wasm-hash.rs"
+
+[[bin]]
+name = "diff-engine"
+path = "src/bin/diff-engine.rs"
