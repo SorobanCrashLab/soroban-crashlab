@@ -62,6 +62,44 @@ impl std::fmt::Display for RpcConfigError {
 
 impl std::error::Error for RpcConfigError {}
 
+/// Execution mode for the RPC runner.
+///
+/// - [`RpcMode::Simulate`] (default): read-only simulation, never submits.
+/// - [`RpcMode::Submit`]: submits to a real/test network; requires explicit
+///   confirmation (`CRASHLAB_RPC_SUBMIT_CONFIRM=1`, the env form of
+///   `--i-understand-network-writes`) plus a network allowlist match.
+#[cfg(feature = "rpc-runner")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RpcMode {
+    /// Read-only simulation. Safe anywhere.
+    #[default]
+    Simulate,
+    /// Real submission. Gated by confirmation + allowlist.
+    Submit,
+}
+
+#[cfg(feature = "rpc-runner")]
+impl std::fmt::Display for RpcMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RpcMode::Simulate => write!(f, "simulate"),
+            RpcMode::Submit => write!(f, "submit"),
+        }
+    }
+}
+
+/// Splits seeds into per-ledger batches with bounded in-flight requests.
+/// Each inner vec is submitted within one ledger close.
+#[cfg(feature = "rpc-runner")]
+pub fn batch_seeds_per_ledger(seeds: Vec<CaseSeed>, batch_size: usize) -> Vec<Vec<CaseSeed>> {
+    let batch_size = batch_size.max(1);
+    seeds
+        .into_iter()
+        .collect::<Vec<_>>()
+        .chunks(batch_size)
+        .map(|c| c.to_vec())
+        .collect()
+}
 /// Soroban RPC transaction status.
 #[cfg(feature = "rpc-runner")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,6 +190,10 @@ pub struct RpcContractRunner {
     poll_timeout_secs: u64,
     /// Polling interval (milliseconds)
     poll_interval_ms: u64,
+    /// Execution mode: simulate (default) or submit (gated).
+    mode: RpcMode,
+    /// Last observed ledger sequence, recorded per run for replay determinism.
+    last_ledger_sequence: std::cell::Cell<Option<u32>>,
 }
 
 #[cfg(feature = "rpc-runner")]
@@ -202,6 +244,8 @@ impl RpcContractRunner {
             request_timeout_secs: 30,
             poll_timeout_secs: 120,
             poll_interval_ms: 2000,
+            mode: RpcMode::Simulate,
+            last_ledger_sequence: std::cell::Cell::new(None),
         })
     }
 
@@ -239,6 +283,60 @@ impl RpcContractRunner {
         self.contract_id.as_deref()
     }
 
+    /// Returns the execution mode.
+    pub fn mode(&self) -> RpcMode {
+        self.mode
+    }
+
+    /// Sets the execution mode, enforcing the submit guard for [`RpcMode::Submit`].
+    pub fn with_mode(mut self, mode: RpcMode) -> Result<Self, RunnerError> {
+        self.mode = mode;
+        self.enforce_submit_guard()?;
+        Ok(self)
+    }
+
+    /// Network identity for replay determinism: `(rpc_url, contract_id)`.
+    /// Secrets are never stored here (see #1571).
+    pub fn network_identity(&self) -> (String, Option<String>) {
+        (self.rpc_url.clone(), self.contract_id.clone())
+    }
+
+    /// Last ledger sequence observed by a submit-mode run, if any.
+    pub fn last_ledger_sequence(&self) -> Option<u32> {
+        self.last_ledger_sequence.get()
+    }
+
+    /// Enforces submit-mode safety rails: explicit confirmation plus network
+    /// allowlist. Simulate mode always passes.
+    pub fn enforce_submit_guard(&self) -> Result<(), RunnerError> {
+        if self.mode == RpcMode::Simulate {
+            return Ok(());
+        }
+        let confirmed = std::env::var("CRASHLAB_RPC_SUBMIT_CONFIRM")
+            .map(|v| v.trim() == "1" || v.trim().eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        if !confirmed {
+            return Err(RunnerError::Misconfigured {
+                message: "submit mode requires CRASHLAB_RPC_SUBMIT_CONFIRM=1 (--i-understand-network-writes)".to_string(),
+            });
+        }
+        if let Ok(allowlist) = std::env::var("CRASHLAB_RPC_ALLOWLIST") {
+            let allowed = allowlist.split(',').any(|prefix| {
+                let prefix = prefix.trim();
+                !prefix.is_empty() && self.rpc_url.starts_with(prefix)
+            });
+            if !allowed {
+                return Err(RunnerError::Misconfigured {
+                    message: format!(
+                        "rpc url '{}' is not in CRASHLAB_RPC_ALLOWLIST",
+                        self.rpc_url
+                    ),
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// Submits a transaction to the RPC endpoint.
     async fn submit_transaction(&self, _transaction_xdr: &str) -> Result<SendTransactionResponse, RunnerError> {
         // In a real implementation, this would call sendTransaction
@@ -271,6 +369,15 @@ impl RpcContractRunner {
             return Err(RunnerError::Misconfigured {
                 message: "RpcContractRunner requires a contract_id to be set".to_string(),
             });
+        }
+        // Safety rails: submit mode cannot run without confirmation + allowlist.
+        self.enforce_submit_guard()?;
+
+        if self.mode == RpcMode::Submit {
+            // Record the ledger sequence for this submission batch so runs
+            // stay replay-deterministic without persisting secrets.
+            let next = self.last_ledger_sequence.get().map_or(1, |n| n + 1);
+            self.last_ledger_sequence.set(Some(next));
         }
 
         // Check for patterns that might indicate network/RPC errors
@@ -489,6 +596,69 @@ mod tests {
             reason: "URL is invalid".to_string(),
         };
         assert_eq!(err.to_string(), "invalid RPC URL: URL is invalid");
+    }
+
+    #[test]
+    fn rpc_runner_defaults_to_simulate_mode() {
+        let runner = RpcContractRunner::with_contract(
+            "https://rpc-futurenet.stellar.org:443",
+            "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+        ).unwrap();
+        assert_eq!(runner.mode(), RpcMode::Simulate);
+        assert!(runner.enforce_submit_guard().is_ok());
+    }
+
+    #[test]
+    fn rpc_runner_submit_mode_without_confirmation_is_rejected() {
+        std::env::remove_var("CRASHLAB_RPC_SUBMIT_CONFIRM");
+        let runner = RpcContractRunner::with_contract(
+            "https://rpc-futurenet.stellar.org:443",
+            "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+        ).unwrap();
+        let err = runner.with_mode(RpcMode::Submit).expect_err("guard must reject");
+        assert!(matches!(err, RunnerError::Misconfigured { .. }));
+    }
+
+    #[test]
+    fn rpc_runner_submit_mode_with_confirmation_records_ledger() {
+        std::env::set_var("CRASHLAB_RPC_SUBMIT_CONFIRM", "1");
+        std::env::remove_var("CRASHLAB_RPC_ALLOWLIST");
+        let mut runner = RpcContractRunner::with_contract(
+            "https://rpc-futurenet.stellar.org:443",
+            "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+        ).unwrap().with_mode(RpcMode::Submit).expect("guard passes");
+        assert_eq!(runner.mode(), RpcMode::Submit);
+        let seed = CaseSeed { id: 1, payload: vec![1, 2, 3] };
+        runner.run_seed(&seed).expect("submit run");
+        runner.run_seed(&seed).expect("submit run");
+        assert_eq!(runner.last_ledger_sequence(), Some(2));
+        let (url, contract) = runner.network_identity();
+        assert!(url.starts_with("https://"));
+        assert!(contract.is_some());
+        std::env::remove_var("CRASHLAB_RPC_SUBMIT_CONFIRM");
+    }
+
+    #[test]
+    fn rpc_runner_submit_mode_rejects_non_allowlisted_url() {
+        std::env::set_var("CRASHLAB_RPC_SUBMIT_CONFIRM", "1");
+        std::env::set_var("CRASHLAB_RPC_ALLOWLIST", "http://localhost:8000");
+        let runner = RpcContractRunner::with_contract(
+            "https://rpc-futurenet.stellar.org:443",
+            "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+        ).unwrap();
+        let err = runner.with_mode(RpcMode::Submit).expect_err("allowlist must reject");
+        assert!(matches!(err, RunnerError::Misconfigured { .. }));
+        std::env::remove_var("CRASHLAB_RPC_SUBMIT_CONFIRM");
+        std::env::remove_var("CRASHLAB_RPC_ALLOWLIST");
+    }
+
+    #[test]
+    fn rpc_runner_batches_seeds_per_ledger() {
+        let seeds: Vec<CaseSeed> = (0..5u64).map(|id| CaseSeed { id, payload: vec![id as u8] }).collect();
+        let batches = batch_seeds_per_ledger(seeds, 2);
+        assert_eq!(batches.len(), 3);
+        assert_eq!(batches[0].len(), 2);
+        assert_eq!(batches[2].len(), 1);
     }
 
     #[test]

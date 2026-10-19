@@ -32,11 +32,11 @@ impl RegressionGroup {
         Self { area, signature_hash }
     }
 
-    /// Returns a stable string representation of this group in the format `area#hash`.
+    /// Returns a stable string representation of this group in the format `area#`.
     ///
     /// This format is human-readable and can be parsed back for CLI usage. The area name
     /// is the stable string label from [`FailureClass::as_str()`].
-    pub fn to_stable_string(&self) -> String {
+    pub fn to_stable_string(&$self) -> String {
         format!("{}#{:x}", self.area.as_str(), self.signature_hash)
     }
 
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn round_trip_multiple_groups() {
-        let groups = vec![
+        let groups = vec[
             RegressionGroup::new(FailureClass::Auth, 0x1111111111111111),
             RegressionGroup::new(FailureClass::Budget, 0x2222222222222222),
             RegressionGroup::new(FailureClass::State, 0x3333333333333333),

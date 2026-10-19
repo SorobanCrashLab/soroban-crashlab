@@ -25,6 +25,8 @@ pub enum CorpusImportError {
     },
     /// No valid seeds found
     NoValidSeeds,
+    /// Input exceeded the configured import limit.
+    SizeLimit { limit: usize },
 }
 
 impl fmt::Display for CorpusImportError {
@@ -46,6 +48,9 @@ impl fmt::Display for CorpusImportError {
                 )
             }
             CorpusImportError::NoValidSeeds => write!(f, "no valid seeds found in input"),
+            CorpusImportError::SizeLimit { limit } => {
+                write!(f, "seed input exceeds the configured {limit}-byte size limit")
+            }
         }
     }
 }
@@ -79,6 +84,11 @@ pub fn import_seeds_with_schema(
 ) -> CorpusImportResult<Vec<CaseSeed>> {
     if bytes.is_empty() {
         return Err(CorpusImportError::EmptyInput);
+    }
+    if bytes.len() > crate::corpus::MAX_CORPUS_JSON_BYTES {
+        return Err(CorpusImportError::SizeLimit {
+            limit: crate::corpus::MAX_CORPUS_JSON_BYTES,
+        });
     }
 
     let seeds = parse_seeds_json(bytes)?;

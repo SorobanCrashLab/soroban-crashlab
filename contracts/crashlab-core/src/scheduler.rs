@@ -31,6 +31,7 @@
 //! ```
 
 use crate::CaseSeed;
+use crate::seed_novelty::SeedEnergy;
 
 /// A strategy for mutating a [`CaseSeed`] into a new variant.
 pub trait Mutator: Send + Sync {
@@ -44,11 +45,23 @@ pub trait Mutator: Send + Sync {
     fn mutate(&self, seed: &CaseSeed, rng_state: &mut u64) -> CaseSeed;
 }
 
+/// A strategy for selecting a [`CaseSeed`] from the corpus based on energy.
+///
+/// Implementations receive the current per-seed energy scores and return the
+/// index of the seed to mutate. This lets the scheduler convert CPU into
+/// depth by prioritising seeds that reach new coverage.
+pub trait SeedSelector: Send + Sync {
+    /// Selects a seed index from `energies` using `rng_state` for entropy.
+    fn select_seed(&self, energies: &[SeedEnergy], rng_state: &mut u64) -> usize;
+}
+
 /// Statistics for a single mutator's lifecycle within a [`WeightedScheduler`].
 #[derive(Debug, Clone, Default)]
 pub struct MutatorStats {
     /// Total number of times this mutator was selected.
     pub selection_count: u64,
+    /// Sum of energy scores observed for seeds produced by this mutator.
+    pub energy_contribution: f64,
     /// Applications that decoded into a valid ScVal.
     pub decode_success_count: u64,
     /// Applications that reached the contract instead of failing in decode.
@@ -65,6 +78,10 @@ pub struct WeightedScheduler {
     total_weight: f64,
     stats: Vec<MutatorStats>,
     total_selections: u64,
+    /// Per-mutator energy feedback used to bias selection weights.
+    energy_bias: Vec<f64>,
+    /// Decay factor applied to accumulated energy each selection round.
+    energy_decay: f64,
     /// Optional per-mutator weight snapshots for plateau-driven diversification.
     baseline_weights: Vec<f64>,
     dead_mutator_threshold: Option<u64>,
@@ -82,6 +99,8 @@ pub enum SchedulerError {
     MutatorNotFound,
     /// Weight is NaN or infinite.
     InvalidWeight,
+    /// Energy decay factor is outside the (0, 1] range.
+    InvalidEnergyDecay,
 }
 
 impl std::fmt::Display for SchedulerError {
@@ -93,6 +112,9 @@ impl std::fmt::Display for SchedulerError {
             }
             SchedulerError::MutatorNotFound => write!(f, "mutator not found"),
             SchedulerError::InvalidWeight => write!(f, "invalid weight: NaN or infinite"),
+            SchedulerError::InvalidEnergyDecay => {
+                write!(f, "invalid energy decay: must be in (0, 1]")
+            }
         }
     }
 }
@@ -147,6 +169,8 @@ impl WeightedScheduler {
             total_weight,
             stats,
             total_selections: 0,
+            energy_bias: vec![0.0; mutators.len()],
+            energy_decay: 0.95,
             baseline_weights,
             dead_mutator_threshold: None,
             demotion_factor: 0.05,
@@ -190,6 +214,67 @@ impl WeightedScheduler {
         }
 
         &*self.mutators[index]
+    }
+
+    /// Sets the decay factor applied to accumulated energy bias each round.
+    ///
+    /// A value in `(0, 1]` keeps exploration alive by shrinking stale energy.
+    pub fn set_energy_decay(&mut self, decay: f64) -> Result<(), SchedulerError> {
+        if !decay.is_finite() || decay <= 0.0 || decay > 1.0 {
+            return Err(SchedulerError::InvalidEnergyDecay);
+        }
+        self.energy_decay = decay;
+        Ok(())
+    }
+
+    /// Records energy feedback for the mutator at `index`.
+    ///
+    /// The energy is accumulated into a per-mutator bias and folded into the
+    /// selection weights so that productive mutators are favoured. Old energy
+    /// is decayed to keep the scheduler exploring.
+    pub fn record_energy(&mut self, index: usize, energy: f64) -> Result<(), SchedulerError> {
+        if index >= self.mutators.len() {
+            return Err(SchedulerError::MutatorNotFound);
+        }
+        if !energy.is_finite() {
+            return Err(SchedulerError::InvalidWeight);
+        }
+
+        let e = if energy < 0.0 { 0.0 } else { energy };
+        self.stats[index].energy_contribution += e;
+        self.energy_bias[index] = self.energy_bias[index] * self.energy_decay + e;
+
+        // Blend base weight with energy bias; keep a floor so no arm starves.
+        let blended = self.weights[index] + self.energy_bias[index];
+        self.recompute_weights(index, blended)
+    }
+
+    /// Returns the current energy bias for each mutator, in registration order.
+    pub fn energy_biases(&self) -> &[f64] {
+        &self.energy_bias
+    }
+
+    /// Recomputes the cumulative distribution after updating a single weight.
+    fn recompute_weights(&mut self, index: usize, new_weight: f64) -> Result<(), SchedulerError> {
+        let w = if new_weight < 0.0 { 0.0 } else { new_weight };
+        self.weights[index] = w;
+
+        let mut total = 0.0;
+        let mut sum = 0.0;
+        let mut new_cumulative = Vec::with_capacity(self.weights.len());
+        for &weight in &self.weights {
+            total += weight;
+            sum += weight;
+            new_cumulative.push(sum);
+        }
+
+        if total <= 0.0 {
+            return Err(SchedulerError::InvalidWeightConfiguration);
+        }
+
+        self.total_weight = total;
+        self.cumulative_weights = new_cumulative;
+        Ok(())
     }
 
     /// Records that the mutator at `index` produced a novel signature.
@@ -353,6 +438,7 @@ impl WeightedScheduler {
                     contract_reached_count: self.stats[i].contract_reached_count,
                     observed_frequency,
                     configured_frequency,
+                    energy_contribution: self.stats[i].energy_contribution,
                     novelty_count: self.stats[i].novelty_count,
                     demoted: self.demoted[i],
                 }
@@ -446,6 +532,7 @@ pub struct SchedulerStatEntry {
     pub contract_reached_count: u64,
     pub observed_frequency: f64,
     pub configured_frequency: f64,
+    pub energy_contribution: f64,
     pub novelty_count: u64,
     pub demoted: bool,
 }
@@ -654,6 +741,38 @@ mod tests {
         assert!(selected_names.contains("havoc"));
         assert!(selected_names.contains("enum-variant-flip"));
         assert!(selected_names.contains("prng"));
+    }
+
+    #[test]
+    fn record_energy_biases_selection() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![
+            (Box::new(MockMutator("a")), 1.0),
+            (Box::new(MockMutator("b")), 1.0),
+        ];
+        let mut scheduler = WeightedScheduler::new(configs).unwrap();
+        scheduler.record_energy(0, 100.0).unwrap();
+
+        let mut rng = 7u64;
+        let mut a_count = 0;
+        for _ in 0..1000 {
+            if scheduler.select_mutator(&mut rng).name() == "a" {
+                a_count += 1;
+            }
+        }
+        assert!(a_count > 900, "energy bias should dominate selection");
+    }
+
+    #[test]
+    fn energy_decay_is_validated() {
+        let configs: Vec<(Box<dyn Mutator>, f64)> = vec![
+            (Box::new(MockMutator("a")), 1.0),
+        ];
+        let mut scheduler = WeightedScheduler::new(configs).unwrap();
+        assert_eq!(
+            scheduler.set_energy_decay(0.0).err(),
+            Some(SchedulerError::InvalidEnergyDecay)
+        );
+        assert!(scheduler.set_energy_decay(0.9).is_ok());
     }
 
     #[test]

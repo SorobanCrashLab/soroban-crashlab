@@ -51,6 +51,23 @@ function testDuplicatePathsAreRejected(): void {
     );
 }
 
+function testUnsafePathsAreRejected(): void {
+    for (const path of ['../outside.txt', 'nested/../../outside.txt', '/absolute.txt', 'C:/outside.txt', 'nested\\outside.txt']) {
+        assert.throws(() => createZipArchive([{ path, content: 'unsafe' }]), /Invalid ZIP entry path|unsafe segment/);
+    }
+}
+
+function testEntryAndArchiveSizeLimitsAreEnforced(): void {
+    assert.throws(
+        () => createZipArchive([{ path: 'large.txt', content: 'x'.repeat(4 * 1024 * 1024 + 1) }]),
+        /entry exceeds/,
+    );
+    assert.throws(
+        () => readZipArchive(new Uint8Array(17 * 1024 * 1024)),
+        /archive exceeds/,
+    );
+}
+
 function testOutputIsDeterministicForAFixedDate(): void {
     const entries: ZipEntry[] = [{ path: 'a.txt', content: 'hello' }];
     const first = createZipArchive(entries, { modifiedAt: FIXED_DATE });
@@ -122,6 +139,8 @@ testCrc32IsUnsigned();
 testArchiveStartsWithLocalFileHeaderSignature();
 testEmptyArchiveIsJustAnEocdRecord();
 testDuplicatePathsAreRejected();
+testUnsafePathsAreRejected();
+testEntryAndArchiveSizeLimitsAreEnforced();
 testOutputIsDeterministicForAFixedDate();
 
 testRoundTripSingleEntry();

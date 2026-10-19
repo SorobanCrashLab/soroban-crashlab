@@ -1,10 +1,15 @@
-/**
+/*
  * Failure classification taxonomy (#1121).
  *
  * Groups failed runs by the crash category the backend reports, and attaches a
  * definition to each category so the dashboard can explain what a category
  * means and where to start triaging it. Categories roll up into families, which
  * gives the taxonomy two levels: family → category → run.
+ *
+ * Signature schema versioning (W5-G02): the taxonomy leaves feed the
+ * signature preimage, so any change to this file can silently re-bucket
+ * historical signatures. The schema version below is part of the signature
+ * hash input and must be bumped according to the rules in `docs/taxonomy.md`.
  *
  * DOM-free so it can be unit-tested with plain Node.
  */
@@ -21,6 +26,27 @@ export const FAILURE_FAMILY_LABELS: Record<FailureFamily, string> = {
     encoding: 'Encoding',
     other: 'Unclassified',
 };
+
+/**
+ * Current signature schema version.
+ *
+ * This value is part of the signature hash input (alongside the taxonomy
+ * leaves and masked fields) and is stored alongside fixtures and baselines.
+ * Two signatures are only comparable when they were computed under the same
+ * version.
+ *
+ * Bumping rules (cf. `docs/taxonomy.md`):
+ *   - MINOR bump: additive only -- a new leaf is added and existing leaves
+ *     and their preimage contribution are unchanged.
+ *   - MAJOR bump: the preimage changes -- a leaf is renamed, removed, or its
+ *     masking changes. Requires a W5-F08 diff report and maintainer sign-off.
+ */
+export const SIGNATURE_SCHEMA_VERSION = 1;
+
+/** Hint shown when a signature carries a foreign schema version. */
+export const SIGNATURE_SCHEMA_MISMATCH_HINT =
+    'Signature schema version mismatch: recompute baselines under the current schema ' +
+    'with the W5-F08 diff report attached (see docs/taxonomy.md for the migration checklist).';
 
 /** What a category means and how to approach it. */
 export interface FailureCategoryDefinition {
@@ -108,8 +134,8 @@ export function classifyFailureCategory(category: string): FailureCategoryDefini
 /** Most severe first — the order severities are listed and compared in. */
 export const SEVERITY_ORDER: readonly RunSeverity[] = ['critical', 'high', 'medium', 'low'];
 
-function severityRank(severity: RunSeverity): number {
-    return SEVERITY_ORDER.indexOf(severity);
+function severityRank(level: RunSeverity): number {
+    return SEVERITY_ORDER.indexOf(level);
 }
 
 /** Returns the runs the taxonomy covers: failed runs that carry crash detail. */
@@ -131,7 +157,7 @@ export interface CategoryBreakdown {
     severities: RunSeverity[];
     /** Highest severity observed in this category. */
     topSeverity: RunSeverity;
-    /** Fraction of all classified failures, 0–1. */
+    /** Fraction of all classified failures, 0―2 */
     share: number;
 }
 
@@ -211,6 +237,8 @@ export interface TaxonomySummary {
     categories: number;
     families: number;
     signatures: number;
+    /** Schema version the signatures in this summary were computed under. */
+    signatureSchemaVersion: number;
 }
 
 export function summarizeTaxonomy(breakdown: readonly CategoryBreakdown[]): TaxonomySummary {
@@ -227,6 +255,7 @@ export function summarizeTaxonomy(breakdown: readonly CategoryBreakdown[]): Taxo
         categories: breakdown.length,
         families: families.size,
         signatures: signatures.size,
+        signatureSchemaVersion: SIGNATURE_SCHEMA_VERSION,
     };
 }
 
@@ -250,4 +279,49 @@ export function groupBreakdownByFamily(
             count: entries.reduce((total, entry) => total + entry.count, 0),
         }))
         .sort((left, right) => right.count - left.count);
+}
+
+/**
+ * The schema version a stored signature or baseline was computed under.
+ * Signatures without an explicit version are treated as the legacy (v0)
+ * schema, which is never comparable to the current one.
+ */
+export function getSignatureSchemaVersion(stored: { signatureSchemaVersion?: number }): number {
+    return stored.signatureSchemaVersion ?? 0;
+}
+
+/** Result of checking a stored signature against the current schema. */
+export interface SignatureVersionCheck {
+    ok: boolean;
+    /** Schema version the stored signature was computed under. */
+    storedVersion: number;
+    /** Schema version this build computes signatures under. */
+    currentVersion: number;
+    /** Human-readable error with a migration hint, or `null` when the versions match. */
+    error: string | null;
+}
+
+/**
+ * Verifies that a stored signature/baseline was computed under the current
+ * schema version. A mismatch is a hard error with a migration hint -- it must
+ * never be silently re-bucketed as a new signature.
+ */
+export function checkSignatureSchemaVersion(stored: {
+    signatureSchemaVersion?: number;
+    signature?: string;
+}): SignatureVersionCheck {
+    const storedVersion = getSignatureSchemaVersion(stored);
+    const currentVersion = SIGNATURE_SCHEMA_VERSION;
+
+    if (storedVersion === currentVersion) {
+        return { ok: true, storedVersion, currentVersion, error: null };
+    }
+
+    const signature = stored.signature ? ` (${stored.signature})` : '';
+    const error =
+        `Signature ${signature}was computed under schema v${storedVersion}, ` +
+        `but this build computes signatures under schema v${currentVersion}. ` +
+        SIGNATURE_SCHEMA_MISMATCH_HINT;
+
+    return { ok: false, storedVersion, currentVersion, error };
 }

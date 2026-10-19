@@ -9,6 +9,7 @@ import { selectRunStorageDriver } from '@/lib/storage';
 import { paginateKeyset, getRunKeyset, isLegacyOrInvalidCursor } from '@/app/pagination-utils';
 import { FuzzingRunSchema } from '@/lib/schemas/runs';
 import { isRedisConfigured } from '@/lib/redis';
+import { getRunHistory, appendRunHistory } from '@/lib/run-history';
 
 const DEFAULT_PAGE_LIMIT = 20;
 
@@ -57,6 +58,17 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
   }
 
   const driver = selectRunStorageDriver();
+
+  // History surface: when `history=true` is requested, return the persisted
+  // suite-execution timeline (start, duration, per-group pass/fail, deltas)
+  // instead of the flat run list. This feeds the UI trend view.
+  if (sanitizedSearchParams.get('history') === 'true') {
+    const historyLimitParam = parseInt(sanitizedSearchParams.get('limit') ?? '', 10);
+    const historyLimit = Number.isFinite(historyLimitParam) && historyLimitParam > 0 ? historyLimitParam : DEFAULT_PAGE_LIMIT;
+    const history = await getRunHistory({ limit: historyLimit });
+    return withFixtureCaching(request, { data: { history, total: history.length }, total: history.length });
+  }
+
   const rawStatus = sanitizedSearchParams.get('status') as import('@/app/types').RunStatus | undefined;
   const { runs: allRuns } = await driver.listRuns({
     status: rawStatus,
@@ -105,6 +117,16 @@ export const POST = withRouteErrorHandling('POST /api/runs', async (request: Req
   if ('putRun' in driver && typeof driver.putRun === 'function') {
     await (driver as import('@/lib/storage/kv-run-driver').KVRunDriver).putRun(result.data);
   }
+
+  // Persist a history record for this suite execution so the timeline is
+  // browsable via API/CLI (`regression history`) and the UI trend view.
+  await appendRunHistory({
+    runId: result.data.id,
+    startedAt: result.data.startedAt ?? new Date().toISOString(),
+    durationMs: result.data.durationMs ?? 0,
+    groups: result.data.groups ?? [],
+    classificationDeltas: result.data.classificationDeltas ?? [],
+  });
 
   return createdResponse({ run: result.data });
 });

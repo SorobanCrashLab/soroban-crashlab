@@ -5,14 +5,13 @@ use crashlab_core::bundle_persist::CaseBundleDocument;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn unique_tmp() -> PathBuf {
-    let n = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time")
-        .as_nanos();
-    std::env::temp_dir().join(format!("crashlab-replay-bridge-{n}"))
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("crashlab-replay-bridge-{}-{n}", std::process::id()))
 }
 
 fn write_bundle_to_dir(dir: &PathBuf, name: &str, bundle: &crashlab_core::CaseBundle) -> PathBuf {

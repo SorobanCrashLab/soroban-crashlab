@@ -227,6 +227,12 @@ where
 /// [`crate::runner::ContractRunner`] trait into the simulation module without
 /// changing existing call sites.
 ///
+/// # Wall-clock deadline (W5-A11)
+/// The timeout here is a **hard-sandboxing deadline**, not a classification
+/// branch. It uses `mpsc::recv_timeout` which reads the real wall clock, and
+/// this is by design: a runaway simulator must be stopped regardless of any
+/// virtual clock. Per #1795, this path is explicitly *not* migrated to VClock.
+///
 /// # Thread Safety
 /// This function enforces a maximum number of concurrent simulation threads
 /// via [`MAX_CONCURRENT_SIMULATION_THREADS`]. If the cap is reached, the function
@@ -457,6 +463,10 @@ mod tests {
         // the counter settles back to (or below) the baseline instead of
         // asserting instantly; a leaked thread keeps it elevated and fails
         // the assertion after the deadline.
+        //
+        // The polling deadline uses VClock::real() so it does not violate the
+        // grep-gate (no direct Instant::now outside vclock.rs).
+        let clock = crate::vclock::VClock::real();
         let initial_count = active_simulation_thread_count();
         let seed = CaseSeed {
             id: 103,
@@ -466,12 +476,12 @@ mod tests {
 
         let _sig = run_simulation_with_timeout(&seed, &cfg, |s| classify(s));
 
-        let deadline = std::time::Instant::now() + StdDuration::from_millis(2000);
+        let deadline_start = clock.now_monotonic();
         loop {
             if active_simulation_thread_count() <= initial_count {
                 break;
             }
-            if std::time::Instant::now() >= deadline {
+            if clock.elapsed_since(deadline_start) >= StdDuration::from_millis(2000) {
                 break;
             }
             thread::sleep(StdDuration::from_millis(10));

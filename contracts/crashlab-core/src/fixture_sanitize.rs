@@ -13,11 +13,16 @@ use std::collections::HashMap;
 const SENSITIVE_KEYS: &[&[u8]] = &[
     b"authorization",
     b"token",
+    b"access_token",
+    b"refresh_token",
     b"api_key",
     b"apikey",
     b"x-api-key",
+    b"webhook_key",
+    b"client_secret",
     b"password",
     b"secret",
+    b"private_key",
     b"session",
     b"cookie",
     b"set-cookie",
@@ -666,7 +671,18 @@ pub fn sanitize_bundle_document_for_sharing(bundle: &CaseBundle) -> CaseBundleDo
 /// Serializes a share-safe bundle document as pretty JSON.
 pub fn save_sanitized_case_bundle_json(bundle: &CaseBundle) -> Result<Vec<u8>, BundlePersistError> {
     let doc = sanitize_bundle_document_for_sharing(bundle);
-    Ok(serde_json::to_vec_pretty(&doc)?)
+    let mut value = serde_json::to_value(&doc)?;
+    if let Some(environment) = value.get_mut("environment") {
+        let (redacted, _) = crate::redact::redact_json_value(environment);
+        *environment = redacted;
+    }
+    let json = serde_json::to_vec_pretty(&value)?;
+    if json.len() > crate::bundle_persist::MAX_BUNDLE_JSON_BYTES {
+        return Err(BundlePersistError::SizeLimit {
+            limit: crate::bundle_persist::MAX_BUNDLE_JSON_BYTES,
+        });
+    }
+    Ok(json)
 }
 
 /// Builds a scenario from a sanitized bundle for public sharing.

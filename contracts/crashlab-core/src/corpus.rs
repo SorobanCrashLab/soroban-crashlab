@@ -10,6 +10,8 @@ use sha2::{Sha256, Digest};
 
 /// Schema version for [`CorpusArchive`] JSON.
 pub const CORPUS_ARCHIVE_SCHEMA_VERSION: u32 = 2;
+/// Maximum corpus JSON input size accepted by importers.
+pub const MAX_CORPUS_JSON_BYTES: usize = crate::bundle_persist::MAX_BUNDLE_JSON_BYTES;
 
 /// Seed with content-addressed integrity metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,6 +46,7 @@ pub enum CorpusError {
     Json(serde_json::Error),
     UnsupportedSchema { found: u32 },
     Integrity(String),
+    SizeLimit { limit: usize },
 }
 
 impl std::fmt::Display for CorpusError {
@@ -54,6 +57,9 @@ impl std::fmt::Display for CorpusError {
                 write!(f, "unsupported corpus schema version {found}")
             }
             CorpusError::Integrity(msg) => write!(f, "corpus integrity error: {msg}"),
+            CorpusError::SizeLimit { limit } => {
+                write!(f, "corpus exceeds the configured {limit}-byte size limit")
+            }
         }
     }
 }
@@ -64,6 +70,7 @@ impl std::error::Error for CorpusError {
             CorpusError::Json(e) => Some(e),
             CorpusError::UnsupportedSchema { .. } => None,
             CorpusError::Integrity(_) => None,
+            CorpusError::SizeLimit { .. } => None,
         }
     }
 }
@@ -109,7 +116,7 @@ fn sort_addressed_deterministic(seeds: &mut [AddressedSeed]) {
 pub fn corpus_archive_from_seeds(mut seeds: Vec<CaseSeed>) -> CorpusArchive {
     sort_seeds_deterministic(&mut seeds);
     let addressed = seeds.iter().map(|s| AddressedSeed {
-        id: s.id,
+        id: s.id as u32,
         size: s.payload.len(),
         hash: hash_seed_payload(&s.payload),
         payload: s.payload.clone(),
@@ -129,6 +136,11 @@ pub fn export_corpus_json(seeds: &[CaseSeed]) -> Result<Vec<u8>, serde_json::Err
 
 /// Parses JSON into a corpus, validates schema, and verifies integrity.
 pub fn import_corpus_json(bytes: &[u8]) -> Result<Vec<CaseSeed>, CorpusError> {
+    if bytes.len() > MAX_CORPUS_JSON_BYTES {
+        return Err(CorpusError::SizeLimit {
+            limit: MAX_CORPUS_JSON_BYTES,
+        });
+    }
     let arch: CorpusArchive = serde_json::from_slice(bytes)?;
     if arch.schema > CORPUS_ARCHIVE_SCHEMA_VERSION {
         return Err(CorpusError::UnsupportedSchema { found: arch.schema });

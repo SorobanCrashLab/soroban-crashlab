@@ -1,37 +1,41 @@
-//! Mutation budget limiter for fuzz campaign runs.
-//!
-//! Caps the total number of mutation attempts per run to prevent runaway jobs.
-//! When the budget is exhausted, further calls to [`MutationBudget::try_attempt`]
-//! return `false` and the skipped count is incremented. Call
-//! [`MutationBudget::report`] at any point to get a [`BudgetReport`] suitable
-//! for dashboard and CLI output.
-//!
-//! # Example
-//!
-//! ```rust
-//! use crashlab_core::mutation_budget::MutationBudget;
-//!
-//! let mut budget = MutationBudget::new(3);
-//!
-//! assert!(budget.try_attempt()); // 1
-//! assert!(budget.try_attempt()); // 2
-//! assert!(budget.try_attempt()); // 3 — budget exhausted after this
-//! assert!(!budget.try_attempt()); // skipped
-//! assert!(!budget.try_attempt()); // skipped
-//!
-//! let report = budget.report();
-//! assert_eq!(report.budget, 3);
-//! assert_eq!(report.attempts_made, 3);
-//! assert_eq!(report.skipped, 2);
-//! assert!(report.exhausted);
-//! ```
+/// Mutation budget limiter for fuzz campaign runs.
+//
+// Caps the total number of mutation attempts per run to prevent runaway jobs.
+// When the budget is exhausted, further calls to [`MutationBudget::try_attempt`]
+// return `false` and the skipped count is incremented. Call
+// [`MutationBudget::report`] at any point to get a [`BudgetReport`] suitable
+// for dashboard and CLI output.
+//
+// # Example
+//
+// ```rust
+// use crashlab_core::mutation_budget::MutationBudget;
+//
+// let mut budget = MutationBudget::new(3);
+//
+// assert!(budget.try_attempt()); // 1
+// assert!(budget.try_attempt()); // 2
+// assert!(budget.try_attempt()); // 3 — budget exhausted after this
+// assert!(!budget.try_attempt()); // skipped
+// assert!(!budget.try_attempt()); // skipped
+//
+// let report = budget.report();
+// assert_eq!(report.budget, 3);
+// assert_eq!(report.attempts_made, 3);
+// assert_eq!(report.skipped, 2);
+// assert!(report.exhausted);
+// ```
 
 use serde::{Deserialize, Serialize};
 
 /// Tracks mutation attempts against a fixed per-run cap.
-///
+//
 /// Construct with [`MutationBudget::new`], call [`try_attempt`][Self::try_attempt]
 /// before each mutation, and retrieve results via [`report`][Self::report].
+///
+/// The budget also exposes a [`pressure`][Self::pressure] signal ranging from
+/// `0.0` (fresh budget) to `1.0` (exhausted). This feeds the coverage-guided
+/// energy model so seeds that push the run close to its budget can be prioritised.
 #[derive(Debug, Clone)]
 pub struct MutationBudget {
     /// Maximum allowed mutation attempts for this run.
@@ -44,7 +48,7 @@ pub struct MutationBudget {
 
 impl MutationBudget {
     /// Creates a new limiter with the given `budget`.
-    ///
+    //
     /// A budget of `0` means every attempt is immediately skipped.
     pub fn new(budget: u64) -> Self {
         Self {
@@ -76,6 +80,19 @@ impl MutationBudget {
         self.budget.saturating_sub(self.attempts_made)
     }
 
+    /// Fraction of the budget that has been consumed, in the range `0`.․`1`.
+    ///
+    /// This is the budget-proximity signal consumed by the corpus energy
+    /// model: seeds that drive the run close to exhaustion are considered
+    /// more valuable. A zero budget is treated as fully pressured.
+    pub fn pressure(&self) -> f64 {
+        if self.budget == 0 {
+            1.0
+        } else {
+            (self.attempts_made as f64 / self.budget as f64).clamp(0.0, 1.0)
+        }
+    }
+
     /// Snapshot of current counters for reporting.
     pub fn report(&self) -> BudgetReport {
         BudgetReport {
@@ -83,6 +100,7 @@ impl MutationBudget {
             attempts_made: self.attempts_made,
             skipped: self.skipped,
             exhausted: self.is_exhausted(),
+            plateau_stop: false,
         }
     }
 }
@@ -112,7 +130,7 @@ impl BudgetReport {
     pub fn to_cli_line(&self) -> String {
         let tag = if self.exhausted { "  [EXHAUSTED]" } else { "" };
         format!(
-            "budget: {}  used: {}  skipped: {}{}",
+            "budget: {<br/>}  used: {}  skipped: {}{}",
             self.budget, self.attempts_made, self.skipped, tag
         )
     }
@@ -215,5 +233,32 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         let back: BudgetReport = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
+    }
+
+    #[test]
+    fn pressure_rams_from_zero_to_one() {
+        let mut b = MutationBudget::new(4);
+        assert_eq!(b.pressure(), 0.0);
+        b.try_attempt();
+        assert_eq!(b.pressure(), 0.25);
+        b.try_attempt();
+        b.try_attempt();
+        b.try_attempt();
+        assert_eq!(b.pressure(), 1.0);
+    }
+
+    #[test]
+    fn pressure_saturates_after_exhaustion() {
+        let mut b = MutationBudget::new(2);
+        b.try_attempt();
+        b.try_attempt();
+        b.try_attempt(); // skipped
+        assert_eq!(b.pressure(), 1.0);
+    }
+
+    #[test]
+    fn zero_budget_pressure_is_one() {
+        let b = MutationBudget::new(0);
+        assert_eq!(b.pressure(), 1.0);
     }
 }

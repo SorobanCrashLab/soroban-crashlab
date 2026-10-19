@@ -1,13 +1,22 @@
+pub mod vclock;
+pub use vclock::{Monotonic, VClock};
+
+pub mod scval_mutator;
+
 pub mod auth_matrix;
+pub mod auth_scenario;
 pub mod cluster;
 pub mod cors;
+pub mod diff_engine;
 pub mod fixture;
 pub mod fixture_classifier;
 pub mod health;
+pub mod lease;
 pub mod prng;
 pub mod regression_group;
 pub mod reproducer;
 pub mod retry;
+pub mod redact;
 pub mod runner;
 pub mod shrink;
 pub mod signature_hash;
@@ -77,14 +86,26 @@ pub use auth_matrix::{
     collect_mismatched, format_mismatch_summary, run_matrix, run_matrix_for_seeds, AuthMode,
     MatrixReport, ModeResult,
 };
+pub use auth_scenario::{
+    run_auth_scenario, run_auth_scenario_library, AuthExpectation, AuthScenario, AuthScenarioError,
+    AuthScenarioLibrary, AuthScenarioReport, AuthStep, AuthStepOutcome, AuthStepResult,
+    AUTH_STATE_DIVERGENCE_CATEGORY,
+};
 pub use cors::{
     evaluate_cors, CorsConfig, CorsError, CorsEvaluation, HttpMethod, OriginAllowlist,
     OriginPattern,
 };
-pub use fixture::RegressionFixture;
+pub use fixture::{
+    load_bundled_fixture_wasm, resolve_fixture_wasm, verify_wasm_sha256, RegressionFixture,
+};
 pub use fixture_classifier::{
     classify_and_wrap_fixture, classify_and_wrap_verified, classify_fixture,
     classify_paired_fixture, PairedClassification,
+};
+pub use diff_engine::{
+    classify_delta, diff_engines, render_diff_report_json, render_diff_report_markdown,
+    DeltaKind, DiffEngineError, DiffReport, EngineRun, ExpectedDelta, ExpectedDeltaSet,
+    SeedDelta, SeedOutcome,
 };
 pub use health::{
     FailureMetrics, HealthMonitor, HealthStatus, HealthSummary, QueueMetrics, ThroughputMetrics,
@@ -107,7 +128,7 @@ pub use taxonomy::{
 pub use host_runner::HostContractRunner;
 
 #[cfg(feature = "rpc-runner")]
-pub use rpc_runner::{RpcConfigError, RpcContractRunner};
+pub use rpc_runner::{batch_seeds_per_ledger, RpcConfigError, RpcContractRunner, RpcMode};
 
 #[cfg(not(feature = "rpc-runner"))]
 pub use rpc_runner_stub::{RpcConfigError, RpcContractRunner};
@@ -177,7 +198,9 @@ pub use artifact_storage::{
 pub mod fixture_compat;
 pub use fixture_compat::{
     check_bundle_fixtures, check_bundle_signature_hashes, check_manifest_engine_schema,
-    check_seed_fixtures, check_seed_sanitization, CompatReport, CompatWarning,
+    check_seed_fixtures, check_seed_sanitization, load_parity_expectations,
+    missing_parity_expectations, CompatReport, CompatWarning, ParityClassExpectation,
+    ParityContract, PARITY_CONTRACT_VERSION, PARITY_EXPECTATIONS_TOML,
 };
 
 pub mod fixture_manifest;
@@ -244,6 +267,10 @@ pub use scenario_export::{
     derive_test_name, export_crash_report_markdown, export_failing_seed_json,
     export_rust_regression_fixture, export_scenario_json, export_suite_json,
     write_rust_regression_snippet, FailureScenario,
+};
+pub use scenario_export::{
+    export_auth_scenario_json, export_auth_scenario_library_json, AuthScenarioExport,
+    AuthScenarioExportError, AuthScenarioLibraryExport,
 };
 
 pub mod regression_suite;
@@ -317,6 +344,10 @@ pub use run_control::{
     drive_run_from_checkpoint, drive_run_partitioned, drive_run_partitioned_from_checkpoint,
     drive_run_with_health, request_cancel_run, CancelSignal, RunId, RunProgress, RunResumeError,
     RunSummary, RunTerminalState,
+};
+pub use run_control::{
+    drive_auth_scenario, drive_auth_scenario_library, AuthScenarioDriveError,
+    AuthScenarioDriveSummary,
 };
 
 pub mod rpc_envelope;

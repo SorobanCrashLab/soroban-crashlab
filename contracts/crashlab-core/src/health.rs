@@ -1,6 +1,6 @@
+use crate::vclock::{Monotonic, VClock};
 use serde::{Serialize, Deserialize};
 use std::collections::BTreeMap;
-use std::time::Instant;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HealthStatus {
@@ -93,7 +93,8 @@ pub fn export_health_summary_json(summary: &HealthSummary) -> Result<String, ser
 
 #[derive(Debug)]
 pub struct HealthMonitor {
-    start_time: Instant,
+    clock: VClock,
+    start: Monotonic,
     total_cases: u64,
     total_failures: u64,
     unique_signatures: u64,
@@ -108,8 +109,18 @@ pub struct HealthMonitor {
 
 impl HealthMonitor {
     pub fn new(queue_capacity: u64) -> Self {
+        Self::with_clock(queue_capacity, VClock::real())
+    }
+
+    /// Creates a monitor backed by an explicit [`VClock`].
+    ///
+    /// Tests and replay pass a virtual clock so timing-dependent metrics
+    /// (throughput, elapsed) are deterministic (#1795).
+    pub fn with_clock(queue_capacity: u64, clock: VClock) -> Self {
+        let start = clock.now_monotonic();
         Self {
-            start_time: Instant::now(),
+            clock,
+            start,
             total_cases: 0,
             total_failures: 0,
             unique_signatures: 0,
@@ -128,8 +139,35 @@ impl HealthMonitor {
         degraded_throughput_threshold: f64,
         unhealthy_failure_rate_threshold: f64,
     ) -> Self {
+        let clock = VClock::real();
+        let start = clock.now_monotonic();
         Self {
-            start_time: Instant::now(),
+            clock,
+            start,
+            total_cases: 0,
+            total_failures: 0,
+            unique_signatures: 0,
+            queue_pending: 0,
+            queue_in_progress: 0,
+            queue_capacity,
+            degraded_throughput_threshold,
+            unhealthy_failure_rate_threshold,
+            failure_classes: BTreeMap::new(),
+            plateau: PlateauMetrics::default(),
+        }
+    }
+
+    /// Creates a monitor with explicit thresholds and a [`VClock`].
+    pub fn with_thresholds_and_clock(
+        queue_capacity: u64,
+        degraded_throughput_threshold: f64,
+        unhealthy_failure_rate_threshold: f64,
+        clock: VClock,
+    ) -> Self {
+        let start = clock.now_monotonic();
+        Self {
+            clock,
+            start,
             total_cases: 0,
             total_failures: 0,
             unique_signatures: 0,
@@ -145,6 +183,11 @@ impl HealthMonitor {
 
     pub fn record_case(&mut self) {
         self.total_cases += 1;
+    }
+
+    /// The clock backing this monitor.
+    pub fn clock(&self) -> &VClock {
+        &self.clock
     }
 
     pub fn record_failure(&mut self, is_new_signature: bool) {
@@ -188,7 +231,7 @@ impl HealthMonitor {
     }
 
     pub fn summary(&self) -> HealthSummary {
-        let elapsed = self.start_time.elapsed();
+        let elapsed = self.clock.elapsed_since(self.start);
         let elapsed_secs = elapsed.as_secs_f64();
 
         let cases_per_second = if elapsed_secs > 0.0 {
@@ -276,7 +319,7 @@ impl HealthMonitor {
     }
 
     pub fn reset(&mut self) {
-        self.start_time = Instant::now();
+        self.start = self.clock.now_monotonic();
         self.total_cases = 0;
         self.total_failures = 0;
         self.unique_signatures = 0;
@@ -399,8 +442,10 @@ mod tests {
 
     #[test]
     fn throughput_calculated_over_time() {
-        let mut monitor = HealthMonitor::new(100);
-        monitor.start_time = Instant::now() - Duration::from_millis(100);
+        let clock = crate::vclock::VClock::manual();
+        let mut monitor = HealthMonitor::with_clock(100, clock.clone());
+        // Simulate 100 ms already elapsed since the monitor started.
+        clock.advance_by(Duration::from_millis(100));
         for _ in 0..100 {
             monitor.record_case();
         }
