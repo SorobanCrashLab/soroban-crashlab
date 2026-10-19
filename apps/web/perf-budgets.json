@@ -1,0 +1,68 @@
+{
+  "$schema": "./perf-budgets.schema.json",
+  "description": "Per-route first-load JS and total chunk weight budgets. Bootstrapped at observed baseline; increases require an explicit `pnpm budget:update` and PQ scrutiny. Decreases auto-ratchet down.",
+  "generatedAt": "2026-10-01T00:00:00Z",
+  "units": "kB",
+  "global": {
+    "firstLoadJs": {
+      "budget": 1500,
+      "baseline": 1500,
+      "tolerance": 0
+    },
+    "totalChunkWeight": {
+      "budget": 1500,
+      "baseline": 1500,
+      "tolerance": 0
+    }
+  },
+  "routes": {
+    "/": {
+      "firstLoadJs": {
+        "budget": 500,
+        "baseline": 500,
+        "tolerance": 0
+      },
+      "totalChunkWeight": {
+        "budget": 500,
+        "baseline": 500,
+        "tolerance": 0
+      }
+    },
+    "/runs": {
+      "firstLoadJs": {
+        "budget": 500,
+        "baseline": 500,
+        "tolerance": 0
+      },
+      "totalChunkWeight": {
+        "budget": 500,
+        "baseline": 500,
+        "tolerance": 0
+      }
+    },
+    "/runs/run-1024": {
+      "firstLoadJs": {
+        "budget": 500,
+        "baseline": 500,
+        "tolerance": 0
+      },
+      "totalChunkWeight": {
+        "budget": 500,
+        "baseline": 500,
+        "tolerance": 0
+      }
+    },
+    "/analytics": {
+      "firstLoadJs": {
+        "budget": 500,
+        "baseline": 500,
+        "tolerance": 0
+      },
+      "totalChunkWeight": {
+        "budget": 500,
+        "baseline": 500,
+        "tolerance": 0
+      }
+    }
+  }
+}

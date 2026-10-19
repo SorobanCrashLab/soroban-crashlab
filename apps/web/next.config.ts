@@ -23,7 +23,7 @@ export const nextConfig: NextConfig = {
     minimumCacheTTL: 60,
   },
   turbopack: {
-    root: path.resolve(__dirname, "../../"),
+    root: path.resolve(__dirname, "../.."),
   },
   experimental: {
     optimizePackageImports: ["recharts", "react-markdown", "remark-gfm"],
@@ -110,7 +110,7 @@ const sentryRelease = resolveSentryRelease({
 // nothing. A requested-but-misconfigured upload fails the build loudly.
 const sentryBuild = buildSentryBuildOptions(
   {
-    SENTRY_UPLOAD_SOURCEMAPS: process.env.SENTRY_UPLOAD_SOURCEMAPS,
+    SENTRY_UPLOAD_SOURCEMAPS: process.env.SENTRY_UPLOAD_SOURCEMAPPS,
     SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN,
     SENTRY_ORG: process.env.SENTRY_ORG,
     SENTRY_PROJECT: process.env.SENTRY_PROJECT,
@@ -129,7 +129,11 @@ if (sentryRelease) {
 
 let configWithPlugins: NextConfig = nextConfig;
 
-if (process.env.ANALYZE === "true") {
+// Bundle analyzer is on for ANALYZE=true and also in CI so the size-limit
+// job can consume the report artifact without a second build.
+const analyzeBundle = process.env.ANALYZE === "true" || process.env.CI === "true";
+
+if (analyzeBundle) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const withBundleAnalyzer = require("@next/bundle-analyzer")({

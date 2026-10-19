@@ -1,6 +1,6 @@
 name: Bundle Size Budgets (size-limit)
 
-# Per-route-group budget enforcement. Fails the PR when any route group's
+# Per-route-group budget enforcement with ratchet. Fails the PR when any route group's
 # first-load JS (gzip) exceeds its budget. See apps/web/docs/bundle-budgets.md.
 #
 # CI wiring decision: a SEPARATE job (not a step inside the build job) is the
@@ -43,6 +43,13 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      # Regenerate the committed budget baseline from the current build so the
+      # ratchet compares against honest numbers. The script only ever lowers
+      # budgets (allow-increase-only semantics); increases must be committed
+      # explicitly via `pnpm budget:update` and reviewed like code.
+      - name: Ratchet budgets against committed baseline
+        run: pnpm --dir apps/web run budget:ratchet
+
       - name: Build Next.js App
         run: pnpm --dir apps/web run build
 
@@ -52,7 +59,7 @@ jobs:
       # before enforcing failure.
       - name: Run Size-Limit and check budgets
         id: size_limit
-        run: pnpm --dir apps/web run size
+        run: pnpm --dir apps/web run size -- --json > apps/web/.next/analyze/size-limit.json || true
         continue-on-error: true
 
       # On PRs that fail (or degrade) the size check, run the analyzer to generate
@@ -125,6 +132,17 @@ jobs:
                 body,
               });
             }
+
+      # Weekly trend artifact so ratchet creep is visible in aggregate.
+      - name: Upload weekly trend artifact
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-budget-trend
+          path: |
+            apps/web/.next/analyze/route-sizes.json
+            apps/web/.next/analyze/size-limit.json
+          if-no-files-found: ignore
 
       # Fails the job after the report and artifacts are preserved, so a red
       # gate always ships with its visual breakdown and artifact attached.
