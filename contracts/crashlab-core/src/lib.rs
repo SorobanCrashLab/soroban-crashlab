@@ -180,7 +180,9 @@ pub use artifact_storage::{
 pub mod fixture_compat;
 pub use fixture_compat::{
     check_bundle_fixtures, check_bundle_signature_hashes, check_manifest_engine_schema,
-    check_seed_fixtures, check_seed_sanitization, CompatReport, CompatWarning,
+    check_seed_fixtures, check_seed_sanitization, load_parity_expectations,
+    missing_parity_expectations, CompatReport, CompatWarning, ParityClassExpectation,
+    ParityContract, PARITY_CONTRACT_VERSION, PARITY_EXPECTATIONS_TOML,
 };
 
 pub mod fixture_manifest;
