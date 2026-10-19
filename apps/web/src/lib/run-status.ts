@@ -18,7 +18,7 @@
  * *not* used to generate fixture data — fixtures cycle through their own
  * sequences and those literal values must stay byte-identical.
  */
-export const RUN_STATUSES = ['running', 'completed', 'failed', 'cancelled'] as const;
+export const RUN_STATUSES = ['running', 'cancelling', 'completed', 'failed', 'cancelled'] as const;
 
 /** Status variants for a fuzzing run. */
 export type RunStatus = (typeof RUN_STATUSES)[number];
@@ -72,6 +72,18 @@ export const STATUS_META: Record<RunStatus, RunStatusMeta> = {
         sortOrder: 0,
         terminal: false,
     },
+    cancelling: {
+        label: 'Cancelling',
+        badgeClass: 'status-badge-cancelling',
+        pillClass: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+        solidClass: 'bg-amber-500 shadow-amber-500/20',
+        solidHoverClass: 'hover:bg-amber-400',
+        solidFocusClass: 'focus:ring-amber-500',
+        color: 'amber',
+        icon: '◐',
+        sortOrder: 1,
+        terminal: false,
+    },
     completed: {
         label: 'Completed',
         badgeClass: 'status-badge-completed',
@@ -81,7 +93,7 @@ export const STATUS_META: Record<RunStatus, RunStatusMeta> = {
         solidFocusClass: 'focus:ring-emerald-500',
         color: 'green',
         icon: '✓',
-        sortOrder: 1,
+        sortOrder: 2,
         terminal: true,
     },
     failed: {
@@ -93,7 +105,7 @@ export const STATUS_META: Record<RunStatus, RunStatusMeta> = {
         solidFocusClass: 'focus:ring-rose-500',
         color: 'red',
         icon: '✗',
-        sortOrder: 2,
+        sortOrder: 3,
         terminal: true,
     },
     cancelled: {
@@ -105,7 +117,7 @@ export const STATUS_META: Record<RunStatus, RunStatusMeta> = {
         solidFocusClass: 'focus:ring-zinc-500',
         color: 'gray',
         icon: '○',
-        sortOrder: 3,
+        sortOrder: 4,
         terminal: true,
     },
 };

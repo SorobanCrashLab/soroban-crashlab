@@ -549,7 +549,9 @@ impl RunProgress for CampaignHealth {
 pub fn terminal_label(terminal: &RunTerminalState) -> &'static str {
     match terminal {
         RunTerminalState::Completed { .. } => "completed",
+        RunTerminalState::Cancelling { .. } => "cancelling",
         RunTerminalState::Cancelled { .. } => "cancelled",
+        RunTerminalState::PlateauStop { .. } => "plateau_stop",
         RunTerminalState::Failed { .. } => "failed",
     }
 }

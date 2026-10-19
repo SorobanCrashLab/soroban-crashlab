@@ -43,7 +43,20 @@ pub struct RunSummary {
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum RunTerminalState {
     Completed { summary: RunSummary },
-    Cancelled { summary: RunSummary },
+    Cancelling { 
+        summary: RunSummary,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cancel_actor: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cancel_reason: Option<String>,
+    },
+    Cancelled { 
+        summary: RunSummary,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cancel_actor: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cancel_reason: Option<String>,
+    },
     /// Campaign stopped early because a sustained plateau was detected (W5-E05 semantics).
     PlateauStop { summary: RunSummary },
     Failed { message: String },
@@ -225,6 +238,8 @@ where
                     seeds_processed,
                     cancelled_at_seed: Some(seed_index),
                 },
+                cancel_actor: None,
+                cancel_reason: None,
             };
             progress.on_finish(seeds_processed, &terminal);
             return terminal;
@@ -279,6 +294,8 @@ where
                     seeds_processed,
                     cancelled_at_seed: Some(seed_index),
                 },
+                cancel_actor: None,
+                cancel_reason: None,
             };
         }
 
@@ -323,6 +340,8 @@ where
                     seeds_processed,
                     cancelled_at_seed: Some(seed_index),
                 },
+                cancel_actor: None,
+                cancel_reason: None,
             };
         }
         if !partition.owns_seed(seed_index) {
@@ -421,6 +440,8 @@ where
                     seeds_processed,
                     cancelled_at_seed: Some(seed_index),
                 },
+                cancel_actor: None,
+                cancel_reason: None,
             });
         }
         if let Err(message) = work(seed_index) {
@@ -508,6 +529,8 @@ where
                     seeds_processed,
                     cancelled_at_seed: Some(seed_index),
                 },
+                cancel_actor: None,
+                cancel_reason: None,
             });
         }
 
