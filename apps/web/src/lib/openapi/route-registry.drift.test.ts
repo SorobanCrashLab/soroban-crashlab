@@ -29,6 +29,7 @@ const KNOWN_ROUTES = [
   'POST /api/artifacts',
   'GET /api/artifacts/{id}',
   'POST /api/artifacts/validate',
+  'GET /api/audit',
   'GET /api/campaigns',
   'POST /api/campaigns',
   'GET /api/capacity',
