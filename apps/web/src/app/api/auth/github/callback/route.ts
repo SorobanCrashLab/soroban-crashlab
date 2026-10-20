@@ -14,6 +14,7 @@ import {
   verifyState,
 } from '@/lib/github-oauth-state';
 import { safeRedirectPath } from '@/lib/safe-redirect';
+import { DurableSessionStorageError } from '@/lib/auth/server-session';
 
 /**
  * Strict allowlist of post-login redirect targets. Only same-origin relative
@@ -133,16 +134,15 @@ export async function GET(request: NextRequest) {
       status: 302,
     });
 
-    // Bind the session to the authenticated GitHub login so RBAC can resolve a
-    // principal instead of guessing one. Requires a configured signing secret;
-    // without one the flow still completes and the caller stays anonymous,
-    // which resolves to the lowest role.
-    //
     // Note: the code exchange below is still a stub that yields a fixed user, so
-    // the resulting session names that stub identity. Treat this as wiring for
-    // the real exchange, not as a production identity provider — do not set a
-    // session secret until the exchange talks to GitHub.
-    const session = await issueGitHubSession(mockUser.login);
+    // the resulting session names that stub identity. Do not set a session
+    // secret until the exchange talks to GitHub.
+    const session = await issueGitHubSession(
+      mockUser.login,
+      request.cookies.get(GITHUB_SESSION_COOKIE)?.value,
+      Date.now(),
+      request.headers.get('user-agent') ?? '',
+    );
     if (session) {
       response.cookies.set(GITHUB_SESSION_COOKIE, session, {
         httpOnly: true,
@@ -161,7 +161,9 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error('GET /api/auth/github/callback failed', { error });
     return clearCookies(
-      errorResponse('An internal error occurred while processing the GitHub authentication.', 500)
+      error instanceof DurableSessionStorageError
+        ? errorResponse('Sign-in is temporarily unavailable.', 503)
+        : errorResponse('An internal error occurred while processing the GitHub authentication.', 500)
     );
   }
 }

@@ -30,7 +30,7 @@
 //!
 //! | payload | scenario                                                       |
 //! |---------|----------------------------------------------------------------|
-//! | empty   | invoke `total_supply` on the *uninitialized* contract (traps)  |
+//! | empty   | invoke `total_supply` on the *uninitialized* contract (contract error) |
 //! | else    | `op = payload[0] % 4`, `amount = le_i128(payload[1..])`        |
 //! | op == 0 | `total_supply` on uninitialized contract                       |
 //! | op == 1 | `initialize(admin, 1_000_000)` then `balance(admin)`           |
@@ -40,20 +40,21 @@
 //! `admin`/`other` are generated from the test Env, whose base PRNG seed is
 //! fixed (`[0; 32]`, see soroban-sdk testutils), so even the addresses are
 //! stable for a given call sequence. Outcomes are therefore reproducible, and
-//! the `signature_hash` derives from `category + payload` only.
+//! the `signature_hash` includes the category, payload, and structured host
+//! diagnostics captured for the invocation.
 //!
 //! # Outcome → category mapping
 //! Observed host results are mapped to stable labels: contract-level errors to
-//! `contract-<code>`, guest aborts and wasm VM traps to `trap`, and the
-//! remainder through [`crate::taxonomy::FailureClass`] where a class exists
-//! (`auth`, `budget`, `state`), with dedicated labels for the rest (`value`,
-//! `object`, ...). Missing wasm is reported as [`RunnerError::Misconfigured`]
-//! rather than being silently fabricated.
+//! `trap_contract`, guest aborts and wasm VM traps to `trap`, and the
+//! remainder through structured host types (`auth`, `state`, `host_error`).
+//! SDK 22 reports budget exhaustion generically, so this runner does not guess
+//! whether CPU or memory was exhausted. Missing wasm is reported as
+//! [`RunnerError::Misconfigured`] rather than being silently fabricated.
 
 #![cfg(feature = "host-runner")]
 
 use crate::runner::{ContractRunner, RunnerError};
-use crate::{CaseSeed, CrashSignature};
+use crate::{CaseSeed, CrashSignature, HostDiagnostics, HostErrorType, HostTrapOrigin};
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::EnvTestConfig;
 use soroban_sdk::xdr::ScErrorType;
@@ -119,11 +120,14 @@ impl HostContractRunner {
             return Ok(wasm.clone());
         }
         match std::env::var("CRASHLAB_CONTRACT_WASM") {
-            Ok(path) if !path.trim().is_empty() => std::fs::read(path.trim()).map_err(|e| {
-                RunnerError::Misconfigured {
-                    message: format!("could not read CRASHLAB_CONTRACT_WASM '{}': {e}", path.trim()),
-                }
-            }),
+            Ok(path) if !path.trim().is_empty() => {
+                std::fs::read(path.trim()).map_err(|e| RunnerError::Misconfigured {
+                    message: format!(
+                        "could not read CRASHLAB_CONTRACT_WASM '{}': {e}",
+                        path.trim()
+                    ),
+                })
+            }
             _ => Ok(DEFAULT_CONTRACT_WASM.to_vec()),
         }
     }
@@ -133,7 +137,7 @@ impl HostContractRunner {
     /// The contract is deployed for real and the controlling entrypoint is
     /// invoked exactly once; the returned signature reflects the actual host
     /// outcome.
-    fn execute_in_env(&self, seed: &CaseSeed) -> Result<CrashSignature, RunnerError> {
+    fn execute_in_env(&self, seed: &CaseSeed) -> Result<crate::HostInvocationOutcome, RunnerError> {
         let wasm = self.resolve_wasm()?;
 
         // `Env::default()` would write `test_snapshots/<...>.json` files on
@@ -150,18 +154,33 @@ impl HostContractRunner {
         #[allow(deprecated)] // register_contract_wasm is the testutils wasm-deploy API
         let contract_id = env.register_contract_wasm(None, wasm.as_slice());
 
-        let category = run_seed_scenario(&env, &contract_id, seed);
-        let digest = seed
-            .payload
-            .iter()
-            .fold(seed.id, |acc, b| acc.wrapping_mul(1099511628211).wrapping_add(*b as u64));
-        let signature_hash = crate::compute_signature_hash(&category, &seed.payload);
+        let outcome = run_seed_scenario(&env, &contract_id, seed);
+        let digest = seed.payload.iter().fold(seed.id, |acc, b| {
+            acc.wrapping_mul(1099511628211).wrapping_add(*b as u64)
+        });
+        let signature_hash = crate::signature_hash::hash_host_diagnostics(
+            &outcome.category,
+            &seed.payload,
+            &outcome.diagnostics,
+        );
 
-        Ok(CrashSignature {
-            category,
-            digest,
-            signature_hash,
+        Ok(crate::HostInvocationOutcome {
+            signature: CrashSignature {
+                category: outcome.category,
+                digest,
+                signature_hash,
+            },
+            diagnostics: outcome.diagnostics,
         })
+    }
+
+    /// Runs a seed and returns the signature together with diagnostics captured
+    /// directly from its Soroban host invocation.
+    pub fn run_seed_with_diagnostics(
+        &self,
+        seed: &CaseSeed,
+    ) -> Result<crate::HostInvocationOutcome, RunnerError> {
+        self.execute_in_env(seed)
     }
 }
 
@@ -173,13 +192,13 @@ impl Default for HostContractRunner {
 
 impl ContractRunner for HostContractRunner {
     fn run_seed(&mut self, seed: &CaseSeed) -> Result<CrashSignature, RunnerError> {
-        self.execute_in_env(seed)
+        self.execute_in_env(seed).map(|outcome| outcome.signature)
     }
 }
 
 /// Decodes the seed payload into a concrete execution scenario per the
-/// protocol documented on this module, then returns the observed category.
-fn run_seed_scenario(env: &Env, contract_id: &Address, seed: &CaseSeed) -> String {
+/// protocol documented on this module, then returns the observed outcome.
+fn run_seed_scenario(env: &Env, contract_id: &Address, seed: &CaseSeed) -> ObservedInvocation {
     // Administration addresses are stable because the test Env fixes its base
     // PRNG seed; `other` is always distinct from `admin`.
     let admin = Address::generate(env);
@@ -195,15 +214,15 @@ fn run_seed_scenario(env: &Env, contract_id: &Address, seed: &CaseSeed) -> Strin
     let amount = payload_le_i128(&seed.payload[1..]);
 
     match op {
-        // Uninitialized read → guest trap.
+        // Uninitialized read → typed contract error.
         0 => invoke_and_categorize(env, contract_id, "total_supply", &[]),
         // Initialize then read balance → success.
         1 => {
             initialize(env, contract_id, &admin);
             invoke_and_categorize(env, contract_id, "balance", &[admin.to_val()])
         }
-        // Transfer with a payload-derived amount: success, or trap for
-        // non-positive / over-supply amounts.
+        // Transfer with a payload-derived amount: success, or a typed contract
+        // error for non-positive / over-supply amounts.
         2 => {
             initialize(env, contract_id, &admin);
             invoke_and_categorize(
@@ -213,7 +232,7 @@ fn run_seed_scenario(env: &Env, contract_id: &Address, seed: &CaseSeed) -> Strin
                 &[admin.to_val(), other.to_val(), amount.into_val(env)],
             )
         }
-        // Burn by a non-admin account → authorization trap.
+        // Burn by a non-admin account → typed contract authorization error.
         3 => {
             initialize(env, contract_id, &admin);
             invoke_and_categorize(
@@ -248,20 +267,64 @@ fn invoke_and_categorize(
     contract_id: &Address,
     function: &str,
     args: &[Val],
-) -> String {
+) -> ObservedInvocation {
     let symbol = Symbol::new(env, function);
     let result: Result<
         Result<Val, soroban_sdk::ConversionError>,
         Result<soroban_sdk::Error, InvokeError>,
-    > = env.try_invoke_contract::<Val, soroban_sdk::Error>(contract_id, &symbol, to_args(env, args));
+    > = env.try_invoke_contract::<Val, soroban_sdk::Error>(
+        contract_id,
+        &symbol,
+        to_args(env, args),
+    );
 
-    match result {
+    let mut diagnostics = HostDiagnostics {
+        frame_summary: Some(format!("top-level entrypoint: {function}")),
+        ..HostDiagnostics::default()
+    };
+    let category = match result {
         Ok(_) => "success".to_string(),
-        Err(Ok(host_error)) => host_error_category(host_error),
+        Err(Ok(host_error)) => {
+            diagnostics.error_code = Some(host_error.get_code());
+            diagnostics.error_type = Some(host_error_type(host_error));
+            if host_error.is_type(ScErrorType::Contract) {
+                diagnostics.trap_origin = Some(HostTrapOrigin::Contract);
+            } else if host_error.is_type(ScErrorType::WasmVm)
+                || host_error.is_type(ScErrorType::Context)
+            {
+                diagnostics.trap_origin = Some(HostTrapOrigin::Abort);
+            }
+            host_error_category(&diagnostics)
+        }
         Err(Err(invoke_error)) => match invoke_error {
-            InvokeError::Contract(code) => format!("contract-{code}"),
-            InvokeError::Abort => "trap".to_string(),
+            InvokeError::Contract(code) => {
+                diagnostics.error_code = Some(code);
+                diagnostics.error_type = Some(HostErrorType::Contract);
+                diagnostics.trap_origin = Some(HostTrapOrigin::Contract);
+                crate::taxonomy::FailureClass::TrapContract
+                    .as_str()
+                    .to_string()
+            }
+            InvokeError::Abort => {
+                diagnostics.trap_origin = Some(HostTrapOrigin::Abort);
+                "trap".to_string()
+            }
         },
+    };
+    let budget = env.cost_estimate().budget();
+    diagnostics.cpu_instruction_cost = Some(budget.cpu_instruction_cost());
+    diagnostics.memory_bytes_cost = Some(budget.memory_bytes_cost());
+    diagnostics.ledger_touch_count = env.host().get_last_invocation_resources().map(|resources| {
+        u64::from(
+            resources
+                .read_entries
+                .saturating_add(resources.write_entries),
+        )
+    });
+
+    ObservedInvocation {
+        category,
+        diagnostics,
     }
 }
 
@@ -276,45 +339,64 @@ fn to_args(env: &Env, args: &[Val]) -> soroban_sdk::Vec<Val> {
 
 /// Maps a host error to a stable signature category.
 ///
-/// Where [`crate::taxonomy::FailureClass`] defines a matching class it is used
-/// verbatim (`auth`, `budget`, `state`); wasm VM traps (guest panics) become
-/// `trap`; contract-level errors become `contract-<code>`; the remaining host
-/// error types get dedicated labels so nothing collapses into a single bucket.
-fn host_error_category(error: soroban_sdk::Error) -> String {
+/// Where structured diagnostics identify a specific leaf it is used (`auth`,
+/// `state`, or `trap_contract`); wasm VM traps become `trap`, and other host
+/// errors use `host_error`.
+fn host_error_category(diagnostics: &HostDiagnostics) -> String {
+    if let Some(class) = diagnostics
+        .budget_exhaustion
+        .map(|exhaustion| match exhaustion {
+            crate::BudgetExhaustion::Cpu => crate::taxonomy::FailureClass::BudgetExhaustedCpu,
+            crate::BudgetExhaustion::Memory => crate::taxonomy::FailureClass::BudgetExhaustedMem,
+        })
+    {
+        return class.as_str().to_string();
+    }
+    if diagnostics.trap_origin == Some(HostTrapOrigin::Contract) {
+        return crate::taxonomy::FailureClass::TrapContract
+            .as_str()
+            .to_string();
+    }
+    match diagnostics.error_type {
+        Some(HostErrorType::Auth) => crate::taxonomy::FailureClass::Auth.as_str().to_string(),
+        Some(HostErrorType::Storage) => crate::taxonomy::FailureClass::State.as_str().to_string(),
+        Some(HostErrorType::WasmVm | HostErrorType::Context) => "trap".to_string(),
+        _ => crate::taxonomy::classify_host_diagnostics(diagnostics)
+            .unwrap_or(crate::taxonomy::FailureClass::HostError)
+            .as_str()
+            .to_string(),
+    }
+}
+
+fn host_error_type(error: soroban_sdk::Error) -> HostErrorType {
     if error.is_type(ScErrorType::Contract) {
-        return format!("contract-{}", error.get_code());
+        HostErrorType::Contract
+    } else if error.is_type(ScErrorType::WasmVm) {
+        HostErrorType::WasmVm
+    } else if error.is_type(ScErrorType::Context) {
+        HostErrorType::Context
+    } else if error.is_type(ScErrorType::Storage) {
+        HostErrorType::Storage
+    } else if error.is_type(ScErrorType::Object) {
+        HostErrorType::Object
+    } else if error.is_type(ScErrorType::Crypto) {
+        HostErrorType::Crypto
+    } else if error.is_type(ScErrorType::Events) {
+        HostErrorType::Events
+    } else if error.is_type(ScErrorType::Budget) {
+        HostErrorType::Budget
+    } else if error.is_type(ScErrorType::Value) {
+        HostErrorType::Value
+    } else if error.is_type(ScErrorType::Auth) {
+        HostErrorType::Auth
+    } else {
+        HostErrorType::Unknown
     }
-    if error.is_type(ScErrorType::WasmVm) {
-        return "trap".to_string();
-    }
-    if error.is_type(ScErrorType::Budget) {
-        return crate::taxonomy::FailureClass::Budget.as_str().to_string();
-    }
-    if error.is_type(ScErrorType::Auth) {
-        return crate::taxonomy::FailureClass::Auth.as_str().to_string();
-    }
-    if error.is_type(ScErrorType::Storage) {
-        return crate::taxonomy::FailureClass::State.as_str().to_string();
-    }
-    // Guest panics surface as Context errors on the host; collisions with
-    // Value/Object conversion problems are rare, so guest aborts and wasm VM
-    // traps collapse to a single stable `trap` bucket.
-    if error.is_type(ScErrorType::Context) || error.is_type(ScErrorType::WasmVm) {
-        return "trap".to_string();
-    }
-    if error.is_type(ScErrorType::Value) {
-        return "value".to_string();
-    }
-    if error.is_type(ScErrorType::Object) {
-        return "object".to_string();
-    }
-    if error.is_type(ScErrorType::Events) {
-        return "events".to_string();
-    }
-    if error.is_type(ScErrorType::Crypto) {
-        return "crypto".to_string();
-    }
-    "unknown".to_string()
+}
+
+struct ObservedInvocation {
+    category: String,
+    diagnostics: HostDiagnostics,
 }
 
 /// Little-endian signed payload decode (up to 16 bytes).
@@ -344,7 +426,10 @@ mod tests {
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
             let previous = std::env::var("CRASHLAB_CONTRACT_WASM").ok();
             std::env::set_var("CRASHLAB_CONTRACT_WASM", value);
-            Self { _lock: lock, previous }
+            Self {
+                _lock: lock,
+                previous,
+            }
         }
     }
 
@@ -362,9 +447,9 @@ mod tests {
     }
 
     fn digest_of(seed: &CaseSeed) -> u64 {
-        seed.payload
-            .iter()
-            .fold(seed.id, |acc, b| acc.wrapping_mul(1099511628211).wrapping_add(*b as u64))
+        seed.payload.iter().fold(seed.id, |acc, b| {
+            acc.wrapping_mul(1099511628211).wrapping_add(*b as u64)
+        })
     }
 
     /// End-to-end: deploying the committed soroban-example wasm and invoking a
@@ -373,16 +458,31 @@ mod tests {
     /// signature* produced by real host execution, not a payload heuristic.
     #[test]
     fn host_runner_produces_known_trap_signature_end_to_end() {
-        let mut runner = HostContractRunner::new();
+        let runner = HostContractRunner::new();
         let s = seed(7, vec![0x00]);
 
-        let sig = runner.run_seed(&s).expect("real execution succeeded");
+        let outcome = runner
+            .run_seed_with_diagnostics(&s)
+            .expect("real execution succeeded");
         let expected_digest = digest_of(&s);
-        let expected_hash = crate::compute_signature_hash(&sig.category, &s.payload);
+        let expected_hash = crate::signature_hash::hash_host_diagnostics(
+            &outcome.signature.category,
+            &s.payload,
+            &outcome.diagnostics,
+        );
 
-        assert_eq!(sig.category, "trap");
-        assert_eq!(sig.digest, expected_digest);
-        assert_eq!(sig.signature_hash, expected_hash);
+        assert_eq!(outcome.signature.category, "trap_contract");
+        assert_eq!(outcome.signature.digest, expected_digest);
+        assert_eq!(outcome.signature.signature_hash, expected_hash);
+        assert_eq!(
+            outcome.diagnostics.trap_origin,
+            Some(HostTrapOrigin::Contract)
+        );
+        assert_eq!(outcome.diagnostics.error_code, Some(2));
+        assert_eq!(
+            outcome.diagnostics.error_type,
+            Some(HostErrorType::Contract)
+        );
     }
 
     #[test]
@@ -400,16 +500,20 @@ mod tests {
         let mut runner = HostContractRunner::new();
         // op == 2 with an amount far above the initialized supply.
         let payload = vec![0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F];
-        let sig = runner.run_seed(&seed(3, payload)).expect("execution succeeded");
-        assert_eq!(sig.category, "trap");
+        let sig = runner
+            .run_seed(&seed(3, payload))
+            .expect("execution succeeded");
+        assert_eq!(sig.category, "trap_contract");
     }
 
     #[test]
     fn host_runner_burn_traps_for_non_admin_account() {
         let mut runner = HostContractRunner::new();
         // op == 3: `burn(other, other, 1)` — `other` is not the stored admin.
-        let sig = runner.run_seed(&seed(4, vec![0x03, 0x01])).expect("execution succeeded");
-        assert_eq!(sig.category, "trap");
+        let sig = runner
+            .run_seed(&seed(4, vec![0x03, 0x01]))
+            .expect("execution succeeded");
+        assert_eq!(sig.category, "trap_contract");
     }
 
     #[test]
@@ -424,14 +528,58 @@ mod tests {
     }
 
     #[test]
+    fn host_runner_exposes_structured_invocation_diagnostics() {
+        let runner = HostContractRunner::new();
+        let outcome = runner
+            .run_seed_with_diagnostics(&seed(12, vec![0x01]))
+            .expect("real invocation succeeds");
+
+        assert_eq!(outcome.signature.category, "success");
+        assert_eq!(
+            outcome.diagnostics.frame_summary.as_deref(),
+            Some("top-level entrypoint: balance")
+        );
+        assert!(outcome.diagnostics.cpu_instruction_cost.is_some());
+        assert!(outcome.diagnostics.memory_bytes_cost.is_some());
+        assert_eq!(
+            outcome.signature.signature_hash,
+            crate::signature_hash::hash_host_diagnostics(
+                &outcome.signature.category,
+                &[0x01],
+                &outcome.diagnostics,
+            )
+        );
+    }
+
+    #[test]
+    fn generic_budget_error_is_not_guessed_as_cpu_or_memory() {
+        let diagnostics = HostDiagnostics {
+            error_code: Some(10),
+            error_type: Some(HostErrorType::Budget),
+            cpu_instruction_cost: Some(100),
+            memory_bytes_cost: Some(200),
+            ..HostDiagnostics::default()
+        };
+
+        assert_eq!(
+            host_error_category(&diagnostics),
+            crate::taxonomy::FailureClass::HostError.as_str()
+        );
+    }
+
+    #[test]
     fn host_runner_differs_across_scenarios() {
         let mut runner = HostContractRunner::new();
 
-        let success_run = runner.run_seed(&seed(1, vec![0x01])).expect("execution succeeded");
-        let trap_run = runner.run_seed(&seed(2, vec![0x00])).expect("execution succeeded");
+        let success_run = runner
+            .run_seed(&seed(1, vec![0x01]))
+            .expect("execution succeeded");
+        let trap_run = runner
+            .run_seed(&seed(2, vec![0x00]))
+            .expect("execution succeeded");
 
         assert_eq!(success_run.category, "success");
-        assert_eq!(trap_run.category, "trap");
+        assert_eq!(trap_run.category, "trap_contract");
         assert_ne!(success_run.category, trap_run.category);
         assert_ne!(success_run.signature_hash, trap_run.signature_hash);
     }
@@ -439,7 +587,9 @@ mod tests {
     #[test]
     fn host_runner_with_explicit_wasm_bypasses_environment() {
         let mut runner = HostContractRunner::with_wasm(DEFAULT_CONTRACT_WASM.to_vec());
-        let sig = runner.run_seed(&seed(1, vec![0x01])).expect("execution succeeded");
+        let sig = runner
+            .run_seed(&seed(1, vec![0x01]))
+            .expect("execution succeeded");
         assert_eq!(sig.category, "success");
     }
 
@@ -448,18 +598,23 @@ mod tests {
         let _guard = EnvGuard::set("/nonexistent/does-not-exist.wasm");
 
         let mut runner = HostContractRunner::new();
-        let err = runner.run_seed(&seed(1, vec![0x01])).expect_err("should be misconfigured");
+        let err = runner
+            .run_seed(&seed(1, vec![0x01]))
+            .expect_err("should be misconfigured");
         assert!(matches!(err, RunnerError::Misconfigured { .. }));
     }
 
     #[test]
     fn host_runner_loads_wasm_from_environment_path() {
-        let _guard = EnvGuard::set(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/soroban-example.wasm"),
-        );
+        let _guard = EnvGuard::set(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/fixtures/soroban-example.wasm"
+        ));
 
         let mut runner = HostContractRunner::new();
-        let sig = runner.run_seed(&seed(1, vec![0x01])).expect("execution succeeded");
+        let sig = runner
+            .run_seed(&seed(1, vec![0x01]))
+            .expect("execution succeeded");
         assert_eq!(sig.category, "success");
     }
 

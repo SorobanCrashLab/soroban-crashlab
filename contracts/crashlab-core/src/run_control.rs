@@ -13,9 +13,14 @@
 //! ([`crate::worker_partition::RingCoverage`]) rather than as a modulo cursor, so
 //! resuming with a different worker count neither re-executes covered seeds nor
 //! leaves a coverage hole.
+//!
+//! Lease-aware callers can use
+//! [`drive_run_partitioned_with_lease_from_checkpoint`]. Its checkpointed lease
+//! ledger rejects overlapping live claims and fences writes from expired or
+//! reclaimed generations.
 
 use crate::checkpoint::{CheckpointError, RunCheckpoint};
-use crate::worker_partition::{ring_slot, WorkerPartition};
+use crate::worker_partition::{ring_slot, LeaseError, LeaseToken, WorkerPartition};
 use std::collections::HashMap;
 use std::fs;
 use std::io;
@@ -40,11 +45,19 @@ pub struct RunSummary {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum RunTerminalState {
-    Completed { summary: RunSummary },
-    Cancelled { summary: RunSummary },
+    Completed {
+        summary: RunSummary,
+    },
+    Cancelled {
+        summary: RunSummary,
+    },
     /// Campaign stopped early because a sustained plateau was detected (W5-E05 semantics).
-    PlateauStop { summary: RunSummary },
-    Failed { message: String },
+    PlateauStop {
+        summary: RunSummary,
+    },
+    Failed {
+        message: String,
+    },
 }
 
 /// Validation failures when resuming a run from a persisted checkpoint.
@@ -54,6 +67,8 @@ pub enum RunResumeError {
     Checkpoint(CheckpointError),
     /// `total_seeds` could not be represented as a checkpoint length on this platform.
     TotalSeedsOverflow { total_seeds: u64 },
+    /// A partition lease could not be acquired or its fencing token was rejected.
+    Lease(LeaseError),
 }
 
 impl std::fmt::Display for RunResumeError {
@@ -64,6 +79,7 @@ impl std::fmt::Display for RunResumeError {
                 f,
                 "total_seeds {total_seeds} exceeds the supported checkpoint range on this platform"
             ),
+            RunResumeError::Lease(err) => err.fmt(f),
         }
     }
 }
@@ -73,6 +89,12 @@ impl std::error::Error for RunResumeError {}
 impl From<CheckpointError> for RunResumeError {
     fn from(value: CheckpointError) -> Self {
         Self::Checkpoint(value)
+    }
+}
+
+impl From<LeaseError> for RunResumeError {
+    fn from(value: LeaseError) -> Self {
+        Self::Lease(value)
     }
 }
 
@@ -473,6 +495,14 @@ where
             continue;
         }
 
+        if checkpoint.ring_coverage.is_seed_completed(seed_index) {
+            if last_index_for_slot.get(&slot) == Some(&seed_index) {
+                completed_slots.push(slot);
+            }
+            checkpoint.next_seed_index = seed_index as usize + 1;
+            continue;
+        }
+
         if let Err(message) = work(seed_index) {
             // The failed seed's slot is deliberately *not* marked covered, so a
             // retry re-executes it instead of silently losing it.
@@ -482,6 +512,7 @@ where
 
         seeds_processed += 1;
         checkpoint.next_seed_index = seed_index as usize + 1;
+        checkpoint.ring_coverage.mark_seed_completed(seed_index);
 
         if last_index_for_slot.get(&slot) == Some(&seed_index) {
             completed_slots.push(slot);
@@ -490,6 +521,77 @@ where
 
     checkpoint.ring_coverage.mark_slots(completed_slots);
     checkpoint.next_seed_index = total_seeds as usize;
+
+    Ok(RunTerminalState::Completed {
+        summary: RunSummary {
+            seeds_processed,
+            cancelled_at_seed: None,
+        },
+    })
+}
+
+/// Drives one partition under a persisted, expiring lease.
+///
+/// `now_ms` is an explicit clock so callers and tests can deterministically
+/// expire/reclaim ownership. The lease record and completed seed ledger live in
+/// `checkpoint.ring_coverage`; persist that checkpoint after the call. A resumed
+/// worker skips individually committed seeds, including work completed before a
+/// prior worker died part-way through a ring slot.
+pub fn drive_run_partitioned_with_lease_from_checkpoint<F>(
+    _run_id: RunId,
+    campaign_id: &str,
+    checkpoint: &mut RunCheckpoint,
+    total_seeds: u64,
+    partition: &WorkerPartition,
+    signal: &CancelSignal,
+    now_ms: u64,
+    lease_ttl_ms: u64,
+    mut work: F,
+) -> Result<RunTerminalState, RunResumeError>
+where
+    F: FnMut(u64) -> Result<(), String>,
+{
+    let total_seeds = validate_resume_checkpoint(checkpoint, campaign_id, total_seeds)? as u64;
+    let range = partition.ring_range();
+    if range.is_empty() {
+        return Ok(RunTerminalState::Completed {
+            summary: RunSummary {
+                seeds_processed: 0,
+                cancelled_at_seed: None,
+            },
+        });
+    }
+    let token: LeaseToken = checkpoint.ring_coverage.lease_ledger_mut().claim(
+        range,
+        partition.worker_index(),
+        now_ms,
+        lease_ttl_ms,
+    )?;
+    let mut seeds_processed = 0u64;
+
+    for seed_index in 0..total_seeds {
+        if signal.is_cancelled() {
+            return Ok(RunTerminalState::Cancelled {
+                summary: RunSummary {
+                    seeds_processed,
+                    cancelled_at_seed: Some(seed_index),
+                },
+            });
+        }
+        if !partition.owns_seed(seed_index)
+            || checkpoint.ring_coverage.is_seed_completed(seed_index)
+        {
+            continue;
+        }
+        if let Err(message) = work(seed_index) {
+            return Ok(RunTerminalState::Failed { message });
+        }
+        checkpoint
+            .ring_coverage
+            .record_seed_completed(token, seed_index, now_ms)?;
+        seeds_processed += 1;
+        checkpoint.next_seed_index = (seed_index as usize).saturating_add(1);
+    }
 
     Ok(RunTerminalState::Completed {
         summary: RunSummary {
@@ -828,6 +930,86 @@ mod tests {
             other => panic!("expected completed, got {other:?}"),
         }
         assert!(again.is_empty(), "covered slots must not be re-executed");
+    }
+
+    #[test]
+    fn dead_worker_resume_is_exact_once_and_reclaims_expired_lease() {
+        let id = RunId(151);
+        let seeds = seeds(20);
+        let partition = WorkerPartition::single_worker();
+        let signal = CancelSignal::new(id);
+        let cancel_after_one = signal.clone();
+        let mut checkpoint = RunCheckpoint::new_run("campaign-lease", &seeds);
+        let mut first_seen = Vec::new();
+
+        let outcome = drive_run_partitioned_with_lease_from_checkpoint(
+            id,
+            "campaign-lease",
+            &mut checkpoint,
+            seeds.len() as u64,
+            &partition,
+            &signal,
+            1_000,
+            100,
+            |seed| {
+                first_seen.push(seed);
+                cancel_after_one.cancel();
+                Ok(())
+            },
+        )
+        .expect("first worker run");
+        assert!(matches!(outcome, RunTerminalState::Cancelled { .. }));
+        assert_eq!(first_seen.len(), 1);
+
+        // A checkpoint roundtrip models durable worker state; the next worker
+        // resumes after the recorded lease expires.
+        let bytes = crate::checkpoint::save_run_checkpoint_json(&checkpoint).expect("serialize");
+        let mut resumed = crate::checkpoint::load_run_checkpoint_json(&bytes).expect("load");
+        let resume_signal = CancelSignal::new(id);
+        let mut resumed_seen = Vec::new();
+        let outcome = drive_run_partitioned_with_lease_from_checkpoint(
+            id,
+            "campaign-lease",
+            &mut resumed,
+            seeds.len() as u64,
+            &partition,
+            &resume_signal,
+            1_100,
+            100,
+            |seed| {
+                resumed_seen.push(seed);
+                Ok(())
+            },
+        )
+        .expect("resume after worker death");
+        assert!(matches!(outcome, RunTerminalState::Completed { .. }));
+        let mut all = first_seen;
+        all.extend(resumed_seen);
+        all.sort_unstable();
+        assert_eq!(all, (0..seeds.len() as u64).collect::<Vec<_>>());
+        assert_eq!(resumed.ring_coverage.lease_ledger().reclaimed_leases(), 1);
+    }
+
+    #[test]
+    fn active_partition_lease_prevents_duplicate_claims() {
+        let seeds = seeds(4);
+        let partition = WorkerPartition::single_worker();
+        let mut checkpoint = RunCheckpoint::new_run("campaign-lease", &seeds);
+        let token = checkpoint
+            .ring_coverage
+            .lease_ledger_mut()
+            .claim(partition.ring_range(), 10, 0, 1_000)
+            .expect("first lease");
+        let err = checkpoint
+            .ring_coverage
+            .lease_ledger_mut()
+            .claim(partition.ring_range(), 11, 1, 1_000)
+            .expect_err("live lease must block competing owner");
+        assert!(matches!(err, LeaseError::AlreadyLeased { .. }));
+        checkpoint
+            .ring_coverage
+            .record_seed_completed(token, 0, 2)
+            .expect("lease holder can record progress");
     }
 
     #[test]

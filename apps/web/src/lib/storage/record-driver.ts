@@ -31,7 +31,9 @@ export interface RecordDriver {
   readonly name: string;
 
   getRecord(key: string): Promise<string | null>;
-  putRecord(key: string, value: string): Promise<void>;
+  putRecord(key: string, value: string, ttlSeconds?: number): Promise<void>;
+  /** Atomically replaces a record only if it still exists. */
+  updateRecordIfPresent(key: string, value: string, ttlSeconds?: number): Promise<boolean>;
   deleteRecord(key: string): Promise<boolean>;
 
   addToIndex(indexKey: string, member: string): Promise<void>;
@@ -70,16 +72,40 @@ export function readPositiveIntegerEnv(name: string, fallback: number): number {
 export class InMemoryRecordDriver implements RecordDriver {
   readonly name = 'in-memory-records';
 
-  private readonly records = new Map<string, string>();
+  private readonly records = new Map<string, { value: string; expiresAt?: number }>();
   private readonly indexes = new Map<string, Set<string>>();
   private readonly entries = new Map<string, string[]>();
 
   async getRecord(key: string): Promise<string | null> {
-    return this.records.get(key) ?? null;
+    const record = this.records.get(key);
+    if (record?.expiresAt !== undefined && record.expiresAt <= Date.now()) {
+      this.records.delete(key);
+      return null;
+    }
+    return record?.value ?? null;
   }
 
-  async putRecord(key: string, value: string): Promise<void> {
-    this.records.set(key, value);
+  async putRecord(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    const ttl = Number.isFinite(ttlSeconds) && ttlSeconds! > 0 ? ttlSeconds : undefined;
+    this.records.set(key, {
+      value,
+      ...(ttl === undefined ? {} : { expiresAt: Date.now() + ttl * 1000 }),
+    });
+  }
+
+  async updateRecordIfPresent(key: string, value: string, ttlSeconds?: number): Promise<boolean> {
+    const existing = this.records.get(key);
+    if (existing?.expiresAt !== undefined && existing.expiresAt <= Date.now()) {
+      this.records.delete(key);
+      return false;
+    }
+    if (!existing) return false;
+    const ttl = Number.isFinite(ttlSeconds) && ttlSeconds! > 0 ? ttlSeconds : undefined;
+    this.records.set(key, {
+      value,
+      ...(ttl === undefined ? {} : { expiresAt: Date.now() + ttl * 1000 }),
+    });
+    return true;
   }
 
   async deleteRecord(key: string): Promise<boolean> {
@@ -144,7 +170,7 @@ export class InMemoryRecordDriver implements RecordDriver {
  */
 export interface RecordRedisClient {
   get(key: string): Promise<unknown>;
-  set(key: string, value: string): Promise<unknown>;
+  set(key: string, value: string, options?: { ex?: number; xx?: true }): Promise<unknown>;
   del(key: string): Promise<unknown>;
   sadd(key: string, member: string): Promise<unknown>;
   srem(key: string, member: string): Promise<unknown>;
@@ -170,8 +196,20 @@ export class RedisRecordDriver implements RecordDriver {
     return typeof value === 'string' ? value : JSON.stringify(value);
   }
 
-  async putRecord(key: string, value: string): Promise<void> {
+  async putRecord(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    if (Number.isFinite(ttlSeconds) && ttlSeconds! > 0) {
+      await this.redis.set(key, value, { ex: Math.ceil(ttlSeconds!) });
+      return;
+    }
     await this.redis.set(key, value);
+  }
+
+  async updateRecordIfPresent(key: string, value: string, ttlSeconds?: number): Promise<boolean> {
+    const options: { ex?: number; xx: true } = { xx: true };
+    if (Number.isFinite(ttlSeconds) && ttlSeconds! > 0) {
+      options.ex = Math.ceil(ttlSeconds!);
+    }
+    return (await this.redis.set(key, value, options)) === 'OK';
   }
 
   async deleteRecord(key: string): Promise<boolean> {

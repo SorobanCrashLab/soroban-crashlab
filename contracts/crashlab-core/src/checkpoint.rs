@@ -13,7 +13,10 @@
 //! * **v1** — `schema`, `campaign_id`, `next_seed_index`, `total_seeds`.
 //! * **v2** — adds `ring_coverage`. Missing `ring_coverage` in a v1 file is
 //!   read as empty coverage, so existing checkpoints load unchanged and are
-//!   upgraded to v2 when written back.
+//!   upgraded to the current schema when written back.
+//! * **v3** — adds checkpoint generation and CRC fields.
+//! * **v4** — coverage carries the partition lease ledger and seed-level
+//!   completion set; the CRC covers this state. v3 retains its legacy CRC.
 
 use crate::worker_partition::RingCoverage;
 use crate::CaseSeed;
@@ -21,13 +24,13 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 /// Current schema version for [`RunCheckpoint`] JSON on disk.
-pub const RUN_CHECKPOINT_SCHEMA_VERSION: u32 = 3;
+pub const RUN_CHECKPOINT_SCHEMA_VERSION: u32 = 4;
 
 /// Schema versions [`load_run_checkpoint_json`] and [`RunCheckpoint::validate_run`] accept.
 ///
 /// v1 files predate ring coverage; they are accepted and read with empty
-/// coverage, then serialized as v2 on the next save.
-pub const SUPPORTED_RUN_CHECKPOINT_SCHEMAS: &[u32] = &[1, 2, 3];
+/// coverage, then upgraded when saved.
+pub const SUPPORTED_RUN_CHECKPOINT_SCHEMAS: &[u32] = &[1, 2, 3, 4];
 
 /// Serializable checkpoint for a single campaign run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -183,7 +186,7 @@ impl RunCheckpoint {
         self.crc32 = checkpoint_crc32(self);
     }
 
-    /// Validates the stored CRC32 (v3 only; legacy schemas skip).
+    /// Validates the stored CRC32 (v3/v4; legacy schemas skip).
     pub fn validate_crc32(&self) -> Result<(), CheckpointError> {
         if self.schema < 3 {
             return Ok(());
@@ -217,6 +220,12 @@ fn checkpoint_crc32(cp: &RunCheckpoint) -> u32 {
     buf.extend_from_slice(&cp.total_seeds.to_le_bytes());
     buf.extend_from_slice(&cp.generation.to_le_bytes());
     buf.extend_from_slice(&cp.schema.to_le_bytes());
+    if cp.schema >= 4 {
+        buf.extend_from_slice(
+            &serde_json::to_vec(&cp.ring_coverage)
+                .expect("ring coverage serialization is infallible"),
+        );
+    }
     crc32_ieee(&buf)
 }
 
@@ -310,16 +319,17 @@ fn temp_path(path: &Path) -> PathBuf {
 fn sync_dir(dir: &Path) -> Result<(), CheckpointIOError> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::FileExt;
-        let _ = dir;
-        let _ = FileExt::sync_all;
+        std::fs::File::open(dir)?.sync_all()?;
     }
     let _ = dir;
     Ok(())
 }
 
 /// Writes a checkpoint crash-consistently via temp file + atomic rename.
-pub fn save_run_checkpoint_atomic(path: &Path, cp: &RunCheckpoint) -> Result<u64, CheckpointIOError> {
+pub fn save_run_checkpoint_atomic(
+    path: &Path,
+    cp: &RunCheckpoint,
+) -> Result<u64, CheckpointIOError> {
     let mut next = cp.clone();
     next.generation = cp.generation.saturating_add(1);
     next.schema = RUN_CHECKPOINT_SCHEMA_VERSION;
@@ -522,6 +532,31 @@ mod tests {
     }
 
     #[test]
+    fn lease_ledger_roundtrips_and_is_covered_by_checkpoint_crc() {
+        let seeds = seeds(4);
+        let mut cp = RunCheckpoint::new_run("lease-campaign", &seeds);
+        cp.ring_coverage
+            .lease_ledger_mut()
+            .claim(crate::worker_partition::RingRange::new(0, 16), 2, 10, 50)
+            .expect("claim lease");
+        cp.refresh_crc32();
+
+        let bytes = save_run_checkpoint_json(&cp).unwrap();
+        let mut loaded = load_run_checkpoint_json(&bytes).unwrap();
+        assert_eq!(
+            loaded.ring_coverage.lease_ledger().leases(),
+            cp.ring_coverage.lease_ledger().leases()
+        );
+        loaded.validate_crc32().expect("valid checkpoint CRC");
+        loaded
+            .ring_coverage
+            .lease_ledger_mut()
+            .claim(crate::worker_partition::RingRange::new(20, 24), 3, 10, 50)
+            .expect("second lease");
+        assert!(loaded.validate_crc32().is_err());
+    }
+
+    #[test]
     fn is_complete_when_fully_advanced() {
         let s = seeds(3);
         let mut cp = RunCheckpoint::new_run("c", &s);
@@ -562,7 +597,7 @@ mod tests {
         let cp = RunCheckpoint::new_run("c", &s);
         assert_eq!(cp.schema, RUN_CHECKPOINT_SCHEMA_VERSION);
         assert!(cp.ring_coverage.is_empty());
-        // The v2 field round-trips through JSON.
+        // The current coverage and lease state round-trip through JSON.
         let bytes = save_run_checkpoint_json(&cp).unwrap();
         let loaded = load_run_checkpoint_json(&bytes).unwrap();
         assert_eq!(loaded, cp);
