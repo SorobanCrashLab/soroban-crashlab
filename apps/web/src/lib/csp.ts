@@ -31,6 +31,8 @@ export const NONCE_HEADER = 'x-nonce';
 
 /** Header carrying the policy itself, in both directions. */
 export const CSP_HEADER = 'Content-Security-Policy';
+export const CSP_REPORT_ONLY_HEADER = 'Content-Security-Policy-Report-Only';
+export const CSP_REPORT_PATH = '/api/csp-report';
 
 /**
  * Number of random bytes behind each nonce. 16 bytes (128 bits) matches the
@@ -76,6 +78,8 @@ export function buildCspHeader(nonce: string): string {
     "form-action 'self'",
     "base-uri 'self'",
     "object-src 'none'",
+    `report-uri ${CSP_REPORT_PATH}`,
+    "report-to csp-endpoint",
     "upgrade-insecure-requests",
   ].join('; ');
 }

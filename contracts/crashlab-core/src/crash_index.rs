@@ -92,7 +92,23 @@ impl CrashIndex {
     /// If a group already exists for `bundle.signature.signature_hash`, the
     /// count is incremented and `newest_sample` is replaced with `bundle`.
     /// Otherwise a new group is created with `count = 1`.
+    ///
+    /// Transport and rate-limit harness faults never enter the corpus:
+    /// use [`CrashIndex::try_insert`] to enforce that.
     pub fn insert(&mut self, bundle: CaseBundle) {
+        let _ = self.try_insert(bundle);
+    }
+
+    /// Inserts `bundle` unless it is an excluded harness fault.
+    ///
+    /// Returns `false` when the bundle was excluded from the corpus.
+    pub fn try_insert(&mut self, bundle: CaseBundle) -> bool {
+        if let Some(class) = crate::taxonomy::FailureClass::from_category_label(&bundle.signature.category) {
+            if class.excludes_from_corpus() {
+                return false;
+            }
+        }
+        let key = bundle.signature.signature_hash;
         let key = bundle.signature.signature_hash;
         match self.groups.get_mut(&key) {
             Some(group) => {
@@ -109,6 +125,7 @@ impl CrashIndex {
                 self.groups.insert(key, group);
             }
         }
+        true
     }
 
     /// Number of distinct crash signatures tracked.
@@ -305,6 +322,7 @@ mod tests {
             environment: None,
             failure_payload: Vec::new(),
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         }); // empty-input
         idx.insert(bundle(2, vec![0x01])); // normal payload
         idx.insert(bundle(3, vec![0x01])); // normal payload (count=2)

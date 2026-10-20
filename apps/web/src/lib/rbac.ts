@@ -38,6 +38,7 @@ import { OIDC_SESSION_COOKIE, verifyOidcSession } from './auth/oidc-session';
 import { selectRecordDriver, readPositiveIntegerEnv } from './storage/record-driver';
 import { getRoleAssignment, type UserIdentity, type UserRole } from './storage/role-store';
 import { hashTokenSecret, resolveTokenPrincipalIdByHash } from './storage/token-principal-store';
+import { matchRouteCatalogEntry } from './route-catalog';
 
 export type { UserIdentity, UserRole } from './storage/role-store';
 
@@ -303,48 +304,12 @@ export function hasRequiredRole(userRole: UserRole, requiredRole: UserRole): boo
   return false;
 }
 
-export interface RouteRoleRule {
-  methods: string[];
-  pattern: RegExp;
-  requiredRole: UserRole;
-}
-
-/**
- * Inventory table of route-level role requirements across mutating API endpoints.
- */
-export const ROUTE_ROLE_RULES: RouteRoleRule[] = [
-  // Destructive / Config endpoints -> maintainer
-  { methods: ['DELETE'], pattern: /^\/api\/runs\/[^/]+$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/runs\/[^/]+\/replay$/, requiredRole: 'maintainer' },
-  { methods: ['POST', 'PUT', 'DELETE'], pattern: /^\/api\/settings(\/.*)?$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/sentry\/config$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/sentry\/test-connection$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/smtp\/config$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/smtp\/test-connection$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/grafana\/config$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/grafana\/test-connection$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/pagerduty\/config$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/pagerduty\/test-connection$/, requiredRole: 'maintainer' },
-  { methods: ['POST', 'PUT', 'DELETE'], pattern: /^\/api\/networks(\/.*)?$/, requiredRole: 'maintainer' },
-  { methods: ['POST', 'DELETE'], pattern: /^\/api\/webhooks(\/.*)?$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/webhooks\/retry$/, requiredRole: 'maintainer' },
-  { methods: ['POST'], pattern: /^\/api\/campaigns(\/.*)?$/, requiredRole: 'maintainer' },
-
-  // Annotation / Triage / Action endpoints -> analyst
-  { methods: ['POST'], pattern: /^\/api\/runs\/[^/]+\/annotations$/, requiredRole: 'analyst' },
-  { methods: ['POST'], pattern: /^\/api\/runs\/[^/]+\/tags$/, requiredRole: 'analyst' },
-  { methods: ['POST'], pattern: /^\/api\/runs\/[^/]+\/issues$/, requiredRole: 'analyst' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/smtp\/send$/, requiredRole: 'analyst' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/grafana\/annotations$/, requiredRole: 'analyst' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/pagerduty\/trigger$/, requiredRole: 'analyst' },
-  { methods: ['POST'], pattern: /^\/api\/artifacts\/validate$/, requiredRole: 'analyst' },
-  { methods: ['POST'], pattern: /^\/api\/integrations\/slack\/interactivity$/, requiredRole: 'analyst' },
-  { methods: ['POST'], pattern: /^\/api\/triage\/.*$/, requiredRole: 'analyst' },
-];
-
 /**
  * Determine required role for a given request path and method.
- * Returns null if no specific role restriction applies (e.g. GET requests or unlisted endpoints).
+ *
+ * The role requirement lives in the declarative route catalog (#1817) — this
+ * function is the pure adapter the rest of the RBAC code reads it through.
+ * Returns null if no specific role restriction applies (e.g. GET requests).
  */
 export function getRequiredRoleForRequest(method: string, pathname: string): UserRole | null {
   const upperMethod = method.toUpperCase();
@@ -354,10 +319,9 @@ export function getRequiredRoleForRequest(method: string, pathname: string): Use
     return null;
   }
 
-  for (const rule of ROUTE_ROLE_RULES) {
-    if (rule.methods.includes(upperMethod) && rule.pattern.test(pathname)) {
-      return rule.requiredRole;
-    }
+  const entry = matchRouteCatalogEntry(upperMethod, pathname);
+  if (entry?.requiredCapability?.role) {
+    return entry.requiredCapability.role;
   }
 
   // Fallback for any other mutating request on /api

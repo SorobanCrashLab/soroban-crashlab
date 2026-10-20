@@ -304,6 +304,7 @@ mod threat_model_tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -335,6 +336,7 @@ mod threat_model_tests {
                 provenance: None,
                 original_seed: None,
                 shrink_lineage: None,
+            engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
             };
 
             let bytes = serde_json::to_vec(&doc).unwrap();
@@ -359,6 +361,7 @@ mod threat_model_tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -385,6 +388,7 @@ mod threat_model_tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -678,16 +682,24 @@ mod threat_model_tests {
 
     #[test]
     fn t9_rust_fixture_with_malicious_payload() {
-        let malicious_payload = b"}; std::process::Command::new(\"rm\").arg(\"-rf\").arg(\"/\").spawn(); {".to_vec();
-        let bundle = to_bundle(CaseSeed { id: 1, payload: malicious_payload });
+        let malicious_payloads = [
+            b"}; std::process::Command::new(\"rm\").arg(\"-rf\").arg(\"/\").spawn(); {".as_slice(),
+            b"$(touch /tmp/should-not-run); `id`; eval(\"format!(\\\"{}\\\")\")".as_slice(),
+        ];
 
-        let fixture = export_rust_regression_fixture(&bundle, "test_safe").unwrap();
+        for payload in malicious_payloads {
+            let bundle = to_bundle(CaseSeed { id: 1, payload: payload.to_vec() });
+            let fixture = export_rust_regression_fixture(&bundle, "test_safe").unwrap();
 
-        // Malicious code should be hex-encoded, not executable
-        assert!(!fixture.contains("std::process::Command"),
-                "payload should be hex-encoded, not executable");
-        assert!(!fixture.contains("remove_dir"),
-                "no filesystem operations should be generated");
+            assert!(!fixture.contains("std::process::Command"),
+                    "payload should be hex-encoded, not executable");
+            assert!(!fixture.contains("remove_dir"),
+                    "no filesystem operations should be generated");
+            assert!(!fixture.contains("eval("),
+                    "payload must never become evaluated code");
+            assert!(!fixture.contains("$(touch"),
+                    "shell syntax must remain inert data");
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -762,6 +774,7 @@ mod threat_model_tests {
                     provenance: None,
                     original_seed: None,
                     shrink_lineage: None,
+                engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
                 }
             })
             .collect();

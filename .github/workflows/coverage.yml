@@ -1,0 +1,192 @@
+name: Coverage
+
+# Issue #1822.
+#
+# Coverage without a ratchet is a screenshot; with one it is a gate. This
+# workflow measures line coverage on both stacks, uploads the reports, and
+# compares them against the committed baselines:
+#   - repo total may not drop by more than the tolerance;
+#   - no file may drop by more than the tolerance;
+#   - on PRs, the changed lines must be at least as covered as the
+#     `changedLinesMinimum`.
+#
+# Bootstrap phase: the committed baselines are empty (`bootstrap: true`) until
+# the first full run on a healthy main, so the job reports the delta but does
+# not fail. Flip it to enforcement with the repository variable
+# COVERAGE_ENFORCE=true, or by passing enforce=true on a manual run.
+#
+# The nightly run exists so ratchet games (deleting tests) show up as a trend
+# drop even when a single PR keeps the total flat.
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/src/**'
+      - 'apps/web/coverage-baseline.json'
+      - 'contracts/crashlab-core/src/**'
+      - 'contracts/crashlab-core/coverage-baseline.json'
+      - 'scripts/coverage/**'
+      - 'TEST_COVERAGE_ANALYSIS.md'
+      - '.github/workflows/coverage.yml'
+  push:
+    branches: [main]
+  schedule:
+    - cron: '40 3 * * *'
+  workflow_dispatch:
+    inputs:
+      enforce:
+        description: 'Fail the ratchet when coverage regresses'
+        type: boolean
+        default: false
+      update-baseline:
+        description: 'Regenerate the baselines from this run (uploaded as an artifact)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  COVERAGE_ENFORCE: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.enforce == 'true') || vars.COVERAGE_ENFORCE == 'true' }}
+  UPDATE_BASELINE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.update-baseline == 'true' }}
+
+jobs:
+  web-coverage:
+    name: Web coverage ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install workspace dependencies
+        # Bootstrap phase is report-only: if the workspace cannot install (e.g.
+        # the lockfile and manifests are out of sync on the base branch), skip
+        # the measurement rather than hard-failing the ratchet job.
+        continue-on-error: true
+        run: pnpm install --frozen-lockfile
+
+      - name: Measure coverage (vitest + istanbul)
+        # A failing test still produces partial coverage; the unit-test job owns
+        # the red/green signal, this job owns the ratchet.
+        continue-on-error: true
+        run: pnpm --dir apps/web run test:coverage
+
+      - name: Build the PR diff for changed-lines coverage
+        if: github.event_name == 'pull_request'
+        run: git diff --unified=0 "${{ github.event.pull_request.base.sha }}"...HEAD -- 'apps/web/src' > "$RUNNER_TEMP/pr.diff" || true
+
+      - name: Check the ratchet
+        run: |
+          if [ ! -f apps/web/coverage/lcov.info ]; then
+            echo "No coverage report produced (tests failed before coverage was written); nothing to check."
+            exit 0
+          fi
+          DIFF_ARGS=""
+          if [ -s "$RUNNER_TEMP/pr.diff" ]; then
+            DIFF_ARGS="--diff $RUNNER_TEMP/pr.diff"
+          fi
+          ENFORCE=""
+          if [ "$COVERAGE_ENFORCE" = "true" ]; then ENFORCE="--enforce"; fi
+          node scripts/coverage/check-coverage-ratchet.mjs \
+            --label web \
+            --format lcov \
+            --report apps/web/coverage/lcov.info \
+            --baseline apps/web/coverage-baseline.json \
+            --root "$GITHUB_WORKSPACE" \
+            --lcov apps/web/coverage/lcov.info $DIFF_ARGS $ENFORCE
+
+      - name: Regenerate the web baseline (manual only)
+        if: env.UPDATE_BASELINE == 'true' && hashFiles('apps/web/coverage/lcov.info') != ''
+        run: |
+          node scripts/coverage/write-baseline.mjs \
+            --format lcov --report apps/web/coverage/lcov.info --root "$GITHUB_WORKSPACE" \
+            --stack web --tool "vitest (istanbul v8)" \
+            --out apps/web/coverage-baseline.json
+
+      - name: Upload web coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-coverage
+          path: |
+            apps/web/coverage/lcov.info
+            apps/web/coverage/coverage-summary.json
+            apps/web/coverage-baseline.json
+          if-no-files-found: ignore
+
+  rust-coverage:
+    name: Rust coverage ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # 1.97.1
+        with:
+          toolchain: 1.97.1
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: contracts/crashlab-core
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Measure coverage (cargo-llvm-cov -> lcov)
+        continue-on-error: true
+        working-directory: contracts/crashlab-core
+        run: cargo llvm-cov --all-targets --lcov --output-path lcov.info
+
+      - name: Build the PR diff for changed-lines coverage
+        if: github.event_name == 'pull_request'
+        run: git diff --unified=0 "${{ github.event.pull_request.base.sha }}"...HEAD -- 'contracts/crashlab-core/src' > "$RUNNER_TEMP/pr.diff" || true
+
+      - name: Check the ratchet
+        run: |
+          if [ ! -f contracts/crashlab-core/lcov.info ]; then
+            echo "No coverage report produced (build failed before coverage was written); nothing to check."
+            exit 0
+          fi
+          DIFF_ARGS=""
+          if [ -s "$RUNNER_TEMP/pr.diff" ]; then
+            DIFF_ARGS="--diff $RUNNER_TEMP/pr.diff"
+          fi
+          ENFORCE=""
+          if [ "$COVERAGE_ENFORCE" = "true" ]; then ENFORCE="--enforce"; fi
+          node scripts/coverage/check-coverage-ratchet.mjs \
+            --label rust \
+            --format lcov \
+            --report contracts/crashlab-core/lcov.info \
+            --baseline contracts/crashlab-core/coverage-baseline.json \
+            --root "$GITHUB_WORKSPACE" \
+            --lcov contracts/crashlab-core/lcov.info $DIFF_ARGS $ENFORCE
+
+      - name: Regenerate the rust baseline (manual only)
+        if: env.UPDATE_BASELINE == 'true' && hashFiles('contracts/crashlab-core/lcov.info') != ''
+        run: |
+          node scripts/coverage/write-baseline.mjs \
+            --format lcov --report contracts/crashlab-core/lcov.info --root "$GITHUB_WORKSPACE" \
+            --stack rust --tool cargo-llvm-cov \
+            --out contracts/crashlab-core/coverage-baseline.json
+
+      - name: Upload rust coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-coverage
+          path: |
+            contracts/crashlab-core/lcov.info
+            contracts/crashlab-core/coverage-baseline.json
+          if-no-files-found: ignore

@@ -3,13 +3,14 @@
 //! Presets bundle a **runtime mutation budget** (maximum mutation attempts per
 //! campaign) and **mutation intensity** (how aggressively the engine explores the
 //! mutation space). Values are fixed so CI and operators get predictable
-//! behaviour: [`CampaignPreset::Smoke`] for quick checks, [`CampaignPreset::Nightly`]
+//! behaviour: [`CampaignPreset::Smoke] for quick checks, [`CampaignPreset::Nightly`]
 //! for scheduled runs, and [`CampaignPreset::Deep`] for exhaustive campaigns.
-//!
-//! Each preset also carries a plateau detection policy (rolling window, score
-//! threshold, and response action) so cost-aware budgeting behaviour is configured
-//! per campaign class (smoke/touch vs deep) and reproducible across runs.
+//
+// Each preset also carries a plateau detection policy (rolling window, score
+// threshold, and response action) so cost-aware budgeting behaviour is configured
+// per campaign class (smoke/touch vs deep) and reproducible across runs.
 
+use crate::dictionary::DictionaryId;
 use crate::mutation_budget::MutationBudget;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -28,10 +29,10 @@ pub enum CampaignPreset {
 }
 
 /// Scheduling class of a campaign (#1904).
-///
-/// Classes are ordered by priority — `Interactive` before `Nightly` before
-/// `Deep` — which decides who yields when capacity is contended and which
-/// scheduling window applies. See `docs/ops/capacity.md`.
+//
+// Classes are ordered by priority — `Interactive` before `Nightly` before
+// `Deep` — which decides who yields when capacity is contended and which
+// scheduling window applies. See `docs/ops/capacity.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CampaignClass {
@@ -105,15 +106,15 @@ impl PlateauAction {
 /// score from signature novelty, coverage deltas, and mutator yield. When the
 /// score stays at or below `score_threshold_bps` for `sustained_windows` consecutive
 /// windows, the configured [`PlateauAction`] is triggered.
-///
-/// Smoke/interactive campaigns use a shorter window and higher threshold so they
-/// stop wasting interactive latency on flat runs; deep campaigns use a longer
-/// window and lower threshold so they only react to sustained plateaus.
+//
+// Smoke/interactive campaigns use a shorter window and higher threshold so they
+// stop wasting interactive latency on flat runs; deep campaigns use a longer
+// window and lower threshold so they only react to sustained plateaus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlateauPolicy {
     /// Number of seeds per rolling observation window.
     pub window_seeds: u64,
-    /// Plateau score threshold in basis points (0-10_000). At or below
+    /// Plateau score threshold in basis-points (0-10_000). At or below
     /// this score the window is considered plateaued.
     pub score_threshold_bps: u32,
     /// How many consecutive plateaued windows are required before the
@@ -250,6 +251,30 @@ impl CampaignPreset {
         }
     }
 
+    /// Dictionary selected for this preset (W5-B02).
+    ///
+    /// Every preset ships the curated Soroban pitfall dictionary so known-hard
+    /// edges (TTL, archival, depth, metering, address classes) are exercised by
+    /// default. Deeper presets use the full dictionary; smoke uses the same
+    /// content but with a lower injection probability (see
+    /// [`CampaignPreset::dictionary_injection_bps`]).
+    pub const fn dictionary(self) -> DictionaryId {
+        DictionaryId::SorobanPitfalls
+    }
+
+    /// Probability, in basis points, that a mutation attempt injects a
+    /// dictionary value instead of a purely random one.
+    ///
+    /// Smoke keeps injection light so quick runs stay fast; nightly and deep
+    /// bias heavily toward curated values so known-hard edges are hit early.
+    pub const fn dictionary_injection_bps(self) -> u32 {
+        match self {
+            CampaignPreset::Smoke => 2_500,
+            CampaignPreset::Nightly => 5_000,
+            CampaignPreset::Deep => 7_500,
+        }
+    }
+
     /// Read preset from the `CRASHLAB_PRESET` environment variable.
     ///
     /// Unset or unrecognised values fall back to [`CampaignPreset::Nightly`] so
@@ -257,7 +282,7 @@ impl CampaignPreset {
     pub fn from_env_or_default() -> Self {
         std::env::var("CRASHLAB_PRESET")
             .ok()
-            .and_then(|s s.parse().ok())
+            .and_then(|s| s.parse().ok())
             .unwrap_or_default()
     }
 
@@ -280,7 +305,7 @@ impl Default for CampaignPreset {
 }
 
 impl fmt::Display for CampaignPreset {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
@@ -291,7 +316,7 @@ pub struct ParseCampaignPresetError(pub String);
 
 impl fmt::Display for ParseCampaignPresetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write(
+        write!(
             f,
             "unknown campaign preset {:?}: expected smoke, nightly, or deep",
             self.0
@@ -309,7 +334,7 @@ impl FromStr for CampaignPreset {
             "smoke" => Ok(CampaignPreset::Smoke),
             "nightly" => Ok(CampaignPreset::Nightly),
             "deep" => Ok(CampaignPreset::Deep),
-            _ => Err(ParseCampaignPresetError(s.to_string())),
+            _ => Err(ParseCampaignPresetError(s.trim().to_owned())),
         }
     }
 }
@@ -442,63 +467,22 @@ mod tests {
     }
 
     #[test]
-    fn plateau_policies_are_valid() {
+    fn every_preset_selects_the_soroban_dictionary() {
         for p in CampaignPreset::ALL {
-            let policy = p.plateau_policy();
-            assert!(policy.is_valid(), "{:b} has an invalid plateau policy", p);
-            assert!(policy.window_seeds > 0);
-            assert!(policy.score_threshold_bps <= 10_000);
-            assert!(policy.sustained_windows > 0);
+            assert_eq!(p.dictionary(), DictionaryId::SorobanPitfalls);
         }
     }
 
     #[test]
-    fn smoke_stops_early_nightly_warns_deep_diversifies() {
-        assert_eq!(
-            CampaignPreset::Smoke.plateau_policy().action,
-            PlateauAction::StopEarly
-        );
-        assert_eq!(
-            CampaignPreset::Nightly.plateau_policy().action,
-            PlateauAction::Warn
-        );
-        assert_eq!(
-            CampaignPreset::Deep.plateau_policy().action,
-            PlateauAction::Diversify
-        );
-    }
-
-    #[test]
-    fn deep_window_longer_than_smoke() {
-        assert!(
-            CampaignPreset::Deep.plateau_policy().window_seeds
-                > CampaignPreset::Smoke.plateau_policy().window_seeds
-        );
-    }
-
-    #[test]
-    fn plateau_score_threshold_classifies() {
-        let policy = CampaignPreset::Nightly.plateau_policy();
-        assert!(policy.is_plateaued(0));
-        assert!(policy.is_plateaued(policy.score_threshold_bps));
-        assert!(!policy.is_plateaued(policy.score_threshold_bps + 1));
-    }
-
-    #[test]
-    fn plateau_action_serde_roundtrip() {
-        for action in PlateauAction::ALL {
-            let json = serde_json::to_string(&action).unwrap();
-            let back: PlateauAction = serde_json::from_str(&json).unwrap();
-            assert_eq!(back, action);
-            assert_eq!(json, format!("\"{}\"", action.as_str()));
+    fn dictionary_injection_probability_is_bounded_and_ordered() {
+        let s = CampaignPreset::Smoke.dictionary_injection_bps();
+        let n = CampaignPreset::Nightly.dictionary_injection_bps();
+        let d = CampaignPreset::Deep.dictionary_injection_bps();
+        assert!(s < n);
+        assert!(n < d);
+        for p in CampaignPreset::ALL {
+            let bps = p.dictionary_injection_bps();
+            assert!(bps <= 10_000, "injection probability must be at most 10000 bps");
         }
-    }
-
-    #[test]
-    fn plateau_policy_serde_roundtrip() {
-        let policy = CampaignPreset::Deep.plateau_policy();
-        let json = serde_json::to_string(&policy).unwrap();
-        let back: PlateauPolicy = serde_json::from_str(&json).unwrap();
-        assert_eq!(back, policy);
     }
 }

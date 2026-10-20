@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
-import { buildOpenApiSpec } from '@/lib/openapi/spec';
+import { serializeOpenApiSpec } from '@/lib/openapi/spec';
 
 export async function GET() {
-  return NextResponse.json(buildOpenApiSpec());
+  // Served as pre-serialized bytes so the response is byte-identical to the
+  // committed openapi.json the CI gate diffs (#1831).
+  return new NextResponse(serializeOpenApiSpec(), {
+    headers: { 'content-type': 'application/json' },
+  });
 }

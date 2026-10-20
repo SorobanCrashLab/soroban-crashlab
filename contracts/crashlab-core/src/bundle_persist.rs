@@ -12,6 +12,8 @@ use std::io::{Read, Write};
 
 /// Current on-disk schema version for [`save_case_bundle_json`] / [`load_case_bundle_json`].
 pub const CASE_BUNDLE_SCHEMA_VERSION: u32 = 2;
+/// Maximum JSON bytes accepted from or written to bundle persistence.
+pub const MAX_BUNDLE_JSON_BYTES: usize = 64 * 1024 * 1024;
 
 /// Schema versions this crate can load.
 pub const SUPPORTED_BUNDLE_SCHEMAS: &[u32] = &[1, CASE_BUNDLE_SCHEMA_VERSION];
@@ -45,6 +47,9 @@ pub struct CaseBundleDocument {
     /// Shrink delta metadata linking `original_seed` to `seed` (#1866).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shrink_lineage: Option<ShrinkLineage>,
+    /// Mutation engine version that produced this bundle (#1794).
+    #[serde(default)]
+    pub engine_version: String,
 }
 
 /// Errors from loading or saving a bundle.
@@ -58,6 +63,8 @@ pub enum BundlePersistError {
     UnsupportedSchema { found: u32 },
     /// Provenance verification failed (#1864).
     Provenance(String),
+    /// Artifact input or output exceeded a configured safety limit.
+    SizeLimit { limit: usize },
 }
 
 impl fmt::Display for BundlePersistError {
@@ -71,6 +78,9 @@ impl fmt::Display for BundlePersistError {
                 SUPPORTED_BUNDLE_SCHEMAS
             ),
             BundlePersistError::Provenance(msg) => write!(f, "bundle provenance error: {msg}"),
+            BundlePersistError::SizeLimit { limit } => {
+                write!(f, "bundle exceeds the configured {limit}-byte size limit")
+            }
         }
     }
 }
@@ -82,6 +92,7 @@ impl std::error::Error for BundlePersistError {
             BundlePersistError::Io(e) => Some(e),
             BundlePersistError::UnsupportedSchema { .. } => None,
             BundlePersistError::Provenance(_) => None,
+            BundlePersistError::SizeLimit { .. } => None,
         }
     }
 }
@@ -101,6 +112,11 @@ impl From<std::io::Error> for BundlePersistError {
 impl CaseBundleDocument {
     /// Builds a document from an in-memory bundle using the current schema version.
     pub fn from_bundle(bundle: &CaseBundle) -> Self {
+        let engine_version = if bundle.engine_version.is_empty() {
+            crate::engine_version::ENGINE_VERSION.to_string()
+        } else {
+            bundle.engine_version.clone()
+        };
         Self {
             schema: CASE_BUNDLE_SCHEMA_VERSION,
             seed: bundle.seed.clone(),
@@ -111,6 +127,7 @@ impl CaseBundleDocument {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+            engine_version,
         }
     }
 
@@ -164,12 +181,18 @@ impl CaseBundleDocument {
         if !SUPPORTED_BUNDLE_SCHEMAS.contains(&self.schema) {
             return Err(BundlePersistError::UnsupportedSchema { found: self.schema });
         }
+        let engine_version = if self.engine_version.is_empty() {
+            "unknown".to_string()
+        } else {
+            self.engine_version
+        };
         Ok(CaseBundle {
             seed: self.seed,
             signature: self.signature,
             environment: self.environment,
             failure_payload: self.failure_payload,
             rpc_envelope: self.rpc_envelope,
+            engine_version,
         })
     }
 }
@@ -181,11 +204,26 @@ impl CaseBundleDocument {
 /// the seed and failure payloads before export.
 pub fn save_case_bundle_json(bundle: &CaseBundle) -> Result<Vec<u8>, BundlePersistError> {
     let doc = CaseBundleDocument::from_bundle(bundle);
-    Ok(serde_json::to_vec_pretty(&doc)?)
+    serialize_bounded(&doc)
+}
+
+fn serialize_bounded<T: Serialize>(value: &T) -> Result<Vec<u8>, BundlePersistError> {
+    let bytes = serde_json::to_vec_pretty(value)?;
+    if bytes.len() > MAX_BUNDLE_JSON_BYTES {
+        return Err(BundlePersistError::SizeLimit {
+            limit: MAX_BUNDLE_JSON_BYTES,
+        });
+    }
+    Ok(bytes)
 }
 
 /// Parses JSON bytes into a [`CaseBundle`], validating `schema`.
 pub fn load_case_bundle_json(bytes: &[u8]) -> Result<CaseBundle, BundlePersistError> {
+    if bytes.len() > MAX_BUNDLE_JSON_BYTES {
+        return Err(BundlePersistError::SizeLimit {
+            limit: MAX_BUNDLE_JSON_BYTES,
+        });
+    }
     let doc: CaseBundleDocument = serde_json::from_slice(bytes)?;
     doc.into_bundle()
 }
@@ -202,7 +240,7 @@ pub fn bundle_artifact_class() -> &'static str {
 pub fn save_case_bundle_document_json(
     doc: &CaseBundleDocument,
 ) -> Result<Vec<u8>, BundlePersistError> {
-    Ok(serde_json::to_vec_pretty(doc)?)
+    serialize_bounded(doc)
 }
 
 /// Parses JSON bytes into a [`CaseBundleDocument`], validating `schema`.
@@ -212,6 +250,11 @@ pub fn save_case_bundle_document_json(
 pub fn load_case_bundle_document_json(
     bytes: &[u8],
 ) -> Result<CaseBundleDocument, BundlePersistError> {
+    if bytes.len() > MAX_BUNDLE_JSON_BYTES {
+        return Err(BundlePersistError::SizeLimit {
+            limit: MAX_BUNDLE_JSON_BYTES,
+        });
+    }
     let doc: CaseBundleDocument = serde_json::from_slice(bytes)?;
     if !SUPPORTED_BUNDLE_SCHEMAS.contains(&doc.schema) {
         return Err(BundlePersistError::UnsupportedSchema { found: doc.schema });
@@ -232,7 +275,14 @@ pub fn write_case_bundle_json<W: Write>(
 /// Reads JSON from any [`Read`] implementation.
 pub fn read_case_bundle_json<R: Read>(reader: &mut R) -> Result<CaseBundle, BundlePersistError> {
     let mut buf = Vec::new();
-    reader.read_to_end(&mut buf)?;
+    reader
+        .take(MAX_BUNDLE_JSON_BYTES as u64 + 1)
+        .read_to_end(&mut buf)?;
+    if buf.len() > MAX_BUNDLE_JSON_BYTES {
+        return Err(BundlePersistError::SizeLimit {
+            limit: MAX_BUNDLE_JSON_BYTES,
+        });
+    }
     load_case_bundle_json(&buf)
 }
 
@@ -301,6 +351,7 @@ mod tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+            engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
         let bytes = serde_json::to_vec(&doc).unwrap();
         let err = load_case_bundle_json(&bytes).unwrap_err();

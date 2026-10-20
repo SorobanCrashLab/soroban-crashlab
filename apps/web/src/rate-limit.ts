@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkRbacPermission } from './lib/rbac';
+import { enforceRouteAuthorization } from './lib/route-guard';
 
 interface RateLimitBucket {
   count: number;
@@ -43,9 +43,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  const rbacDenial = await checkRbacPermission(request);
-  if (rbacDenial) {
-    return rbacDenial;
+  const guardDenial = await enforceRouteAuthorization(request);
+  if (guardDenial) {
+    return guardDenial;
   }
 
   const now = Date.now();

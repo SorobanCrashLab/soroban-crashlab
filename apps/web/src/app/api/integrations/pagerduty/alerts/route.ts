@@ -17,6 +17,7 @@
 import { z } from 'zod';
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { checkRequestSize } from '@/lib/request-size-limits';
+import { withSizeLimitAndLogging } from '@/lib/route-handler';
 import { getAlertDispatcher } from '@/lib/notifications/alert-runtime';
 import { ALERT_SEVERITIES } from '@/lib/notifications/alert-policy';
 import type { PagerDutyAlert } from '../../../../../features/integrations/integrate-pagerduty-alert-integration-utils';
@@ -94,7 +95,7 @@ export async function GET() {
   });
 }
 
-export async function POST(request: Request) {
+async function postHandler(request: Request) {
   const sizeError = checkRequestSize(request);
   if (sizeError) return sizeError;
 
@@ -127,3 +128,5 @@ export async function POST(request: Request) {
     return errorResponse(error instanceof Error ? error.message : 'Alert action failed', 404);
   }
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/integrations/pagerduty/alerts', postHandler);

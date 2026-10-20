@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRbacPermission } from '../../../../lib/rbac';
 import { checkRequestSize } from '../../../../lib/request-size-limits';
+import { withSizeLimitAndLogging } from '../../../../lib/route-handler';
 import {
   setNotificationPreference,
   getNotificationPreference,
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ preference });
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const rbacError = await checkRbacPermission(request);
   if (rbacError) return rbacError;
 
@@ -54,3 +55,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = withSizeLimitAndLogging('POST /api/settings/notifications', postHandler);

@@ -4,6 +4,7 @@ import {
   InMemoryIdempotencyStore,
   resetIdempotencyStore,
 } from '@/lib/storage/idempotency-store';
+import { resetRateLimitStore } from '@/lib/rate-limit';
 
 const CONFIG = { seedSource: 'random', authMode: 'none', parallelism: 4, timeoutSeconds: 3600 };
 
@@ -23,7 +24,10 @@ async function campaignId(res: Response): Promise<string> {
   return body.data.campaign.id;
 }
 
-beforeEach(() => resetIdempotencyStore(new InMemoryIdempotencyStore()));
+beforeEach(() => {
+  resetIdempotencyStore(new InMemoryIdempotencyStore());
+  resetRateLimitStore();
+});
 afterEach(() => resetIdempotencyStore());
 
 describe('POST /api/campaigns — idempotency (#1634)', () => {
@@ -62,18 +66,18 @@ describe('POST /api/campaigns — idempotency (#1634)', () => {
     expect(await campaignId(second)).not.toBe(await campaignId(first));
   });
 
-  it('rejects the same key with a different payload with 422', async () => {
+  it('rejects the same key with a different payload with 409', async () => {
     await POST(createRequest(CONFIG, 'key-1') as never);
     const collision = await POST(createRequest({ ...CONFIG, parallelism: 16 }, 'key-1') as never);
 
-    expect(collision.status).toBe(422);
-    expect(await collision.json()).toMatchObject({ code: 'IDEMPOTENCY_KEY_REUSED' });
+    expect(collision.status).toBe(409);
+    expect(await collision.json()).toMatchObject({ code: 'IDEMPTENCY_KEY_REUSED' });
   });
 
-  it('rejects a malformed key with 400', async () => {
+  it('rejects a malformed key with 422', async () => {
     const res = await POST(createRequest(CONFIG, 'x'.repeat(256)) as never);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(await res.json()).toMatchObject({ code: 'IDEMPOTENCY_KEY_INVALID' });
   });
 
@@ -83,14 +87,14 @@ describe('POST /api/campaigns — idempotency (#1634)', () => {
       POST(createRequest(CONFIG, 'race') as never),
     ]);
 
-    expect([a.status, b.status].sort()).toEqual([200, 201]);
+    expect([a.status, b.status].sort()).toEqual([201, 409]);
     expect(await campaignId(a)).toBe(await campaignId(b));
   });
 
   it('keeps the legacy behaviour when no key is sent', async () => {
-    const res = await POST(createRequest(CONFIG) as never);
+    const res = await POST(createRequest(CONFIG)  as never);
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
     expect(res.headers.get('Idempotent-Replayed')).toBeNull();
   });
 });

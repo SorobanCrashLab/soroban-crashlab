@@ -13,6 +13,7 @@
 import type { FuzzingRun, LedgerStateChange } from '../types';
 import { collectRunArtifacts } from './artifact-collection';
 import { createZipArchive, crc32, type ZipEntry } from './zip-writer';
+import { redactArtifactText } from '../../lib/redaction';
 
 /** Bumped when the bundle layout changes in a way consumers must notice. */
 export const BUNDLE_VERSION = '1.0';
@@ -115,10 +116,10 @@ export function buildRunBundleFiles(
     const artifacts = collectRunArtifacts(run, ledgerChanges, { downloadedAt: generatedAt });
 
     const payloads: ZipEntry[] = [
-        { path: 'metadata.json', content: JSON.stringify(artifacts.metadata, null, 2) },
-        { path: 'traces.json', content: JSON.stringify(artifacts.traces, null, 2) },
-        { path: 'fixtures.json', content: JSON.stringify(artifacts.fixtures, null, 2) },
-        { path: 'README.md', content: buildReadme(run, generatedAt) },
+        { path: 'metadata.json', content: redactArtifactText(JSON.stringify(artifacts.metadata, null, 2)) },
+        { path: 'traces.json', content: redactArtifactText(JSON.stringify(artifacts.traces, null, 2)) },
+        { path: 'fixtures.json', content: redactArtifactText(JSON.stringify(artifacts.fixtures, null, 2)) },
+        { path: 'README.md', content: redactArtifactText(buildReadme(run, generatedAt)) },
     ];
 
     const manifest: BundleManifest = {
@@ -145,7 +146,8 @@ export function buildRunBundleFiles(
 
 /** Filename for the downloaded archive, dated so repeat downloads stay distinct. */
 export function buildRunArtifactZipFilename(runId: string, generatedAt: Date = new Date()): string {
-    return `run-${runId}-artifacts-${generatedAt.toISOString().slice(0, 10)}.zip`;
+    const safeRunId = runId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 120) || 'run';
+    return `run-${safeRunId}-artifacts-${generatedAt.toISOString().slice(0, 10)}.zip`;
 }
 
 /**

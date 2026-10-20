@@ -40,6 +40,7 @@ pub struct MutationBudget {
     attempts_made: u64,
     /// Attempts that were rejected because the budget was already exhausted.
     skipped: u64,
+    plateau_stop: bool,
 }
 
 impl MutationBudget {
@@ -51,6 +52,7 @@ impl MutationBudget {
             budget,
             attempts_made: 0,
             skipped: 0,
+            plateau_stop: false,
         }
     }
 
@@ -83,7 +85,18 @@ impl MutationBudget {
             attempts_made: self.attempts_made,
             skipped: self.skipped,
             exhausted: self.is_exhausted(),
+            plateau_stop: self.plateau_stop,
         }
+    }
+
+    /// Marks the budget as stopped by plateau detection.
+    pub fn mark_plateau_stop(&mut self) {
+        self.plateau_stop = true;
+    }
+
+    /// Returns true when plateau detection stopped the run.
+    pub fn is_plateau_stop(&self) -> bool {
+        self.plateau_stop
     }
 }
 

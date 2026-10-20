@@ -1,5 +1,7 @@
 pub mod auth_matrix;
+pub mod cluster;
 pub mod cors;
+pub mod dictionary;
 pub mod fixture;
 pub mod fixture_classifier;
 pub mod health;
@@ -7,12 +9,26 @@ pub mod prng;
 pub mod regression_group;
 pub mod reproducer;
 pub mod retry;
+pub mod redact;
 pub mod runner;
+pub mod shrink;
 pub mod signature_hash;
 pub mod suite_runner;
 pub mod taxonomy;
+pub mod trace;
+pub use trace::{SeedTrace, TraceEvent, MAX_TRACE_BYTES, MAX_TRACE_EVENTS, TRACE_SCHEMA_VERSION};
+pub mod host_coverage;
+pub use host_coverage::{HostCoverage, HOST_FUNCTION_SURFACE};
+pub mod canon;
+pub use canon::{format_f64_canonical, is_byte_identical_round_trip, parse_canonical_line, write_canonical_line, PERSISTED_FORMATS_WITH_ROUND_TRIP_TEST};
+pub mod sandbox;
+pub use sandbox::{SandboxConfig, SandboxKill, DEFAULT_SEED_DEADLINE, MAX_HOST_RECURSION_DEPTH, MAX_XDR_DECODE_BYTES};
 
 pub use runner::{create_runner, ContractRunner, MockRunner, RunnerCreationError, RunnerError};
+
+pub use dictionary::{
+    Dictionary, DictionaryEntry, DictionaryError, DictionaryHitReport, DictionaryLoader,
+};
 
 #[cfg(feature = "host-runner")]
 pub mod host_runner;
@@ -93,7 +109,7 @@ pub use reproducer::{
     filter_ci_pack, shrink_bundle_payload, shrink_bundle_with_lineage,
     shrink_seed_preserving_signature, FlakyDetector, ReproReport, StabilityVerdict,
 };
-pub use retry::{execute_with_retry, RetryConfig, SimulationError};
+pub use retry::{execute_with_retry, execute_with_retry_counting, simulation_error_for_fault, RetryConfig, SimulationError};
 pub use signature_hash::{hash_category_payload, SignatureHasher};
 pub use suite_runner::{GroupStats, GroupSummary, SuiteRunnerConfig};
 pub use taxonomy::crash_signature_from_seed;
@@ -105,7 +121,7 @@ pub use taxonomy::{
 pub use host_runner::HostContractRunner;
 
 #[cfg(feature = "rpc-runner")]
-pub use rpc_runner::{RpcConfigError, RpcContractRunner};
+pub use rpc_runner::{CancelToken, LedgerTracker, RpcConfigError, RpcContractRunner, RpcPoolConfig};
 
 #[cfg(not(feature = "rpc-runner"))]
 pub use rpc_runner_stub::{RpcConfigError, RpcContractRunner};
@@ -113,11 +129,19 @@ pub use rpc_runner_stub::{RpcConfigError, RpcContractRunner};
 pub mod seed_validator;
 pub use seed_validator::{SeedSchema, SeedValidationError, Validate};
 
+pub mod engine_version;
+pub use engine_version::{drift_class, requires_override, EngineDrift, ENGINE_VERSION};
+
+pub mod scval_mutator;
+pub use scval_mutator::{ScValDecodeError, ScValMutatorConfig};
+
 pub mod havoc;
 pub use havoc::{apply_havoc_mutation, derive_seed_state, HavocConfig, HavocMutator, HavocOp};
 
 pub mod scheduler;
-pub use scheduler::{Mutator, MutatorRegistry, SchedulerError, WeightedScheduler};
+pub use scheduler::{
+    Mutator, MutatorRegistry, MutatorStats, SchedulerError, SchedulerStatEntry, WeightedScheduler,
+};
 
 pub mod campaign_presets;
 pub use campaign_presets::{
@@ -130,8 +154,9 @@ pub use capacity::{
 };
 pub mod replay;
 pub use replay::{
-    replay_mismatch_message, replay_seed_bundle, replay_seed_bundle_json, replay_seed_bundle_path,
-    replay_success_message, ReplayError, ReplayResult,
+    check_engine_version, replay_mismatch_message, replay_seed_bundle, replay_seed_bundle_checked,
+    replay_seed_bundle_json, replay_seed_bundle_json_checked, replay_seed_bundle_path,
+    replay_seed_bundle_path_checked, replay_success_message, ReplayError, ReplayResult,
 };
 
 pub mod env_fingerprint;
@@ -199,6 +224,11 @@ pub use signature_comparison::{
     SignatureInfo, SignatureSnapshot,
 };
 
+pub mod baseline;
+pub use baseline::{
+    Baseline, BaselineEntry, BaselineError, Classification, EntryStatus, ObservedSignature,
+};
+
 pub mod fixture_sanitize;
 pub use fixture_sanitize::{
     export_sanitized_scenario_json, export_sanitized_suite_json, sanitize_and_validate_bundle,
@@ -211,8 +241,10 @@ pub use fixture_sanitize::{
 
 pub mod checkpoint;
 pub use checkpoint::{
-    load_run_checkpoint_json, save_run_checkpoint_json, CheckpointError, RunCheckpoint,
-    RUN_CHECKPOINT_SCHEMA_VERSION, SUPPORTED_RUN_CHECKPOINT_SCHEMAS,
+    generation_path, load_checkpoint_file, load_run_checkpoint_atomic, load_run_checkpoint_json,
+    save_run_checkpoint_atomic, save_run_checkpoint_json, verify_checkpoint_generation,
+    write_checkpoint_file, CheckpointError, CheckpointIOError, CheckpointLoad, LoadedCheckpoint,
+    RunCheckpoint, RUN_CHECKPOINT_SCHEMA_VERSION, SUPPORTED_RUN_CHECKPOINT_SCHEMAS,
 };
 
 pub mod corpus;
@@ -243,10 +275,20 @@ pub use regression_suite::{
     RegressionCaseResult, RegressionSuiteSummary, REGRESSION_REPORT_SCHEMA_VERSION,
 };
 
+pub mod rust_repro;
+pub use rust_repro::{render_rust_test, ReproExportError};
+
 pub mod regression_grouping;
 pub use regression_grouping::{
-    export_rust_regression_suite, group_bundles_by_regression_group, regression_group_key,
+    export_rust_regression_suite, group_bundles_by_normalized_signature,
+    group_bundles_by_regression_group, normalized_cluster_key, regression_group_key,
     regression_group_keys_sorted, regression_group_module_ident, RegressionGroupKey,
+};
+
+pub use cluster::{
+    cluster_observations, normalize_signature, ClusterKey, ClusterMember, ClusterSnapshot,
+    ClusterStore, FailureCluster, FailureObservation, NormalizationRules, NormalizedSignature,
+    DEFAULT_AMOUNT_MIN_DIGITS, NORMALIZATION_RULES_VERSION,
 };
 
 pub mod simulation;
@@ -286,6 +328,7 @@ pub use worker_partition::{
 pub mod health_snapshot;
 pub use health_snapshot::{
     append_health_snapshot, classify_failure_message, health_snapshot_path, read_health_snapshots,
+    read_health_snapshot_log,
     read_latest_health_snapshot, read_latest_health_snapshot_line, terminal_label, BudgetSnapshot, CampaignHealth, HealthSnapshot,
     HealthSnapshotError, DEFAULT_SNAPSHOT_INTERVAL_SEEDS, HEALTH_SNAPSHOT_FILE,
     HEALTH_SNAPSHOT_SCHEMA_VERSION, SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS,
@@ -302,7 +345,12 @@ pub use run_control::{
 pub mod rpc_envelope;
 pub use rpc_envelope::{RpcEnvelopeCapture, RpcRequestEnvelope, RpcResponseEnvelope};
 
+pub mod rpc_fault;
+pub use rpc_fault::{is_harness_error_message, RpcFault};
+
 pub mod stellar_address;
+pub mod address_neighbors;
+pub use address_neighbors::{generate_address_neighbors, AddressNeighbor, AddressNeighborStrategy};
 
 // Re-enable threat model tests (compile-only pass). Obsolete cases can be
 // ignored or updated as follow-ups (see ROADMAP-004).
@@ -380,6 +428,8 @@ pub struct CaseBundle {
     pub failure_payload: Vec<u8>,
     /// Captured RPC request/response envelopes for reproducibility auditing.
     pub rpc_envelope: Option<RpcEnvelopeCapture>,
+    /// Mutation engine version that produced this bundle.
+    pub engine_version: String,
 }
 
 impl CaseBundle {
@@ -431,6 +481,7 @@ pub fn to_bundle(seed: CaseSeed) -> CaseBundle {
         environment: None,
         failure_payload: Vec::new(),
         rpc_envelope: None,
+        engine_version: ENGINE_VERSION.to_string(),
     }
 }
 
@@ -445,6 +496,7 @@ pub fn to_bundle_with_environment(seed: CaseSeed) -> CaseBundle {
         environment,
         failure_payload: Vec::new(),
         rpc_envelope: None,
+        engine_version: ENGINE_VERSION.to_string(),
     }
 }
 
@@ -458,6 +510,7 @@ pub fn to_bundle_with_rpc_envelope(seed: CaseSeed, envelope: RpcEnvelopeCapture)
         environment: None,
         failure_payload: Vec::new(),
         rpc_envelope: Some(envelope),
+        engine_version: ENGINE_VERSION.to_string(),
     }
 }
 

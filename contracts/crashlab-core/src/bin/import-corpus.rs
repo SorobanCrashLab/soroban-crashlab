@@ -13,9 +13,11 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::process;
 
+const MAX_IMPORT_BYTES: usize = crashlab_core::corpus::MAX_CORPUS_JSON_BYTES;
+
 fn main() {
     if let Err(err) = run() {
-        eprintln!("{err}");
+        eprintln!("{}", crashlab_core::redact::redact_text(&err));
         process::exit(1);
     }
 }
@@ -39,30 +41,54 @@ fn load_seeds_from_env_args() -> Result<Vec<CaseSeed>, String> {
         if path.is_dir() {
             return load_seeds_from_directory(path);
         }
-        let bytes = fs::read(path).map_err(|e| format!("read {path_str}: {e}"))?;
+        let bytes = read_bounded(
+            fs::File::open(path).map_err(|e| format!("read {path_str}: {e}"))?,
+            path_str,
+        )?;
         return parse_seeds(&bytes);
     }
 
-    let mut buf = Vec::new();
-    io::stdin()
-        .read_to_end(&mut buf)
-        .map_err(|e| format!("stdin: {e}"))?;
+    let buf = read_bounded(io::stdin().lock(), "stdin")?;
     parse_seeds(&buf)
+}
+
+fn read_bounded(mut reader: impl Read, source: &str) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    reader
+        .by_ref()
+        .take(MAX_IMPORT_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("read {source}: {error}"))?;
+    if bytes.len() > MAX_IMPORT_BYTES {
+        return Err(format!(
+            "input from {source} exceeds the {MAX_IMPORT_BYTES}-byte limit"
+        ));
+    }
+    Ok(bytes)
 }
 
 pub fn load_seeds_from_directory(dir: &Path) -> Result<Vec<CaseSeed>, String> {
     let mut all_seeds = Vec::new();
+    let mut total_bytes = 0usize;
     let mut entries: Vec<_> = fs::read_dir(dir)
         .map_err(|e| format!("read dir {}: {e}", dir.display()))?
-        .filter_map(|e| e.ok())
-        .collect();
+        .collect::<Result<_, _>>()
+        .map_err(|e| format!("read directory entry: {e}"))?;
     entries.sort_by_key(|e| e.path());
 
     for entry in entries {
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let bytes = fs::read(&path)
-                .map_err(|e| format!("read {}: {e}", path.display()))?;
+            let bytes = read_bounded(
+                fs::File::open(&path).map_err(|error| format!("read {}: {error}", path.display()))?,
+                &path.display().to_string(),
+            )?;
+            total_bytes = total_bytes.saturating_add(bytes.len());
+            if total_bytes > MAX_IMPORT_BYTES {
+                return Err(format!(
+                    "directory input exceeds the {MAX_IMPORT_BYTES}-byte aggregate limit"
+                ));
+            }
             let seeds = parse_seeds(&bytes)
                 .map_err(|e| format!("failed to parse {}: {e}", path.display()))?;
             all_seeds.extend(seeds);
@@ -79,6 +105,11 @@ pub fn load_seeds_from_directory(dir: &Path) -> Result<Vec<CaseSeed>, String> {
 pub fn parse_seeds(bytes: &[u8]) -> Result<Vec<CaseSeed>, String> {
     if bytes.is_empty() {
         return Err("empty input".to_string());
+    }
+    if bytes.len() > MAX_IMPORT_BYTES {
+        return Err(format!(
+            "seed input exceeds the {MAX_IMPORT_BYTES}-byte limit"
+        ));
     }
 
     if let Ok(seeds) = import_corpus_json(bytes) {
