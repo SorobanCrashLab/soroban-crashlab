@@ -35,6 +35,8 @@ function filePathToRoute(file: string): string {
   const relative = file
     .replace(join(process.cwd(), 'src/app'), '')
     .replace(/\/route\.ts$/, '');
+    .replace(/[\\/]route\.ts$/, '')
+    .replace(/\\/g, '/');
   return relative.startsWith('/') ? relative : `/${relative}`;
 }
 

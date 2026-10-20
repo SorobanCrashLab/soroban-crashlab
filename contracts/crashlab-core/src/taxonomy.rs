@@ -8,7 +8,7 @@ use std::collections::HashMap;
 /// [`classify_failure`] rules change. Downstream consumers such as the
 /// normalization rules in [`crate::cluster`] record this version so results
 /// produced against different taxonomies are never silently conflated.
-pub const TAXONOMY_VERSION: u32 = 1;
+pub const TAXONOMY_VERSION: u32 = 2;
 
 /// Stable failure categories for Soroban contract crashes.
 ///
@@ -52,6 +52,18 @@ pub enum FailureClass {
     /// Internal simulation worker thread panicked.
     /// This is distinct from timeout - the worker crashed internally.
     InternalPanic,
+    /// RPC transport fault: connect/timeout/reset (never enters crash corpus).
+    RpcTransport,
+    /// RPC rate-limit fault: 429/503 with retry-after (never enters corpus).
+    RpcRateLimited,
+    /// RPC sequence fault: nonce gap requiring re-sync and single replay.
+    RpcSequence,
+    /// RPC resource fault: fee/budget refusal with detail for signatures.
+    RpcResource,
+    /// RPC contract fault: genuine trap, distinct from transport noise.
+    RpcContract,
+    /// RPC not-found fault: archived entry.
+    RpcNotFound,
 }
 
 impl FailureClass {
@@ -71,11 +83,17 @@ impl FailureClass {
             FailureClass::Unknown => "unknown",
             FailureClass::Timeout => "timeout",
             FailureClass::InternalPanic => "internal-panic",
+            FailureClass::RpcTransport => "rpc-transport",
+            FailureClass::RpcRateLimited => "rpc-rate-limited",
+            FailureClass::RpcSequence => "rpc-sequence",
+            FailureClass::RpcResource => "rpc-resource",
+            FailureClass::RpcContract => "rpc-contract",
+            FailureClass::RpcNotFound => "rpc-not-found",
         }
     }
 
     /// All variants in declaration order, useful for iteration and reporting.
-    pub const ALL: [FailureClass; 10] = [
+    pub const ALL: [FailureClass; 16] = [
         FailureClass::Auth,
         FailureClass::Budget,
         FailureClass::State,
@@ -86,6 +104,12 @@ impl FailureClass {
         FailureClass::Unknown,
         FailureClass::Timeout,
         FailureClass::InternalPanic,
+        FailureClass::RpcTransport,
+        FailureClass::RpcRateLimited,
+        FailureClass::RpcSequence,
+        FailureClass::RpcResource,
+        FailureClass::RpcContract,
+        FailureClass::RpcNotFound,
     ];
 
     /// Parses a persisted category label into a stable failure class.
@@ -101,6 +125,12 @@ impl FailureClass {
             "unknown" => Some(FailureClass::Unknown),
             "timeout" => Some(FailureClass::Timeout),
             "internal-panic" => Some(FailureClass::InternalPanic),
+            "rpc-transport" => Some(FailureClass::RpcTransport),
+            "rpc-rate-limited" => Some(FailureClass::RpcRateLimited),
+            "rpc-sequence" => Some(FailureClass::RpcSequence),
+            "rpc-resource" => Some(FailureClass::RpcResource),
+            "rpc-contract" => Some(FailureClass::RpcContract),
+            "rpc-not-found" => Some(FailureClass::RpcNotFound),
             _ => None,
         }
     }
@@ -109,6 +139,28 @@ impl FailureClass {
 impl std::fmt::Display for FailureClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+impl FailureClass {
+    /// True for RPC harness faults that must never enter the crash corpus.
+    pub fn is_harness_fault(self) -> bool {
+        matches!(
+            self,
+            FailureClass::RpcTransport
+                | FailureClass::RpcRateLimited
+                | FailureClass::RpcSequence
+                | FailureClass::RpcResource
+                | FailureClass::RpcNotFound
+        )
+    }
+
+    /// True when a bundle with this class must be excluded from `CrashIndex`.
+    pub fn excludes_from_corpus(self) -> bool {
+        matches!(
+            self,
+            FailureClass::RpcTransport | FailureClass::RpcRateLimited
+        )
     }
 }
 
@@ -338,9 +390,10 @@ mod tests {
 
     #[test]
     fn all_contains_ten_variants() {
-        assert_eq!(FailureClass::ALL.len(), 10);
+        assert_eq!(FailureClass::ALL.len(), 16);
         assert!(FailureClass::ALL.contains(&FailureClass::Unknown));
         assert!(FailureClass::ALL.contains(&FailureClass::InternalPanic));
+        assert!(FailureClass::ALL.contains(&FailureClass::RpcTransport));
     }
 
     #[test]

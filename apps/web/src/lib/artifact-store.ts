@@ -2,6 +2,9 @@
  * Shared in-memory artifact store for Next.js API routes.
  * Production should replace this module with a filesystem or Rust-backed adapter.
  * Issue #1843: Added content checksumming for corruption detection
+ */
+import { createHash } from "crypto";
+import { redactArtifactText, redactText } from './redaction';
  *
  * Tenant-scoped (#1894): every artifact lives under
  * `org/<org>/project/<project>/artifacts/<id>`, and every accessor takes the

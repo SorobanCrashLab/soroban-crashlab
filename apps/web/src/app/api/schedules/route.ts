@@ -11,6 +11,7 @@ import {
 } from '@/lib/cron';
 import { isCampaignClass } from '@/lib/capacity/quotas';
 import { getSchedulerState, setSchedulerState } from './_store';
+import { withCsrfGuard } from '@/lib/csrf';
 
 export const GET = withRouteErrorHandling('GET /api/schedules', async () => {
   const { schedules, history, ledger } = getSchedulerState();
@@ -32,7 +33,7 @@ export const GET = withRouteErrorHandling('GET /api/schedules', async () => {
   return successResponse({ schedules: enrichedSchedules, history, ledger });
 });
 
-export const POST = withRouteErrorHandling('POST /api/schedules', async (request: NextRequest) => {
+export const POST = withRouteErrorHandling('POST /api/schedules', withCsrfGuard({ authClass: 'session' }, async (request: NextRequest) => {
   const parsedBody = await readJsonBody(request);
   if ('error' in parsedBody) return parsedBody.error;
 
@@ -77,7 +78,7 @@ export const POST = withRouteErrorHandling('POST /api/schedules', async (request
 
   setSchedulerState({ ...state, schedules: addSchedule(state.schedules, schedule) });
   return successResponse({ schedule }, { status: 201 });
-});
+}));
 
 function deriveStatus(
   schedule: { enabled: boolean; nextRun?: string | null },

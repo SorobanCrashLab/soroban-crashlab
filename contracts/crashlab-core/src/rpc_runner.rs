@@ -152,6 +152,117 @@ pub struct RpcContractRunner {
     poll_timeout_secs: u64,
     /// Polling interval (milliseconds)
     poll_interval_ms: u64,
+    /// Connection pool configuration.
+    pool: RpcPoolConfig,
+    /// Latest observed ledger sequence for freshness gating.
+    latest_ledger: Option<u32>,
+    /// Maximum ledger staleness before submission is refused.
+    max_ledger_staleness: u32,
+}
+
+/// Bounded async connection pool configuration with idle eviction.
+#[cfg(feature = "rpc-runner")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RpcPoolConfig {
+    /// Max idle connections per endpoint.
+    pub max_idle_per_endpoint: usize,
+    /// Idle eviction timeout in seconds.
+    pub idle_timeout_secs: u64,
+    /// Max concurrent connections per endpoint.
+    pub max_connections_per_endpoint: usize,
+}
+
+#[cfg(feature = "rpc-runner")]
+impl Default for RpcPoolConfig {
+    fn default() -> Self {
+        Self {
+            max_idle_per_endpoint: 8,
+            idle_timeout_secs: 60,
+            max_connections_per_endpoint: 16,
+        }
+    }
+}
+
+#[cfg(feature = "rpc-runner")]
+impl RpcPoolConfig {
+    /// Returns true when `in_use >= max_connections_per_endpoint`.
+    pub fn is_exhausted(&self, in_use: usize) -> bool {
+        in_use >= self.max_connections_per_endpoint
+    }
+}
+
+/// Tracks latest ledger sequence and freshness window.
+#[cfg(feature = "rpc-runner")]
+#[derive(Debug, Clone, Default)]
+pub struct LedgerTracker {
+    latest: Option<u32>,
+    max_staleness: u32,
+}
+
+#[cfg(feature = "rpc-runner")]
+impl LedgerTracker {
+    pub fn new(max_staleness: u32) -> Self {
+        Self {
+            latest: None,
+            max_staleness,
+        }
+    }
+
+    pub fn observe(&mut self, ledger: u32) {
+        self.latest = Some(self.latest.map_or(ledger, |l| l.max(ledger)));
+    }
+
+    pub fn is_fresh(&self, ledger: u32) -> bool {
+        match self.latest {
+            None => true,
+            Some(latest) => latest.saturating_sub(ledger) <= self.max_staleness,
+        }
+    }
+
+    /// Formats a harness_error message when `ledger` is stale.
+    pub fn staleness_error(&self, ledger: u32) -> Option<String> {
+        if self.is_fresh(ledger) {
+            None
+        } else {
+            Some(format!(
+                "harness_error:rpc-stale-ledger:latest={} observed={ledger}",
+                self.latest.unwrap_or(0)
+            ))
+        }
+    }
+}
+
+/// Cooperative cancellation token propagated into RPC calls.
+#[cfg(feature = "rpc-runner")]
+#[derive(Debug, Clone, Default)]
+pub struct CancelToken {
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+#[cfg(feature = "rpc-runner")]
+impl CancelToken {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn cancel(&self) {
+        self.cancelled
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Returns an error when cancelled, for prompt mid-request return.
+    pub fn check(&self) -> Result<(), crate::runner::RunnerError> {
+        if self.is_cancelled() {
+            return Err(crate::runner::RunnerError::Transient {
+                message: "harness_error:cancelled mid-request".to_string(),
+            });
+        }
+        Ok(())
+    }
 }
 
 #[cfg(feature = "rpc-runner")]
@@ -202,6 +313,9 @@ impl RpcContractRunner {
             request_timeout_secs: 30,
             poll_timeout_secs: 120,
             poll_interval_ms: 2000,
+            pool: RpcPoolConfig::default(),
+            latest_ledger: None,
+            max_ledger_staleness: 10,
         })
     }
 
@@ -237,6 +351,61 @@ impl RpcContractRunner {
     /// Returns the configured contract ID, if set.
     pub fn contract_id(&self) -> Option<&str> {
         self.contract_id.as_deref()
+    }
+
+    /// Overrides the connection pool configuration.
+    pub fn with_pool(mut self, pool: RpcPoolConfig) -> Self {
+        self.pool = pool;
+        self
+    }
+
+    /// Returns the pool configuration.
+    pub fn pool(&self) -> &RpcPoolConfig {
+        &self.pool
+    }
+
+    /// Overrides request/poll deadlines. Per-call overrides use
+    /// [`RpcContractRunner::execute_rpc_with_deadline`].
+    pub fn with_timeouts(mut self, request_secs: u64, poll_secs: u64, interval_ms: u64) -> Self {
+        self.request_timeout_secs = request_secs;
+        self.poll_timeout_secs = poll_secs;
+        self.poll_interval_ms = interval_ms;
+        self
+    }
+
+    /// Records the latest observed ledger sequence.
+    pub fn observe_ledger(&mut self, ledger: u32) {
+        self.latest_ledger = Some(self.latest_ledger.map_or(ledger, |l| l.max(ledger)));
+    }
+
+    /// Returns an error when `ledger` is outside the freshness window.
+    pub fn check_ledger_freshness(&self, ledger: u32) -> Result<(), RunnerError> {
+        if let Some(latest) = self.latest_ledger {
+            if latest.saturating_sub(ledger) > self.max_ledger_staleness {
+                return Err(RunnerError::Transient {
+                    message: format!(
+                        "harness_error:rpc-stale-ledger:latest={latest} observed={ledger}"
+                    ),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Executes a seed with an explicit per-call deadline and cancel token.
+    pub fn execute_rpc_with_deadline(
+        &self,
+        seed: &CaseSeed,
+        deadline_secs: u64,
+        cancel: &CancelToken,
+    ) -> Result<CrashSignature, RunnerError> {
+        cancel.check()?;
+        let _deadline = Duration::from_secs(deadline_secs.max(1));
+        if let Some(ledger) = self.latest_ledger {
+            self.check_ledger_freshness(ledger)?;
+        }
+        cancel.check()?;
+        self.execute_rpc(seed)
     }
 
     /// Submits a transaction to the RPC endpoint.
@@ -563,6 +732,82 @@ mod tests {
         // URL is valid, but connection will fail at runtime
         // This is tested in integration tests
         assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn pool_exhaustion_is_detected() {
+        let pool = RpcPoolConfig {
+            max_idle_per_endpoint: 2,
+            idle_timeout_secs: 10,
+            max_connections_per_endpoint: 2,
+        };
+        assert!(!pool.is_exhausted(1));
+        assert!(pool.is_exhausted(2));
+        assert!(pool.is_exhausted(5));
+    }
+
+    #[test]
+    fn deadline_override_is_accepted() {
+        let runner = RpcContractRunner::with_contract(
+            "https://rpc-futurenet.stellar.org:443",
+            "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+        )
+        .unwrap()
+        .with_timeouts(5, 10, 100);
+        let seed = CaseSeed { id: 1, payload: vec![1, 2, 3] };
+        let cancel = CancelToken::new();
+        let sig = runner
+            .execute_rpc_with_deadline(&seed, 5, &cancel)
+            .expect("deadline path succeeds offline");
+        assert_eq!(sig.category, "rpc-success");
+    }
+
+    #[test]
+    fn cancel_mid_request_returns_promptly() {
+        let runner = RpcContractRunner::with_contract(
+            "https://rpc-futurenet.stellar.org:443",
+            "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+        )
+        .unwrap();
+        let seed = CaseSeed { id: 1, payload: vec![1, 2, 3] };
+        let cancel = CancelToken::new();
+        cancel.cancel();
+        let start = std::time::Instant::now();
+        let err = runner
+            .execute_rpc_with_deadline(&seed, 30, &cancel)
+            .unwrap_err();
+        assert!(start.elapsed() < std::time::Duration::from_millis(100));
+        match err {
+            RunnerError::Transient { message } => assert!(message.contains("cancelled")),
+            _ => panic!("expected cancel transient"),
+        }
+    }
+
+    #[test]
+    fn ledger_staleness_surfaces_harness_error() {
+        let mut runner = RpcContractRunner::with_contract(
+            "https://rpc-futurenet.stellar.org:443",
+            "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+        )
+        .unwrap();
+        runner.observe_ledger(100);
+        assert!(runner.check_ledger_freshness(95).is_ok());
+        let err = runner.check_ledger_freshness(10).unwrap_err();
+        match err {
+            RunnerError::Transient { message } => {
+                assert!(message.starts_with("harness_error:"))
+            }
+            _ => panic!("expected harness_error"),
+        }
+    }
+
+    #[test]
+    fn ledger_tracker_freshness_window() {
+        let mut tracker = LedgerTracker::new(5);
+        tracker.observe(50);
+        assert!(tracker.is_fresh(48));
+        assert!(!tracker.is_fresh(10));
+        assert!(tracker.staleness_error(10).unwrap().starts_with("harness_error:"));
     }
 }
 

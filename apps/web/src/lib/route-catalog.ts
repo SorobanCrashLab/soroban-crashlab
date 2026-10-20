@@ -29,6 +29,7 @@ export type RateLimitClass = 'default' | 'strict' | 'lenient' | 'none';
 
 export interface RouteCapability {
   /** Mutating requests are role-gated; read-only entries omit this. */
+  /** Absent for read-only endpoints: a token scope is enough. */
   role?: UserRole;
   scopes?: ApiTokenScope[];
 }
@@ -75,6 +76,9 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('GET', '/api/campaigns/[id]/timeline', 'session', null, 'default'),
   r('GET', '/api/capacity', 'public', null, 'default'),
   r('POST', '/api/capacity/usage', 'token', { role: 'analyst' }, 'default'),
+  r('GET', '/api/capacity', 'public', null, 'default'),
+  r('POST', '/api/capacity/usage', 'token', { role: 'analyst' }, 'default'),
+  r('POST', '/api/csp-report', 'public', null, 'strict'),
   r('GET', '/api/database/migrations', 'session', null, 'default'),
   r('POST', '/api/database/migrations', 'session', { role: 'analyst' }, 'default'),
   r('GET', '/api/health', 'public', null, 'none'),
@@ -120,6 +124,11 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('GET', '/api/openapi', 'public', null, 'default'),
   r('GET', '/api/runs', 'session', { scopes: ['runs:read'] }, 'default'),
   r('POST', '/api/runs', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
+  r('GET', '/api/replay-jobs/[id]', 'session', { scopes: ['runs:read'] }, 'default'),
+  r('GET', '/api/replay-jobs/[id]/stream', 'session', { scopes: ['runs:read'] }, 'default'),
+  r('GET', '/api/runs', 'session', { scopes: ['runs:read'] }, 'default'),
+  r('POST', '/api/runs', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
+  r('GET', '/api/runs/compare', 'session', { scopes: ['runs:read'] }, 'default'),
   r('GET', '/api/runs/[id]', 'session', { scopes: ['runs:read'] }, 'default'),
   // Reserved policy: the destructive verb is pre-registered at maintainer so a
   // future DELETE handler cannot land under the permissive fallback.
@@ -127,6 +136,7 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('DELETE', '/api/runs/[id]/annotations', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
   r('GET', '/api/runs/[id]/annotations', 'session', { scopes: ['runs:read'] }, 'default'),
   r('POST', '/api/runs/[id]/annotations', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
+  r('GET', '/api/runs/[id]/clusters', 'session', { scopes: ['runs:read'] }, 'default'),
   r('DELETE', '/api/runs/[id]/issues', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
   r('GET', '/api/runs/[id]/issues', 'session', { scopes: ['runs:read'] }, 'default'),
   r('POST', '/api/runs/[id]/issues', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
@@ -161,6 +171,8 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('POST', '/api/settings/tokens', 'session', { role: 'maintainer', scopes: ['settings:write'] }, 'default'),
   r('POST', '/api/settings/tokens/[id]/revoke', 'session', { role: 'maintainer', scopes: ['settings:write'] }, 'default'),
   r('POST', '/api/settings/tokens/[id]/rotate', 'session', { role: 'maintainer', scopes: ['settings:write'] }, 'default'),
+  r('GET', '/api/triage/queue', 'session', { role: 'analyst' }, 'default'),
+  r('POST', '/api/triage/queue', 'session', { role: 'analyst' }, 'default'),
   r('GET', '/api/uploadthing', 'token', null, 'default'),
   r('POST', '/api/uploadthing', 'token', { role: 'analyst' }, 'default'),
   r('DELETE', '/api/webhooks', 'token', { role: 'maintainer', scopes: ['webhook:write'] }, 'default'),

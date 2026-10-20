@@ -2434,6 +2434,178 @@
         ]
       }
     },
+    "/api/replay-jobs/{id}": {
+      "get": {
+        "description": "Get a replay job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Get a replay job",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/replay-jobs/{id}/stream": {
+      "get": {
+        "description": "Stream replay job progress (SSE)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Stream replay job progress (SSE)",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
     "/api/runs": {
       "get": {
         "description": "Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20). Envelope: { data: { runs, total, nextCursor, hasMore }, total }.",
@@ -2623,6 +2795,83 @@
           }
         ],
         "summary": "Create a fuzzing run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/compare": {
+      "get": {
+        "description": "Side-by-side delta for ?base=<id>&candidate=<id>: metadata, coverage, crash signature and per-field verdicts.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Compare two runs field by field",
         "tags": [
           "runs"
         ]
@@ -4141,6 +4390,158 @@
         "summary": "Rotate an API token",
         "tags": [
           "settings"
+        ]
+      }
+    },
+    "/api/triage/queue": {
+      "get": {
+        "description": "List the triage queue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List the triage queue",
+        "tags": [
+          "runs"
+        ]
+      },
+      "post": {
+        "description": "Update a triage queue item",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Update a triage queue item",
+        "tags": [
+          "runs"
         ]
       }
     },

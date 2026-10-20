@@ -130,6 +130,7 @@
     "test:e2e:update-snapshots": "playwright test --update-snapshots",
     "test:visual": "playwright test --config playwright.visual.config.ts",
     "test:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots"
+    "test:error-boundary": "npx tsc src/components/error-boundary-utils.ts src/components/error-boundary-utils.test.ts --skipLibCheck --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react && node build/test-tmp/components/error-boundary-utils.test.js"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.75.2",

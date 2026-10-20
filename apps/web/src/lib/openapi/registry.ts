@@ -55,6 +55,10 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('POST', '/api/runs', 'bearer-or-maintainer', 'Create a fuzzing run', ['runs'], ['VALIDATION_ERROR', 'UNAUTHORIZED', 'FORBIDDEN'], {
     scopes: ['write'],
   }),
+  r('GET', '/api/runs/compare', 'bearer', 'Compare two runs field by field', ['runs'], ['VALIDATION_ERROR', 'RUN_NOT_FOUND'], {
+    scopes: ['read'],
+    description: 'Side-by-side delta for ?base=<id>&candidate=<id>: metadata, coverage, crash signature and per-field verdicts.',
+  }),
   r('GET', '/api/runs/{id}', 'bearer', 'Get a single run', ['runs'], ['RUN_NOT_FOUND', 'RUN_ID_REQUIRED', 'UNAUTHORIZED'], {
     scopes: ['read'],
   }),
@@ -70,6 +74,10 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('POST', '/api/runs/{id}/replay', 'bearer-or-maintainer', 'Replay a crashed run (maintainer)', ['runs'], ['RUN_NOT_FOUND', 'FORBIDDEN'], { scopes: ['write'] }),
   r('GET', '/api/runs/{id}/replay-history', 'bearer', 'Replay history for a run', ['runs'], ['RUN_NOT_FOUND'], { scopes: ['read'] }),
   r('GET', '/api/runs/{id}/stream', 'bearer', 'Stream run progress (SSE)', ['runs'], ['RUN_NOT_FOUND'], { scopes: ['read'] }),
+  r('GET', '/api/replay-jobs/{id}', 'bearer', 'Get a replay job', ['runs'], ['NOT_FOUND', 'UNAUTHORIZED'], { scopes: ['read'] }),
+  r('GET', '/api/replay-jobs/{id}/stream', 'bearer', 'Stream replay job progress (SSE)', ['runs'], ['NOT_FOUND', 'UNAUTHORIZED'], { scopes: ['read'] }),
+  r('GET', '/api/triage/queue', 'bearer', 'List the triage queue', ['runs'], ['UNAUTHORIZED'], { scopes: ['read'] }),
+  r('POST', '/api/triage/queue', 'bearer-or-maintainer', 'Update a triage queue item', ['runs'], ['VALIDATION_ERROR', 'NOT_FOUND', 'FORBIDDEN'], { scopes: ['write'] }),
   r('GET', '/api/artifacts', 'bearer', 'List artifacts', ['artifacts'], ['UNAUTHORIZED'], { paginated: true, scopes: ['read'] }),
   r('POST', '/api/artifacts', 'bearer', 'Upload an artifact bundle', ['artifacts'], ['ARTIFACT_MISSING_BUNDLE_FIELD', 'ARTIFACT_PAYLOAD_TOO_LARGE'], { scopes: ['write'] }),
   r('GET', '/api/artifacts/{id}', 'bearer', 'Get an artifact', ['artifacts'], ['NOT_FOUND'], { scopes: ['read'] }),
