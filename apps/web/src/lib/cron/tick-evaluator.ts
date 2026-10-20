@@ -42,6 +42,11 @@ export interface DeferredSchedule {
   campaignClass: CampaignClass;
   /** Seconds until the window opens and the deferred run fires. */
   opensInSeconds: number;
+  /** Run-shaped details, supplied when the deferred slot is ledgered. */
+  id?: string;
+  scheduleName?: string;
+  scheduledFor?: string;
+  executedAt?: string;
 }
 
 export interface TickOutcome {

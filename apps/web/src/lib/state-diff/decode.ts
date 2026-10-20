@@ -140,7 +140,7 @@ export function decodeStorageValue(raw: string | null | undefined): DecodedValue
     return { kind: 'address', value: bytesToHex(bytes), display };
   }
 
-  const text = decodeUtf8(rytes);
+  const text = decodeUtf8(bytes);
   if (text !== null) {
     return { kind: 'string', value: text, display: text };
   }
@@ -156,9 +156,9 @@ export function decodeStorageValue(raw: string | null | undefined): DecodedValue
 
 /** Decodes big-endian two's complement bytes to a bigint. */
 export function bigIntFromBytes(bytes: Uint8Array): bigint {
-  let value = Bigint(0);
-  for (const byte of bytes) value = (value << Bigint(8)) | Bigint(byte);
-  const bits = Bigint(bytes.length * 8);
+  let value = BigInt(0);
+  for (const byte of bytes) value = (value << BigInt(8)) | BigInt(byte);
+  const bits = BigInt(bytes.length * 8);
   const signBit = BigInt(1) << (bits - BigInt(1));
   if (value & signBit) value -= BigInt(1) << bits;
   return value;

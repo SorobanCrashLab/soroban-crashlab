@@ -35,7 +35,8 @@ export type AuditAction =
   | 'auth.login'
   | 'auth.login.denied'
   | 'auth.role.grant'
-  | 'tenant.access.denied';
+  | 'tenant.access.denied'
+  | 'quota.override';
 
 /** Used when no principal could be resolved — availability over attribution. */
 export const SYSTEM_ACTOR = 'system';

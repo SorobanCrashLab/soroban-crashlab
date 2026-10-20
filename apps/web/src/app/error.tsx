@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { isIdlempotencyError } from '@/lib/idempotency-key';
+import { isIdempotencyError } from '@/lib/idempotency-key';
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -29,8 +29,8 @@ export default function HomeError({ error, reset }: ErrorProps) {
           Something went wrong
         </h2>
         <p className="text-sm text-red-700 dark:text-red-300 mb-4">
-          {isIdlempotencyError(error)
-            ? IEEMP_RETRY_HINT
+          {isIdempotencyError(error)
+            ? IDEMP_RETRY_HINT
             : 'An unexpected error occurred. You can retry or return to the dashboard.'}
         </p>
         <div className="flex flex-wrap justify-center gap-3">

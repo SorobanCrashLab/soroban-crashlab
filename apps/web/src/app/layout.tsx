@@ -5,6 +5,7 @@ import { NONCE_HEADER } from "../lib/csp";
 import { fontVariables } from "./fonts";
 import { ThemeProvider } from "../components/ThemeProvider";
 import { AccessibilityProvider } from "../components/AccessibilityProvider";
+import A11yShell from "../components/a11y/A11yShell";
 import { LocaleProvider } from "../i18n/context";
 import { ToastProvider } from "../components/Toast";
 import NavBar from "../components/NavBar";
@@ -107,6 +108,7 @@ export default async function RootLayout({
           <ThemeProvider>
             <AccessibilityProvider>
               <ToastProvider>
+                <A11yShell>
               <NavBar />
               <AddKeyboardShortcutCheatsheetModal />
               <CommandPalette />
@@ -118,6 +120,7 @@ export default async function RootLayout({
                   </PageTransition>
                 </main>
               </GlobalScrollEffects>
+              </A11yShell>
               </ToastProvider>
             </AccessibilityProvider>
           </ThemeProvider>

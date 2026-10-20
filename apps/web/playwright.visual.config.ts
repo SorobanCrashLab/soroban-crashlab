@@ -39,7 +39,7 @@ export default defineConfig({
     ['html', { open: 'never', outputFolder: 'playwright-report-visual' }],
     ['json', { outputFile: 'test-results-visual/results.json' }],
     ['junit', { outputFile: 'test-results-visual/junit.xml' }],
-    ...(process.env.CI ? [['github']] : []),
+    ...(process.env.CI ? [['github'] as const] : []),
   ],
   use: {
     baseURL: 'http://localhost:3077',

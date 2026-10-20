@@ -1,4 +1,4 @@
-import { createUploadThing, type FileRouter } from 'uploadthing/next';
+import { createUploadthing, type FileRouter } from 'uploadthing/next';
 import { UploadThingError, UTApi } from 'uploadthing/server';
 import { z } from 'zod';
 import { isRedisConfigured, getRedis } from '@/lib/redis';
@@ -25,7 +25,7 @@ function isUploadRejection(data: unknown): data is UploadRejectionData {
   return typeof data === 'object' && data !== null && 'uploadRejection' in data;
 }
 
-const f = createUploadThing({
+const f = createUploadthing({
   // Gate rejections carry the standard `{ error, code }` envelope fields; the
   // route re-emits them as 422 (#1636). `message` stays for the SDK client.
   errorFormatter: (err) =>
@@ -36,7 +36,7 @@ const f = createUploadThing({
 
 function assertA11Budget(violations: ReadonlyArray<{ impact?: string | null }>): void {
   const failing = violations.filter((v) =>
-    v.impact != null && (A1YY_FAIL_IMPACTS as readonly string[]).includes(v.impact),
+    v.impact != null && (A1Y_FAIL_IMPACTS as readonly string[]).includes(v.impact),
   );
   if (failing.length > 0) {
     throw new Error(`a11y gate: ${failing.length} critical/serious violation(s)`);

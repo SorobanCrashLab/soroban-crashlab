@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const login = await client.complete({ code: params.get('code'), state: params.get('state'), cookieState });
-    const session = await issueDidcSession(login.identity);
+    const session = await issueOidcSession(login.identity);
     if (!session) return clearState(errorResponse('External sign-in sessions are not configured.', 503));
 
     // Resolve the post-auth redirect target from the 'next' query param,

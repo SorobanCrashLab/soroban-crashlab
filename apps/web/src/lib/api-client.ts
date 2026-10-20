@@ -141,6 +141,8 @@ export const api = {
       const qs = new URLSearchParams();
       if (opts.cursor) qs.set('cursor', opts.cursor);
       if (opts.limit != null) qs.set('limit', String(opts.limit));
+      if (opts.sort) qs.set('sort', opts.sort);
+      if (opts.order) qs.set('order', opts.order);
       const path = qs.toString() ? `/runs?${qs.toString()}` : '/runs';
       return dedupedFetchJson<unknown>(apiUrl(path), resolvedSignal).then((payload) =>
         unwrapApiPayload(payload, apiUrl(path), RunsListResponseSchema),
@@ -279,6 +281,14 @@ export interface FetchRunsOptions {
   cursor?: string | null;
   /** Maximum number of runs to return (default: server-side default). */
   limit?: number;
+  /**
+   * Server-side sort key (#1875). Must be one of `RUN_SORT_FIELDS`; the API
+   * falls back to `queuedAt` for unknown values. The keyset cursor is bound to
+   * the sort key, so change the sort only with a fresh cursor.
+   */
+  sort?: string;
+  /** Server-side sort direction (`asc` | `desc`, default `desc`). */
+  order?: 'asc' | 'desc';
 }
 
 /**
