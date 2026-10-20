@@ -47,6 +47,9 @@ pub struct CaseBundleDocument {
     /// Shrink delta metadata linking `original_seed` to `seed` (#1866).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shrink_lineage: Option<ShrinkLineage>,
+    /// Mutation engine version that produced this bundle (#1794).
+    #[serde(default)]
+    pub engine_version: String,
 }
 
 /// Errors from loading or saving a bundle.
@@ -109,6 +112,11 @@ impl From<std::io::Error> for BundlePersistError {
 impl CaseBundleDocument {
     /// Builds a document from an in-memory bundle using the current schema version.
     pub fn from_bundle(bundle: &CaseBundle) -> Self {
+        let engine_version = if bundle.engine_version.is_empty() {
+            crate::engine_version::ENGINE_VERSION.to_string()
+        } else {
+            bundle.engine_version.clone()
+        };
         Self {
             schema: CASE_BUNDLE_SCHEMA_VERSION,
             seed: bundle.seed.clone(),
@@ -119,6 +127,7 @@ impl CaseBundleDocument {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+            engine_version,
         }
     }
 
@@ -172,12 +181,18 @@ impl CaseBundleDocument {
         if !SUPPORTED_BUNDLE_SCHEMAS.contains(&self.schema) {
             return Err(BundlePersistError::UnsupportedSchema { found: self.schema });
         }
+        let engine_version = if self.engine_version.is_empty() {
+            "unknown".to_string()
+        } else {
+            self.engine_version
+        };
         Ok(CaseBundle {
             seed: self.seed,
             signature: self.signature,
             environment: self.environment,
             failure_payload: self.failure_payload,
             rpc_envelope: self.rpc_envelope,
+            engine_version,
         })
     }
 }
@@ -336,6 +351,7 @@ mod tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+            engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
         let bytes = serde_json::to_vec(&doc).unwrap();
         let err = load_case_bundle_json(&bytes).unwrap_err();

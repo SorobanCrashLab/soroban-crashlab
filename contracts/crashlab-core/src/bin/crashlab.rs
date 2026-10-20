@@ -16,7 +16,8 @@ use crashlab_core::{
     RUN_CHECKPOINT_SCHEMA_VERSION, CampaignPreset, CancelSignal, SeededPrng, WorkerPartition,
     cancel_marker_path, cancel_requested, create_runner, default_state_dir, drive_run,
     drive_run_from_checkpoint, drive_run_partitioned_from_checkpoint, load_run_checkpoint_json,
-    read_health_snapshot_log, read_latest_health_snapshot_line, replay_mismatch_message, replay_seed_bundle_path,
+    read_health_snapshot_log, read_latest_health_snapshot_line, replay_mismatch_message,
+    replay_seed_bundle_path_checked,
     replay_success_message, request_cancel_run, run_regression_suite_from_json,
     save_run_checkpoint_json,
     HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
@@ -122,12 +123,8 @@ fn main() {
             }
         }
         (Some("replay"), Some("seed"), Some(path), None) => {
-            if !rest.is_empty() {
-                print_usage();
-                std::process::exit(1);
-            }
-
-            match replay_seed_bundle_path(path) {
+            let accept_mismatch = rest.iter().any(|a| a == "--accept-engine-mismatch");
+            match replay_seed_bundle_path_checked(path, accept_mismatch) {
                 Ok(result) if result.matches => {
                     println!("{}", replay_success_message(&result));
                 }
@@ -1215,13 +1212,17 @@ fn parse_u32(raw: &str, flag: &str) -> Result<u32, String> {
 /// ring partitioning has been swept yet" and is exactly how a v1 checkpoint is
 /// interpreted on load.
 fn snapshot_checkpoint(campaign_id: &str, next_seed_index: u64, total_seeds: usize) -> RunCheckpoint {
-    RunCheckpoint {
+    let mut cp = RunCheckpoint {
         schema: RUN_CHECKPOINT_SCHEMA_VERSION,
         campaign_id: campaign_id.to_string(),
         next_seed_index: next_seed_index as usize,
         total_seeds,
         ring_coverage: RingCoverage::new(),
-    }
+        generation: 0,
+        crc32: 0,
+    };
+    cp.refresh_crc32();
+    cp
 }
 
 /// Writes `checkpoint` so a reader never observes a partial file (ADR-0008).

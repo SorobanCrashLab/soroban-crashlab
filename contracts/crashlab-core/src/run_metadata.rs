@@ -61,7 +61,7 @@ impl RunMetadata {
             timeout_ms,
             name,
             run_id: None,
-            engine_version: None,
+            engine_version: Some(crate::engine_version::ENGINE_VERSION.to_string()),
             environment_fingerprint_hash: None,
         }
     }

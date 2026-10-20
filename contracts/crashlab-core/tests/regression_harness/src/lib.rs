@@ -33,6 +33,7 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+        engine_version: crashlab_core::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let result = replay_seed_bundle(&bundle);

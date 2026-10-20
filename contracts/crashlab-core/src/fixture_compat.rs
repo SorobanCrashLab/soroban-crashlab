@@ -204,6 +204,7 @@ mod tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         }
     }
 
@@ -404,6 +405,7 @@ mod tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
         // Corrupt the stored hash.
         doc.signature.signature_hash = doc.signature.signature_hash.wrapping_add(1);
@@ -460,6 +462,7 @@ mod tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
         let mut bad_doc = good_doc.clone();
         bad_doc.signature.signature_hash = bad_doc.signature.signature_hash.wrapping_add(7);

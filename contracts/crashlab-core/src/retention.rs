@@ -35,6 +35,8 @@ pub enum ArtifactClass {
     Trace,
     /// Raw seed inputs.
     RawSeed,
+    /// Generic raw artifacts (legacy backends).
+    Raw,
     /// Aggregated statistics.
     AggregatedStats,
     /// Audit logs.
@@ -48,8 +50,27 @@ impl ArtifactClass {
             ArtifactClass::Bundle => "bundle",
             ArtifactClass::Trace => "trace",
             ArtifactClass::RawSeed => "raw_seed",
+            ArtifactClass::Raw => "raw",
             ArtifactClass::AggregatedStats => "aggregated_stats",
             ArtifactClass::Audit => "audit",
+        }
+    }
+
+    /// Classifies an artifact id into a class by prefix convention.
+    pub fn classify(id: &str) -> ArtifactClass {
+        let lower = id.to_lowercase();
+        if lower.starts_with("bundle") || lower.starts_with("crash") {
+            ArtifactClass::Bundle
+        } else if lower.starts_with("trace") {
+            ArtifactClass::Trace
+        } else if lower.starts_with("seed") {
+            ArtifactClass::RawSeed
+        } else if lower.starts_with("stat") {
+            ArtifactClass::AggregatedStats
+        } else if lower.starts_with("audit") || lower.starts_with("log") {
+            ArtifactClass::Audit
+        } else {
+            ArtifactClass::Raw
         }
     }
 }
@@ -78,6 +99,7 @@ pub struct ClassPolicies {
     pub bundle: ClassPolicy,
     pub trace: ClassPolicy,
     pub raw_seed: ClassPolicy,
+    pub raw: ClassPolicy,
     pub aggregated_stats: ClassPolicy,
     pub audit: ClassPolicy,
 }
@@ -96,6 +118,10 @@ impl Default for ClassPolicies {
             raw_seed: ClassPolicy {
                 ttl: Some(Duration::days(7)),
                 min_count: 3,
+            },
+            raw: ClassPolicy {
+                ttl: Some(Duration::days(7)),
+                min_count: 1,
             },
             aggregated_stats: ClassPolicy {
                 ttl: Some(Duration::days(90)),
@@ -116,6 +142,7 @@ impl ClassPolicies {
             ArtifactClass::Bundle => &self.bundle,
             ArtifactClass::Trace => &self.trace,
             ArtifactClass::RawSeed => &self.raw_seed,
+            ArtifactClass::Raw => &self.raw,
             ArtifactClass::AggregatedStats => &self.aggregated_stats,
             ArtifactClass::Audit => &self.audit,
         }
@@ -488,6 +515,7 @@ mod tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+            engine_version: String::new(),
         }
     }
 

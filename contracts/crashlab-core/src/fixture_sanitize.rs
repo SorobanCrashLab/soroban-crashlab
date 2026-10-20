@@ -580,6 +580,7 @@ pub fn sanitize_bundle_with_context(
         environment: bundle.environment.clone(),
         failure_payload,
         rpc_envelope: None,
+    engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
     };
 
     (sanitized, report)
@@ -621,6 +622,7 @@ pub fn sanitize_and_validate_bundle(
         provenance: None,
         original_seed: None,
         shrink_lineage: None,
+    engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
     };
     let json = serde_json::to_vec(&doc).map_err(|e| {
         SanitizationError::LoadFailed(format!("serialize: {e}"))
@@ -665,6 +667,7 @@ pub fn sanitize_bundle_document_for_sharing(bundle: &CaseBundle) -> CaseBundleDo
         provenance: None,
         original_seed: None,
         shrink_lineage: None,
+    engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
     }
 }
 
@@ -781,6 +784,7 @@ mod tests {
             environment: None,
             failure_payload: b"Authorization: Bearer super-secret-token\npanic: trap".to_vec(),
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let sanitized = sanitize_bundle_for_sharing(&bundle);
@@ -805,6 +809,7 @@ mod tests {
             environment: None,
             failure_payload: b"Set-Cookie: session=abc123; Path=/".to_vec(),
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let sanitized = sanitize_bundle_for_sharing(&bundle);
@@ -832,6 +837,7 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let sanitized = sanitize_bundle_for_sharing(&bundle);
@@ -855,6 +861,7 @@ mod tests {
             environment: None,
             failure_payload: b"cookie=session-123".to_vec(),
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let json = String::from_utf8(save_sanitized_case_bundle_json(&bundle).unwrap()).unwrap();
@@ -878,6 +885,7 @@ mod tests {
             environment: None,
             failure_payload: b"Authorization: Bearer super-secret-token".to_vec(),
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let sanitized_bundle = sanitize_bundle_for_sharing(&bundle);
@@ -911,6 +919,7 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let scenario = sanitized_failure_scenario(&bundle, "public");
@@ -1026,6 +1035,7 @@ mod tests {
             environment: None,
             failure_payload: failure.to_vec(),
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let (sanitized, report) = sanitize_bundle_with_context(&bundle, &ctx);
@@ -1050,6 +1060,7 @@ mod tests {
             environment: None,
             failure_payload: b"token=secret123\nhost=prod".to_vec(),
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let (sanitized, report) = sanitize_bundle_with_context(&bundle, &ctx);
@@ -1072,6 +1083,7 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let result = sanitize_and_validate_bundle(&bundle, &SanitizationContext::default());
@@ -1094,6 +1106,7 @@ mod tests {
                 environment: None,
                 failure_payload: vec![],
                 rpc_envelope: None,
+            engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
             }
         };
         let bundles = vec![make_bundle(3), make_bundle(1), make_bundle(2)];

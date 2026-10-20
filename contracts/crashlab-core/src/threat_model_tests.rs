@@ -304,6 +304,7 @@ mod threat_model_tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -335,6 +336,7 @@ mod threat_model_tests {
                 provenance: None,
                 original_seed: None,
                 shrink_lineage: None,
+            engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
             };
 
             let bytes = serde_json::to_vec(&doc).unwrap();
@@ -359,6 +361,7 @@ mod threat_model_tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -385,6 +388,7 @@ mod threat_model_tests {
             provenance: None,
             original_seed: None,
             shrink_lineage: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let bytes = serde_json::to_vec(&doc).unwrap();
@@ -770,6 +774,7 @@ mod threat_model_tests {
                     provenance: None,
                     original_seed: None,
                     shrink_lineage: None,
+                engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
                 }
             })
             .collect();
