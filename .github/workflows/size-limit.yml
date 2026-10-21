@@ -88,7 +88,7 @@ jobs:
       # this step 403s. The audit still ran and the table is in the job
       # summary — the budget result must decide the job, not the comment.
       - name: Post sticky bundle analysis comment
-        if: always() && github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -133,4 +133,3 @@ jobs:
         run: |
           echo "::error::Bundle size limit exceeded! See the PR comment, job summary, and download the 'bundle-analysis-report' artifact to inspect the visual treemap."
           exit 1
-
