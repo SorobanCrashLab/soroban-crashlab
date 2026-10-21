@@ -9,6 +9,7 @@ import { selectRunStorageDriver } from '@/lib/storage';
 import { paginateKeyset, getRunKeyset, isLegacyOrInvalidCursor } from '@/app/pagination-utils';
 import { FuzzingRunSchema } from '@/lib/schemas/runs';
 import { isRedisConfigured } from '@/lib/redis';
+import { withCsrfProtection } from '@/lib/csrf';
 
 const DEFAULT_PAGE_LIMIT = 20;
 
@@ -88,7 +89,7 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
   return withFixtureCaching(request, { data, total: data.total });
 });
 
-export const POST = withRouteErrorHandling('POST /api/runs', async (request: Request) => {
+export const POST = withRouteErrorHandling('POST /api/runs', withCsrfProtection(async (request: Request) => {
   if (!isRedisConfigured()) {
     return errorResponse('Storage not configured', status.serviceUnavailable);
   }
@@ -107,4 +108,4 @@ export const POST = withRouteErrorHandling('POST /api/runs', async (request: Req
   }
 
   return createdResponse({ run: result.data });
-});
+}));

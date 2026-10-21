@@ -16,7 +16,7 @@ pub const MAX_CORPUS_JSON_BYTES: usize = crate::bundle_persist::MAX_BUNDLE_JSON_
 /// Seed with content-addressed integrity metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AddressedSeed {
-    pub id: u32,
+    pub id: u64,
     pub payload: Vec<u8>,
     pub size: usize,
     pub hash: String,
@@ -35,9 +35,9 @@ pub struct CorpusArchive {
 #[derive(Debug, Clone)]
 pub enum CorpusVerifyStatus {
     Valid,
-    Corrupt { seed_id: u32, reason: String },
-    Missing { seed_id: u32 },
-    Orphaned { seed_id: u32 },
+    Corrupt { seed_id: u64, reason: String },
+    Missing { seed_id: u64 },
+    Orphaned { seed_id: u64 },
 }
 
 /// Errors from loading a corpus archive.

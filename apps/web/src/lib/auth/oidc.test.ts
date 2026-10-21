@@ -10,6 +10,7 @@ import { OidcClient, oidcIdentity, type OidcConfig } from './oidc';
 import { resetDiscoveryCache, validateDiscovery } from './oidc-discovery';
 import { mapClaimsToRole, parseRoleMapping } from './oidc-role-mapping';
 import { issueOidcSession, OIDC_SESSION_MAX_AGE_SECONDS, verifyOidcSession } from './oidc-session';
+import { InMemoryRecordDriver, resetRecordDriver, setRecordDriver } from '../storage/record-driver';
 
 const ISSUER = 'https://idp.test';
 const CLIENT_ID = 'crashlab-web';
@@ -406,6 +407,7 @@ describe('role mapping', () => {
 describe('OIDC session cookie', () => {
   it('round-trips, rejects tampering and expires', async () => {
     process.env.CRASHLAB_OIDC_SESSION_SECRET = 'test-secret';
+    setRecordDriver(new InMemoryRecordDriver());
     try {
       const session = (await issueOidcSession('id-1', T0))!;
       expect(await verifyOidcSession(session, T0)).toBe('id-1');
@@ -414,6 +416,7 @@ describe('OIDC session cookie', () => {
       expect(await verifyOidcSession(session, T0 + (OIDC_SESSION_MAX_AGE_SECONDS + 1) * 1000)).toBeNull();
     } finally {
       delete process.env.CRASHLAB_OIDC_SESSION_SECRET;
+      resetRecordDriver();
     }
   });
 });

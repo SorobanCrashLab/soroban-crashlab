@@ -25,10 +25,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 /// Version of the snapshot line format written by this crate.
-pub const HEALTH_SNAPSHOT_SCHEMA_VERSION: u32 = 2;
+pub const HEALTH_SNAPSHOT_SCHEMA_VERSION: u32 = 3;
 
 /// Schema versions [`HealthSnapshot::from_json_line`] accepts.
-pub const SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS: &[u32] = &[HEALTH_SNAPSHOT_SCHEMA_VERSION, 1];
+pub const SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS: &[u32] = &[HEALTH_SNAPSHOT_SCHEMA_VERSION, 2, 1];
 
 /// Maximum number of malformed complete records tolerated before a log is
 /// considered too corrupt to use.
@@ -40,6 +40,19 @@ pub const HEALTH_SNAPSHOT_FILE: &str = "health.jsonl";
 /// Snapshots are written at most once per this many processed seeds unless the
 /// caller overrides the interval.
 pub const DEFAULT_SNAPSHOT_INTERVAL_SEEDS: u64 = 100;
+
+/// Maximum recent per-seed host diagnostic records echoed into each snapshot.
+pub const MAX_SEED_DIAGNOSTIC_ECHOES: usize = 16;
+
+/// Maximum UTF-8 byte length retained for a diagnostic frame summary.
+pub const MAX_DIAGNOSTIC_FRAME_SUMMARY_BYTES: usize = 128;
+
+/// A bounded diagnostic echo tied to its stable seed index in the run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SeedDiagnosticEcho {
+    pub seed_index: u64,
+    pub diagnostics: crate::HostDiagnostics,
+}
 
 /// How much campaign is left, in seeds.
 ///
@@ -87,6 +100,16 @@ pub struct HealthSnapshot {
     pub failure_classes: BTreeMap<String, u64>,
     pub queue: QueueMetrics,
     pub budget: BudgetSnapshot,
+    /// Expired partition leases reclaimed by this run.
+    #[serde(default)]
+    pub reclaimed_leases: u64,
+    /// Writes rejected because their worker lease had expired or been fenced.
+    #[serde(default)]
+    pub zombie_writes: u64,
+    /// Recent host diagnostics keyed by stable seed index. Missing from
+    /// snapshots written before diagnostic echoes were introduced.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seed_diagnostic_echoes: Vec<SeedDiagnosticEcho>,
 }
 
 impl HealthSnapshot {
@@ -113,6 +136,9 @@ impl HealthSnapshot {
             failure_classes: summary.failure_classes,
             queue: summary.queue,
             budget: BudgetSnapshot::new(total_seeds, seeds_processed),
+            reclaimed_leases: 0,
+            zombie_writes: 0,
+            seed_diagnostic_echoes: Vec::new(),
         }
     }
 
@@ -125,6 +151,29 @@ impl HealthSnapshot {
     /// Marks this as the final snapshot, recording how the loop ended.
     pub fn with_terminal(mut self, terminal: impl Into<String>) -> Self {
         self.terminal = Some(terminal.into());
+        self
+    }
+
+    /// Adds the persisted partition lease counters to the snapshot.
+    pub fn with_partition_lease_counts(
+        mut self,
+        reclaimed_leases: u64,
+        zombie_writes: u64,
+    ) -> Self {
+        self.reclaimed_leases = reclaimed_leases;
+        self.zombie_writes = zombie_writes;
+        self
+    }
+
+    /// Adds one diagnostic echo, retaining only the most recent bounded set.
+    /// A repeated seed index replaces its prior record rather than creating an
+    /// ambiguous duplicate.
+    pub fn with_seed_diagnostic_echo(
+        mut self,
+        seed_index: u64,
+        diagnostics: crate::HostDiagnostics,
+    ) -> Self {
+        push_seed_diagnostic_echo(&mut self.seed_diagnostic_echoes, seed_index, diagnostics);
         self
     }
 
@@ -164,7 +213,10 @@ pub enum HealthSnapshotError {
         found: u32,
         supported: &'static [u32],
     },
-    CorruptLog { corrupt_lines: usize, threshold: usize },
+    CorruptLog {
+        corrupt_lines: usize,
+        threshold: usize,
+    },
 }
 
 impl std::fmt::Display for HealthSnapshotError {
@@ -265,14 +317,23 @@ pub fn read_health_snapshot_log(
     let path = health_snapshot_path(run_id, base);
     let contents = match fs::read_to_string(&path) {
         Ok(contents) => contents,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(HealthSnapshotLog {
-            snapshots: Vec::new(), degraded: false, truncated_tail: false, corrupt_lines: 0,
-        }),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            return Ok(HealthSnapshotLog {
+                snapshots: Vec::new(),
+                degraded: false,
+                truncated_tail: false,
+                corrupt_lines: 0,
+            })
+        }
         Err(err) => return Err(err.into()),
     };
 
     let truncated_tail = !contents.is_empty() && !contents.ends_with('\n');
-    let complete = if truncated_tail { contents.rsplit_once('\n').map_or("", |(prefix, _)| prefix) } else { contents.as_str() };
+    let complete = if truncated_tail {
+        contents.rsplit_once('\n').map_or("", |(prefix, _)| prefix)
+    } else {
+        contents.as_str()
+    };
     let mut snapshots = Vec::new();
     let mut corrupt_lines = 0;
     for line in complete.lines().filter(|line| !line.trim().is_empty()) {
@@ -308,7 +369,10 @@ pub fn read_latest_health_snapshot(
     run_id: RunId,
     base: impl AsRef<Path>,
 ) -> Result<Option<HealthSnapshot>, HealthSnapshotError> {
-    Ok(read_health_snapshot_log(run_id, base)?.snapshots.into_iter().next_back())
+    Ok(read_health_snapshot_log(run_id, base)?
+        .snapshots
+        .into_iter()
+        .next_back())
 }
 
 /// Reads the newest snapshot line in `run_id`'s log verbatim, or `None` when
@@ -324,17 +388,23 @@ pub fn read_latest_health_snapshot_line(
     run_id: RunId,
     base: impl AsRef<Path>,
 ) -> Result<Option<String>, HealthSnapshotError> {
-    let path = health_snapshot_path(run_id, base);
+    let path = health_snapshot_path(run_id, &base);
     let contents = match fs::read_to_string(path) {
         Ok(contents) => contents,
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(err) => return Err(err.into()),
     };
-    let log = read_health_snapshot_log(run_id, base)?;
+    let log = read_health_snapshot_log(run_id, &base)?;
     let latest_sequence = log.snapshots.last().map(|snapshot| snapshot.sequence);
     if let Some(sequence) = latest_sequence {
-        for line in contents.lines().rev().filter(|line| !line.trim().is_empty()) {
-            if HealthSnapshot::from_json_line(line).is_ok_and(|snapshot| snapshot.sequence == sequence) {
+        for line in contents
+            .lines()
+            .rev()
+            .filter(|line| !line.trim().is_empty())
+        {
+            if HealthSnapshot::from_json_line(line)
+                .is_ok_and(|snapshot| snapshot.sequence == sequence)
+            {
                 return Ok(Some(crate::redact::redact_text(line)));
             }
         }
@@ -398,6 +468,9 @@ pub struct CampaignHealth {
     snapshots_emitted: u64,
     snapshot_write_failures: u64,
     terminal: Option<String>,
+    reclaimed_leases: u64,
+    zombie_writes: u64,
+    seed_diagnostic_echoes: Vec<SeedDiagnosticEcho>,
     last: Option<HealthSnapshot>,
 }
 
@@ -420,6 +493,9 @@ impl CampaignHealth {
             snapshots_emitted: 0,
             snapshot_write_failures: 0,
             terminal: None,
+            reclaimed_leases: 0,
+            zombie_writes: 0,
+            seed_diagnostic_echoes: Vec::new(),
             last: None,
         }
     }
@@ -485,6 +561,19 @@ impl CampaignHealth {
             .record_classified_failure(class, is_new_signature);
     }
 
+    /// Updates partition lease counters from the checkpoint's lease ledger.
+    pub fn set_partition_lease_counts(&mut self, reclaimed_leases: u64, zombie_writes: u64) {
+        self.reclaimed_leases = reclaimed_leases;
+        self.zombie_writes = zombie_writes;
+    }
+
+    /// Records a bounded per-seed diagnostic echo for subsequent snapshots.
+    /// `seed_index` is preserved verbatim so callers can correlate echoes with
+    /// the stable index used by the campaign runner.
+    pub fn echo_seed_diagnostic(&mut self, seed_index: u64, diagnostics: crate::HostDiagnostics) {
+        push_seed_diagnostic_echo(&mut self.seed_diagnostic_echoes, seed_index, diagnostics);
+    }
+
     /// Emits a snapshot for the current metrics, persisting it when configured.
     ///
     /// Called by [`CampaignHealth::on_seed_processed`] at each interval and once
@@ -506,6 +595,11 @@ impl CampaignHealth {
         if let Some(terminal) = &self.terminal {
             snapshot = snapshot.with_terminal(terminal.clone());
         }
+        snapshot = snapshot.with_partition_lease_counts(self.reclaimed_leases, self.zombie_writes);
+        for echo in &self.seed_diagnostic_echoes {
+            snapshot =
+                snapshot.with_seed_diagnostic_echo(echo.seed_index, echo.diagnostics.clone());
+        }
 
         self.last = Some(snapshot);
         self.snapshots_emitted += 1;
@@ -518,6 +612,34 @@ impl CampaignHealth {
         }
 
         self.last.as_ref().expect("snapshot was just stored")
+    }
+}
+
+fn push_seed_diagnostic_echo(
+    echoes: &mut Vec<SeedDiagnosticEcho>,
+    seed_index: u64,
+    mut diagnostics: crate::HostDiagnostics,
+) {
+    if let Some(summary) = diagnostics.frame_summary.as_mut() {
+        truncate_utf8(summary, MAX_DIAGNOSTIC_FRAME_SUMMARY_BYTES);
+    }
+    echoes.retain(|echo| echo.seed_index != seed_index);
+    if echoes.len() == MAX_SEED_DIAGNOSTIC_ECHOES {
+        echoes.remove(0);
+    }
+    echoes.push(SeedDiagnosticEcho {
+        seed_index,
+        diagnostics,
+    });
+}
+
+fn truncate_utf8(value: &mut String, max_bytes: usize) {
+    if value.len() > max_bytes {
+        let mut boundary = max_bytes;
+        while !value.is_char_boundary(boundary) {
+            boundary -= 1;
+        }
+        value.truncate(boundary);
     }
 }
 
@@ -550,6 +672,7 @@ pub fn terminal_label(terminal: &RunTerminalState) -> &'static str {
     match terminal {
         RunTerminalState::Completed { .. } => "completed",
         RunTerminalState::Cancelled { .. } => "cancelled",
+        RunTerminalState::PlateauStop { .. } => "plateau_stop",
         RunTerminalState::Failed { .. } => "failed",
     }
 }
@@ -627,6 +750,95 @@ mod tests {
     }
 
     #[test]
+    fn seed_diagnostic_echoes_round_trip_with_stable_indexes() {
+        let diagnostics = crate::HostDiagnostics {
+            error_code: Some(5),
+            error_type: Some(crate::HostErrorType::Contract),
+            trap_origin: Some(crate::HostTrapOrigin::Contract),
+            frame_summary: Some("top-level entrypoint: transfer".to_string()),
+            ..crate::HostDiagnostics::default()
+        };
+        let mut health = CampaignHealth::new(RunId(91), 100);
+        health.echo_seed_diagnostic(73, diagnostics.clone());
+        health.echo_seed_diagnostic(88, diagnostics.clone());
+
+        let snapshot = health.emit_snapshot(88).clone();
+        let parsed = HealthSnapshot::from_json_line(&snapshot.to_json_line().unwrap()).unwrap();
+
+        assert_eq!(
+            parsed.seed_diagnostic_echoes,
+            vec![
+                SeedDiagnosticEcho {
+                    seed_index: 73,
+                    diagnostics: diagnostics.clone(),
+                },
+                SeedDiagnosticEcho {
+                    seed_index: 88,
+                    diagnostics,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn seed_diagnostic_echoes_are_bounded_deduplicated_and_legacy_compatible() {
+        let mut health = CampaignHealth::new(RunId(92), 100);
+        for seed_index in 0..(MAX_SEED_DIAGNOSTIC_ECHOES as u64 + 2) {
+            health.echo_seed_diagnostic(
+                seed_index,
+                crate::HostDiagnostics {
+                    frame_summary: Some("x".repeat(MAX_DIAGNOSTIC_FRAME_SUMMARY_BYTES + 20)),
+                    ..crate::HostDiagnostics::default()
+                },
+            );
+        }
+        health.echo_seed_diagnostic(
+            (MAX_SEED_DIAGNOSTIC_ECHOES as u64) + 1,
+            crate::HostDiagnostics {
+                error_code: Some(7),
+                ..crate::HostDiagnostics::default()
+            },
+        );
+
+        let snapshot = health.emit_snapshot(0).clone();
+        assert_eq!(
+            snapshot.seed_diagnostic_echoes.len(),
+            MAX_SEED_DIAGNOSTIC_ECHOES
+        );
+        assert_eq!(snapshot.seed_diagnostic_echoes[0].seed_index, 2);
+        assert_eq!(
+            snapshot.seed_diagnostic_echoes.last().unwrap().seed_index,
+            (MAX_SEED_DIAGNOSTIC_ECHOES as u64) + 1
+        );
+        assert_eq!(
+            snapshot
+                .seed_diagnostic_echoes
+                .last()
+                .unwrap()
+                .diagnostics
+                .error_code,
+            Some(7),
+            "repeated indexes replace existing echoes"
+        );
+        assert!(snapshot.seed_diagnostic_echoes.iter().all(|echo| {
+            echo.diagnostics
+                .frame_summary
+                .as_ref()
+                .map_or(true, |summary| {
+                    summary.len() <= MAX_DIAGNOSTIC_FRAME_SUMMARY_BYTES
+                })
+        }));
+
+        let mut legacy_value = serde_json::to_value(&snapshot).unwrap();
+        legacy_value
+            .as_object_mut()
+            .unwrap()
+            .remove("seed_diagnostic_echoes");
+        let legacy: HealthSnapshot = serde_json::from_value(legacy_value).unwrap();
+        assert!(legacy.seed_diagnostic_echoes.is_empty());
+    }
+
+    #[test]
     fn snapshot_records_budget_remaining() {
         let snapshot =
             HealthSnapshot::from_monitor(&monitor_with_cases(30), RunId(2), 3, 100, 30, "t");
@@ -634,6 +846,26 @@ mod tests {
         assert_eq!(snapshot.budget.total_seeds, 100);
         assert_eq!(snapshot.budget.processed_seeds, 30);
         assert_eq!(snapshot.budget.remaining_seeds, 70);
+    }
+
+    #[test]
+    fn lease_counters_are_serialized_in_health_snapshots() {
+        let snapshot =
+            HealthSnapshot::from_monitor(&monitor_with_cases(2), RunId(3), 1, 10, 2, "t")
+                .with_partition_lease_counts(4, 7);
+        let parsed = HealthSnapshot::from_json_line(&snapshot.to_json_line().unwrap()).unwrap();
+        assert_eq!(parsed.reclaimed_leases, 4);
+        assert_eq!(parsed.zombie_writes, 7);
+    }
+
+    #[test]
+    fn campaign_health_attaches_lease_counters_to_snapshots() {
+        let mut health = CampaignHealth::new(RunId(31), 5).emitting_every(0);
+        health.set_partition_lease_counts(2, 3);
+        health.emit_snapshot(0);
+        let snapshot = health.last_snapshot().expect("snapshot");
+        assert_eq!(snapshot.reclaimed_leases, 2);
+        assert_eq!(snapshot.zombie_writes, 3);
     }
 
     #[test]
@@ -646,7 +878,10 @@ mod tests {
     fn unsupported_schema_versions_are_rejected() {
         let snapshot = HealthSnapshot::from_monitor(&monitor_with_cases(1), RunId(1), 1, 1, 1, "t");
         let line = snapshot.to_json_line().expect("serialize");
-        let bumped = line.replace("\"v\":2", "\"v\":99");
+        let bumped = line.replace(
+            &format!("\"v\":{HEALTH_SNAPSHOT_SCHEMA_VERSION}"),
+            "\"v\":99",
+        );
 
         match HealthSnapshot::from_json_line(&bumped) {
             Err(HealthSnapshotError::UnsupportedSchema { found, supported }) => {
@@ -773,10 +1008,24 @@ mod tests {
         let recovered = read_health_snapshot_log(run_id, &base).expect("recover");
         assert!(recovered.degraded);
         assert_eq!(recovered.corrupt_lines, 1);
-        assert_eq!(recovered.snapshots.len(), 1, "unterminated final record is ignored");
+        assert_eq!(
+            recovered.snapshots.len(),
+            1,
+            "unterminated final record is ignored"
+        );
 
-        fs::write(&path, format!("{}", "{broken}\n".repeat(MAX_CORRUPT_HEALTH_SNAPSHOT_LINES + 1))).expect("write corrupt log");
-        assert!(matches!(read_health_snapshot_log(run_id, &base), Err(HealthSnapshotError::CorruptLog { .. })));
+        fs::write(
+            &path,
+            format!(
+                "{}",
+                "{broken}\n".repeat(MAX_CORRUPT_HEALTH_SNAPSHOT_LINES + 1)
+            ),
+        )
+        .expect("write corrupt log");
+        assert!(matches!(
+            read_health_snapshot_log(run_id, &base),
+            Err(HealthSnapshotError::CorruptLog { .. })
+        ));
         let _ = fs::remove_dir_all(&base);
     }
 

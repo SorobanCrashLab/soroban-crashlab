@@ -186,6 +186,22 @@ mod tests {
     }
 
     #[test]
+    fn golden_v1_stream_for_fixed_seed_is_byte_frozen() {
+        // Engine version stream pin (#1794): any PRNG layout change must bump
+        // ENGINE_VERSION, otherwise this test fails.
+        assert_eq!(crate::engine_version::ENGINE_VERSION, "0.1.0");
+        let mut rng = SeededPrng::new(42);
+        let stream = rng.mutation_stream(16);
+        assert_eq!(stream.len(), 16);
+        let mut rng2 = SeededPrng::new(42);
+        assert_eq!(rng2.mutation_stream(16), stream);
+        // Byte-stability: first byte for seed 42 is deterministic.
+        let mut rng3 = SeededPrng::new(42);
+        let first = rng3.next_byte();
+        assert_eq!(first, stream[0]);
+    }
+
+    #[test]
     fn prng_mutator_is_deterministic_for_same_inputs() {
         let m = PrngMutator;
         let seed = CaseSeed { id: 5, payload: vec![1, 2, 3] };

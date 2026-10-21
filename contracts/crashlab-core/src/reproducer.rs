@@ -673,6 +673,7 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let shrunk = shrink_bundle_payload(&bundle, anchor_signature).unwrap();
@@ -752,6 +753,7 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let (shrunk, lineage) = shrink_bundle_with_lineage(&bundle, "ddmin", anchor_signature).unwrap();
@@ -774,6 +776,7 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let (shrunk, lineage) = shrink_bundle_with_lineage(&bundle, "ddmin", anchor_signature).unwrap();

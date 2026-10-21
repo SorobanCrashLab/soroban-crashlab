@@ -1,15 +1,16 @@
-/// Named fuzz campaign presets for repeatable run profiles.
-//
-// Presets bundle a **runtime mutation budget** (maximum mutation attempts per
-// campaign) and **mutation intensity** (how aggressively the engine explores the
-// mutation space). Values are fixed so CI and operators get predictable
-// behaviour: [`CampaignPreset::Smoke] for quick checks, [`CampaignPreset::Nightly`]
-// for scheduled runs, and [`CampaignPreset::Deep] for exhaustive campaigns.
+//! Named fuzz campaign presets for repeatable run profiles.
+//!
+//! Presets bundle a **runtime mutation budget** (maximum mutation attempts per
+//! campaign) and **mutation intensity** (how aggressively the engine explores the
+//! mutation space). Values are fixed so CI and operators get predictable
+//! behaviour: [`CampaignPreset::Smoke] for quick checks, [`CampaignPreset::Nightly`]
+//! for scheduled runs, and [`CampaignPreset::Deep`] for exhaustive campaigns.
 //
 // Each preset also carries a plateau detection policy (rolling window, score
 // threshold, and response action) so cost-aware budgeting behaviour is configured
 // per campaign class (smoke/touch vs deep) and reproducible across runs.
 
+use crate::dictionary::DictionaryId;
 use crate::mutation_budget::MutationBudget;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -17,7 +18,7 @@ use std::str::FromStr;
 
 /// Predefined fuzz campaign profile (smoke, nightly, or deep).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum CampaignPreset {
     /// Fast feedback: minimal budget and low exploration intensity.
     Smoke,
@@ -57,7 +58,7 @@ impl CampaignClass {
     }
 
     /// Stable snake_case name shared with the web API.
-    pub const fn as_str(self) -> &''static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             CampaignClass::Interactive => "interactive",
             CampaignClass::Nightly => "nightly",
@@ -90,7 +91,7 @@ impl PlateauAction {
     pub const ALL: [Self; 3] = [Self::Warn, Self::Diversify, Self::StopEarly];
 
     /// Stable snake_case name for telemetry and the web API.
-    pub const fn as_str(self) -> &''static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             PlateauAction::Warn => "warn",
             PlateauAction::Diversify => "diversify",
@@ -250,6 +251,30 @@ impl CampaignPreset {
         }
     }
 
+    /// Dictionary selected for this preset (W5-B02).
+    ///
+    /// Every preset ships the curated Soroban pitfall dictionary so known-hard
+    /// edges (TTL, archival, depth, metering, address classes) are exercised by
+    /// default. Deeper presets use the full dictionary; smoke uses the same
+    /// content but with a lower injection probability (see
+    /// [`CampaignPreset::dictionary_injection_bps`]).
+    pub const fn dictionary(self) -> DictionaryId {
+        DictionaryId::SorobanPitfalls
+    }
+
+    /// Probability, in basis points, that a mutation attempt injects a
+    /// dictionary value instead of a purely random one.
+    ///
+    /// Smoke keeps injection light so quick runs stay fast; nightly and deep
+    /// bias heavily toward curated values so known-hard edges are hit early.
+    pub const fn dictionary_injection_bps(self) -> u32 {
+        match self {
+            CampaignPreset::Smoke => 2_500,
+            CampaignPreset::Nightly => 5_000,
+            CampaignPreset::Deep => 7_500,
+        }
+    }
+
     /// Read preset from the `CRASHLAB_PRESET` environment variable.
     ///
     /// Unset or unrecognised values fall back to [`CampaignPreset::Nightly`] so
@@ -262,7 +287,7 @@ impl CampaignPreset {
     }
 
     /// Stable snake_case name for CLI and metadata.
-    pub const fn as_str(self) -> &''static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             CampaignPreset::Smoke => "smoke",
             CampaignPreset::Nightly => "nightly",
@@ -280,7 +305,7 @@ impl Default for CampaignPreset {
 }
 
 impl fmt::Display for CampaignPreset {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
@@ -291,7 +316,7 @@ pub struct ParseCampaignPresetError(pub String);
 
 impl fmt::Display for ParseCampaignPresetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write(
+        write!(
             f,
             "unknown campaign preset {:?}: expected smoke, nightly, or deep",
             self.0
@@ -304,12 +329,160 @@ impl std::error::Error for ParseCampaignPresetError {}
 impl FromStr for CampaignPreset {
     type Err = ParseCampaignPresetError;
 
-    fn from_str(s& str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.trim().to_ascii_lowercase().as_str() {
             "smoke" => Ok(CampaignPreset::Smoke),
             "nightly" => Ok(CampaignPreset::Nightly),
             "deep" => Ok(CampaignPreset::Deep),
             _ => Err(ParseCampaignPresetError(s.trim().to_owned())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn presets_order_by_budget_and_intensity() {
+        let s = CampaignPreset::Smoke.parameters();
+        let n = CampaignPreset::Nightly.parameters();
+        let d = CampaignPreset::Deep.parameters();
+
+        assert!(s.max_mutations_per_run < n.max_mutations_per_run);
+        assert!(n.max_mutations_per_run < d.max_mutations_per_run);
+
+        assert!(s.mutation_intensity_bps < n.mutation_intensity_bps);
+        assert!(n.mutation_intensity_bps < d.mutation_intensity_bps);
+    }
+
+    #[test]
+    fn intensity_bps_within_range() {
+        for p in CampaignPreset::ALL {
+            let x = p.parameters().mutation_intensity_bps;
+            assert!(x <= 10_000, "intensity must be at most 10000 bps");
+        }
+    }
+
+    #[test]
+    fn parse_roundtrip() {
+        assert_eq!(
+            "smoke".parse::<CampaignPreset>().unwrap(),
+            CampaignPreset::Smoke
+        );
+        assert_eq!(
+            "NIGHTLY".parse::<CampaignPreset>().unwrap(),
+            CampaignPreset::Nightly
+        );
+        assert_eq!(
+            " Deep ".parse::<CampaignPreset>().unwrap(),
+            CampaignPreset::Deep
+        );
+        assert!("".parse::<CampaignPreset>().is_err());
+    }
+
+    #[test]
+    fn serde_roundtrip() {
+        let json = serde_json::to_string(&CampaignPreset::Nightly).unwrap();
+        assert_eq!(json, "\"nightly\"");
+        let back: CampaignPreset = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, CampaignPreset::Nightly);
+    }
+
+    #[test]
+    fn display_matches_as_str() {
+        for p in CampaignPreset::ALL {
+            assert_eq!(p.to_string(), p.as_str());
+        }
+    }
+
+    #[test]
+    fn presets_map_to_priority_ordered_classes() {
+        assert_eq!(CampaignPreset::Smoke.class(), CampaignClass::Interactive);
+        assert_eq!(CampaignPreset::Nightly.class(), CampaignClass::Nightly);
+        assert_eq!(CampaignPreset::Deep.class(), CampaignClass::Deep);
+        assert!(CampaignClass::Interactive < CampaignClass::Nightly);
+        assert!(CampaignClass::Nightly < CampaignClass::Deep);
+        let ranks: Vec<u8> = CampaignClass::ALL.iter().map(|c| c.priority()).collect();
+        assert_eq!(ranks, vec![0, 1, 2]);
+        assert_eq!(
+            serde_json::to_string(&CampaignClass::Interactive).unwrap(),
+            "\"interactive\""
+        );
+        assert_eq!(CampaignClass::Deep.as_str(), "deep");
+    }
+
+    #[test]
+    fn resource_units_scale_with_intensity() {
+        assert_eq!(CampaignPreset::Smoke.resource_units_per_seed(), 1);
+        assert_eq!(CampaignPreset::Nightly.resource_units_per_seed(), 2);
+        assert_eq!(CampaignPreset::Deep.resource_units_per_seed(), 4);
+    }
+
+    #[test]
+    fn default_is_nightly() {
+        assert_eq!(CampaignPreset::default(), CampaignPreset::Nightly);
+    }
+
+    #[test]
+    fn parameters_contain_expected_values() {
+        let s = CampaignPreset::Smoke.parameters();
+        assert_eq!(s.max_mutations_per_run, 1_000);
+        assert_eq!(s.mutation_intensity_bps, 2_500);
+        assert_eq!(s.base_seed, 0x9E37_79B9_7FA4_7C01);
+
+        let n = CampaignPreset::Nightly.parameters();
+        assert_eq!(n.max_mutations_per_run, 100_000);
+        assert_eq!(n.mutation_intensity_bps, 5_000);
+        assert_eq!(n.base_seed, 0x9E37_79B9_7FA4_7C02);
+
+        let d = CampaignPreset::Deep.parameters();
+        assert_eq!(d.max_mutations_per_run, 10_000_000);
+        assert_eq!(d.mutation_intensity_bps, 10_000);
+        assert_eq!(d.base_seed, 0x9E37_79B9_7FA4_7C03);
+    }
+
+    #[test]
+    fn to_mutation_budget_matches_preset_cap() {
+        let budget = CampaignPreset::Smoke.to_mutation_budget();
+        let report = budget.report();
+        assert_eq!(report.budget, 1_000);
+        assert!(!report.exhausted);
+    }
+
+    #[test]
+    fn apply_intensity_scales_weights() {
+        let mut weights = vec![1.0, 2.0, 3.0];
+        CampaignPreset::Smoke.apply_intensity(&mut weights);
+        // Smoke intensity = 2500 / 10000 = 0.25
+        assert_eq!(weights, vec![0.25, 0.5, 0.75]);
+    }
+
+    #[test]
+    fn apply_intensity_full_keeps_weights_unchanged() {
+        let mut weights = vec![1.0, 2.0, 3.0];
+        CampaignPreset::Deep.apply_intensity(&mut weights);
+        // Deep intensity = 10000 / 10000 = 1.0
+        assert_eq!(weights, vec![1.0, 2.0, 3.0]);
+    }
+
+    #[test]
+    fn every_preset_selects_the_soroban_dictionary() {
+        for p in CampaignPreset::ALL {
+            assert_eq!(p.dictionary(), DictionaryId::SorobanPitfalls);
+        }
+    }
+
+    #[test]
+    fn dictionary_injection_probability_is_bounded_and_ordered() {
+        let s = CampaignPreset::Smoke.dictionary_injection_bps();
+        let n = CampaignPreset::Nightly.dictionary_injection_bps();
+        let d = CampaignPreset::Deep.dictionary_injection_bps();
+        assert!(s < n);
+        assert!(n < d);
+        for p in CampaignPreset::ALL {
+            let bps = p.dictionary_injection_bps();
+            assert!(bps <= 10_000, "injection probability must be at most 10000 bps");
         }
     }
 }

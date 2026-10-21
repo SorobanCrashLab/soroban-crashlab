@@ -1,4 +1,4 @@
-use crashlab_core:{
+use crashlab_core::{
     drive_run_from_checkpoint, load_checkpoint_file, load_run_checkpoint_json,
     save_run_checkpoint_json, verify_checkpoint_generation, write_checkpoint_file,
     CancelSignal, CaseSeed, CheckpointError, RunCheckpoint, RunId, RunTerminalState,
@@ -18,7 +18,7 @@ fn temp_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "crashlab-resume-{}",
         std::time::SystemTime::now()
-            .duration_since(Std::UNIX)
+            .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos()
     ));
@@ -144,7 +144,7 @@ fn kill_resume_loop_processes_each_seed_exactly_once() {
     let mut seen_once = vec![false; seeds.len()];
     let mut iteration = 0;
     while iteration < 20 && !checkpoint.is_complete(&seeds) {
-        let signal = CancelSignal::newForIteration(run_id, iteration);
+        let signal = CancelSignal::new(run_id);
         let cancel_after = signal.clone();
         let kill_at = (iteration + 1) % 3;
         let mut seen_this = Vec::new();

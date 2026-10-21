@@ -4,9 +4,12 @@ import {
   constantTimeHexEqual,
   getGitHubSessionMaxAgeSeconds,
   getGitHubSessionSecret,
+  invalidateGitHubSession,
   issueGitHubSession,
   verifyGitHubSession,
 } from './github-session';
+import { SESSION_ABSOLUTE_TIMEOUT_MS, SESSION_IDLE_TIMEOUT_MS } from './auth/server-session';
+import { InMemoryRecordDriver, resetRecordDriver, setRecordDriver } from './storage/record-driver';
 
 describe('GitHub session cookie', () => {
   const originalSecret = process.env.CRASHLAB_GITHUB_SESSION_SECRET;
@@ -15,6 +18,7 @@ describe('GitHub session cookie', () => {
 
   beforeEach(() => {
     env.CRASHLAB_GITHUB_SESSION_SECRET = 'a-test-signing-secret-for-session-cookies';
+    setRecordDriver(new InMemoryRecordDriver());
   });
 
   afterEach(() => {
@@ -23,6 +27,7 @@ describe('GitHub session cookie', () => {
 
     if (originalTtl === undefined) delete env.CRASHLAB_GITHUB_SESSION_TTL_SECONDS;
     else env.CRASHLAB_GITHUB_SESSION_TTL_SECONDS = originalTtl;
+    resetRecordDriver();
   });
 
   it('exposes a stable cookie name', () => {
@@ -32,7 +37,90 @@ describe('GitHub session cookie', () => {
   it('round-trips a login', async () => {
     const session = await issueGitHubSession('Octocat');
     expect(session).not.toBeNull();
+    expect(session).not.toContain('octocat');
     expect(await verifyGitHubSession(session)).toBe('octocat');
+  });
+
+  it('rejects verification when the User-Agent changes', async () => {
+    const session = await issueGitHubSession('octocat', null, Date.now(), 'Browser/1.0');
+    expect(await verifyGitHubSession(session, Date.now(), 'Browser/1.0')).toBe('octocat');
+    expect(await verifyGitHubSession(session, Date.now(), 'Browser/2.0')).toBeNull();
+  });
+
+  it('rotates the cookie identifier and revokes the previous session on login', async () => {
+    const first = await issueGitHubSession('octocat', null, 1000);
+    const rotated = await issueGitHubSession('octocat', first, 2000);
+    expect(rotated).not.toBe(first);
+    expect(await verifyGitHubSession(first, 2000)).toBeNull();
+    expect(await verifyGitHubSession(rotated, 2000)).toBe('octocat');
+  });
+
+  it('invalidates a session server-side on logout', async () => {
+    const session = await issueGitHubSession('octocat');
+    expect(await invalidateGitHubSession(session)).toBe(true);
+    expect(await verifyGitHubSession(session)).toBeNull();
+  });
+
+  it('enforces a 30-minute idle timeout on verification', async () => {
+    const idleSession = await issueGitHubSession('octocat', null, 1000);
+    expect(await verifyGitHubSession(idleSession, 1000 + SESSION_IDLE_TIMEOUT_MS)).toBeNull();
+
+    const activeSession = await issueGitHubSession('octocat', null, 1000);
+    expect(await verifyGitHubSession(activeSession, 1000 + SESSION_IDLE_TIMEOUT_MS - 1)).toBe('octocat');
+    expect(await verifyGitHubSession(activeSession, 1000 + SESSION_IDLE_TIMEOUT_MS * 2 - 1)).toBeNull();
+  });
+
+  it('enforces a 12-hour absolute timeout despite recent activity', async () => {
+    const session = await issueGitHubSession('octocat', null, 1000);
+    const lastMoment = 1000 + SESSION_ABSOLUTE_TIMEOUT_MS - 1;
+    for (
+      let at = 1000 + SESSION_IDLE_TIMEOUT_MS - 1;
+      at < lastMoment;
+      at += SESSION_IDLE_TIMEOUT_MS - 1
+    ) {
+      expect(await verifyGitHubSession(session, at)).toBe('octocat');
+    }
+    expect(await verifyGitHubSession(session, lastMoment)).toBe('octocat');
+    expect(await verifyGitHubSession(session, 1000 + SESSION_ABSOLUTE_TIMEOUT_MS)).toBeNull();
+  });
+
+  it('fails closed when the record store is unavailable', async () => {
+    const session = await issueGitHubSession('octocat');
+    setRecordDriver({
+      name: 'unavailable',
+      getRecord: async () => { throw new Error('store down'); },
+      putRecord: async () => { throw new Error('store down'); },
+      updateRecordIfPresent: async () => { throw new Error('store down'); },
+      deleteRecord: async () => { throw new Error('store down'); },
+      addToIndex: async () => {},
+      removeFromIndex: async () => {},
+      listIndex: async () => [],
+      clearIndex: async () => {},
+      appendEntry: async () => {},
+      listEntries: async () => [],
+      countEntries: async () => 0,
+      trimEntries: async () => {},
+    });
+    expect(await verifyGitHubSession(session)).toBeNull();
+  });
+
+  it('does not issue sessions from the in-memory fallback outside tests', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalRedisUrl = process.env.KV_REST_API_URL;
+    const originalRedisToken = process.env.KV_REST_API_TOKEN;
+    process.env.NODE_ENV = 'production';
+    delete process.env.KV_REST_API_URL;
+    delete process.env.KV_REST_API_TOKEN;
+    try {
+      await expect(issueGitHubSession('octocat')).rejects.toThrow('Durable session storage');
+    } finally {
+      if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = originalNodeEnv;
+      if (originalRedisUrl === undefined) delete process.env.KV_REST_API_URL;
+      else process.env.KV_REST_API_URL = originalRedisUrl;
+      if (originalRedisToken === undefined) delete process.env.KV_REST_API_TOKEN;
+      else process.env.KV_REST_API_TOKEN = originalRedisToken;
+    }
   });
 
   it('refuses to issue without a configured secret', async () => {
@@ -82,10 +170,13 @@ describe('GitHub session cookie', () => {
 
   it('defaults the max age and honours an override', () => {
     delete env.CRASHLAB_GITHUB_SESSION_TTL_SECONDS;
-    expect(getGitHubSessionMaxAgeSeconds()).toBe(604800);
+    expect(getGitHubSessionMaxAgeSeconds()).toBe(43200);
 
     env.CRASHLAB_GITHUB_SESSION_TTL_SECONDS = '3600';
     expect(getGitHubSessionMaxAgeSeconds()).toBe(3600);
+
+    env.CRASHLAB_GITHUB_SESSION_TTL_SECONDS = '604800';
+    expect(getGitHubSessionMaxAgeSeconds()).toBe(43200);
   });
 });
 
