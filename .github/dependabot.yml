@@ -41,3 +41,16 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  # Rust advisories arrive via the dependency-audit workflow; enabling the cargo
+  # ecosystem here lets Dependabot open version-bump PRs for the crates in
+  # contracts/ once the open-pull-requests-limit is raised. Inert while the
+  # limit stands, same as the npm and github-actions ecosystems above.
+  - package-ecosystem: "cargo"
+    directory: "/contracts"
+    open-pull-requests-limit: 0
+    groups:
+      cargo-minor:
+        update-types:
+          - "minor"
+          - "patch"
