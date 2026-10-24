@@ -21,22 +21,7 @@ interface CloudWatchConfig {
 
 type LogWriter = (entry: StructuredLogEntry) => void | Promise<void>;
 
-const REDACTED_KEYS = new Set(['token', 'password', 'secret', 'authorization', 'cookie', 'bearer']);
-
-function redact(obj: unknown): unknown {
-  if (typeof obj !== 'object' || obj === null) return obj;
-  if (Array.isArray(obj)) return obj.map(redact);
-  
-  const result: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (REDACTED_KEYS.has(k.toLowerCase()) || k.toLowerCase().includes('secret') || k.toLowerCase().includes('token')) {
-      result[k] = '[REDACTED]';
-    } else {
-      result[k] = redact(v);
-    }
-  }
-  return result;
-}
+import { redactText, redactValue } from './redaction';
 
 export class StructuredLogger {
   private writer: LogWriter;
@@ -70,14 +55,14 @@ export class StructuredLogger {
     }
 
     const entry: StructuredLogEntry = {
+      ...redactValue(fields) as Record<string, unknown>,
       level,
       timestamp: new Date().toISOString(),
-      message,
+      message: redactText(message),
       service: this.service,
       environment: this.environment,
       requestId,
       module: this.defaultModule,
-      ...redact(fields) as Record<string, unknown>,
     };
 
     try {

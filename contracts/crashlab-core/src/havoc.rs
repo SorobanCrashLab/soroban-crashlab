@@ -12,9 +12,10 @@
 //!   [`crate::scval_mutator`], hitting numeric boundaries, size edges, and
 //!   address-type swaps instead of wasting budget on structurally invalid bytes.
 
+use crate::dictionary::{Dictionary, DictionaryHitTracker};
 use crate::enum_flip::{ENUM_MARKER, INVALID_TAGS, VALID_TAGS};
-use crate::scval_mutator::{self, ScValMutatorConfig};
 use crate::scheduler::Mutator;
+use crate::scval_mutator::{self, ScValMutatorConfig};
 use crate::CaseSeed;
 
 /// The individual operations supported by the havoc mutator.
@@ -63,6 +64,10 @@ pub struct HavocConfig {
     pub weight_chunk_repeat: u32,
     /// Relative weight for [`HavocOp::XdrTagFlip`] (default: 20).
     pub weight_xdr_tag_flip: u32,
+    /// Probability (in percent, 0-100) of injecting a dictionary value per mutation (default: 30).
+    pub dictionary_injection_percent: u32,
+    /// Maximum number of dictionary entries to consider when injecting (default: 0 = all).
+    pub dictionary_max_entries: usize,
     /// Relative weight for [`HavocOp::ScValMutate`] (default: 30).
     pub weight_scval_mutate: u32,
 }
@@ -79,6 +84,8 @@ impl Default for HavocConfig {
             weight_block_delete: 15,
             weight_chunk_repeat: 15,
             weight_xdr_tag_flip: 20,
+            dictionary_injection_percent: 30,
+            dictionary_max_entries: 0,
             weight_scval_mutate: 30,
         }
     }
@@ -94,6 +101,17 @@ impl HavocConfig {
             + self.weight_chunk_repeat
             + self.weight_xdr_tag_flip
             + self.weight_scval_mutate
+    }
+
+    /// Returns true if dictionary injection is enabled for this config.
+    pub fn dictionary_enabled(&self) -> bool {
+        self.dictionary_injection_percent > 0
+    }
+
+    /// Returns true if a dictionary injection should occur for the given rng state.
+    pub fn should_inject_dictionary(&self, rng_state: &mut u64) -> bool {
+        self.dictionary_enabled()
+            && (next_u64(rng_state) % 100) < self.dictionary_injection_percent as u64
     }
 }
 
@@ -177,7 +195,11 @@ fn apply_byte_flip(payload: &mut Vec<u8>, _config: &HavocConfig, rng_state: &mut
         }
         2 => {
             // Small arithmetic tweak (+1 or -1)
-            let delta = if (next_u64(rng_state) & 1) == 1 { 1u8 } else { 0xFFu8 };
+            let delta = if (next_u64(rng_state) & 1) == 1 {
+                1u8
+            } else {
+                0xFFu8
+            };
             payload[idx] = payload[idx].wrapping_add(delta);
         }
         _ => {
@@ -313,6 +335,59 @@ fn apply_xdr_tag_flip(payload: &mut Vec<u8>, config: &HavocConfig, rng_state: &m
     }
 }
 
+/// Injects a dictionary value into a structurally-aware slot of `payload`.
+///
+/// The injection replaces a contiguous region of the payload with a dictionary
+/// value, or inserts it at a random position when the payload is empty or the
+/// dictionary value is larger than the available room. Returns the index of the
+/// dictionary entry that was injected, if any.
+pub fn apply_dictionary_injection(
+    payload: &mut Vec<u8>,
+    config: &HavocConfig,
+    dictionary: &Dictionary,
+    rng_state: &mut u64,
+) -> Option<usize> {
+    if dictionary.is_empty() {
+        return None;
+    }
+
+    let limit = if config.dictionary_max_entries == 0 {
+        dictionary.len()
+    } else {
+        config.dictionary_max_entries.min(dictionary.len())
+    };
+    if limit == 0 {
+        return None;
+    }
+
+    let entry_idx = next_usize(rng_state) % limit;
+    let value = dictionary.value(entry_idx)?;
+    if value.is_empty() {
+        return None;
+    }
+
+    // Structurally-aware slot selection: prefer replacing an existing region
+    // when the payload can accommodate the dictionary value, otherwise insert.
+    if payload.len() >= value.len() && !payload.is_empty() {
+        let max_start = payload.len() - value.len();
+        let pos = if max_start == 0 {
+            0
+        } else {
+            next_usize(rng_state) % (max_start + 1)
+        };
+        payload[pos..pos + value.len()].copy_from_slice(value);
+    } else {
+        let pos = if payload.is_empty() {
+            0
+        } else {
+            next_usize(rng_state) % (payload.len() + 1)
+        };
+        payload.splice(pos..pos, value.iter().copied());
+    }
+
+    Some(entry_idx)
+}
+
 fn apply_scval_mutate(payload: &mut Vec<u8>, config: &HavocConfig, rng_state: &mut u64) {
     // Type-directed mutation: parse the payload as an ScVal tree (tolerant),
     // apply a type-aware operation, and re-encode to XDR. If the payload does
@@ -370,6 +445,27 @@ pub fn apply_havoc_mutation(
     op
 }
 
+/// Selects and applies a weighted havoc operation to `payload`, optionally
+/// injecting a dictionary value first when the config enables it.
+///
+/// Returns the applied havoc op along with the dictionary entry index that was
+/// injected (if any), so callers can update hit tracking.
+pub fn apply_havoc_mutation_with_dictionary(
+    payload: &mut Vec<u8>,
+    config: &HavocConfig,
+    dictionary: Option<&Dictionary>,
+    rng_state: &mut u64,
+) -> (HavocOp, Option<usize>) {
+    let mut injected = None;
+    if let Some(dict) = dictionary {
+        if config.should_inject_dictionary(rng_state) {
+            injected = apply_dictionary_injection(payload, config, dict, rng_state);
+        }
+    }
+    let op = apply_havoc_mutation(payload, config, rng_state);
+    (op, injected)
+}
+
 /// Derives a deterministic PRNG state from a [`CaseSeed`]'s `id` and `payload`.
 ///
 /// Uses FNV-1a hashing mixed with SplitMix64 constants so that any change in
@@ -395,11 +491,32 @@ pub fn derive_seed_state(seed: &CaseSeed) -> u64 {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HavocMutator {
     pub config: HavocConfig,
+    pub dictionary: Option<Dictionary>,
+    pub hits: Option<DictionaryHitTracker>,
 }
 
 impl HavocMutator {
     pub fn new(config: HavocConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            dictionary: None,
+            hits: None,
+        }
+    }
+
+    pub fn with_dictionary(mut self, dictionary: Dictionary) -> Self {
+        self.dictionary = Some(dictionary);
+        self
+    }
+
+    pub fn with_hit_tracker(mut self, tracker: DictionaryHitTracker) -> Self {
+        self.hits = Some(tracker);
+        self
+    }
+
+    /// Returns the dictionary hit tracker, if one is attached.
+    pub fn hit_tracker(&self) -> Option<&DictionaryHitTracker> {
+        self.hits.as_ref()
     }
 }
 
@@ -410,7 +527,13 @@ impl Mutator for HavocMutator {
 
     fn mutate(&self, seed: &CaseSeed, rng_state: &mut u64) -> CaseSeed {
         let mut payload = seed.payload.clone();
-        apply_havoc_mutation(&mut payload, &self.config, rng_state);
+        let (_op, injected) = apply_havoc_mutation_with_dictionary(
+            &mut payload,
+            &self.config,
+            self.dictionary.as_ref(),
+            rng_state,
+        );
+        let _ = injected;
         CaseSeed {
             id: seed.id,
             payload,
@@ -425,11 +548,26 @@ mod tests {
     #[test]
     fn property_mutation_is_deterministic_given_seed_state() {
         let test_seeds = vec![
-            CaseSeed { id: 0, payload: vec![] },
-            CaseSeed { id: 1, payload: vec![42] },
-            CaseSeed { id: 7, payload: vec![1, 2, 3, 4] },
-            CaseSeed { id: 100, payload: vec![0xAA; 64] },
-            CaseSeed { id: u64::MAX, payload: vec![0xE0, 0x01, 0x02, 0x03] },
+            CaseSeed {
+                id: 0,
+                payload: vec![],
+            },
+            CaseSeed {
+                id: 1,
+                payload: vec![42],
+            },
+            CaseSeed {
+                id: 7,
+                payload: vec![1, 2, 3, 4],
+            },
+            CaseSeed {
+                id: 100,
+                payload: vec![0xAA; 64],
+            },
+            CaseSeed {
+                id: u64::MAX,
+                payload: vec![0xE0, 0x01, 0x02, 0x03],
+            },
         ];
 
         for seed in &test_seeds {
@@ -441,7 +579,11 @@ mod tests {
             let mut payload2 = seed.payload.clone();
             apply_havoc_mutation(&mut payload2, &HavocConfig::default(), &mut state2);
 
-            assert_eq!(payload1, payload2, "seed id {} was not deterministic", seed.id);
+            assert_eq!(
+                payload1, payload2,
+                "seed id {} was not deterministic",
+                seed.id
+            );
             assert_eq!(state1, state2);
         }
     }
@@ -565,7 +707,13 @@ mod tests {
         let mut seeds: Vec<Vec<u8>> = Vec::new();
         for _ in 0..16 {
             let mut p = Vec::new();
-            if scval_mutator::synthesize_xdr_payload(&mut p, &ScValMutatorConfig::default(), &mut rng).is_ok() {
+            if scval_mutator::synthesize_xdr_payload(
+                &mut p,
+                &ScValMutatorConfig::default(),
+                &mut rng,
+            )
+            .is_ok()
+            {
                 seeds.push(p);
             }
         }
@@ -595,13 +743,65 @@ mod tests {
         let mut p = vec![1];
         for _ in 0..100 {
             apply_havoc_mutation(&mut p, &config, &mut rng);
-            assert!(p.len() >= config.min_len, "len {} < min_len {}", p.len(), config.min_len);
-            assert!(p.len() <= config.max_len, "len {} > max_len {}", p.len(), config.max_len);
+            assert!(
+                p.len() >= config.min_len,
+                "len {} < min_len {}",
+                p.len(),
+                config.min_len
+            );
+            assert!(
+                p.len() <= config.max_len,
+                "len {} > max_len {}",
+                p.len(),
+                config.max_len
+            );
         }
 
         // Starts above max_len
         let mut p_large = vec![0xFF; 50];
         apply_havoc_mutation(&mut p_large, &config, &mut rng);
         assert!(p_large.len() <= config.max_len);
+    }
+
+    #[test]
+    fn property_dictionary_injection_reaches_payload() {
+        use crate::dictionary::Dictionary;
+
+        let mut dict = Dictionary::new("test");
+        dict.push_value("ttl_edge", vec![0xE0, 0x00, 0x00, 0x01]);
+        dict.push_value("depth_edge", vec![0xDE, 0xAD, 0xBE, 0xEF]);
+
+        let config = HavocConfig {
+            dictionary_injection_percent: 100,
+            ..Default::default()
+        };
+
+        let mut rng = 0x1234_5678_9ABC_DEF0u64;
+        let mut payload = vec![0u8; 8];
+        let (_, injected) =
+            apply_havoc_mutation_with_dictionary(&mut payload, &config, Some(&dict), &mut rng);
+        assert!(injected.is_some(), "dictionary injection did not occur");
+    }
+
+    #[test]
+    fn property_dictionary_injection_disabled_when_percent_zero() {
+        use crate::dictionary::Dictionary;
+
+        let mut dict = Dictionary::new("test");
+        dict.push_value("ttl_edge", vec![0xE0, 0x00, 0x00, 0x01]);
+
+        let config = HavocConfig {
+            dictionary_injection_percent: 0,
+            ..Default::default()
+        };
+
+        let mut rng = 42u64;
+        let mut payload = vec![0u8; 8];
+        let (_, injected) =
+            apply_havoc_mutation_with_dictionary(&mut payload, &config, Some(&dict), &mut rng);
+        assert!(
+            injected.is_none(),
+            "dictionary injection should be disabled"
+        );
     }
 }

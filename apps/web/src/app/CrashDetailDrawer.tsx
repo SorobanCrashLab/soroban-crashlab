@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useCallback, useRef, useState } from 'react';
 import { FuzzingRun } from './types';
-import { simulateSeedReplay } from './replay';
+import { REPLAY_RUNNERS, REPLAY_RUNNER_INFO, type ReplayRunner } from '../lib/replay/runners';
+import type { EnvironmentCheck } from '../lib/replay/environment';
+import type { ReplayFailure } from '../lib/replay/failure';
 import { generateMarkdownReport } from './report-utils';
 import ReportModal from './ReportModal';
-import { useMaintainerMode } from './useMaintainerMode';
 import { ReplayButtonStatus } from './replay-ui-utils';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { explainGate, useEffectiveAccess } from '../lib/permissions';
 
 interface CrashDetailDrawerProps {
     run: FuzzingRun;
@@ -20,8 +22,17 @@ interface CrashDetailDrawerProps {
 export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: CrashDetailDrawerProps) {
     const [status, setStatus] = useState<ReplayButtonStatus>('idle');
     const [replayedRunId, setReplayedRunId] = useState<string | null>(null);
+    const [runner, setRunner] = useState<ReplayRunner>('host');
+    const [acknowledged, setAcknowledged] = useState(false);
+    const [mismatch, setMismatch] = useState<EnvironmentCheck | null>(null);
+    const [jobId, setJobId] = useState<string | null>(null);
+    const [failure, setFailure] = useState<ReplayFailure | null>(null);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-    const { isMaintainer } = useMaintainerMode();
+    // Replay is a server-side capability (#1880), not a local toggle: the
+    // maintainer-mode switch no longer implies write access the server will
+    // reject with a 403.
+    const { can: holdsCapability, role, status: accessStatus } = useEffectiveAccess();
+    const canTriggerReplay = holdsCapability('runs:replay');
 
     const asideRef = useRef<HTMLElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -34,16 +45,58 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
     });
 
     const handleReplay = useCallback(async () => {
-        if (!run.crashDetail || status === 'loading' || !isMaintainer) return;
+        if (!run.crashDetail || status === 'loading' || !canTriggerReplay) return;
         
         setStatus('loading');
         setReplayedRunId(null);
+        setJobId(null);
+        setFailure(null);
         try {
-            const { newRunId } = await simulateSeedReplay(run.id);
-            setReplayedRunId(newRunId);
+            const response = await fetch(`/api/runs/${encodeURIComponent(run.id)}/replay`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ runner, actor: 'maintainer', acknowledgeMismatch: acknowledged }),
+            });
+            const payload = (await response.json()) as {
+                data?: {
+                    ok?: boolean;
+                    newRunId?: string;
+                    jobId?: string;
+                    failure?: ReplayFailure;
+                };
+                error?: string;
+                environment?: EnvironmentCheck;
+                requiresAcknowledgement?: boolean;
+            };
+
+            if (response.status === 409 && payload.requiresAcknowledgement) {
+                setMismatch(payload.environment ?? null);
+                setAcknowledged(false);
+                setStatus('idle');
+                return;
+            }
+
+            const data = payload.data;
+            if (!response.ok || !data?.ok || !data.newRunId) {
+                setFailure(
+                    data?.failure ?? {
+                        reason: 'internal',
+                        title: 'Replay failed to start',
+                        message: payload.error ?? 'The replay request was rejected.',
+                        guidance: 'Check the runner selection and try again.',
+                        retryable: true,
+                    },
+                );
+                setStatus('error');
+                return;
+            }
+
+            setMismatch(null);
+            setJobId(data.jobId ?? null);
+            setReplayedRunId(data.newRunId);
             setStatus('success');
             onReplayComplete?.({
-                id: newRunId,
+                id: data.newRunId,
                 status: 'running',
                 area: run.area,
                 severity: run.severity,
@@ -55,9 +108,16 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
                 minResourceFee: 0,
             });
         } catch {
+            setFailure({
+                reason: 'internal',
+                title: 'Replay failed to start',
+                message: 'The replay request could not reach the server.',
+                guidance: 'Check your connection and try again.',
+                retryable: true,
+            });
             setStatus('error');
         }
-    }, [isMaintainer, onReplayComplete, status, run]);
+    }, [canTriggerReplay, onReplayComplete, status, run]);
 
     const canReplay = Boolean(run.crashDetail);
 
@@ -126,16 +186,61 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
                             </div>
                             
                             <div className="space-y-3">
+                                <label className="flex flex-col gap-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                                    Replay runner
+                                    <select
+                                        value={runner}
+                                        onChange={(event) => setRunner(event.target.value as ReplayRunner)}
+                                        disabled={status === 'loading'}
+                                        className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm font-normal text-zinc-900 dark:text-zinc-100"
+                                    >
+                                        {REPLAY_RUNNERS.map((value) => (
+                                            <option key={value} value={value}>
+                                                {REPLAY_RUNNER_INFO[value].label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">
+                                        {REPLAY_RUNNER_INFO[runner].description}
+                                    </span>
+                                </label>
+
+                                {mismatch && mismatch.status === 'mismatch' && (
+                                    <div
+                                        role="alert"
+                                        className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-900 dark:text-amber-200"
+                                    >
+                                        <p className="font-bold">Environment mismatch</p>
+                                        <p className="mt-1">{mismatch.summary}</p>
+                                        <ul className="mt-2 space-y-0.5 font-mono">
+                                            {mismatch.mismatches.map((entry) => (
+                                                <li key={entry.field}>
+                                                    {entry.field}: {entry.expected} → {entry.actual}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <label className="mt-3 flex items-start gap-2 font-semibold">
+                                            <input
+                                                type="checkbox"
+                                                checked={acknowledged}
+                                                onChange={(event) => setAcknowledged(event.target.checked)}
+                                                className="mt-0.5"
+                                            />
+                                            I understand the replay environment differs and want to run anyway.
+                                        </label>
+                                    </div>
+                                )}
+
                                 <button
                                     type="button"
                                     onClick={handleReplay}
-                                    disabled={!canReplay || status === 'loading' || !isMaintainer}
+                                    disabled={!canReplay || status === 'loading' || !canTriggerReplay}
                                     aria-busy={status === 'loading'}
                                     className={`
                                         w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all shadow-md active:scale-[0.97]
                                         ${status === 'loading' 
                                             ? 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500 cursor-not-allowed' 
-                                            : !isMaintainer
+                                            : !canTriggerReplay
                                                 ? 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed opacity-60'
                                                 : status === 'error'
                                                     ? 'bg-rose-600 text-white hover:bg-rose-700'
@@ -158,9 +263,9 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
                                     {status === 'loading' ? 'Running replay…' : status === 'error' ? 'Retry replay' : status === 'success' ? 'Replay queued' : 'Run seed replay'}
                                 </button>
                                 
-                                {!isMaintainer && (
+                                {!canTriggerReplay && (
                                     <p className="text-[10px] text-zinc-500 dark:text-zinc-500 italic">
-                                        * Enable maintainer mode to trigger replays.
+                                        * {explainGate('runs:replay', accessStatus, role)}
                                     </p>
                                 )}
                             </div>
@@ -184,6 +289,14 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
                                             >
                                                 View new run detail →
                                             </Link>
+                                            {jobId && (
+                                                <Link
+                                                    href={`/replay/${encodeURIComponent(jobId)}`}
+                                                    className="ml-4 mt-3 inline-block text-xs font-bold text-emerald-600 dark:text-emerald-400 underline hover:no-underline"
+                                                >
+                                                    View replay report →
+                                                </Link>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -198,8 +311,17 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
                                             </svg>
                                         </div>
                                         <div>
-                                            <p className="text-sm font-bold text-rose-900 dark:text-rose-100">Replay failed to start</p>
-                                            <p className="text-xs text-rose-700 dark:text-rose-400 mt-1">There was an issue scheduling the replay. Please try again or contact system support.</p>
+                                            <p className="text-sm font-bold text-rose-900 dark:text-rose-100">
+                                                {failure?.title ?? 'Replay failed to start'}
+                                            </p>
+                                            <p className="text-xs text-rose-700 dark:text-rose-400 mt-1">
+                                                {failure?.message ?? 'There was an issue scheduling the replay. Please try again or contact system support.'}
+                                            </p>
+                                            {failure?.guidance && (
+                                                <p className="text-[10px] text-rose-600 dark:text-rose-300 mt-2">
+                                                    {failure.guidance}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

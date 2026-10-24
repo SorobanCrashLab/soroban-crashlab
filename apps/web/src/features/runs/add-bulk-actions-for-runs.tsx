@@ -4,12 +4,14 @@ import * as React from 'react';
 import { useState, useCallback } from 'react';
 import { FuzzingRun } from '../../app/types';
 import {
+  bulkActionCapability,
   canPerformBulkAction,
   getBulkActionDescription,
   type BulkActionType,
 } from '../../app/runs-bulk-actions-utils';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { getConfirmDialogConfig } from '../../components/confirm-dialog-utils';
+import { explainGate, requiredRoleForCapability, useEffectiveAccess } from '../../lib/permissions';
 
 export type BulkAction = BulkActionType;
 
@@ -18,6 +20,12 @@ interface BulkActionsProps {
   onAction: (action: BulkAction, runIds: string[], data?: Record<string, unknown>) => void;
   onClearSelection: () => void;
   disabled?: boolean;
+  /**
+   * Total number of selected runs (#1875). A query-based "select all matching"
+   * selection can cover rows that are not loaded in memory, so the toolbar must
+   * show the full count rather than `selectedRuns.length`.
+   */
+  selectionCount?: number;
 }
 
 const BULK_ACTIONS: BulkActionType[] = [
@@ -34,14 +42,27 @@ const BulkActionsForRuns: React.FC<BulkActionsProps> = ({
   onAction,
   onClearSelection,
   disabled = false,
+  selectionCount,
 }) => {
+  const totalSelected = selectionCount ?? selectedRuns.length;
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const [selectedAction, setSelectedAction] = useState<BulkActionType | null>(null);
   const [actionData, setActionData] = useState<Record<string, string | boolean>>({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
+  // Server capabilities gate the destructive actions (#1880).
+  const { status: accessStatus, role, can: holdsCapability } = useEffectiveAccess();
+  const actionAllowed = useCallback(
+    (action: BulkActionType) => {
+      const capability = bulkActionCapability(action);
+      return capability === null || holdsCapability(capability);
+    },
+    [holdsCapability],
+  );
+
   const handleActionSelect = useCallback(
     (action: BulkActionType) => {
+      if (!actionAllowed(action)) return;
       setIsActionMenuOpen(false);
 
       // Intercept delete to show confirmation dialog
@@ -60,14 +81,15 @@ const BulkActionsForRuns: React.FC<BulkActionsProps> = ({
       onAction(action, runIds);
       setSelectedAction(null);
     },
-    [selectedRuns, onAction],
+    [selectedRuns, onAction, actionAllowed],
   );
 
   const handleDeleteConfirm = useCallback(() => {
+    if (!actionAllowed('delete')) return;
     const runIds = selectedRuns.map((run) => run.id);
     onAction('delete', runIds);
     setDeleteConfirmOpen(false);
-  }, [selectedRuns, onAction]);
+  }, [selectedRuns, onAction, actionAllowed]);
 
   const handleDeleteCancel = useCallback(() => {
     setDeleteConfirmOpen(false);
@@ -200,7 +222,7 @@ const BulkActionsForRuns: React.FC<BulkActionsProps> = ({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {selectedRuns.length} run{selectedRuns.length !== 1 ? 's' : ''} selected
+              {totalSelected} run{totalSelected !== 1 ? 's' : ''} selected
             </span>
             <button type="button" onClick={onClearSelection} className="btn-ghost text-sm h-8 px-3">
               Clear selection
@@ -228,20 +250,30 @@ const BulkActionsForRuns: React.FC<BulkActionsProps> = ({
                 role="menu"
                 style={{ padding: '4px 0' }}
               >
-                {BULK_ACTIONS.map((action) => (
-                  <button
-                    key={action}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => handleActionSelect(action)}
-                    disabled={!canPerformBulkAction(action, selectedRuns)}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col"
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
-                  >
-                    <span className="font-medium capitalize">{action}</span>
-                    <span className="text-xs text-meta">{getBulkActionDescription(action)}</span>
-                  </button>
-                ))}
+                {BULK_ACTIONS.map((action) => {
+                  const capability = bulkActionCapability(action);
+                  const allowed = actionAllowed(action);
+                  const requiredRole = capability ? requiredRoleForCapability(capability) : null;
+                  return (
+                    <button
+                      key={action}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleActionSelect(action)}
+                      disabled={!canPerformBulkAction(action, selectedRuns) || !allowed}
+                      title={!allowed && capability ? explainGate(capability, accessStatus, role) : undefined}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+                    >
+                      <span className="font-medium capitalize">{action}</span>
+                      <span className="text-xs text-meta">
+                        {allowed
+                          ? getBulkActionDescription(action)
+                          : `Requires the ${requiredRole ?? 'maintainer'} role.`}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -257,7 +289,7 @@ const BulkActionsForRuns: React.FC<BulkActionsProps> = ({
 
       {/* Delete confirmation dialog */}
       {(() => {
-        const cfg = getConfirmDialogConfig('delete-runs', selectedRuns.length);
+        const cfg = getConfirmDialogConfig('delete-runs', totalSelected);
         return (
           <ConfirmDialog
             isOpen={deleteConfirmOpen}

@@ -1,7 +1,7 @@
-import { withRouteErrorHandling } from '@/lib/api-route-error';
-import { readJsonBody } from '@/lib/api-request-utils';
+import { withRouteErrorHandling, readJsonBody } from '@/lib/route-handler';
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
+import { withCsrfGuard } from '@/lib/csrf';
 import { createdResponse, successResponse } from '@/lib/api-response-utils';
 import { codedErrorResponse, ERROR_CODES } from '@/lib/error-codes';
 import { withIdempotency } from '@/lib/idempotency-middleware';
@@ -27,6 +27,7 @@ import {
 import { readQuotaLimits } from '@/lib/capacity/quotas';
 import { getCapacityLedger } from '@/lib/capacity/usage-ledger';
 import { readSchedulingWindows } from '@/lib/capacity/windows';
+import { registerCampaign } from '@/lib/campaigns/campaign-registry';
 import { resolvePrincipal, resolveRoleForPrincipal } from '@/lib/rbac';
 
 const IDEMPOTENCY_SCOPE = 'POST /api/campaigns';
@@ -64,11 +65,14 @@ interface CampaignResponse {
  *    bypass is written to the audit log. Non-maintainers → 403 QUOTA_OVERRIDE_FORBIDDEN.
  * With no quotas or windows configured every campaign is admitted, as before.
  */
-export const POST = withRouteErrorHandling('POST /api/campaigns', async (request: NextRequest) => {
-  return withIdempotency(request, IDEMPOTENCY_SCOPE, async (ctx) => {
-    return createCampaign(request, ctx);
-  });
-});
+export const POST = withCsrfGuard(
+  'POST /api/campaigns',
+  withRouteErrorHandling('POST /api/campaigns', async (request: NextRequest) => {
+    return withIdempotency(request, IDEMPOTENCY_SCOPE, async (ctx) => {
+      return createCampaign(request, ctx);
+    });
+  }),
+);
 
 async function createCampaign(
   request: NextRequest,
@@ -147,13 +151,30 @@ async function createCampaign(
     const winner = await store.putIfAbsent(record);
     // A concurrent request with the same key stored its campaign first.
     if (winner !== record) {
-      // Another request won the race; surface retry guidance instead of
-      // executing the campaign a second time.
-      return replayOrReject(winner.fingerprint, winner.response as CampaignResponse, payload, key);
+      return replayOrReject(winner.fingerprint, winner.response, payload, key);
     }
   }
 
   ledger.admit({ campaignId: campaign.id, ...resources });
+
+  // The timeline (#1874) is keyed by campaign id; register the new campaign
+  // (and its start marker) so `GET /api/campaigns/[id]/timeline` can serve it.
+  registerCampaign({
+    id: campaign.id,
+    name:
+      typeof payload.name === 'string' && payload.name.trim().length > 0
+        ? payload.name.trim()
+        : undefined,
+    status: 'queued',
+    createdAt: campaign.createdAt,
+    target: {
+      ...(typeof payload.area === 'string' ? { area: payload.area } : {}),
+      ...(typeof payload.preset === 'string' ? { preset: payload.preset } : {}),
+      seeds: resources.seeds,
+      workers: resources.workers,
+    },
+  });
+
   if (overriddenBy !== null && !admission.ok) {
     recordAuditEvent({
       action: 'quota.override',
@@ -204,7 +225,7 @@ function replayOrReject(
   storedResponse: CampaignResponse,
   payload: unknown,
   key: string,
-) {
+) : NextResponse {
   if (storedFingerprint !== fingerprintPayload(payload)) {
     return codedErrorResponse('IDEMPOTENCY_KEY_REUSED');
   }

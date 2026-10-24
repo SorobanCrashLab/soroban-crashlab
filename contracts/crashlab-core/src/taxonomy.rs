@@ -8,7 +8,7 @@ use std::collections::HashMap;
 /// [`classify_failure`] rules change. Downstream consumers such as the
 /// normalization rules in [`crate::cluster`] record this version so results
 /// produced against different taxonomies are never silently conflated.
-pub const TAXONOMY_VERSION: u32 = 1;
+pub const TAXONOMY_VERSION: u32 = 3;
 
 /// Stable failure categories for Soroban contract crashes.
 ///
@@ -26,6 +26,10 @@ pub const TAXONOMY_VERSION: u32 = 1;
 /// | `Unknown`          | Raw failure did not match any known category                |
 /// | `Timeout`          | Simulation attempt exceeded the configured timeout          |
 /// | `InternalPanic`    | Internal simulation worker thread panicked                  |
+/// | `BudgetExhaustedCpu` | Structured CPU budget exhaustion                         |
+/// | `BudgetExhaustedMem` | Structured memory budget exhaustion                      |
+/// | `HostError`        | Structured host error without a more specific leaf         |
+/// | `TrapContract`     | Contract-returned error from a host invocation             |
 ///
 /// Classifications produced by [`classify_failure`] are deterministic:
 /// the same seed always maps to the same `FailureClass`.
@@ -52,6 +56,26 @@ pub enum FailureClass {
     /// Internal simulation worker thread panicked.
     /// This is distinct from timeout - the worker crashed internally.
     InternalPanic,
+    /// RPC transport fault: connect/timeout/reset (never enters crash corpus).
+    RpcTransport,
+    /// RPC rate-limit fault: 429/503 with retry-after (never enters corpus).
+    RpcRateLimited,
+    /// RPC sequence fault: nonce gap requiring re-sync and single replay.
+    RpcSequence,
+    /// RPC resource fault: fee/budget refusal with detail for signatures.
+    RpcResource,
+    /// RPC contract fault: genuine trap, distinct from transport noise.
+    RpcContract,
+    /// RPC not-found fault: archived entry.
+    RpcNotFound,
+    /// Soroban host explicitly reported exhaustion of the CPU instruction budget.
+    BudgetExhaustedCpu,
+    /// Soroban host explicitly reported exhaustion of the memory budget.
+    BudgetExhaustedMem,
+    /// A structured host error that has no more specific stable taxonomy leaf.
+    HostError,
+    /// A contract-returned error identified by the typed invocation result.
+    TrapContract,
 }
 
 impl FailureClass {
@@ -71,11 +95,21 @@ impl FailureClass {
             FailureClass::Unknown => "unknown",
             FailureClass::Timeout => "timeout",
             FailureClass::InternalPanic => "internal-panic",
+            FailureClass::RpcTransport => "rpc-transport",
+            FailureClass::RpcRateLimited => "rpc-rate-limited",
+            FailureClass::RpcSequence => "rpc-sequence",
+            FailureClass::RpcResource => "rpc-resource",
+            FailureClass::RpcContract => "rpc-contract",
+            FailureClass::RpcNotFound => "rpc-not-found",
+            FailureClass::BudgetExhaustedCpu => "budget_exhausted_cpu",
+            FailureClass::BudgetExhaustedMem => "budget_exhausted_mem",
+            FailureClass::HostError => "host_error",
+            FailureClass::TrapContract => "trap_contract",
         }
     }
 
     /// All variants in declaration order, useful for iteration and reporting.
-    pub const ALL: [FailureClass; 10] = [
+    pub const ALL: [FailureClass; 20] = [
         FailureClass::Auth,
         FailureClass::Budget,
         FailureClass::State,
@@ -86,6 +120,16 @@ impl FailureClass {
         FailureClass::Unknown,
         FailureClass::Timeout,
         FailureClass::InternalPanic,
+        FailureClass::RpcTransport,
+        FailureClass::RpcRateLimited,
+        FailureClass::RpcSequence,
+        FailureClass::RpcResource,
+        FailureClass::RpcContract,
+        FailureClass::RpcNotFound,
+        FailureClass::BudgetExhaustedCpu,
+        FailureClass::BudgetExhaustedMem,
+        FailureClass::HostError,
+        FailureClass::TrapContract,
     ];
 
     /// Parses a persisted category label into a stable failure class.
@@ -101,14 +145,64 @@ impl FailureClass {
             "unknown" => Some(FailureClass::Unknown),
             "timeout" => Some(FailureClass::Timeout),
             "internal-panic" => Some(FailureClass::InternalPanic),
+            "rpc-transport" => Some(FailureClass::RpcTransport),
+            "rpc-rate-limited" => Some(FailureClass::RpcRateLimited),
+            "rpc-sequence" => Some(FailureClass::RpcSequence),
+            "rpc-resource" => Some(FailureClass::RpcResource),
+            "rpc-contract" => Some(FailureClass::RpcContract),
+            "rpc-not-found" => Some(FailureClass::RpcNotFound),
+            "budget_exhausted_cpu" => Some(FailureClass::BudgetExhaustedCpu),
+            "budget_exhausted_mem" => Some(FailureClass::BudgetExhaustedMem),
+            "host_error" => Some(FailureClass::HostError),
+            "trap_contract" => Some(FailureClass::TrapContract),
             _ => None,
         }
     }
 }
 
+/// Classifies only structured host diagnostics. No error-message text or seed
+/// bytes are consulted.
+pub fn classify_host_diagnostics(diagnostics: &crate::HostDiagnostics) -> Option<FailureClass> {
+    if let Some(exhaustion) = diagnostics.budget_exhaustion {
+        return Some(match exhaustion {
+            crate::BudgetExhaustion::Cpu => FailureClass::BudgetExhaustedCpu,
+            crate::BudgetExhaustion::Memory => FailureClass::BudgetExhaustedMem,
+        });
+    }
+    if diagnostics.trap_origin == Some(crate::HostTrapOrigin::Contract) {
+        return Some(FailureClass::TrapContract);
+    }
+    if diagnostics.error_type.is_some() {
+        return Some(FailureClass::HostError);
+    }
+    None
+}
+
 impl std::fmt::Display for FailureClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+impl FailureClass {
+    /// True for RPC harness faults that must never enter the crash corpus.
+    pub fn is_harness_fault(self) -> bool {
+        matches!(
+            self,
+            FailureClass::RpcTransport
+                | FailureClass::RpcRateLimited
+                | FailureClass::RpcSequence
+                | FailureClass::RpcResource
+                | FailureClass::RpcNotFound
+        )
+    }
+
+    /// True when a bundle with this class must be excluded from `CrashIndex`.
+    pub fn excludes_from_corpus(self) -> bool {
+        matches!(
+            self,
+            FailureClass::RpcTransport | FailureClass::RpcRateLimited
+        )
     }
 }
 
@@ -225,7 +319,8 @@ pub fn crash_signature_from_seed(seed: &CaseSeed) -> CrashSignature {
     });
 
     // Use the signature hashing helper so hashing logic is centralized.
-    let signature_hash = crate::signature_hash::hash_category_payload(category.as_str(), &seed.payload);
+    let signature_hash =
+        crate::signature_hash::hash_category_payload(category.as_str(), &seed.payload);
 
     CrashSignature {
         category,
@@ -327,6 +422,16 @@ mod tests {
         assert_eq!(FailureClass::EmptyInput.as_str(), "empty-input");
         assert_eq!(FailureClass::OversizedInput.as_str(), "oversized-input");
         assert_eq!(FailureClass::Unknown.as_str(), "unknown");
+        assert_eq!(
+            FailureClass::BudgetExhaustedCpu.as_str(),
+            "budget_exhausted_cpu"
+        );
+        assert_eq!(
+            FailureClass::BudgetExhaustedMem.as_str(),
+            "budget_exhausted_mem"
+        );
+        assert_eq!(FailureClass::HostError.as_str(), "host_error");
+        assert_eq!(FailureClass::TrapContract.as_str(), "trap_contract");
     }
 
     #[test]
@@ -337,10 +442,61 @@ mod tests {
     }
 
     #[test]
-    fn all_contains_ten_variants() {
-        assert_eq!(FailureClass::ALL.len(), 10);
+    fn all_contains_twenty_variants() {
+        assert_eq!(FailureClass::ALL.len(), 20);
         assert!(FailureClass::ALL.contains(&FailureClass::Unknown));
         assert!(FailureClass::ALL.contains(&FailureClass::InternalPanic));
+        assert!(FailureClass::ALL.contains(&FailureClass::RpcTransport));
+        assert!(FailureClass::ALL.contains(&FailureClass::BudgetExhaustedCpu));
+        assert!(FailureClass::ALL.contains(&FailureClass::BudgetExhaustedMem));
+        assert!(FailureClass::ALL.contains(&FailureClass::HostError));
+        assert!(FailureClass::ALL.contains(&FailureClass::TrapContract));
+    }
+
+    #[test]
+    fn structured_host_diagnostics_select_leaf_categories() {
+        let cpu = crate::HostDiagnostics {
+            error_type: Some(crate::HostErrorType::Budget),
+            budget_exhaustion: Some(crate::BudgetExhaustion::Cpu),
+            ..crate::HostDiagnostics::default()
+        };
+        let memory = crate::HostDiagnostics {
+            error_type: Some(crate::HostErrorType::Budget),
+            budget_exhaustion: Some(crate::BudgetExhaustion::Memory),
+            ..crate::HostDiagnostics::default()
+        };
+        let contract = crate::HostDiagnostics {
+            error_code: Some(7),
+            error_type: Some(crate::HostErrorType::Contract),
+            trap_origin: Some(crate::HostTrapOrigin::Contract),
+            ..crate::HostDiagnostics::default()
+        };
+        let host = crate::HostDiagnostics {
+            error_code: Some(1),
+            error_type: Some(crate::HostErrorType::Value),
+            ..crate::HostDiagnostics::default()
+        };
+
+        assert_eq!(
+            classify_host_diagnostics(&cpu),
+            Some(FailureClass::BudgetExhaustedCpu)
+        );
+        assert_eq!(
+            classify_host_diagnostics(&memory),
+            Some(FailureClass::BudgetExhaustedMem)
+        );
+        assert_eq!(
+            classify_host_diagnostics(&contract),
+            Some(FailureClass::TrapContract)
+        );
+        assert_eq!(
+            classify_host_diagnostics(&host),
+            Some(FailureClass::HostError)
+        );
+        assert_eq!(
+            classify_host_diagnostics(&crate::HostDiagnostics::default()),
+            None
+        );
     }
 
     #[test]
@@ -348,6 +504,22 @@ mod tests {
         assert_eq!(
             FailureClass::from_category_label("budget"),
             Some(FailureClass::Budget)
+        );
+        assert_eq!(
+            FailureClass::from_category_label("budget_exhausted_cpu"),
+            Some(FailureClass::BudgetExhaustedCpu)
+        );
+        assert_eq!(
+            FailureClass::from_category_label("budget_exhausted_mem"),
+            Some(FailureClass::BudgetExhaustedMem)
+        );
+        assert_eq!(
+            FailureClass::from_category_label("host_error"),
+            Some(FailureClass::HostError)
+        );
+        assert_eq!(
+            FailureClass::from_category_label("trap_contract"),
+            Some(FailureClass::TrapContract)
         );
         assert_eq!(FailureClass::from_category_label("runtime-failure"), None);
     }

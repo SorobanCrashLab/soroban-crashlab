@@ -21,6 +21,7 @@ fn regression_seed_42_af88cf52() {
         environment: None,
         failure_payload: vec![],
         rpc_envelope: None,
+    engine_version: crashlab_core::engine_version::ENGINE_VERSION.to_string(),
     };
 
     let result = replay_seed_bundle(&bundle);
@@ -50,6 +51,7 @@ fn regression_seed_99_cbf29ce4() {
         environment: None,
         failure_payload: vec![],
         rpc_envelope: None,
+    engine_version: crashlab_core::engine_version::ENGINE_VERSION.to_string(),
     };
 
     let result = replay_seed_bundle(&bundle);

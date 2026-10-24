@@ -144,7 +144,7 @@ fn kill_resume_loop_processes_each_seed_exactly_once() {
     let mut seen_once = vec![false; seeds.len()];
     let mut iteration = 0;
     while iteration < 20 && !checkpoint.is_complete(&seeds) {
-        let signal = CancelSignal::newForIteration(run_id, iteration);
+        let signal = CancelSignal::new(run_id);
         let cancel_after = signal.clone();
         let kill_at = (iteration + 1) % 3;
         let mut seen_this = Vec::new();

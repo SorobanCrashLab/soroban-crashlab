@@ -131,7 +131,10 @@ fn runs_status_json_emits_the_last_log_line_verbatim() {
 
     let parsed: serde_json::Value =
         serde_json::from_str(stdout.trim()).expect("--json must emit one JSON object");
-    assert_eq!(parsed["v"], 2);
+    assert_eq!(
+        parsed["v"],
+        crashlab_core::health_snapshot::HEALTH_SNAPSHOT_SCHEMA_VERSION
+    );
     assert_eq!(parsed["run_id"], 42);
     assert_eq!(parsed["campaign_id"], "campaign-42");
     assert_eq!(parsed["terminal"], "completed");

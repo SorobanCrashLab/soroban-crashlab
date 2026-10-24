@@ -23,6 +23,7 @@
 import { recordAuditEvent } from './audit/audit-sink';
 import { DEFAULT_REQUEST_SIZE_LIMITS } from './request-size-limits';
 import { MAX_MODULE_SIZE, parseContractWasm } from './wasm-parse';
+import { redactText } from './redaction';
 
 export const ARTIFACT_CLASSES = ['wasm', 'bundle', 'seed', 'log', 'trace'] as const;
 export type ArtifactClass = (typeof ARTIFACT_CLASSES)[number];
@@ -74,6 +75,7 @@ export type UploadRejectionReason =
   | 'too-large'
   | 'bad-magic'
   | 'polyglot'
+  | 'sensitive-content'
   | 'malformed';
 
 export type UploadValidation =
@@ -157,6 +159,11 @@ const BINARY_SIGNATURES: ReadonlyArray<{ name: string; bytes: readonly number[] 
   { name: 'PDF', bytes: [0x25, 0x50, 0x44, 0x46] },
   { name: 'ELF', bytes: [0x7f, 0x45, 0x4c, 0x46] },
   { name: 'PE/DOS', bytes: [0x4d, 0x5a] },
+  { name: 'Mach-O', bytes: [0xfe, 0xed, 0xfa, 0xce] },
+  { name: 'Mach-O 64-bit', bytes: [0xfe, 0xed, 0xfa, 0xcf] },
+  { name: 'Mach-O little-endian', bytes: [0xce, 0xfa, 0xed, 0xfe] },
+  { name: 'Mach-O 64-bit little-endian', bytes: [0xcf, 0xfa, 0xed, 0xfe] },
+  { name: 'Java class', bytes: [0xca, 0xfe, 0xba, 0xbe] },
   { name: 'PNG', bytes: [0x89, 0x50, 0x4e, 0x47] },
   { name: 'GIF', bytes: [0x47, 0x49, 0x46, 0x38] },
   { name: 'gzip', bytes: [0x1f, 0x8b] },
@@ -208,6 +215,9 @@ export function validateUploadContent(artifactClass: ArtifactClass, bytes: Uint8
   if (text === null) {
     return reject('bad-magic', `A ${artifactClass} artifact must be UTF-8 text without NUL bytes.`);
   }
+  if (content === 'text' && /^\uFEFF?\s*(?:<!doctype\s+html\b|<html\b|<svg\b|<script\b)/i.test(text)) {
+    return reject('polyglot', `A ${artifactClass} artifact cannot contain active HTML or SVG content.`);
+  }
 
   if (content === 'json') {
     const trimmed = text.replace(/^﻿/, '').trimStart();
@@ -242,8 +252,13 @@ export function recordUploadRejection(record: UploadRejectionRecord): void {
   rejectionCounts.set(record.reason, (rejectionCounts.get(record.reason) ?? 0) + 1);
   recordAuditEvent({
     action: 'upload.reject',
-    target: record.fileName,
-    metadata: { ...record, rateLimitClass: UPLOAD_RATE_LIMIT_CLASS },
+    target: redactText(record.fileName),
+    metadata: {
+      ...record,
+      fileName: redactText(record.fileName),
+      runId: record.runId ? redactText(record.runId) : record.runId,
+      rateLimitClass: UPLOAD_RATE_LIMIT_CLASS,
+    },
   });
 }
 

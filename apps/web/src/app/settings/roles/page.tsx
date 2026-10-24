@@ -1,6 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Can } from '../../../components/Can';
+import {
+  CAPABILITY_CODES,
+  can,
+  getCapability,
+  requiredRoleForCapability,
+  useEffectiveAccess,
+} from '../../../lib/permissions';
 
 interface RoleAssignment {
   id: string;
@@ -22,39 +30,25 @@ interface AuditLog {
   performedBy?: string;
 }
 
-/** Mirrors the server's own view of the caller. Never taken from the client. */
-interface EffectiveAccess {
-  principal: {
-    identityType: 'github' | 'api-key' | 'anonymous';
-    identityValue: string;
-    subject: string;
-    authenticated: boolean;
-  };
-  role: 'analyst' | 'maintainer';
-  capabilities: {
-    canAnnotate: boolean;
-    canAdminister: boolean;
-  };
-  maintainerCount: number;
-  gitHubSessionsEnabled: boolean;
-}
-
 export default function RoleManagementPage() {
   const [assignments, setAssignments] = useState<RoleAssignment[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [access, setAccess] = useState<EffectiveAccess | null>(null);
   const [loading, setLoading] = useState(true);
   const [newIdentityType, setNewIdentityType] = useState<'github' | 'api-key'>('github');
   const [newIdentityValue, setNewIdentityValue] = useState('');
   const [newRole, setNewRole] = useState<'analyst' | 'maintainer'>('analyst');
 
+  // Effective access comes from the shared capability client (#1880) rather
+  // than a page-local fetch: one cached GET /api/settings/roles/me per session.
+  const { access, status: accessStatus, can: holdsCapability } = useEffectiveAccess();
+  const canManageRoles = accessStatus === 'ready' && access !== null && holdsCapability('roles:manage');
+
   useEffect(() => {
     async function fetchData() {
       try {
-        const [assignRes, auditRes, meRes] = await Promise.all([
+        const [assignRes, auditRes] = await Promise.all([
           fetch('/api/settings/roles'),
           fetch('/api/settings/roles/audit'),
-          fetch('/api/settings/roles/me'),
         ]);
 
         if (assignRes.ok) {
@@ -65,10 +59,6 @@ export default function RoleManagementPage() {
         if (auditRes.ok) {
           const data = await auditRes.json();
           setAuditLogs(data.logs || []);
-        }
-
-        if (meRes.ok) {
-          setAccess(await meRes.json());
         }
       } catch (err) {
         console.error('Failed to fetch role data:', err);
@@ -82,7 +72,7 @@ export default function RoleManagementPage() {
 
   async function handleAssignRole(e: React.FormEvent) {
     e.preventDefault();
-    if (!newIdentityValue.trim()) return;
+    if (!newIdentityValue.trim() || !canManageRoles) return;
 
     try {
       const res = await fetch('/api/settings/roles', {
@@ -116,6 +106,7 @@ export default function RoleManagementPage() {
   }
 
   async function handleRevokeRole(identityType: string, identityValue: string) {
+    if (!canManageRoles) return;
     try {
       await fetch('/api/settings/roles', {
         method: 'DELETE',
@@ -199,6 +190,72 @@ export default function RoleManagementPage() {
         )}
       </div>
 
+      <div className="bg-white rounded-lg shadow p-6 space-y-4" data-testid="capability-matrix">
+        <div>
+          <h2 className="text-lg font-semibold">Capability matrix</h2>
+          <p className="text-sm text-gray-600">
+            Every gated action in the UI maps to a capability. Each capability&apos;s required
+            role is read from the server&apos;s route registry — the same source the API
+            authorizes against — so this table cannot drift from real enforcement.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b">
+              <tr>
+                <th className="text-left py-2 px-4">Capability</th>
+                <th className="text-left py-2 px-4">Code</th>
+                <th className="text-left py-2 px-4">What it covers</th>
+                <th className="text-left py-2 px-4">Requires</th>
+                <th className="text-left py-2 px-4">You</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CAPABILITY_CODES.map((code) => {
+                const definition = getCapability(code);
+                const required = requiredRoleForCapability(code);
+                const granted = access === null ? null : can(access.role, code);
+                if (!definition) return null;
+                return (
+                  <tr key={code} className="border-b last:border-b-0">
+                    <td className="py-2 px-4 font-medium">{definition.label}</td>
+                    <td className="py-2 px-4">
+                      <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{code}</code>
+                    </td>
+                    <td className="py-2 px-4 text-xs text-gray-600">{definition.description}</td>
+                    <td className="py-2 px-4">
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-semibold ${
+                          required === 'maintainer'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}
+                      >
+                        {required ?? 'unknown'}
+                      </span>
+                    </td>
+                    <td className="py-2 px-4">
+                      <span
+                        data-testid={`capability-granted-${code}`}
+                        className={`px-2 py-1 rounded text-xs font-semibold ${
+                          granted === true
+                            ? 'bg-green-100 text-green-800'
+                            : granted === false
+                              ? 'bg-gray-100 text-gray-600'
+                              : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
+                        {granted === true ? 'Granted' : granted === false ? 'Denied' : 'Checking…'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
         <h2 className="text-lg font-semibold">Assign Role</h2>
         <form onSubmit={handleAssignRole} className="space-y-4">
@@ -241,12 +298,21 @@ export default function RoleManagementPage() {
               </select>
             </div>
           </div>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Assign Role
-          </button>
+          <Can capability="roles:manage" mode="disabled">
+            {(gate) => (
+              <button
+                type="submit"
+                disabled={gate.disabled}
+                className={`px-4 py-2 rounded-md ${
+                  gate.disabled
+                    ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Assign Role
+              </button>
+            )}
+          </Can>
         </form>
       </div>
 
@@ -289,12 +355,21 @@ export default function RoleManagementPage() {
                       {new Date(a.createdAt).toLocaleDateString()}
                     </td>
                     <td className="py-2 px-4">
-                      <button
-                        onClick={() => handleRevokeRole(a.identityType, a.identityValue)}
-                        className="text-red-600 hover:text-red-800 text-sm font-medium"
-                      >
-                        Revoke
-                      </button>
+                      <Can capability="roles:manage" mode="disabled" showNote={false}>
+                        {(gate) => (
+                          <button
+                            onClick={() => handleRevokeRole(a.identityType, a.identityValue)}
+                            disabled={gate.disabled}
+                            className={`text-sm font-medium ${
+                              gate.disabled
+                                ? 'text-gray-400 cursor-not-allowed'
+                                : 'text-red-600 hover:text-red-800'
+                            }`}
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </Can>
                     </td>
                   </tr>
                 ))}

@@ -11,12 +11,14 @@ import {
 } from '@/lib/cron';
 import { isCampaignClass } from '@/lib/capacity/quotas';
 import { getSchedulerState, setSchedulerState } from './_store';
+import { withCsrfGuard } from '@/lib/csrf';
 
 export const GET = withRouteErrorHandling('GET /api/schedules', async () => {
   const { schedules, history, ledger } = getSchedulerState();
   const now = Date.now();
+  const ledgerEntries = Object.values(ledger).flat();
   const enrichedSchedules = schedules.map((schedule) => {
-    const entries = ledger.filter((entry) => entry.scheduleId === schedule.id);
+    const entries = ledgerEntries.filter((entry) => entry.scheduleId === schedule.id);
     const lastRun = entries.length > 0 ? entries[entries.length - 1] : null;
     const missedCount = entries.filter((entry) => entry.outcome === 'misfire').length;
     return {
@@ -31,7 +33,7 @@ export const GET = withRouteErrorHandling('GET /api/schedules', async () => {
   return successResponse({ schedules: enrichedSchedules, history, ledger });
 });
 
-export const POST = withRouteErrorHandling('POST /api/schedules', async (request: NextRequest) => {
+export const POST = withRouteErrorHandling('POST /api/schedules', withCsrfGuard({ authClass: 'session' }, async (request: NextRequest) => {
   const parsedBody = await readJsonBody(request);
   if ('error' in parsedBody) return parsedBody.error;
 
@@ -76,7 +78,7 @@ export const POST = withRouteErrorHandling('POST /api/schedules', async (request
 
   setSchedulerState({ ...state, schedules: addSchedule(state.schedules, schedule) });
   return successResponse({ schedule }, { status: 201 });
-});
+}));
 
 function deriveStatus(
   schedule: { enabled: boolean; nextRun?: string | null },

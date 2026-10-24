@@ -19,7 +19,8 @@ function createFakeRedis() {
     async get(key) {
       return values.get(key) ?? null;
     },
-    async set(key, value) {
+    async set(key, value, options) {
+      if (options?.xx && !values.has(key)) return null;
       values.set(key, value);
       return 'OK';
     },
@@ -90,6 +91,13 @@ describe.each(drivers)('RecordDriver: $name', ({ create }) => {
     await driver.putRecord('gone', 'value');
     expect(await driver.deleteRecord('gone')).toBe(true);
     expect(await driver.getRecord('gone')).toBeNull();
+  });
+
+  it('updates a record only while it still exists', async () => {
+    expect(await driver.updateRecordIfPresent('missing', 'new')).toBe(false);
+    await driver.putRecord('present', 'old');
+    expect(await driver.updateRecordIfPresent('present', 'new', 60)).toBe(true);
+    expect(await driver.getRecord('present')).toBe('new');
   });
 
   it('enumerates an index and drops members from it', async () => {

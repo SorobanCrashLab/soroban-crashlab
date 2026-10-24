@@ -34,6 +34,11 @@ const EOCD_SIGNATURE = 0x06054b50;
 const LOCAL_HEADER_SIZE = 30;
 const CENTRAL_HEADER_SIZE = 46;
 const EOCD_SIZE = 22;
+const MAX_ZIP_ENTRIES = 500;
+const MAX_ZIP_ENTRY_BYTES = 4 * 1024 * 1024;
+const MAX_ZIP_TOTAL_BYTES = 16 * 1024 * 1024;
+const MAX_ZIP_PATH_BYTES = 512;
+const MAX_ZIP_ARCHIVE_BYTES = MAX_ZIP_TOTAL_BYTES + MAX_ZIP_ENTRIES * (LOCAL_HEADER_SIZE + CENTRAL_HEADER_SIZE + MAX_ZIP_PATH_BYTES) + EOCD_SIZE;
 
 /** Version 2.0: the minimum that understands the fields we write. */
 const VERSION = 20;
@@ -81,10 +86,18 @@ function toDosDateTime(date: Date): { time: number; date: number } {
     return { time, date: dosDate };
 }
 
-function sanitizeZipPath(path: string): string {
-    let sanitized = path.replace(/^[a-zA-Z]:/, '').replace(/^\/+/, '');
-    sanitized = sanitized.split('/').filter(part => part !== '' && part !== '.').join('/');
-    return sanitized || 'entry';
+function validateZipPath(path: string): string {
+    if (!path || path.includes('\\') || path.includes('\0') || /^[a-zA-Z]:/.test(path) || path.startsWith('/')) {
+        throw new Error('Invalid ZIP entry path');
+    }
+    const segments = path.split('/');
+    if (segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+        throw new Error('ZIP entry path contains an unsafe segment');
+    }
+    if ([...path].some((character) => character.charCodeAt(0) < 0x20 || character.charCodeAt(0) === 0x7f)) {
+        throw new Error('ZIP entry path contains a control character');
+    }
+    return path;
 }
 
 /**
@@ -99,17 +112,31 @@ export function createZipArchive(
 ): Uint8Array {
     const encoder = new TextEncoder();
     const { time, date } = toDosDateTime(options.modifiedAt ?? new Date());
+    if (entries.length > MAX_ZIP_ENTRIES) {
+        throw new Error(`ZIP archive exceeds the ${MAX_ZIP_ENTRIES} entry limit`);
+    }
 
     const seenPaths = new Set<string>();
+    let totalBytes = 0;
     const prepared = entries.map((entry) => {
-        const safePath = sanitizeZipPath(entry.path);
+        const safePath = validateZipPath(entry.path);
         if (seenPaths.has(safePath)) {
             throw new Error(`Duplicate entry path in archive: ${safePath}`);
         }
         seenPaths.add(safePath);
 
         const nameBytes = encoder.encode(safePath);
+        if (nameBytes.byteLength > MAX_ZIP_PATH_BYTES) {
+            throw new Error(`ZIP entry path exceeds the ${MAX_ZIP_PATH_BYTES} byte limit`);
+        }
         const dataBytes = encoder.encode(entry.content);
+        if (dataBytes.byteLength > MAX_ZIP_ENTRY_BYTES) {
+            throw new Error(`ZIP entry exceeds the ${MAX_ZIP_ENTRY_BYTES} byte limit`);
+        }
+        totalBytes += dataBytes.byteLength;
+        if (totalBytes > MAX_ZIP_TOTAL_BYTES) {
+            throw new Error(`ZIP archive exceeds the ${MAX_ZIP_TOTAL_BYTES} byte uncompressed limit`);
+        }
         return { nameBytes, dataBytes, crc: crc32(dataBytes), offset: 0 };
     });
 
@@ -196,8 +223,11 @@ export function createZipArchive(
  * without pulling in a decompressor.
  */
 export function readZipArchive(bytes: Uint8Array): ZipEntry[] {
+    if (bytes.byteLength > MAX_ZIP_ARCHIVE_BYTES) {
+        throw new Error(`ZIP archive exceeds the ${MAX_ZIP_ARCHIVE_BYTES} byte limit`);
+    }
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    const decoder = new TextDecoder();
+    const decoder = new TextDecoder('utf-8', { fatal: true });
 
     // The EOCD sits at the end, after an optional comment, so scan backwards.
     let eocd = -1;
@@ -212,10 +242,17 @@ export function readZipArchive(bytes: Uint8Array): ZipEntry[] {
     }
 
     const entryCount = view.getUint16(eocd + 10, true);
+    if (entryCount > MAX_ZIP_ENTRIES) {
+        throw new Error(`ZIP archive exceeds the ${MAX_ZIP_ENTRIES} entry limit`);
+    }
     let cursor = view.getUint32(eocd + 16, true);
     const entries: ZipEntry[] = [];
+    let totalBytes = 0;
 
     for (let i = 0; i < entryCount; i++) {
+        if (cursor + CENTRAL_HEADER_SIZE > bytes.byteLength) {
+            throw new Error(`Truncated central directory at entry ${i}`);
+        }
         if (view.getUint32(cursor, true) !== CENTRAL_HEADER_SIGNATURE) {
             throw new Error(`Corrupt central directory at entry ${i}`);
         }
@@ -226,19 +263,53 @@ export function readZipArchive(bytes: Uint8Array): ZipEntry[] {
         }
 
         const expectedCrc = view.getUint32(cursor + 16, true);
+        const compressedSize = view.getUint32(cursor + 20, true);
         const size = view.getUint32(cursor + 24, true);
         const nameLength = view.getUint16(cursor + 28, true);
         const extraLength = view.getUint16(cursor + 30, true);
         const commentLength = view.getUint16(cursor + 32, true);
         const localOffset = view.getUint32(cursor + 42, true);
 
-        const path = decoder.decode(bytes.subarray(cursor + CENTRAL_HEADER_SIZE, cursor + CENTRAL_HEADER_SIZE + nameLength));
+        if (size > MAX_ZIP_ENTRY_BYTES) {
+            throw new Error(`ZIP entry exceeds the ${MAX_ZIP_ENTRY_BYTES} byte limit`);
+        }
+        if (compressedSize !== size) {
+            throw new Error(`Stored ZIP entry has inconsistent sizes`);
+        }
+        totalBytes += size;
+        if (totalBytes > MAX_ZIP_TOTAL_BYTES) {
+            throw new Error(`ZIP archive exceeds the ${MAX_ZIP_TOTAL_BYTES} byte uncompressed limit`);
+        }
+        const nameStart = cursor + CENTRAL_HEADER_SIZE;
+        if (nameStart + nameLength + extraLength + commentLength > bytes.byteLength) {
+            throw new Error(`Truncated central directory entry ${i}`);
+        }
+        const path = validateZipPath(decoder.decode(bytes.subarray(nameStart, nameStart + nameLength)));
 
         // Name and extra lengths are re-read from the local header: they are
         // allowed to differ from the central directory copy.
+        if (localOffset + LOCAL_HEADER_SIZE > bytes.byteLength) {
+            throw new Error(`Invalid local header offset for entry ${path}`);
+        }
+        if (view.getUint32(localOffset, true) !== LOCAL_HEADER_SIGNATURE) {
+            throw new Error(`Invalid local file header for entry ${path}`);
+        }
         const localNameLength = view.getUint16(localOffset + 26, true);
         const localExtraLength = view.getUint16(localOffset + 28, true);
-        const dataStart = localOffset + LOCAL_HEADER_SIZE + localNameLength + localExtraLength;
+        const localNameStart = localOffset + LOCAL_HEADER_SIZE;
+        const dataStart = localNameStart + localNameLength + localExtraLength;
+        if (dataStart > bytes.byteLength) {
+            throw new Error(`Truncated local header for entry ${path}`);
+        }
+        const localPath = validateZipPath(
+            decoder.decode(bytes.subarray(localNameStart, localNameStart + localNameLength)),
+        );
+        if (localPath !== path) {
+            throw new Error(`ZIP entry path mismatch for ${path}`);
+        }
+        if (dataStart + size > bytes.byteLength) {
+            throw new Error(`Truncated data for entry ${path}`);
+        }
         const data = bytes.subarray(dataStart, dataStart + size);
 
         if (crc32(data) !== expectedCrc) {

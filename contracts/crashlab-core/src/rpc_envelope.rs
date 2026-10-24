@@ -5,23 +5,9 @@
 //! redacted to prevent credential leakage while maintaining enough
 //! information for reproducibility debugging.
 
+use crate::HostDiagnostics;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-/// Sensitive field patterns that should be redacted from captured envelopes.
-const SENSITIVE_PATTERNS: &[&str] = &[
-    "authorization",
-    "auth",
-    "token",
-    "key",
-    "secret",
-    "signature",
-    "private",
-    "password",
-    "credential",
-    "seed",
-    "mnemonic",
-];
 
 /// A captured RPC request envelope with sensitive fields redacted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,13 +34,9 @@ impl RpcRequestEnvelope {
         }
     }
 
-    /// Creates a new request envelope without redaction (use with caution).
+    /// Legacy constructor name; captures are now redacted like [`Self::new`].
     pub fn new_unsanitized(method: impl Into<String>, params: Value) -> Self {
-        Self {
-            method: method.into(),
-            params,
-            redacted_fields: Vec::new(),
-        }
+        Self::new(method, params)
     }
 }
 
@@ -72,6 +54,9 @@ pub struct RpcResponseEnvelope {
     /// List of field paths that were redacted.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub redacted_fields: Vec<String>,
+    /// Optional structured host diagnostics associated with this RPC result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_diagnostics: Option<HostDiagnostics>,
 }
 
 impl RpcResponseEnvelope {
@@ -84,6 +69,7 @@ impl RpcResponseEnvelope {
             result: Some(sanitized_result),
             error: None,
             redacted_fields,
+            host_diagnostics: None,
         }
     }
 
@@ -96,20 +82,32 @@ impl RpcResponseEnvelope {
             result: None,
             error: Some(sanitized_error),
             redacted_fields,
+            host_diagnostics: None,
         }
     }
 
-    /// Creates a new response envelope without redaction (use with caution).
+    /// Attaches structured diagnostics without changing the captured response
+    /// payload or its redaction metadata.
+    pub fn with_host_diagnostics(mut self, diagnostics: HostDiagnostics) -> Self {
+        self.host_diagnostics = Some(diagnostics);
+        self
+    }
+
+    /// Legacy constructor name; captures are now redacted like the other constructors.
     pub fn new_unsanitized(
         status: impl Into<String>,
         result: Option<Value>,
         error: Option<Value>,
     ) -> Self {
+        let mut redacted_fields = Vec::new();
+        let result = result.map(|value| redact_sensitive_fields(&value, "", &mut redacted_fields));
+        let error = error.map(|value| redact_sensitive_fields(&value, "", &mut redacted_fields));
         Self {
             status: status.into(),
             result,
             error,
-            redacted_fields: Vec::new(),
+            redacted_fields,
+            host_diagnostics: None,
         }
     }
 }
@@ -169,49 +167,19 @@ impl RpcEnvelopeCapture {
 /// Field names are compared case-insensitively against known sensitive patterns.
 /// Returns a new Value with sensitive fields replaced by `[REDACTED]`.
 fn redact_sensitive_fields(value: &Value, path: &str, redacted: &mut Vec<String>) -> Value {
-    match value {
-        Value::Object(map) => {
-            let mut new_map = serde_json::Map::new();
-            for (key, val) in map {
-                let current_path = if path.is_empty() {
-                    key.clone()
-                } else {
-                    format!("{}.{}", path, key)
-                };
-
-                if is_sensitive_field(key) {
-                    redacted.push(current_path);
-                    new_map.insert(key.clone(), Value::String("[REDACTED]".to_string()));
-                } else {
-                    new_map.insert(
-                        key.clone(),
-                        redact_sensitive_fields(val, &current_path, redacted),
-                    );
-                }
-            }
-            Value::Object(new_map)
+    let (sanitized, fields) = crate::redact::redact_json_value(value);
+    redacted.extend(fields.into_iter().map(|field| {
+        if path.is_empty() {
+            field
+        } else {
+            format!("{path}.{field}")
         }
-        Value::Array(arr) => {
-            let new_arr: Vec<Value> = arr
-                .iter()
-                .enumerate()
-                .map(|(i, v)| {
-                    let item_path = format!("{}[{}]", path, i);
-                    redact_sensitive_fields(v, &item_path, redacted)
-                })
-                .collect();
-            Value::Array(new_arr)
-        }
-        _ => value.clone(),
-    }
+    }));
+    sanitized
 }
 
-/// Checks if a field name matches any sensitive pattern (case-insensitive).
 fn is_sensitive_field(field_name: &str) -> bool {
-    let lower = field_name.to_lowercase();
-    SENSITIVE_PATTERNS
-        .iter()
-        .any(|pattern| lower.contains(pattern))
+    crate::redact::is_sensitive_field(field_name)
 }
 
 #[cfg(test)]
@@ -396,5 +364,31 @@ mod tests {
         assert_eq!(capture, deserialized);
         assert!(deserialized.has_redactions());
         assert_eq!(deserialized.request.params["password"], "[REDACTED]");
+    }
+
+    #[test]
+    fn response_host_diagnostics_round_trip_and_old_data_defaults_to_none() {
+        let diagnostics = HostDiagnostics {
+            error_code: Some(9),
+            error_type: Some(crate::HostErrorType::Budget),
+            frame_summary: Some("top-level entrypoint: transfer".to_string()),
+            cpu_instruction_cost: Some(123),
+            ..HostDiagnostics::default()
+        };
+        let response = RpcResponseEnvelope::error(serde_json::json!({"code": 1}))
+            .with_host_diagnostics(diagnostics.clone());
+
+        let json = serde_json::to_string(&response).expect("serialize");
+        let round_trip: RpcResponseEnvelope = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(round_trip.host_diagnostics, Some(diagnostics));
+
+        let mut legacy = serde_json::to_value(&response).expect("serialize legacy shape");
+        legacy
+            .as_object_mut()
+            .expect("response object")
+            .remove("host_diagnostics");
+        let legacy: RpcResponseEnvelope =
+            serde_json::from_value(legacy).expect("missing optional field defaults");
+        assert_eq!(legacy.host_diagnostics, None);
     }
 }

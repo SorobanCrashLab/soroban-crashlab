@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from './ThemeProvider';
 import { useEffect, useRef, useState } from 'react';
 import { useMaintainerMode } from '../app/useMaintainerMode';
+import { useEffectiveAccess } from '../lib/permissions';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { LogoMark } from './Logo';
 
@@ -24,11 +25,16 @@ export default function NavBar() {
   const pathname = usePathname();
   const { theme, toggle, mounted } = useTheme();
   const { isMaintainer, mounted: mmMounted } = useMaintainerMode();
+  const { status: accessStatus, can: holdsCapability } = useEffectiveAccess();
   const [scrolled, setScrolled] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
-  const showMaintainer = mmMounted && isMaintainer;
+  // Maintainer entry is shown when the server role grants it or the local
+  // maintainer-mode toggle is on (#1880 dual gate; ADR-0012).
+  const showMaintainer =
+    (mmMounted && isMaintainer) ||
+    (accessStatus === 'ready' && holdsCapability('settings:write'));
   const navItems = showMaintainer ? allNavItems : allNavItems.filter(i => i.href !== '/maintainer');
 
   useEffect(() => {

@@ -61,3 +61,12 @@ export function selectRunStorageDriver(): RunStorageDriver {
 
   return runDriver;
 }
+
+/** Test/DI seam: inject a driver without touching module mocks. */
+export function setRunStorageDriver(driver: RunStorageDriver | undefined): void {
+  runDriver = driver;
+}
+
+export function resetRunStorageDriver(): void {
+  runDriver = undefined;
+}

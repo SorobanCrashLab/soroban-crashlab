@@ -13,9 +13,11 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::process;
 
+const MAX_IMPORT_BYTES: usize = crashlab_core::corpus::MAX_CORPUS_JSON_BYTES;
+
 fn main() {
     if let Err(err) = run() {
-        eprintln!("{err}");
+        eprintln!("{}", crashlab_core::redact::redact_text(&err));
         process::exit(1);
     }
 }
@@ -39,30 +41,55 @@ fn load_seeds_from_env_args() -> Result<Vec<CaseSeed>, String> {
         if path.is_dir() {
             return load_seeds_from_directory(path);
         }
-        let bytes = fs::read(path).map_err(|e| format!("read {path_str}: {e}"))?;
+        let bytes = read_bounded(
+            fs::File::open(path).map_err(|e| format!("read {path_str}: {e}"))?,
+            &path_str,
+        )?;
         return parse_seeds(&bytes);
     }
 
-    let mut buf = Vec::new();
-    io::stdin()
-        .read_to_end(&mut buf)
-        .map_err(|e| format!("stdin: {e}"))?;
+    let buf = read_bounded(io::stdin().lock(), "stdin")?;
     parse_seeds(&buf)
+}
+
+fn read_bounded(mut reader: impl Read, source: &str) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    reader
+        .by_ref()
+        .take(MAX_IMPORT_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("read {source}: {error}"))?;
+    if bytes.len() > MAX_IMPORT_BYTES {
+        return Err(format!(
+            "input from {source} exceeds the {MAX_IMPORT_BYTES}-byte limit"
+        ));
+    }
+    Ok(bytes)
 }
 
 pub fn load_seeds_from_directory(dir: &Path) -> Result<Vec<CaseSeed>, String> {
     let mut all_seeds = Vec::new();
+    let mut total_bytes = 0usize;
     let mut entries: Vec<_> = fs::read_dir(dir)
         .map_err(|e| format!("read dir {}: {e}", dir.display()))?
-        .filter_map(|e| e.ok())
-        .collect();
+        .collect::<Result<_, _>>()
+        .map_err(|e| format!("read directory entry: {e}"))?;
     entries.sort_by_key(|e| e.path());
 
     for entry in entries {
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let bytes = fs::read(&path)
-                .map_err(|e| format!("read {}: {e}", path.display()))?;
+            let bytes = read_bounded(
+                fs::File::open(&path)
+                    .map_err(|error| format!("read {}: {error}", path.display()))?,
+                &path.display().to_string(),
+            )?;
+            total_bytes = total_bytes.saturating_add(bytes.len());
+            if total_bytes > MAX_IMPORT_BYTES {
+                return Err(format!(
+                    "directory input exceeds the {MAX_IMPORT_BYTES}-byte aggregate limit"
+                ));
+            }
             let seeds = parse_seeds(&bytes)
                 .map_err(|e| format!("failed to parse {}: {e}", path.display()))?;
             all_seeds.extend(seeds);
@@ -70,7 +97,10 @@ pub fn load_seeds_from_directory(dir: &Path) -> Result<Vec<CaseSeed>, String> {
     }
 
     if all_seeds.is_empty() {
-        return Err(format!("no valid JSON fixtures or seeds found in directory {}", dir.display()));
+        return Err(format!(
+            "no valid JSON fixtures or seeds found in directory {}",
+            dir.display()
+        ));
     }
 
     Ok(all_seeds)
@@ -79,6 +109,11 @@ pub fn load_seeds_from_directory(dir: &Path) -> Result<Vec<CaseSeed>, String> {
 pub fn parse_seeds(bytes: &[u8]) -> Result<Vec<CaseSeed>, String> {
     if bytes.is_empty() {
         return Err("empty input".to_string());
+    }
+    if bytes.len() > MAX_IMPORT_BYTES {
+        return Err(format!(
+            "seed input exceeds the {MAX_IMPORT_BYTES}-byte limit"
+        ));
     }
 
     if let Ok(seeds) = import_corpus_json(bytes) {
@@ -115,8 +150,7 @@ pub fn parse_seeds(bytes: &[u8]) -> Result<Vec<CaseSeed>, String> {
         }]);
     }
 
-    serde_json::from_slice::<Vec<CaseSeed>>(bytes)
-        .map_err(|e| format!("malformed seed input: {e}"))
+    serde_json::from_slice::<Vec<CaseSeed>>(bytes).map_err(|e| format!("malformed seed input: {e}"))
 }
 
 pub fn validate_seeds(seeds: &[CaseSeed]) -> Result<(), String> {
@@ -175,7 +209,8 @@ mod tests {
 
     #[test]
     fn parse_accepts_failure_scenario() {
-        let raw = r#"{"seed_id":7,"input_payload":"","mode":"invoker","failure_class":"empty-input"}"#;
+        let raw =
+            r#"{"seed_id":7,"input_payload":"","mode":"invoker","failure_class":"empty-input"}"#;
         let seeds = parse_seeds(raw.as_bytes()).expect("failure scenario should parse");
         assert_eq!(seeds.len(), 1);
         assert_eq!(seeds[0].id, 7);
@@ -198,8 +233,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_invalid_json() {
-        let err = parse_seeds(br#"this is not json"#)
-            .expect_err("invalid JSON must fail");
+        let err = parse_seeds(br#"this is not json"#).expect_err("invalid JSON must fail");
         assert!(err.contains("malformed seed input"));
     }
 
@@ -212,8 +246,7 @@ mod tests {
     #[test]
     fn parse_rejects_missing_id_field() {
         let raw = r#"[{"payload":[1,2,3]}]"#;
-        let err = parse_seeds(raw.as_bytes())
-            .expect_err("missing id field must fail");
+        let err = parse_seeds(raw.as_bytes()).expect_err("missing id field must fail");
         assert!(err.contains("malformed seed input"));
     }
 
@@ -242,8 +275,8 @@ mod tests {
     #[test]
     fn validation_accepts_seed_at_maximum_bounds() {
         let seeds = vec![CaseSeed {
-            id: u64::MAX,                     // max_id
-            payload: vec![0u8; 64],           // max_payload_len = 64
+            id: u64::MAX,           // max_id
+            payload: vec![0u8; 64], // max_payload_len = 64
         }];
         assert!(validate_seeds(&seeds).is_ok());
     }
@@ -349,11 +382,17 @@ mod tests {
         let seeds = load_seeds_from_directory(&fixtures_dir)
             .expect("should successfully load all shipped fixtures");
         assert!(!seeds.is_empty(), "fixtures should contain seeds");
-        assert!(validate_seeds(&seeds).is_ok(), "all shipped fixtures must pass validation");
+        assert!(
+            validate_seeds(&seeds).is_ok(),
+            "all shipped fixtures must pass validation"
+        );
 
         // Verify that empty payload from empty_input_001.json is included and valid
         let empty_seed = seeds.iter().find(|s| s.id == 7);
-        assert!(empty_seed.is_some(), "empty_input_001.json (id 7) must be loaded");
+        assert!(
+            empty_seed.is_some(),
+            "empty_input_001.json (id 7) must be loaded"
+        );
         assert_eq!(empty_seed.unwrap().payload, Vec::<u8>::new());
     }
 }
