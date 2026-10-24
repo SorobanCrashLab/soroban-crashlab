@@ -41,9 +41,7 @@ impl RpcFault {
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
-            RpcFault::Transport { .. }
-                | RpcFault::RateLimited { .. }
-                | RpcFault::Sequence { .. }
+            RpcFault::Transport { .. } | RpcFault::RateLimited { .. } | RpcFault::Sequence { .. }
         )
     }
 
@@ -194,10 +192,31 @@ mod tests {
         use crate::{CaseSeed, CrashSignature};
 
         let cases: Vec<(Option<i64>, &str, Option<u16>, FailureClass, bool, u32)> = vec![
-            (None, "connection reset", None, FailureClass::RpcTransport, true, 3),
+            (
+                None,
+                "connection reset",
+                None,
+                FailureClass::RpcTransport,
+                true,
+                3,
+            ),
             (None, "x", Some(429), FailureClass::RpcRateLimited, true, 3),
-            (None, "bad_seq nonce", None, FailureClass::RpcSequence, false, 2),
-            (None, "insufficient fee", None, FailureClass::RpcResource, false, 1),
+            (
+                None,
+                "bad_seq nonce",
+                None,
+                FailureClass::RpcSequence,
+                false,
+                2,
+            ),
+            (
+                None,
+                "insufficient fee",
+                None,
+                FailureClass::RpcResource,
+                false,
+                1,
+            ),
             (None, "trap", None, FailureClass::RpcContract, false, 1),
             (None, "x", Some(404), FailureClass::RpcNotFound, false, 1),
         ];
@@ -208,6 +227,7 @@ mod tests {
             jitter_factor: 0.0,
         };
         let mut index = CrashIndex::new();
+        let mut next_hash = 9000u64;
         for (code, msg, status, class, excluded, expected_calls) in cases {
             let fault = RpcFault::parse_envelope(code, msg, status);
             assert_eq!(fault.failure_class(), class);
@@ -231,11 +251,17 @@ mod tests {
             assert_eq!(observed, expected_calls);
 
             let bundle = crate::CaseBundle {
-                seed: CaseSeed { id: 1, payload: vec![1] },
+                seed: CaseSeed {
+                    id: 1,
+                    payload: vec![1],
+                },
                 signature: CrashSignature {
                     category: class.as_str().to_string(),
                     digest: 1,
-                    signature_hash: 9000 + observed as u64,
+                    signature_hash: {
+                        next_hash += 1;
+                        next_hash
+                    },
                 },
                 environment: None,
                 failure_payload: Vec::new(),

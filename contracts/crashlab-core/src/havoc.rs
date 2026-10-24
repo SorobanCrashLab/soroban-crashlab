@@ -12,10 +12,10 @@
 //!   [`crate::scval_mutator`], hitting numeric boundaries, size edges, and
 //!   address-type swaps instead of wasting budget on structurally invalid bytes.
 
-use crate::enum_flip::{ENUM_MARKER, INVALID_TAGS, VALID_TAGS};
 use crate::dictionary::{Dictionary, DictionaryHitTracker};
-use crate::scval_mutator::{self, ScValMutatorConfig};
+use crate::enum_flip::{ENUM_MARKER, INVALID_TAGS, VALID_TAGS};
 use crate::scheduler::Mutator;
+use crate::scval_mutator::{self, ScValMutatorConfig};
 use crate::CaseSeed;
 
 /// The individual operations supported by the havoc mutator.
@@ -110,7 +110,8 @@ impl HavocConfig {
 
     /// Returns true if a dictionary injection should occur for the given rng state.
     pub fn should_inject_dictionary(&self, rng_state: &mut u64) -> bool {
-        self.dictionary_enabled() && (next_u64(rng_state) % 100) < self.dictionary_injection_percent as u64
+        self.dictionary_enabled()
+            && (next_u64(rng_state) % 100) < self.dictionary_injection_percent as u64
     }
 }
 
@@ -194,7 +195,11 @@ fn apply_byte_flip(payload: &mut Vec<u8>, _config: &HavocConfig, rng_state: &mut
         }
         2 => {
             // Small arithmetic tweak (+1 or -1)
-            let delta = if (next_u64(rng_state) & 1) == 1 { 1u8 } else { 0xFFu8 };
+            let delta = if (next_u64(rng_state) & 1) == 1 {
+                1u8
+            } else {
+                0xFFu8
+            };
             payload[idx] = payload[idx].wrapping_add(delta);
         }
         _ => {
@@ -365,10 +370,18 @@ pub fn apply_dictionary_injection(
     // when the payload can accommodate the dictionary value, otherwise insert.
     if payload.len() >= value.len() && !payload.is_empty() {
         let max_start = payload.len() - value.len();
-        let pos = if max_start == 0 { 0 } else { next_usize(rng_state) % (max_start + 1) };
+        let pos = if max_start == 0 {
+            0
+        } else {
+            next_usize(rng_state) % (max_start + 1)
+        };
         payload[pos..pos + value.len()].copy_from_slice(value);
     } else {
-        let pos = if payload.is_empty() { 0 } else { next_usize(rng_state) % (payload.len() + 1) };
+        let pos = if payload.is_empty() {
+            0
+        } else {
+            next_usize(rng_state) % (payload.len() + 1)
+        };
         payload.splice(pos..pos, value.iter().copied());
     }
 
@@ -484,7 +497,11 @@ pub struct HavocMutator {
 
 impl HavocMutator {
     pub fn new(config: HavocConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            dictionary: None,
+            hits: None,
+        }
     }
 
     pub fn with_dictionary(mut self, dictionary: Dictionary) -> Self {
@@ -531,11 +548,26 @@ mod tests {
     #[test]
     fn property_mutation_is_deterministic_given_seed_state() {
         let test_seeds = vec![
-            CaseSeed { id: 0, payload: vec![] },
-            CaseSeed { id: 1, payload: vec![42] },
-            CaseSeed { id: 7, payload: vec![1, 2, 3, 4] },
-            CaseSeed { id: 100, payload: vec![0xAA; 64] },
-            CaseSeed { id: u64::MAX, payload: vec![0xE0, 0x01, 0x02, 0x03] },
+            CaseSeed {
+                id: 0,
+                payload: vec![],
+            },
+            CaseSeed {
+                id: 1,
+                payload: vec![42],
+            },
+            CaseSeed {
+                id: 7,
+                payload: vec![1, 2, 3, 4],
+            },
+            CaseSeed {
+                id: 100,
+                payload: vec![0xAA; 64],
+            },
+            CaseSeed {
+                id: u64::MAX,
+                payload: vec![0xE0, 0x01, 0x02, 0x03],
+            },
         ];
 
         for seed in &test_seeds {
@@ -547,7 +579,11 @@ mod tests {
             let mut payload2 = seed.payload.clone();
             apply_havoc_mutation(&mut payload2, &HavocConfig::default(), &mut state2);
 
-            assert_eq!(payload1, payload2, "seed id {} was not deterministic", seed.id);
+            assert_eq!(
+                payload1, payload2,
+                "seed id {} was not deterministic",
+                seed.id
+            );
             assert_eq!(state1, state2);
         }
     }
@@ -671,7 +707,13 @@ mod tests {
         let mut seeds: Vec<Vec<u8>> = Vec::new();
         for _ in 0..16 {
             let mut p = Vec::new();
-            if scval_mutator::synthesize_xdr_payload(&mut p, &ScValMutatorConfig::default(), &mut rng).is_ok() {
+            if scval_mutator::synthesize_xdr_payload(
+                &mut p,
+                &ScValMutatorConfig::default(),
+                &mut rng,
+            )
+            .is_ok()
+            {
                 seeds.push(p);
             }
         }
@@ -701,8 +743,18 @@ mod tests {
         let mut p = vec![1];
         for _ in 0..100 {
             apply_havoc_mutation(&mut p, &config, &mut rng);
-            assert!(p.len() >= config.min_len, "len {} < min_len {}", p.len(), config.min_len);
-            assert!(p.len() <= config.max_len, "len {} > max_len {}", p.len(), config.max_len);
+            assert!(
+                p.len() >= config.min_len,
+                "len {} < min_len {}",
+                p.len(),
+                config.min_len
+            );
+            assert!(
+                p.len() <= config.max_len,
+                "len {} > max_len {}",
+                p.len(),
+                config.max_len
+            );
         }
 
         // Starts above max_len
@@ -747,6 +799,9 @@ mod tests {
         let mut payload = vec![0u8; 8];
         let (_, injected) =
             apply_havoc_mutation_with_dictionary(&mut payload, &config, Some(&dict), &mut rng);
-        assert!(injected.is_none(), "dictionary injection should be disabled");
+        assert!(
+            injected.is_none(),
+            "dictionary injection should be disabled"
+        );
     }
 }

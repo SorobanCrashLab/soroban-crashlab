@@ -43,7 +43,7 @@ fn load_seeds_from_env_args() -> Result<Vec<CaseSeed>, String> {
         }
         let bytes = read_bounded(
             fs::File::open(path).map_err(|e| format!("read {path_str}: {e}"))?,
-            path_str,
+            &path_str,
         )?;
         return parse_seeds(&bytes);
     }
@@ -80,7 +80,8 @@ pub fn load_seeds_from_directory(dir: &Path) -> Result<Vec<CaseSeed>, String> {
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
             let bytes = read_bounded(
-                fs::File::open(&path).map_err(|error| format!("read {}: {error}", path.display()))?,
+                fs::File::open(&path)
+                    .map_err(|error| format!("read {}: {error}", path.display()))?,
                 &path.display().to_string(),
             )?;
             total_bytes = total_bytes.saturating_add(bytes.len());
@@ -96,7 +97,10 @@ pub fn load_seeds_from_directory(dir: &Path) -> Result<Vec<CaseSeed>, String> {
     }
 
     if all_seeds.is_empty() {
-        return Err(format!("no valid JSON fixtures or seeds found in directory {}", dir.display()));
+        return Err(format!(
+            "no valid JSON fixtures or seeds found in directory {}",
+            dir.display()
+        ));
     }
 
     Ok(all_seeds)
@@ -146,8 +150,7 @@ pub fn parse_seeds(bytes: &[u8]) -> Result<Vec<CaseSeed>, String> {
         }]);
     }
 
-    serde_json::from_slice::<Vec<CaseSeed>>(bytes)
-        .map_err(|e| format!("malformed seed input: {e}"))
+    serde_json::from_slice::<Vec<CaseSeed>>(bytes).map_err(|e| format!("malformed seed input: {e}"))
 }
 
 pub fn validate_seeds(seeds: &[CaseSeed]) -> Result<(), String> {
@@ -206,7 +209,8 @@ mod tests {
 
     #[test]
     fn parse_accepts_failure_scenario() {
-        let raw = r#"{"seed_id":7,"input_payload":"","mode":"invoker","failure_class":"empty-input"}"#;
+        let raw =
+            r#"{"seed_id":7,"input_payload":"","mode":"invoker","failure_class":"empty-input"}"#;
         let seeds = parse_seeds(raw.as_bytes()).expect("failure scenario should parse");
         assert_eq!(seeds.len(), 1);
         assert_eq!(seeds[0].id, 7);
@@ -229,8 +233,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_invalid_json() {
-        let err = parse_seeds(br#"this is not json"#)
-            .expect_err("invalid JSON must fail");
+        let err = parse_seeds(br#"this is not json"#).expect_err("invalid JSON must fail");
         assert!(err.contains("malformed seed input"));
     }
 
@@ -243,8 +246,7 @@ mod tests {
     #[test]
     fn parse_rejects_missing_id_field() {
         let raw = r#"[{"payload":[1,2,3]}]"#;
-        let err = parse_seeds(raw.as_bytes())
-            .expect_err("missing id field must fail");
+        let err = parse_seeds(raw.as_bytes()).expect_err("missing id field must fail");
         assert!(err.contains("malformed seed input"));
     }
 
@@ -273,8 +275,8 @@ mod tests {
     #[test]
     fn validation_accepts_seed_at_maximum_bounds() {
         let seeds = vec![CaseSeed {
-            id: u64::MAX,                     // max_id
-            payload: vec![0u8; 64],           // max_payload_len = 64
+            id: u64::MAX,           // max_id
+            payload: vec![0u8; 64], // max_payload_len = 64
         }];
         assert!(validate_seeds(&seeds).is_ok());
     }
@@ -380,11 +382,17 @@ mod tests {
         let seeds = load_seeds_from_directory(&fixtures_dir)
             .expect("should successfully load all shipped fixtures");
         assert!(!seeds.is_empty(), "fixtures should contain seeds");
-        assert!(validate_seeds(&seeds).is_ok(), "all shipped fixtures must pass validation");
+        assert!(
+            validate_seeds(&seeds).is_ok(),
+            "all shipped fixtures must pass validation"
+        );
 
         // Verify that empty payload from empty_input_001.json is included and valid
         let empty_seed = seeds.iter().find(|s| s.id == 7);
-        assert!(empty_seed.is_some(), "empty_input_001.json (id 7) must be loaded");
+        assert!(
+            empty_seed.is_some(),
+            "empty_input_001.json (id 7) must be loaded"
+        );
         assert_eq!(empty_seed.unwrap().payload, Vec::<u8>::new());
     }
 }

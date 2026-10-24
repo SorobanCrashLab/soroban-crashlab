@@ -475,7 +475,9 @@ mod tests {
         let doc = CaseBundleDocument::from_bundle(&bundle).with_provenance(sample_provenance());
         let bytes = save_case_bundle_document_json(&doc).unwrap();
         let loaded = load_case_bundle_document_json(&bytes).unwrap();
-        loaded.verify_provenance(crate::provenance::ProvenancePolicy::Require).unwrap();
+        loaded
+            .verify_provenance(crate::provenance::ProvenancePolicy::Require)
+            .unwrap();
         assert!(loaded.provenance.is_some());
     }
 
@@ -514,16 +516,23 @@ mod tests {
 
     #[test]
     fn paired_document_round_trips_both_seeds() {
-        let minimal = to_bundle(crate::CaseSeed {
+        let minimal_seed = crate::CaseSeed {
             id: 42,
             payload: vec![0xAA, 0xBB],
-        });
+        };
+        let minimal = CaseBundle {
+            seed: minimal_seed.clone(),
+            signature: crate::classify(&minimal_seed),
+            environment: None,
+            failure_payload: Vec::new(),
+            rpc_envelope: None,
+            engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
+        };
         let original_seed = crate::CaseSeed {
             id: 42,
             payload: vec![9, 9, 0xAA, 0xBB, 9],
         };
-        let lineage = ShrinkLineage::new("ddmin", 5, 5, 2, 1, 1)
-            .with_preserved_field("signature");
+        let lineage = ShrinkLineage::new("ddmin", 5, 5, 2, 1, 1).with_preserved_field("signature");
         let doc = CaseBundleDocument::from_bundle(&minimal)
             .with_pairing(original_seed.clone(), lineage.clone());
 

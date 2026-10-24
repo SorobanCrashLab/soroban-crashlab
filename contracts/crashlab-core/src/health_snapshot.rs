@@ -984,10 +984,13 @@ mod tests {
     fn version_two_writer_uses_v_and_legacy_version_one_is_readable() {
         let snapshot = HealthSnapshot::from_monitor(&monitor_with_cases(1), RunId(8), 1, 1, 1, "t");
         let line = snapshot.to_json_line().expect("serialize");
-        assert!(line.contains("\"v\":2"));
+        assert!(line.contains(&format!("\"v\":{HEALTH_SNAPSHOT_SCHEMA_VERSION}")));
         assert!(!line.contains("schema_version"));
 
-        let legacy = line.replace("\"v\":2", "\"schema_version\":1");
+        let legacy = line.replace(
+            &format!("\"v\":{HEALTH_SNAPSHOT_SCHEMA_VERSION}"),
+            "\"schema_version\":1",
+        );
         let parsed = HealthSnapshot::from_json_line(&legacy).expect("legacy v1 should be read");
         assert_eq!(parsed.schema_version, 1);
 

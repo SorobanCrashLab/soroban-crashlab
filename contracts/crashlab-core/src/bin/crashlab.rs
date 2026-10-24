@@ -11,54 +11,27 @@
 //! See `docs/RUN_LIFECYCLE.md` for the start → checkpoint → resume → cancel
 //! lifecycle and ADR-0008 for the design rationale.
 
-use crashlab_core::{
-    CaseSeed, HealthMonitor, MutationBudget, QuotaGuard, RunId, RunTerminalState, ThrottleDecision,
-    RUN_CHECKPOINT_SCHEMA_VERSION, CampaignPreset, CancelSignal, SeededPrng, WorkerPartition,
-    cancel_marker_path, cancel_requested, create_runner, default_state_dir, drive_run,
-    drive_run_from_checkpoint, drive_run_partitioned_from_checkpoint, load_run_checkpoint_json,
-    read_health_snapshot_log, read_latest_health_snapshot_line, replay_mismatch_message,
-    replay_seed_bundle_path_checked,
-    replay_success_message, request_cancel_run, run_regression_suite_from_json,
-    save_run_checkpoint_json,
-    HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
-    ArtifactStore, RunCheckpoint, CaseBundleDocument, FixtureManifest, ProvenancePolicy,
-    load_case_bundle_document_json, import_corpus_json, verify_corpus_integrity,
-    apply_minimization, plan_minimization, CorpusRecord,
-};
 use crashlab_core::worker_partition::RingCoverage;
+use crashlab_core::{
+    apply_minimization, cancel_marker_path, cancel_requested, create_runner, default_state_dir,
+    drive_run, drive_run_from_checkpoint, drive_run_partitioned_from_checkpoint,
+    import_corpus_json, load_case_bundle_document_json, load_run_checkpoint_json,
+    plan_minimization, read_health_snapshot_log, read_latest_health_snapshot_line,
+    replay_mismatch_message, replay_seed_bundle_path, replay_success_message, request_cancel_run,
+    run_regression_suite_from_json, save_run_checkpoint_json, verify_corpus_integrity,
+    ArtifactStore, CampaignPreset, CancelSignal, CaseBundleDocument, CaseSeed, CorpusRecord,
+    FixtureManifest, HealthMonitor, HealthSnapshot, HealthStatus, LocalArtifactStore,
+    MutationBudget, ProvenancePolicy, QuotaGuard, RetentionPolicy, RetentionRecord, RunCheckpoint,
+    RunId, RunTerminalState, SeededPrng, ThrottleDecision, WorkerPartition,
+    RUN_CHECKPOINT_SCHEMA_VERSION,
+};
 use std::collections::HashSet;
 use std::fs;
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-macro_rules! println {
-    () => {
-        std::println!()
-    };
-    ($($argument:tt)*) => {{
-        let message = format!($($argument)*);
-        std::println!("{}", crashlab_core::redact::redact_text(&message));
-    }};
-}
-
-macro_rules! eprintln {
-    () => {
-        std::eprintln!()
-    };
-    ($($argument:tt)*) => {{
-        let message = format!($($argument)*);
-        std::eprintln!("{}", crashlab_core::redact::redact_text(&message));
-    }};
-}
-
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default())
-        .format(|buffer, record| {
-            let message = crashlab_core::redact::redact_text(&record.args().to_string());
-            writeln!(buffer, "{} {} {}", buffer.timestamp(), record.level(), message)
-        })
-        .init();
+    env_logger::init();
     let mut args = std::env::args();
     let _prog = args.next();
 
@@ -124,8 +97,12 @@ fn main() {
             }
         }
         (Some("replay"), Some("seed"), Some(path), None) => {
-            let accept_mismatch = rest.iter().any(|a| a == "--accept-engine-mismatch");
-            match replay_seed_bundle_path_checked(path, accept_mismatch) {
+            if !rest.is_empty() {
+                print_usage();
+                std::process::exit(1);
+            }
+
+            match replay_seed_bundle_path(path) {
                 Ok(result) if result.matches => {
                     println!("{}", replay_success_message(&result));
                 }
@@ -241,8 +218,18 @@ fn main() {
                 policy.heartbeat_ttl = Some(chrono::Duration::seconds(ttl));
             }
             policy.sweep_grace_period = chrono::Duration::seconds(grace_period_secs);
+            load_pin_manifest(&default_state_dir(), &mut policy);
 
             sweep_retention(&policy, dry_run);
+        }
+        (Some("retention"), Some("plan"), extra1, extra2) => {
+            if extra1.is_some() || extra2.is_some() || !rest.is_empty() {
+                print_usage();
+                std::process::exit(1);
+            }
+            let mut policy = RetentionPolicy::default();
+            load_pin_manifest(&default_state_dir(), &mut policy);
+            plan_retention(&policy);
         }
         (Some("fixture"), Some("verify"), Some(path), flag)
             if flag.is_none() || flag == Some("--policy") =>
@@ -264,13 +251,13 @@ fn main() {
         (Some("corpus"), Some("minimize"), Some(path), flag)
             if flag.is_none() || flag == Some("--dry-run") || flag == Some("--apply") =>
         {
+            corpus_minimize_command(path, flag == Some("--apply"));
+        }
         (Some("shrink"), Some(path), Some(out_path), None) => {
             if !rest.is_empty() {
                 print_usage();
                 std::process::exit(1);
             }
-            corpus_minimize_command(path, flag == Some("--apply"));
-        }
             shrink_command(path, out_path);
         }
         _ => {
@@ -292,11 +279,12 @@ fn print_usage() {
                 crashlab regression baseline set <observed-suite.json> <baseline.json>\n\
                 crashlab regression baseline compare <observed-suite.json> <baseline.json>\n\
                 crashlab corpus verify <corpus-json-path>\n\
-                 crashlab corpus minimize <corpus-json-path> [--dry-run|--apply]\n\
+                crashlab corpus minimize <corpus-json-path> [--dry-run|--apply]\n\
                 crashlab shrink <bundle-json-path> <out-bundle-json-path>\n\
                 crashlab fixture verify <manifest-or-bundle-json> [--policy <require|warn|off>]\n\
                 crashlab fixture show <manifest-or-bundle-json> [--json]\n\
                 crashlab retention sweep [--dry-run] [--heartbeat-ttl <secs>] [--grace-period <secs>]\n\
+                crashlab retention plan\n\
                 \n\
                 run start options:\n\
                 \x20 --preset <smoke|nightly|deep>   campaign profile (default: $CRASHLAB_PRESET or nightly)\n\
@@ -596,11 +584,12 @@ fn corpus_verify_command(path: &str) {
 
 /// `crashlab corpus minimize <corpus.json> [--dry-run|--apply]` (#1853).
 ///
-/// Default is a dry run that only reports. `--apply` writes the removed seed ids
-/// to the sidecar `<corpus.json>.tombstones.json`; the corpus archive itself is
-/// never rewritten and no seed is hard-deleted. Observed signatures and
-/// provenance are not stored in the archive yet, so every seed uses the
-/// outcome-class fallback key and has no provenance protection.
+/// Tombstones coverage-equivalent seeds via `plan_minimization` /
+/// `apply_minimization`, writing the set of removed ids to the sidecar
+/// `<corpus.json>.tombstones.json`; the corpus archive itself is never
+/// rewritten and no seed is hard-deleted. Observed signatures and provenance
+/// are not stored in the archive yet, so every seed uses the outcome-class
+/// fallback key and has no provenance protection.
 fn corpus_minimize_command(path: &str, apply: bool) {
     let bytes = match fs::read(path) {
         Ok(b) => b,
@@ -613,29 +602,9 @@ fn corpus_minimize_command(path: &str, apply: bool) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("failed to parse corpus: {e}");
-/// Iteration cap for `crashlab shrink`; each iteration is one replay check.
-const SHRINK_MAX_ITERATIONS: u32 = 10_000;
-
-/// `crashlab shrink <bundle> <out>` (#1849): ddmin the bundle seed payload while
-/// preserving its full signature under the replay check (`classify` plus
-/// `signatures_match`). The shrunk bundle keeps the original seed and a
-/// [`ShrinkLineage`] in its `original_seed` / `shrink_lineage` fields.
-fn shrink_command(path: &str, out_path: &str) {
-    let bytes = match fs::read(path) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("failed to read {path}: {e}");
             std::process::exit(1);
         }
     };
-    let doc = match load_case_bundle_document_json(&bytes) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("{path} is not a case bundle: {e}");
-            std::process::exit(1);
-        }
-    };
-
     let sidecar = PathBuf::from(format!("{path}.tombstones.json"));
     let previously: Vec<u64> = match fs::read(&sidecar) {
         Ok(raw) => match serde_json::from_slice(&raw) {
@@ -711,6 +680,32 @@ fn shrink_command(path: &str, out_path: &str) {
         report.tombstoned,
         report.bytes_tombstoned,
         sidecar.display()
+    );
+}
+
+/// Iteration cap for `crashlab shrink`; each iteration is one replay check.
+const SHRINK_MAX_ITERATIONS: u32 = 10_000;
+
+/// `crashlab shrink <bundle> <out>` (#1849): ddmin the bundle seed payload while
+/// preserving its full signature under the replay check (`classify` plus
+/// `signatures_match`). The shrunk bundle keeps the original seed and a
+/// [`ShrinkLineage`] in its `original_seed` / `shrink_lineage` fields.
+fn shrink_command(path: &str, out_path: &str) {
+    let bytes = match fs::read(path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("failed to read {path}: {e}");
+            std::process::exit(1);
+        }
+    };
+    let doc = match load_case_bundle_document_json(&bytes) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("{path} is not a case bundle: {e}");
+            std::process::exit(1);
+        }
+    };
+
     let original = doc.original_or_minimal_seed().clone();
     let expected = doc.signature.clone();
     let seed_id = original.id;
@@ -839,7 +834,10 @@ fn report_run_status(id: u64, as_json: bool) {
                         .unwrap_or(serde_json::Value::Null);
                     if let Some(object) = value.as_object_mut() {
                         object.insert("degraded".into(), serde_json::Value::Bool(true));
-                        object.insert("truncated_tail".into(), serde_json::Value::Bool(log.truncated_tail));
+                        object.insert(
+                            "truncated_tail".into(),
+                            serde_json::Value::Bool(log.truncated_tail),
+                        );
                         object.insert("corrupt_lines".into(), serde_json::json!(log.corrupt_lines));
                     } else {
                         value = serde_json::json!({"snapshot": null, "degraded": true,
@@ -864,8 +862,10 @@ fn report_run_status(id: u64, as_json: bool) {
         }
     };
     if log.degraded {
-        eprintln!("warning: health snapshot log is degraded ({} corrupt line(s), truncated tail: {})",
-            log.corrupt_lines, log.truncated_tail);
+        eprintln!(
+            "warning: health snapshot log is degraded ({} corrupt line(s), truncated tail: {})",
+            log.corrupt_lines, log.truncated_tail
+        );
     }
     match log.snapshots.last() {
         Some(snapshot) => print_snapshot_summary(snapshot),
@@ -1090,10 +1090,7 @@ fn run_regression_suite_command(path: &str, report_path: Option<&Path>) {
                 for case in &summary.cases {
                     if !case.passed {
                         if let Some(ref error) = case.error {
-                            eprintln!(
-                                "::error::Seed {} ({}): {}",
-                                case.seed_id, case.mode, error
-                            );
+                            eprintln!("::error::Seed {} ({}): {}", case.seed_id, case.mode, error);
                         } else if let Some(ref actual) = case.actual_failure_class {
                             eprintln!(
                                 "::error::Seed {} ({}): expected {}, got {}",
@@ -1131,8 +1128,8 @@ fn load_fixtures_from_directory(dir: &Path) -> Result<Vec<u8>, String> {
 
         // Only process .json files
         if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let bytes = fs::read(&path)
-                .map_err(|e| format!("failed to read {}: {}", path.display(), e))?;
+            let bytes =
+                fs::read(&path).map_err(|e| format!("failed to read {}: {}", path.display(), e))?;
 
             // Try to parse as a single scenario
             if let Ok(scenario) = serde_json::from_slice::<serde_json::Value>(&bytes) {
@@ -1249,8 +1246,10 @@ fn parse_run_start_options(args: &[String]) -> Result<RunStartOptions, String> {
             "--worker" => worker = parse_u32(&take_value("--worker")?, "--worker")?,
             "--output" => output = Some(PathBuf::from(take_value("--output")?)),
             "--checkpoint-interval" => {
-                checkpoint_interval =
-                    parse_u64(&take_value("--checkpoint-interval")?, "--checkpoint-interval")?;
+                checkpoint_interval = parse_u64(
+                    &take_value("--checkpoint-interval")?,
+                    "--checkpoint-interval",
+                )?;
             }
             "--progress-interval" => {
                 progress_interval =
@@ -1312,8 +1311,12 @@ fn parse_u32(raw: &str, flag: &str) -> Result<u32, String> {
 /// `ring_coverage` starts empty, which is the documented representation of "no
 /// ring partitioning has been swept yet" and is exactly how a v1 checkpoint is
 /// interpreted on load.
-fn snapshot_checkpoint(campaign_id: &str, next_seed_index: u64, total_seeds: usize) -> RunCheckpoint {
-    let mut cp = RunCheckpoint {
+fn snapshot_checkpoint(
+    campaign_id: &str,
+    next_seed_index: u64,
+    total_seeds: usize,
+) -> RunCheckpoint {
+    RunCheckpoint {
         schema: RUN_CHECKPOINT_SCHEMA_VERSION,
         campaign_id: campaign_id.to_string(),
         next_seed_index: next_seed_index as usize,
@@ -1321,9 +1324,7 @@ fn snapshot_checkpoint(campaign_id: &str, next_seed_index: u64, total_seeds: usi
         ring_coverage: RingCoverage::new(),
         generation: 0,
         crc32: 0,
-    };
-    cp.refresh_crc32();
-    cp
+    }
 }
 
 /// Writes `checkpoint` so a reader never observes a partial file (ADR-0008).
@@ -1395,7 +1396,10 @@ fn run_start_command(args: &[String]) {
         let bytes = match fs::read(&checkpoint_path) {
             Ok(b) => b,
             Err(e) => {
-                eprintln!("failed to read checkpoint {}: {e}", checkpoint_path.display());
+                eprintln!(
+                    "failed to read checkpoint {}: {e}",
+                    checkpoint_path.display()
+                );
                 std::process::exit(1);
             }
         };
@@ -1450,7 +1454,10 @@ fn run_start_command(args: &[String]) {
     println!("state dir: {}", opts.output.display());
     println!("checkpoint: {}", checkpoint_path.display());
     if cancel_requested(run_id, &state_dir) {
-        println!("note: a cancel marker already exists for run {}", opts.run_id);
+        println!(
+            "note: a cancel marker already exists for run {}",
+            opts.run_id
+        );
     }
 
     // `drive_run_from_checkpoint` advances its own checkpoint, so the closure
@@ -1459,7 +1466,11 @@ fn run_start_command(args: &[String]) {
         // Only draw on the quota while budget remains, so a seed the budget
         // would skip anyway does not spend shared allowance.
         if let (Some(guard), false) = (&quota, budget.is_exhausted()) {
-            if let ThrottleDecision::Throttled { remaining, reserved } = guard.admit_seed(class) {
+            if let ThrottleDecision::Throttled {
+                remaining,
+                reserved,
+            } = guard.admit_seed(class)
+            {
                 if quota_throttled == 0 {
                     println!(
                         "throttle: {} seed quota reached (remaining={remaining} reserved_for_higher_priority={reserved}); skipping further seeds",
@@ -1605,11 +1616,105 @@ fn run_start_command(args: &[String]) {
                 opts.run_id, summary.cancelled_at_seed, summary.seeds_processed
             );
         }
+        RunTerminalState::PlateauStop { summary } => {
+            println!(
+                "run {} stopped early on plateau: seeds_processed={}",
+                opts.run_id, summary.seeds_processed
+            );
+        }
         RunTerminalState::Failed { message } => {
             eprintln!("run {} failed: {message}", opts.run_id);
             std::process::exit(1);
         }
     }
+}
+
+fn load_pin_manifest(base: &Path, policy: &mut RetentionPolicy) {
+    let pins_path = base.join("retention-pins.json");
+    let bytes = match fs::read(&pins_path) {
+        Ok(b) => b,
+        Err(_) => return,
+    };
+    let value: serde_json::Value = match serde_json::from_slice(&bytes) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!(
+                "warning: failed to parse pin manifest at {}: {}",
+                pins_path.display(),
+                e
+            );
+            return;
+        }
+    };
+    if let Some(list) = value.get("artifacts").and_then(|v| v.as_array()) {
+        for entry in list {
+            if let Some(id) = entry.as_str() {
+                policy.pins.push(crashlab_core::retention::Pin {
+                    class: crashlab_core::retention::ArtifactClass::Raw,
+                    id: id.to_string(),
+                    reason: "pin manifest".to_string(),
+                });
+            }
+        }
+    }
+}
+
+fn plan_retention(policy: &RetentionPolicy) {
+    let base = default_state_dir();
+    let now = chrono::Utc::now();
+
+    let store_path = base.join("artifacts");
+    let store = match LocalArtifactStore::new(&store_path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!(
+                "failed to open artifact store at {}: {}",
+                store_path.display(),
+                e
+            );
+            std::process::exit(1);
+        }
+    };
+    let artifacts = match store.list_artifacts() {
+        Ok(list) => list,
+        Err(e) => {
+            eprintln!("failed to list artifacts: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let mut records = Vec::new();
+    let mut ids = Vec::new();
+    for art in &artifacts {
+        let path = store_path.join(format!("{}.json", art.id));
+        let Ok(bytes) = fs::read(&path) else { continue };
+        let Ok(doc) = serde_json::from_slice::<CaseBundleDocument>(&bytes) else {
+            continue;
+        };
+        let created_at = chrono::DateTime::parse_from_rfc3339(&art.created_at)
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|_| chrono::Utc::now());
+        records.push(RetentionRecord::new(doc, created_at));
+        ids.push(art.id.clone());
+    }
+
+    let keep = policy.retain_failure_bundle_records(&records, now);
+    let mut pruned = 0usize;
+    for (i, id) in ids.iter().enumerate() {
+        if policy.pins.iter().any(|p| &p.id == id) {
+            println!("retention plan: keep pinned failure bundle: {id}");
+        } else if keep[i] {
+            println!("retention plan: keep failure bundle: {id}");
+        } else {
+            println!("retention plan: prune failure bundle: {id}");
+            pruned += 1;
+        }
+    }
+    println!(
+        "retention plan: {} bundle(s), {} would be pruned",
+        ids.len(),
+        pruned
+    );
 }
 
 fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
@@ -1621,7 +1726,11 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
     let store = match LocalArtifactStore::new(&store_path) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("failed to open artifact store at {}: {}", store_path.display(), e);
+            eprintln!(
+                "failed to open artifact store at {}: {}",
+                store_path.display(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -1636,20 +1745,45 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
 
     let mut bundle_records = Vec::new();
     let mut artifact_ids = Vec::new();
+    let mut deleted_bundles = 0;
 
     for art in &artifacts {
         let path = store_path.join(format!("{}.json", art.id));
         let bytes = match fs::read(&path) {
             Ok(b) => b,
             Err(e) => {
-                eprintln!("warning: failed to read artifact file {}: {}", path.display(), e);
+                eprintln!(
+                    "warning: failed to read artifact file {}: {}",
+                    path.display(),
+                    e
+                );
                 continue;
             }
         };
         let doc: CaseBundleDocument = match serde_json::from_slice(&bytes) {
             Ok(d) => d,
             Err(e) => {
-                eprintln!("warning: failed to parse artifact JSON {}: {}", path.display(), e);
+                eprintln!(
+                    "warning: failed to parse artifact JSON {}: {}",
+                    path.display(),
+                    e
+                );
+                if dry_run {
+                    println!(
+                        "[retention] (dry-run) would prune corrupt artifact: {}",
+                        art.id
+                    );
+                } else {
+                    match store.delete_artifact(&art.id) {
+                        Ok(()) => {
+                            println!("pruned corrupt artifact: {}", art.id);
+                            deleted_bundles += 1;
+                        }
+                        Err(e) => {
+                            eprintln!("failed to delete corrupt artifact {}: {}", art.id, e);
+                        }
+                    }
+                }
                 continue;
             }
         };
@@ -1663,10 +1797,12 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
     }
 
     let bundles_keep = policy.retain_failure_bundle_records(&bundle_records, now);
-    let mut deleted_bundles = 0;
     for (i, &keep) in bundles_keep.iter().enumerate() {
         if !keep {
             let id = &artifact_ids[i];
+            if policy.pins.iter().any(|p| &p.id == id) {
+                continue;
+            }
             if dry_run {
                 println!("[retention] (dry-run) would prune failure bundle: {id}");
                 continue;
@@ -1697,27 +1833,44 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
                     let bytes = match fs::read(&checkpoint_path) {
                         Ok(b) => b,
                         Err(e) => {
-                            eprintln!("warning: failed to read checkpoint at {}: {}", checkpoint_path.display(), e);
+                            eprintln!(
+                                "warning: failed to read checkpoint at {}: {}",
+                                checkpoint_path.display(),
+                                e
+                            );
                             continue;
                         }
                     };
                     let cp: RunCheckpoint = match serde_json::from_slice(&bytes) {
                         Ok(c) => c,
                         Err(e) => {
-                            eprintln!("warning: failed to parse checkpoint at {}: {}", checkpoint_path.display(), e);
+                            eprintln!(
+                                "warning: failed to parse checkpoint at {}: {}",
+                                checkpoint_path.display(),
+                                e
+                            );
                             continue;
                         }
                     };
                     let metadata = match fs::metadata(&checkpoint_path) {
                         Ok(m) => m,
                         Err(e) => {
-                            eprintln!("warning: failed to read metadata for checkpoint at {}: {}", checkpoint_path.display(), e);
+                            eprintln!(
+                                "warning: failed to read metadata for checkpoint at {}: {}",
+                                checkpoint_path.display(),
+                                e
+                            );
                             continue;
                         }
                     };
-                    let modified = metadata.modified().unwrap_or_else(|_| std::time::SystemTime::now());
-                    let duration = modified.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
-                    let created_at = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH + duration);
+                    let modified = metadata
+                        .modified()
+                        .unwrap_or_else(|_| std::time::SystemTime::now());
+                    let duration = modified
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default();
+                    let created_at =
+                        chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH + duration);
 
                     checkpoint_records.push(RetentionRecord::new(cp, created_at));
                     run_dirs.push(path);
@@ -1734,7 +1887,9 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
             let checkpoint_created_at = checkpoint_records[i].created_at;
 
             // Live Heartbeat check: refuse deletion if heartbeat is fresh within TTL
-            let heartbeat_ttl = policy.heartbeat_ttl.unwrap_or_else(|| chrono::Duration::seconds(60));
+            let heartbeat_ttl = policy
+                .heartbeat_ttl
+                .unwrap_or_else(|| chrono::Duration::seconds(60));
             let heartbeat = crashlab_core::stale_detector::read_heartbeat(dir);
             let has_live_heartbeat =
                 crashlab_core::stale_detector::is_heartbeat_alive(dir, heartbeat_ttl, now);
@@ -1774,7 +1929,11 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
                     continue;
                 }
                 Err(e) => {
-                    eprintln!("warning: failed to acquire advisory lock for {}: {}", dir.display(), e);
+                    eprintln!(
+                        "warning: failed to acquire advisory lock for {}: {}",
+                        dir.display(),
+                        e
+                    );
                     continue;
                 }
             };
@@ -1790,7 +1949,11 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
                         heartbeat_desc
                     );
                     if let Err(e) = fs::write(&mark_path, mark_content) {
-                        eprintln!("warning: failed to write sweep mark file at {}: {}", mark_path.display(), e);
+                        eprintln!(
+                            "warning: failed to write sweep mark file at {}: {}",
+                            mark_path.display(),
+                            e
+                        );
                     } else {
                         println!(
                             "[retention] marked candidate run directory for deletion: {} (grace period: {}s)",
@@ -1801,8 +1964,11 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
                     continue;
                 } else if let Ok(meta) = fs::metadata(&mark_path) {
                     if let Ok(mtime) = meta.modified() {
-                        let dur = mtime.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
-                        let marked_at = chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH + dur);
+                        let dur = mtime
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default();
+                        let marked_at =
+                            chrono::DateTime::<chrono::Utc>::from(std::time::UNIX_EPOCH + dur);
                         let elapsed = now.signed_duration_since(marked_at);
                         if elapsed < policy.sweep_grace_period {
                             println!(
@@ -1818,7 +1984,10 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
             }
 
             if dry_run {
-                println!("[retention] (dry-run) would prune run directory: {}", dir.display());
+                println!(
+                    "[retention] (dry-run) would prune run directory: {}",
+                    dir.display()
+                );
                 continue;
             }
 
@@ -1834,5 +2003,10 @@ fn sweep_retention(policy: &RetentionPolicy, dry_run: bool) {
         }
     }
 
-    println!("sweep summary: pruned {deleted_bundles} bundle(s), {deleted_checkpoints} checkpoint(s).");
+    if dry_run {
+        println!("dry run: no changes were made");
+    }
+    println!(
+        "sweep summary: pruned {deleted_bundles} bundle(s), {deleted_checkpoints} checkpoint(s)."
+    );
 }

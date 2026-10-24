@@ -41,8 +41,6 @@ pub enum ArtifactClass {
     AggregatedStats,
     /// Audit logs.
     Audit,
-    /// Unclassified artifact whose backend does not track a class.
-    Raw,
 }
 
 impl ArtifactClass {
@@ -55,26 +53,6 @@ impl ArtifactClass {
             ArtifactClass::Raw => "raw",
             ArtifactClass::AggregatedStats => "aggregated_stats",
             ArtifactClass::Audit => "audit",
-            ArtifactClass::Raw => "raw",
-        }
-    }
-
-    /// Best-effort class for an artifact id, based on its filename prefix.
-    ///
-    /// Ids that match no known prefix classify as [`ArtifactClass::Raw`].
-    pub fn classify(artifact_id: &str) -> ArtifactClass {
-        if artifact_id.starts_with("bundle") {
-            ArtifactClass::Bundle
-        } else if artifact_id.starts_with("trace") {
-            ArtifactClass::Trace
-        } else if artifact_id.starts_with("audit") {
-            ArtifactClass::Audit
-        } else if artifact_id.starts_with("stats") {
-            ArtifactClass::AggregatedStats
-        } else if artifact_id.starts_with("seed") {
-            ArtifactClass::RawSeed
-        } else {
-            ArtifactClass::Raw
         }
     }
 
@@ -167,7 +145,6 @@ impl ClassPolicies {
             ArtifactClass::Raw => &self.raw,
             ArtifactClass::AggregatedStats => &self.aggregated_stats,
             ArtifactClass::Audit => &self.audit,
-            ArtifactClass::Raw => &self.bundle,
         }
     }
 }
