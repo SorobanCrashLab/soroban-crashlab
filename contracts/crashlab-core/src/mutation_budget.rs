@@ -85,7 +85,7 @@ impl MutationBudget {
             attempts_made: self.attempts_made,
             skipped: self.skipped,
             exhausted: self.is_exhausted(),
-            plateau_stop: self.plateau_stop,
+            plateau_stop: false,
         }
     }
 

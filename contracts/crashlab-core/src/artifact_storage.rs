@@ -501,39 +501,6 @@ impl ArtifactStore for LocalArtifactStore {
             && self.artifact_path(artifact_id).exists()
     }
 
-    fn store_artifact_with_ttl(
-        &self,
-        artifact_id: &str,
-        bundle: &CaseBundle,
-        ttl_secs: u64,
-    ) -> Result<ArtifactMetadata, StorageError> {
-        let metadata = self.store_artifact(artifact_id, bundle)?;
-        let expiry = Self::now_epoch_secs().saturating_add(ttl_secs);
-        Self::write_atomic(&self.ttl_path(artifact_id), expiry.to_string().as_bytes())?;
-        Ok(metadata)
-    }
-
-    fn artifact_ttl_remaining(&self, artifact_id: &str) -> Option<u64> {
-        if Self::validate_artifact_id(artifact_id).is_err() {
-            return None;
-        }
-        let expiry = self.ttl_expiry_epoch(artifact_id)?;
-        Some(expiry.saturating_sub(Self::now_epoch_secs()))
-    }
-
-    fn retrieve_artifact_bytes(&self, artifact_id: &str) -> Result<Vec<u8>, StorageError> {
-        let path = self.ensure_readable(artifact_id)?;
-        Ok(fs::read(path)?)
-    }
-
-    fn open_artifact_reader(
-        &self,
-        artifact_id: &str,
-    ) -> Result<Box<dyn io::Read + Send>, StorageError> {
-        let path = self.ensure_readable(artifact_id)?;
-        Ok(Box::new(fs::File::open(path)?))
-    }
-
     fn artifact_class(&self, _artifact_id: &str) -> crate::retention::ArtifactClass {
         crate::retention::ArtifactClass::RawSeed
     }

@@ -126,6 +126,14 @@ impl CancelSignal {
         }
     }
 
+    /// Creates a new in-process signal tagged with an iteration counter.
+    ///
+    /// The iteration counter is not stored — it only serves as a uniqueness
+    /// hint for test readability. Semantically identical to [`CancelSignal::new`].
+    pub fn newForIteration(run_id: RunId, _iteration: usize) -> Self {
+        Self::new(run_id)
+    }
+
     pub fn run_id(&self) -> RunId {
         self.run_id
     }

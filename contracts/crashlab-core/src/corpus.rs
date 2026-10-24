@@ -116,7 +116,7 @@ fn sort_addressed_deterministic(seeds: &mut [AddressedSeed]) {
 pub fn corpus_archive_from_seeds(mut seeds: Vec<CaseSeed>) -> CorpusArchive {
     sort_seeds_deterministic(&mut seeds);
     let addressed = seeds.iter().map(|s| AddressedSeed {
-        id: s.id,
+        id: s.id as u32,
         size: s.payload.len(),
         hash: hash_seed_payload(&s.payload),
         payload: s.payload.clone(),

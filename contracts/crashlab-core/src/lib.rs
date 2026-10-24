@@ -94,8 +94,8 @@ mod rpc_runner_stub {
 }
 
 pub use auth_matrix::{
-    collect_mismatched, format_mismatch_summary, run_matrix, run_matrix_for_seeds, AuthMode,
-    MatrixReport, ModeResult,
+    collect_mismatched, format_mismatch_summary, run_matrix, run_matrix_for_seeds, AuthFrameEntry,
+    AuthMode, MatrixReport, ModeResult, SignerSet, MISSING_AUTH_CATEGORY,
 };
 pub use cors::{
     evaluate_cors, CorsConfig, CorsError, CorsEvaluation, HttpMethod, OriginAllowlist,
@@ -263,9 +263,8 @@ pub use fixture_sanitize::{
 
 pub mod checkpoint;
 pub use checkpoint::{
-    generation_path, load_checkpoint_file, load_run_checkpoint_atomic, load_run_checkpoint_json,
-    save_run_checkpoint_atomic, save_run_checkpoint_json, verify_checkpoint_generation,
-    write_checkpoint_file, CheckpointError, CheckpointIOError, CheckpointLoad, LoadedCheckpoint,
+    load_checkpoint_file, load_run_checkpoint_json, save_run_checkpoint_json,
+    verify_checkpoint_generation, write_checkpoint_file, CheckpointError, LoadedCheckpoint,
     RunCheckpoint, RUN_CHECKPOINT_SCHEMA_VERSION, SUPPORTED_RUN_CHECKPOINT_SCHEMAS,
 };
 
@@ -397,6 +396,9 @@ pub use rpc_fault::{is_harness_error_message, RpcFault};
 pub mod address_neighbors;
 pub mod stellar_address;
 pub use address_neighbors::{generate_address_neighbors, AddressNeighbor, AddressNeighborStrategy};
+
+pub mod scval_mutator;
+pub use scval_mutator::{ScValDecodeError, ScValMutatorConfig};
 
 // Re-enable threat model tests (compile-only pass). Obsolete cases can be
 // ignored or updated as follow-ups (see ROADMAP-004).

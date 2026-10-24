@@ -354,11 +354,7 @@ fn retention_sweep_prunes_stale_heartbeat() {
 
     // Write a stale heartbeat in run 0 (older than the stale threshold).
     let stale_run_dir = base.join("runs").join("0");
-    write_heartbeat_at(
-        &stale_run_dir,
-        chrono::Utc::now() - chrono::Duration::seconds(30 * 24 * 3600),
-    )
-    .expect("write stale heartbeat");
+    write_heartbeat_at(&stale_run_dir, chrono::Utc::now() - chrono::Duration::seconds(30 * 24 * 3600)).expect("write stale heartbeat");
 
     let output = run_sweep(&base, &[]);
 

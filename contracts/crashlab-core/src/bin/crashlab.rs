@@ -13,19 +13,16 @@
 
 use crashlab_core::worker_partition::RingCoverage;
 use crashlab_core::{
-    apply_minimization, cancel_marker_path, cancel_requested, create_runner,
-    current_engine_version, default_state_dir, drive_run, drive_run_from_checkpoint,
-    drive_run_partitioned_from_checkpoint, import_corpus_json, import_seeds,
-    load_case_bundle_document_json, load_run_checkpoint_json, plan_minimization,
-    read_health_snapshot_log, read_latest_health_snapshot_line, replay_mismatch_message,
-    replay_seed_bundle_path, replay_success_message, request_cancel_run,
-    run_regression_suite_from_json, save_run_checkpoint_json, seed_content_hash,
-    verify_corpus_integrity, ArtifactStore, CampaignPreset, CancelSignal, CaseBundleDocument,
-    CaseSeed, CorpusRecord, CorpusStore, EngineVersionPolicy, FixtureManifest, HealthMonitor,
-    HealthSnapshot, HealthStatus, LocalArtifactStore, MutationBudget, PortableCorpusArchive,
-    ProvenancePolicy, QuotaGuard, RetentionPolicy, RetentionRecord, RunCheckpoint, RunId,
-    RunTerminalState, SeededPrng, TaggedSeed, ThrottleDecision, WorkerPartition,
-    RUN_CHECKPOINT_SCHEMA_VERSION,
+    CaseSeed, HealthMonitor, MutationBudget, QuotaGuard, RunId, RunTerminalState, ThrottleDecision,
+    RUN_CHECKPOINT_SCHEMA_VERSION, CampaignPreset, CancelSignal, SeededPrng, WorkerPartition,
+    cancel_marker_path, cancel_requested, create_runner, default_state_dir, drive_run,
+    drive_run_from_checkpoint, drive_run_partitioned_from_checkpoint, load_run_checkpoint_json,
+    read_health_snapshot_log, read_latest_health_snapshot_line, replay_mismatch_message, replay_seed_bundle_path,
+    replay_success_message, request_cancel_run, run_regression_suite_from_json,
+    save_run_checkpoint_json,
+    HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
+    ArtifactStore, RunCheckpoint, CaseBundleDocument, FixtureManifest, ProvenancePolicy,
+    load_case_bundle_document_json, verify_corpus_integrity,
 };
 use std::collections::HashSet;
 use std::fs;
@@ -1328,19 +1325,20 @@ fn parse_u32(raw: &str, flag: &str) -> Result<u32, String> {
 /// `ring_coverage` starts empty, which is the documented representation of "no
 /// ring partitioning has been swept yet" and is exactly how a v1 checkpoint is
 /// interpreted on load.
-fn snapshot_checkpoint(
-    campaign_id: &str,
-    next_seed_index: u64,
-    total_seeds: usize,
-) -> RunCheckpoint {
-    RunCheckpoint {
+fn snapshot_checkpoint(campaign_id: &str, next_seed_index: u64, total_seeds: usize) -> RunCheckpoint {
+    let cp = RunCheckpoint {
         schema: RUN_CHECKPOINT_SCHEMA_VERSION,
         campaign_id: campaign_id.to_string(),
         next_seed_index: next_seed_index as usize,
         total_seeds,
         ring_coverage: RingCoverage::new(),
-        generation: 0,
+        generation: 1,
         crc32: 0,
+    };
+    // Compute the CRC after all fields are set.
+    RunCheckpoint {
+        crc32: cp.compute_crc32(),
+        ..cp
     }
 }
 
@@ -1635,7 +1633,7 @@ fn run_start_command(args: &[String]) {
         }
         RunTerminalState::PlateauStop { summary } => {
             println!(
-                "run {} stopped early on plateau: seeds_processed={}",
+                "run {} stopped early (plateau detected): seeds_processed={}",
                 opts.run_id, summary.seeds_processed
             );
         }
