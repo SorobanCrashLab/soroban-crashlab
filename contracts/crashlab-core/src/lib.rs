@@ -277,6 +277,13 @@ pub use corpus_import::{
     import_seeds, import_seeds_with_schema, CorpusImportError, CorpusImportResult,
 };
 
+pub mod corpus_archive;
+pub use corpus_archive::{
+    compute_manifest_hash, current_engine_version, seed_content_hash, ArchiveEntry, ArchiveError,
+    ArchiveManifest, CorpusArchive as PortableCorpusArchive, CorpusStore, EngineVersionPolicy,
+    MergeReport, TaggedSeed, CORPUS_ARCHIVE_FORMAT_VERSION, SUPPORTED_ARCHIVE_FORMATS,
+};
+
 pub mod corpus_minimize;
 pub use corpus_minimize::{
     apply_minimization, behavior_key, plan_minimization, ApplyReport, BehaviorGroup, BehaviorKey,
