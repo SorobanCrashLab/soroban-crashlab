@@ -1,16 +1,36 @@
 import { NextResponse } from 'next/server';
 import { errorResponse, successResponse, createdResponse, status } from '@/lib/api-response-utils';
+import { codedErrorResponse } from '@/lib/error-codes';
 import { logger } from '@/lib/logger';
 import { withRouteErrorHandling, jsonError, readJsonBody } from '@/lib/route-handler';
 import { sanitizeSearchParams } from '@/lib/sanitize';
 import { withFixtureCaching } from '@/lib/fixture-caching';
 import { API_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
 import { selectRunStorageDriver } from '@/lib/storage';
-import { paginateKeyset, getRunKeyset, isLegacyOrInvalidCursor } from '@/app/pagination-utils';
+import {
+  CursorMismatchError,
+  computeCursorScope,
+  getRunKeyset,
+  paginateKeyset,
+} from '@/app/pagination-utils';
 import { FuzzingRunSchema } from '@/lib/schemas/runs';
 import { isRedisConfigured } from '@/lib/redis';
+import { withCsrfProtection } from '@/lib/csrf';
+import { upsertRunInSearchIndex } from '@/lib/search/server-index';
 
 const DEFAULT_PAGE_LIMIT = 20;
+
+/**
+ * Hard ceiling for a single page (#1875). The virtualized runs table pages
+ * through 100k+ rows with cursors; an unbounded `limit` would let a single
+ * request materialize the whole dataset and defeat both keyset paging and the
+ * response-size budgets.
+ */
+const MAX_PAGE_LIMIT = 500;
+
+/** Default sort for the runs list (matches the historic keyset order). */
+const DEFAULT_SORT_FIELD: RunSortField = 'queuedAt';
+const DEFAULT_SORT_DIRECTION: RunSortDirection = 'desc';
 
 export const GET = withRouteErrorHandling('GET /api/runs', async (request: Request) => {
   const { searchParams } = new URL(request.url);
@@ -63,32 +83,56 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
   });
 
   // Parse keyset pagination parameters from the query string.
-  // A legacy offset cursor is detected and reset gracefully to page 1.
-  const rawCursor = sanitizedSearchParams.get('cursor') ?? '';
-  const cursor = rawCursor && !isLegacyOrInvalidCursor(rawCursor) ? rawCursor : undefined;
-  const legacyCursorDetected = rawCursor && isLegacyOrInvalidCursor(rawCursor);
-
-  if (legacyCursorDetected) {
-    logger.warn('GET /api/runs: legacy or invalid cursor supplied, resetting to page 1', {
-      cursor: rawCursor,
-    });
-  }
+  // A legacy offset or v1 cursor is detected and reset gracefully to page 1;
+  // a v2 cursor bound to a different filter set is rejected with 400 (#1834).
+  const rawCursor = sanitizedSearchParams.get('cursor') ?? undefined;
+  const cursorScope = computeCursorScope({
+    route: 'runs',
+    sort: 'queuedAt:desc',
+    status: rawStatus ?? '',
+  });
 
   const limitParam = parseInt(sanitizedSearchParams.get('limit') ?? '', 10);
-  const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : DEFAULT_PAGE_LIMIT;
+  const limit =
+    Number.isFinite(limitParam) && limitParam > 0
+      ? Math.min(limitParam, MAX_PAGE_LIMIT)
+      : DEFAULT_PAGE_LIMIT;
 
-  const { items, total, nextCursor, hasMore } = paginateKeyset(allRuns, {
-    cursor,
-    limit,
-    getItemKeyset: getRunKeyset,
-    direction: 'desc',
-  });
+  // Sort key + direction (#1875). Unknown keys fall back to the default so a
+  // hand-edited URL can never trigger an unindexed/slow comparator.
+  const rawSort = sanitizedSearchParams.get('sort');
+  const sortField: RunSortField = isRunSortField(rawSort) ? rawSort : DEFAULT_SORT_FIELD;
+  const sortDirection: RunSortDirection =
+    sanitizedSearchParams.get('order') === 'asc' ? 'asc' : DEFAULT_SORT_DIRECTION;
+
+  let paginated;
+  try {
+    paginated = paginateKeyset(allRuns, {
+      cursor: rawCursor,
+      limit,
+      getItemKeyset: getRunKeyset,
+      direction: 'desc',
+      scope: cursorScope,
+      onLegacyCursor: (offending) => {
+        logger.warn('GET /api/runs: legacy or invalid cursor supplied, resetting to page 1', {
+          cursor: offending,
+        });
+      },
+    });
+  } catch (error) {
+    if (error instanceof CursorMismatchError) {
+      logger.warn('GET /api/runs: cursor rejected (sort/filter mismatch)', { error: error.message });
+      return codedErrorResponse('CURSOR_MISMATCH');
+    }
+    throw error;
+  }
+  const { items, total, nextCursor, hasMore } = paginated;
 
   const data = { runs: items, total, nextCursor, hasMore };
   return withFixtureCaching(request, { data, total: data.total });
 });
 
-export const POST = withRouteErrorHandling('POST /api/runs', async (request: Request) => {
+export const POST = withRouteErrorHandling('POST /api/runs', withCsrfProtection(async (request: Request) => {
   if (!isRedisConfigured()) {
     return errorResponse('Storage not configured', status.serviceUnavailable);
   }
@@ -105,6 +149,11 @@ export const POST = withRouteErrorHandling('POST /api/runs', async (request: Req
   if ('putRun' in driver && typeof driver.putRun === 'function') {
     await (driver as import('@/lib/storage/kv-run-driver').KVRunDriver).putRun(result.data);
   }
+  try {
+    await upsertRunInSearchIndex(driver, result.data);
+  } catch (error) {
+    logger.warn('Failed to update run search index', { error });
+  }
 
   return createdResponse({ run: result.data });
-});
+}));

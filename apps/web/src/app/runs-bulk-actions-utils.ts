@@ -5,6 +5,7 @@
  */
 
 import type { FuzzingRun, RunStatus } from './types';
+import type { CapabilityCode } from '../lib/permissions';
 import { RUN_STATUSES, isTerminalStatus } from '../lib/run-status';
 
 export type BulkActionType = 'cancel' | 'retry' | 'delete' | 'export' | 'tag' | 'assign';
@@ -119,6 +120,23 @@ export function createUndoSnapshot(
 
 export function restoreUndoSnapshot(snapshot: BulkUndoSnapshot): { runs: FuzzingRun[]; selectedRunIds: Set<string> } {
   return { runs: snapshot.runs.map((r) => ({ ...r })), selectedRunIds: new Set(snapshot.selectedRunIds) };
+}
+
+/**
+ * The server capability a bulk action needs (#1880), or `null` when the
+ * action only changes client-side view state (cancel/retry/export/assign).
+ * The UI disables the action when the caller's role does not hold it, so the
+ * server's 403 is never the first feedback.
+ */
+export function bulkActionCapability(action: BulkActionType): CapabilityCode | null {
+  switch (action) {
+    case 'delete':
+      return 'runs:delete';
+    case 'tag':
+      return 'runs:annotate';
+    default:
+      return null;
+  }
 }
 
 /**

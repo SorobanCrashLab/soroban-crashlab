@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import { ERROR_CODES } from './error-codes';
 import { httpCall } from './http-call';
+import { containsSensitiveContent, redactText } from './redaction';
 import {
   ARTIFACT_CLASS_RULES,
   recordUploadRejection,
@@ -53,7 +54,10 @@ export function gateDeclaredUploads(
  * size is detected without buffering all of it.
  */
 export async function readBytesCapped(response: Response, maxBytes: number): Promise<Uint8Array> {
-  if (!response.body) return new Uint8Array(await response.arrayBuffer()).slice(0, maxBytes + 1);
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) {
+    throw new RangeError('maxBytes must be a non-negative safe integer');
+  }
+  if (!response.body) return new Uint8Array(0);
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -122,14 +126,27 @@ export async function ingestUploadedArtifact(
   let verdict: UploadValidation;
   try {
     const response = await fetchObject(file.ufsUrl);
-    verdict = response.ok
-      ? validateUploadContent(metadata.artifactClass, await readBytesCapped(response, maxBytes))
-      : { ok: false, reason: 'malformed', message: `Stored object could not be read (HTTP ${response.status}).` };
+    if (response.ok) {
+      const bytes = await readBytesCapped(response, maxBytes);
+      verdict = validateUploadContent(metadata.artifactClass, bytes);
+      if (verdict.ok && metadata.artifactClass !== 'wasm') {
+        const content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        if (containsSensitiveContent(content)) {
+          verdict = {
+            ok: false,
+            reason: 'sensitive-content',
+            message: 'Artifact contains secret-like values. Redact them and upload the sanitized artifact.',
+          };
+        }
+      }
+    } else {
+      verdict = { ok: false, reason: 'malformed', message: `Stored object could not be read (HTTP ${response.status}).` };
+    }
   } catch (error) {
     verdict = {
       ok: false,
       reason: 'malformed',
-      message: `Stored object could not be read: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Stored object could not be read: ${redactText(error instanceof Error ? error.message : String(error))}`,
     };
   }
 
@@ -137,23 +154,28 @@ export async function ingestUploadedArtifact(
     recordUploadRejection({
       stage: 'content',
       reason: verdict.reason,
-      fileName: file.name,
+      fileName: redactText(file.name),
       size: file.size,
       artifactClass: metadata.artifactClass,
-      runId: metadata.runId ?? null,
+      runId: metadata.runId ? redactText(metadata.runId) : null,
     });
     // Fail closed: an unverifiable object is removed, never persisted.
-    await deps.deleteStoredFile(file.key).catch(() => undefined);
+    try {
+      await deps.deleteStoredFile(file.key);
+    } catch (error) {
+      const message = error instanceof Error ? redactText(error.message) : 'unknown storage error';
+      throw new Error(`Failed to delete rejected artifact from storage: ${message}`);
+    }
     return { accepted: false, code: UPLOAD_REJECTED_CODE, reason: verdict.reason, message: verdict.message };
   }
 
   await deps.persist({
     id: file.key,
-    name: file.name,
+    name: redactText(file.name),
     type: metadata.artifactClass,
     size: file.size,
     updatedAt: (deps.now?.() ?? new Date()).toISOString(),
-    runId: metadata.runId ?? null,
+    runId: metadata.runId ? redactText(metadata.runId) : null,
     utKey: file.key,
     utUrl: file.ufsUrl,
   });

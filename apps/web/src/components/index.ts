@@ -2,6 +2,8 @@ export * from './PageHeader';
 export * from './PageSection';
 export * from './StatCard';
 export * from './Button';
+export * from './Can';
+export * from './RequireCapability';
 export * from './TextField';
 export * from './Select';
 export * from './Toggle';

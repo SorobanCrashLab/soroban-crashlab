@@ -54,7 +54,7 @@ const mockRuns = [
 ];
 
 const fulfillRunsRequest = async (page: Page, body: unknown, status = 200) => {
-  await page.route('**/api/runs', async (route) => {
+  await page.route('**/api/runs*', async (route) => {
     const requestUrl = new URL(route.request().url());
     if (requestUrl.pathname !== '/api/runs') {
       await route.continue();

@@ -1,0 +1,500 @@
+{
+  "version": 1,
+  "description": "Per-route performance budgets (W5-D09 / #1881). Bootstrapped from the optimized build; the ratchet only lowers these values unless a reviewed --allow-increase lands.",
+  "generatedAt": "2026-10-19T23:10:19.452Z",
+  "commitSha": "30646892a29a34faca47a4acfb42587a59827a93",
+  "source": "client-reference-manifest",
+  "fixture": {
+    "runId": "run-1024",
+    "samples": 3,
+    "dynamicRoute": "/runs/[id] -> /runs/run-1024"
+  },
+  "tolerances": {
+    "sizePct": 0,
+    "rscPct": 3,
+    "timingPct": 25,
+    "timingFloorMs": 100
+  },
+  "routes": {
+    "/": {
+      "firstLoadJsGzip": 319468,
+      "firstLoadJsRaw": 1071482,
+      "routeOnlyJsGzip": 7710,
+      "routeOnlyJsRaw": 25318,
+      "rscPayloadBytes": 18176,
+      "htmlBytes": 66560,
+      "ttfbMs": 355,
+      "hydrationMs": 650,
+      "lcpMs": 2465,
+      "inpMs": 635
+    },
+    "/403": {
+      "firstLoadJsGzip": 314562,
+      "firstLoadJsRaw": 1053557,
+      "routeOnlyJsGzip": 2804,
+      "routeOnlyJsRaw": 7393
+    },
+    "/_global-error": {
+      "firstLoadJsGzip": 130716,
+      "firstLoadJsRaw": 439570,
+      "routeOnlyJsGzip": 0,
+      "routeOnlyJsRaw": 0
+    },
+    "/_not-found": {
+      "firstLoadJsGzip": 311758,
+      "firstLoadJsRaw": 1046164,
+      "routeOnlyJsGzip": 0,
+      "routeOnlyJsRaw": 0
+    },
+    "/analytics": {
+      "firstLoadJsGzip": 313984,
+      "firstLoadJsRaw": 1052750,
+      "routeOnlyJsGzip": 2226,
+      "routeOnlyJsRaw": 6586,
+      "rscPayloadBytes": 22272,
+      "htmlBytes": 50176,
+      "ttfbMs": 190,
+      "hydrationMs": 320,
+      "lcpMs": 1400,
+      "inpMs": 340
+    },
+    "/analytics/calendar": {
+      "firstLoadJsGzip": 315795,
+      "firstLoadJsRaw": 1056579,
+      "routeOnlyJsGzip": 4037,
+      "routeOnlyJsRaw": 10415
+    },
+    "/analytics/chart-builder": {
+      "firstLoadJsGzip": 316787,
+      "firstLoadJsRaw": 1061369,
+      "routeOnlyJsGzip": 5029,
+      "routeOnlyJsRaw": 15205
+    },
+    "/analytics/clusters": {
+      "firstLoadJsGzip": 314342,
+      "firstLoadJsRaw": 1053768,
+      "routeOnlyJsGzip": 2584,
+      "routeOnlyJsRaw": 7604
+    },
+    "/analytics/comparison": {
+      "firstLoadJsGzip": 312531,
+      "firstLoadJsRaw": 1047448,
+      "routeOnlyJsGzip": 773,
+      "routeOnlyJsRaw": 1284
+    },
+    "/analytics/environment-matrix": {
+      "firstLoadJsGzip": 314945,
+      "firstLoadJsRaw": 1054024,
+      "routeOnlyJsGzip": 3187,
+      "routeOnlyJsRaw": 7860
+    },
+    "/analytics/flaky": {
+      "firstLoadJsGzip": 317748,
+      "firstLoadJsRaw": 1064266,
+      "routeOnlyJsGzip": 5990,
+      "routeOnlyJsRaw": 18102
+    },
+    "/analytics/heatmap": {
+      "firstLoadJsGzip": 317332,
+      "firstLoadJsRaw": 1063804,
+      "routeOnlyJsGzip": 5574,
+      "routeOnlyJsRaw": 17640
+    },
+    "/analytics/taxonomy": {
+      "firstLoadJsGzip": 316636,
+      "firstLoadJsRaw": 1059831,
+      "routeOnlyJsGzip": 4878,
+      "routeOnlyJsRaw": 13667
+    },
+    "/api-docs": {
+      "firstLoadJsGzip": 311758,
+      "firstLoadJsRaw": 1046164,
+      "routeOnlyJsGzip": 0,
+      "routeOnlyJsRaw": 0
+    },
+    "/audit": {
+      "firstLoadJsGzip": 314711,
+      "firstLoadJsRaw": 1053954,
+      "routeOnlyJsGzip": 2953,
+      "routeOnlyJsRaw": 7790
+    },
+    "/campaign-comparison": {
+      "firstLoadJsGzip": 315902,
+      "firstLoadJsRaw": 1057938,
+      "routeOnlyJsGzip": 4144,
+      "routeOnlyJsRaw": 11774
+    },
+    "/campaign-cost-estimator": {
+      "firstLoadJsGzip": 315110,
+      "firstLoadJsRaw": 1055485,
+      "routeOnlyJsGzip": 3352,
+      "routeOnlyJsRaw": 9321
+    },
+    "/campaign-milestone-timeline": {
+      "firstLoadJsGzip": 314867,
+      "firstLoadJsRaw": 1055122,
+      "routeOnlyJsGzip": 3109,
+      "routeOnlyJsRaw": 8958
+    },
+    "/dashboard": {
+      "firstLoadJsGzip": 334962,
+      "firstLoadJsRaw": 1122470,
+      "routeOnlyJsGzip": 23204,
+      "routeOnlyJsRaw": 76306,
+      "rscPayloadBytes": 24064,
+      "htmlBytes": 49920,
+      "ttfbMs": 320,
+      "hydrationMs": 390,
+      "lcpMs": 1420,
+      "inpMs": 555
+    },
+    "/filter-presets": {
+      "firstLoadJsGzip": 313431,
+      "firstLoadJsRaw": 1051288,
+      "routeOnlyJsGzip": 1673,
+      "routeOnlyJsRaw": 5124
+    },
+    "/flaky-tests": {
+      "firstLoadJsGzip": 314189,
+      "firstLoadJsRaw": 1052881,
+      "routeOnlyJsGzip": 2431,
+      "routeOnlyJsRaw": 6717
+    },
+    "/heatmap-calendar": {
+      "firstLoadJsGzip": 314763,
+      "firstLoadJsRaw": 1054581,
+      "routeOnlyJsGzip": 3005,
+      "routeOnlyJsRaw": 8417
+    },
+    "/integrations": {
+      "firstLoadJsGzip": 316208,
+      "firstLoadJsRaw": 1062325,
+      "routeOnlyJsGzip": 4450,
+      "routeOnlyJsRaw": 16161
+    },
+    "/integrations/api-errors": {
+      "firstLoadJsGzip": 312433,
+      "firstLoadJsRaw": 1047548,
+      "routeOnlyJsGzip": 675,
+      "routeOnlyJsRaw": 1384
+    },
+    "/integrations/artifacts": {
+      "firstLoadJsGzip": 312433,
+      "firstLoadJsRaw": 1047548,
+      "routeOnlyJsGzip": 675,
+      "routeOnlyJsRaw": 1384
+    },
+    "/integrations/auth": {
+      "firstLoadJsGzip": 312439,
+      "firstLoadJsRaw": 1047624,
+      "routeOnlyJsGzip": 681,
+      "routeOnlyJsRaw": 1460
+    },
+    "/integrations/ci-replay": {
+      "firstLoadJsGzip": 314608,
+      "firstLoadJsRaw": 1054276,
+      "routeOnlyJsGzip": 2850,
+      "routeOnlyJsRaw": 8112
+    },
+    "/integrations/db-migrations": {
+      "firstLoadJsGzip": 312442,
+      "firstLoadJsRaw": 1047624,
+      "routeOnlyJsGzip": 684,
+      "routeOnlyJsRaw": 1460
+    },
+    "/integrations/github-actions": {
+      "firstLoadJsGzip": 312434,
+      "firstLoadJsRaw": 1047548,
+      "routeOnlyJsGzip": 676,
+      "routeOnlyJsRaw": 1384
+    },
+    "/integrations/grafana": {
+      "firstLoadJsGzip": 312455,
+      "firstLoadJsRaw": 1047632,
+      "routeOnlyJsGzip": 697,
+      "routeOnlyJsRaw": 1468
+    },
+    "/integrations/issue-links": {
+      "firstLoadJsGzip": 312456,
+      "firstLoadJsRaw": 1047583,
+      "routeOnlyJsGzip": 698,
+      "routeOnlyJsRaw": 1419
+    },
+    "/integrations/pagerduty": {
+      "firstLoadJsGzip": 312455,
+      "firstLoadJsRaw": 1047633,
+      "routeOnlyJsGzip": 697,
+      "routeOnlyJsRaw": 1469
+    },
+    "/integrations/prometheus": {
+      "firstLoadJsGzip": 312457,
+      "firstLoadJsRaw": 1047656,
+      "routeOnlyJsGzip": 699,
+      "routeOnlyJsRaw": 1492
+    },
+    "/integrations/replay-e2e": {
+      "firstLoadJsGzip": 312432,
+      "firstLoadJsRaw": 1047548,
+      "routeOnlyJsGzip": 674,
+      "routeOnlyJsRaw": 1384
+    },
+    "/integrations/sanity-check": {
+      "firstLoadJsGzip": 312432,
+      "firstLoadJsRaw": 1047548,
+      "routeOnlyJsGzip": 674,
+      "routeOnlyJsRaw": 1384
+    },
+    "/integrations/sentry": {
+      "firstLoadJsGzip": 312457,
+      "firstLoadJsRaw": 1047630,
+      "routeOnlyJsGzip": 699,
+      "routeOnlyJsRaw": 1466
+    },
+    "/integrations/smtp": {
+      "firstLoadJsGzip": 312459,
+      "firstLoadJsRaw": 1047631,
+      "routeOnlyJsGzip": 701,
+      "routeOnlyJsRaw": 1467
+    },
+    "/integrations/ui-harness": {
+      "firstLoadJsGzip": 312454,
+      "firstLoadJsRaw": 1047631,
+      "routeOnlyJsGzip": 696,
+      "routeOnlyJsRaw": 1467
+    },
+    "/integrations/webhooks": {
+      "firstLoadJsGzip": 316439,
+      "firstLoadJsRaw": 1061068,
+      "routeOnlyJsGzip": 4681,
+      "routeOnlyJsRaw": 14904
+    },
+    "/integrations/webhooks/dead-letter-queue": {
+      "firstLoadJsGzip": 312444,
+      "firstLoadJsRaw": 1047624,
+      "routeOnlyJsGzip": 686,
+      "routeOnlyJsRaw": 1460
+    },
+    "/integrations/webhooks/retry-dashboard": {
+      "firstLoadJsGzip": 312444,
+      "firstLoadJsRaw": 1047624,
+      "routeOnlyJsGzip": 686,
+      "routeOnlyJsRaw": 1460
+    },
+    "/logs": {
+      "firstLoadJsGzip": 324735,
+      "firstLoadJsRaw": 1089018,
+      "routeOnlyJsGzip": 12977,
+      "routeOnlyJsRaw": 42854,
+      "rscPayloadBytes": 22016,
+      "htmlBytes": 61184,
+      "ttfbMs": 205,
+      "hydrationMs": 800,
+      "lcpMs": 1820,
+      "inpMs": 330
+    },
+    "/maintainer": {
+      "firstLoadJsGzip": 314220,
+      "firstLoadJsRaw": 1052950,
+      "routeOnlyJsGzip": 2462,
+      "routeOnlyJsRaw": 6786
+    },
+    "/maintainer/audit-log": {
+      "firstLoadJsGzip": 315329,
+      "firstLoadJsRaw": 1055964,
+      "routeOnlyJsGzip": 3571,
+      "routeOnlyJsRaw": 9800
+    },
+    "/notification-center": {
+      "firstLoadJsGzip": 320970,
+      "firstLoadJsRaw": 1081120,
+      "routeOnlyJsGzip": 9212,
+      "routeOnlyJsRaw": 34956
+    },
+    "/onboarding": {
+      "firstLoadJsGzip": 312625,
+      "firstLoadJsRaw": 1047615,
+      "routeOnlyJsGzip": 867,
+      "routeOnlyJsRaw": 1451
+    },
+    "/onboarding-wizard": {
+      "firstLoadJsGzip": 314458,
+      "firstLoadJsRaw": 1053691,
+      "routeOnlyJsGzip": 2700,
+      "routeOnlyJsRaw": 7527
+    },
+    "/query-builder": {
+      "firstLoadJsGzip": 313929,
+      "firstLoadJsRaw": 1052724,
+      "routeOnlyJsGzip": 2171,
+      "routeOnlyJsRaw": 6560
+    },
+    "/regression-suite": {
+      "firstLoadJsGzip": 316224,
+      "firstLoadJsRaw": 1057943,
+      "routeOnlyJsGzip": 4466,
+      "routeOnlyJsRaw": 11779
+    },
+    "/reproduction-snippet": {
+      "firstLoadJsGzip": 317454,
+      "firstLoadJsRaw": 1062453,
+      "routeOnlyJsGzip": 5696,
+      "routeOnlyJsRaw": 16289
+    },
+    "/runs": {
+      "firstLoadJsGzip": 329107,
+      "firstLoadJsRaw": 1105294,
+      "routeOnlyJsGzip": 17349,
+      "routeOnlyJsRaw": 59130,
+      "rscPayloadBytes": 24064,
+      "htmlBytes": 49920,
+      "ttfbMs": 570,
+      "hydrationMs": 545,
+      "lcpMs": 3460,
+      "inpMs": 1075
+    },
+    "/runs/[id]": {
+      "firstLoadJsGzip": 342893,
+      "firstLoadJsRaw": 1146121,
+      "routeOnlyJsGzip": 31135,
+      "routeOnlyJsRaw": 99957,
+      "rscPayloadBytes": 41216,
+      "htmlBytes": 111360,
+      "ttfbMs": 575,
+      "hydrationMs": 1585,
+      "lcpMs": 3940,
+      "inpMs": 1740
+    },
+    "/runs/[id]/replay-history": {
+      "firstLoadJsGzip": 315757,
+      "firstLoadJsRaw": 1056353,
+      "routeOnlyJsGzip": 3999,
+      "routeOnlyJsRaw": 10189
+    },
+    "/runs/[id]/sequence": {
+      "firstLoadJsGzip": 314165,
+      "firstLoadJsRaw": 1053122,
+      "routeOnlyJsGzip": 2407,
+      "routeOnlyJsRaw": 6958
+    },
+    "/runs/query": {
+      "firstLoadJsGzip": 313320,
+      "firstLoadJsRaw": 1049501,
+      "routeOnlyJsGzip": 1562,
+      "routeOnlyJsRaw": 3337
+    },
+    "/schedules": {
+      "firstLoadJsGzip": 320640,
+      "firstLoadJsRaw": 1071068,
+      "routeOnlyJsGzip": 8882,
+      "routeOnlyJsRaw": 24904
+    },
+    "/search": {
+      "firstLoadJsGzip": 313397,
+      "firstLoadJsRaw": 1051204,
+      "routeOnlyJsGzip": 1639,
+      "routeOnlyJsRaw": 5040
+    },
+    "/settings": {
+      "firstLoadJsGzip": 315193,
+      "firstLoadJsRaw": 1055206,
+      "routeOnlyJsGzip": 3435,
+      "routeOnlyJsRaw": 9042
+    },
+    "/settings/accessibility": {
+      "firstLoadJsGzip": 314566,
+      "firstLoadJsRaw": 1054936,
+      "routeOnlyJsGzip": 2808,
+      "routeOnlyJsRaw": 8772
+    },
+    "/settings/alerting": {
+      "firstLoadJsGzip": 314260,
+      "firstLoadJsRaw": 1053562,
+      "routeOnlyJsGzip": 2502,
+      "routeOnlyJsRaw": 7398
+    },
+    "/settings/alerting/presets": {
+      "firstLoadJsGzip": 314275,
+      "firstLoadJsRaw": 1053607,
+      "routeOnlyJsGzip": 2517,
+      "routeOnlyJsRaw": 7443
+    },
+    "/settings/api": {
+      "firstLoadJsGzip": 312314,
+      "firstLoadJsRaw": 1047131,
+      "routeOnlyJsGzip": 556,
+      "routeOnlyJsRaw": 967
+    },
+    "/settings/config-bundle": {
+      "firstLoadJsGzip": 318871,
+      "firstLoadJsRaw": 1066773,
+      "routeOnlyJsGzip": 7113,
+      "routeOnlyJsRaw": 20609
+    },
+    "/settings/network": {
+      "firstLoadJsGzip": 313429,
+      "firstLoadJsRaw": 1051286,
+      "routeOnlyJsGzip": 1671,
+      "routeOnlyJsRaw": 5122
+    },
+    "/settings/notifications": {
+      "firstLoadJsGzip": 315152,
+      "firstLoadJsRaw": 1056353,
+      "routeOnlyJsGzip": 3394,
+      "routeOnlyJsRaw": 10189
+    },
+    "/settings/reporting": {
+      "firstLoadJsGzip": 313441,
+      "firstLoadJsRaw": 1051319,
+      "routeOnlyJsGzip": 1683,
+      "routeOnlyJsRaw": 5155
+    },
+    "/settings/roles": {
+      "firstLoadJsGzip": 315543,
+      "firstLoadJsRaw": 1058845,
+      "routeOnlyJsGzip": 3785,
+      "routeOnlyJsRaw": 12681
+    },
+    "/start": {
+      "firstLoadJsGzip": 317528,
+      "firstLoadJsRaw": 1063212,
+      "routeOnlyJsGzip": 5770,
+      "routeOnlyJsRaw": 17048
+    },
+    "/trends": {
+      "firstLoadJsGzip": 329840,
+      "firstLoadJsRaw": 1104534,
+      "routeOnlyJsGzip": 18082,
+      "routeOnlyJsRaw": 58370,
+      "rscPayloadBytes": 25344,
+      "htmlBytes": 50432,
+      "ttfbMs": 190,
+      "hydrationMs": 510,
+      "lcpMs": 1725,
+      "inpMs": 500
+    },
+    "/triage": {
+      "firstLoadJsGzip": 322095,
+      "firstLoadJsRaw": 1076106,
+      "routeOnlyJsGzip": 10337,
+      "routeOnlyJsRaw": 29942,
+      "rscPayloadBytes": 22272,
+      "htmlBytes": 47104,
+      "ttfbMs": 110,
+      "hydrationMs": 440,
+      "lcpMs": 1660,
+      "inpMs": 715
+    },
+    "/triage/board": {
+      "firstLoadJsGzip": 313669,
+      "firstLoadJsRaw": 1050214,
+      "routeOnlyJsGzip": 1911,
+      "routeOnlyJsRaw": 4050
+    },
+    "/wasm-ingestion": {
+      "firstLoadJsGzip": 316145,
+      "firstLoadJsRaw": 1061137,
+      "routeOnlyJsGzip": 4387,
+      "routeOnlyJsRaw": 14973
+    }
+  }
+}

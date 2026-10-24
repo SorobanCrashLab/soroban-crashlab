@@ -170,6 +170,20 @@ Key files: [`proxy.ts`](../../apps/web/src/proxy.ts),
 [`pagination-utils.ts`](../../apps/web/src/app/pagination-utils.ts),
 [`api-response-utils.ts`](../../apps/web/src/lib/api-response-utils.ts),
 [`api-client.ts`](../../apps/web/src/lib/api-client.ts).
+
+The UI does not wait to discover authorization from a 403. Before rendering a
+gated control, pages read the caller's role from
+[`api/settings/roles/me`](../../apps/web/src/app/api/settings/roles/me/route.ts)
+through [`permissions.ts`](../../apps/web/src/lib/permissions.ts), whose
+capability registry derives each required role from the same
+[`route-catalog.ts`](../../apps/web/src/lib/route-catalog.ts) the proxy
+authorizes against. [`Can`](../../apps/web/src/components/Can.tsx) disables or
+hides a control with a linked explanation, and
+[`RequireCapability`](../../apps/web/src/components/RequireCapability.tsx)
+redirects unauthorized deep links to the
+[`/403`](../../apps/web/src/app/403/page.tsx) recovery page. This mirror is
+advisory only — the server remains the enforcer. See
+[ADR-0012](../adr/0012-capability-driven-ui-gating.md).
 Live updates for a run stream over
 [`api/runs/[id]/stream`](../../apps/web/src/app/api/runs/[id]/stream) via
 [`run-stream.ts`](../../apps/web/src/lib/run-stream.ts). With no backend
