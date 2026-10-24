@@ -1,5 +1,4 @@
-import { withRouteErrorHandling } from '@/lib/api-route-error';
-import { readJsonBody } from '@/lib/api-request-utils';
+import { withRouteErrorHandling, readJsonBody } from '@/lib/route-handler';
 import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { withCsrfGuard } from '@/lib/csrf';
@@ -28,6 +27,7 @@ import {
 import { readQuotaLimits } from '@/lib/capacity/quotas';
 import { getCapacityLedger } from '@/lib/capacity/usage-ledger';
 import { readSchedulingWindows } from '@/lib/capacity/windows';
+import { registerCampaign } from '@/lib/campaigns/campaign-registry';
 import { resolvePrincipal, resolveRoleForPrincipal } from '@/lib/rbac';
 
 const IDEMPOTENCY_SCOPE = 'POST /api/campaigns';
@@ -156,6 +156,25 @@ async function createCampaign(
   }
 
   ledger.admit({ campaignId: campaign.id, ...resources });
+
+  // The timeline (#1874) is keyed by campaign id; register the new campaign
+  // (and its start marker) so `GET /api/campaigns/[id]/timeline` can serve it.
+  registerCampaign({
+    id: campaign.id,
+    name:
+      typeof payload.name === 'string' && payload.name.trim().length > 0
+        ? payload.name.trim()
+        : undefined,
+    status: 'queued',
+    createdAt: campaign.createdAt,
+    target: {
+      ...(typeof payload.area === 'string' ? { area: payload.area } : {}),
+      ...(typeof payload.preset === 'string' ? { preset: payload.preset } : {}),
+      seeds: resources.seeds,
+      workers: resources.workers,
+    },
+  });
+
   if (overriddenBy !== null && !admission.ok) {
     recordAuditEvent({
       action: 'quota.override',

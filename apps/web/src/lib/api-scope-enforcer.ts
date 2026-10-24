@@ -55,6 +55,8 @@ export function getRequiredScopesForRequest(method: string, pathname: string): A
   // The route catalog is the source of truth for scope requirements. The
   // pattern table below remains as a fallback for paths that have no exact
   // catalog registration (e.g. sub-resources reached under a prefix).
+  // `lib/permissions.ts` reads the same entries to mirror the role requirement
+  // in the UI (ADR-0012); scopes and roles are separate axes.
   const catalogEntry = matchRouteCatalogEntry(upperMethod, pathname);
   if (catalogEntry?.requiredCapability?.scopes) {
     return catalogEntry.requiredCapability.scopes;

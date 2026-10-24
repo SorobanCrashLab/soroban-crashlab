@@ -10,6 +10,9 @@
 // threshold, and response action) so cost-aware budgeting behaviour is configured
 // per campaign class (smoke/touch vs deep) and reproducible across runs.
 
+use crate::budget_targeting::{
+    BudgetTargetPolicy, DEFAULT_BAND_WIDTH_BPS, DEFAULT_EDGE_PRIORITY_BOOST_BPS,
+};
 use crate::dictionary::DictionaryId;
 use crate::mutation_budget::MutationBudget;
 use serde::{Deserialize, Serialize};
@@ -129,9 +132,7 @@ impl PlateauPolicy {
     /// a threshold within basis-point range, and at least one sustained
     /// window.
     pub const fn is_valid(&self) -> bool {
-        self.window_seeds > 0
-            && self.score_threshold_bps <= 10_000
-            && self.sustained_windows > 0
+        self.window_seeds > 0 && self.score_threshold_bps <= 10_000 && self.sustained_windows > 0
     }
 
     /// Classifies a plateau score (in basis points) against this policy's
@@ -292,6 +293,25 @@ impl CampaignPreset {
             CampaignPreset::Smoke => "smoke",
             CampaignPreset::Nightly => "nightly",
             CampaignPreset::Deep => "deep",
+        }
+    }
+
+    /// Budget-boundary targeting policy for this preset (#1859).
+    ///
+    /// The policy fixes the ±5% target-band width and the edge-priority
+    /// boost for [`crate::budget_targeting::BudgetTargeter`] and only varies
+    /// the iteration cap, so quick smoke campaigns search fewer knob values
+    /// while deep campaigns get the full binary-search budget.
+    pub const fn budget_target_policy(self) -> BudgetTargetPolicy {
+        let max_iterations = match self {
+            CampaignPreset::Smoke => 8,
+            CampaignPreset::Nightly => 16,
+            CampaignPreset::Deep => 32,
+        };
+        BudgetTargetPolicy {
+            band_width_bps: DEFAULT_BAND_WIDTH_BPS,
+            max_iterations,
+            edge_priority_boost_bps: DEFAULT_EDGE_PRIORITY_BOOST_BPS,
         }
     }
 }
@@ -482,7 +502,27 @@ mod tests {
         assert!(n < d);
         for p in CampaignPreset::ALL {
             let bps = p.dictionary_injection_bps();
-            assert!(bps <= 10_000, "injection probability must be at most 10000 bps");
+            assert!(
+                bps <= 10_000,
+                "injection probability must be at most 10000 bps"
+            );
+        }
+    }
+
+    #[test]
+    fn plateau_policy_serde_roundtrip() {
+        let policy = CampaignPreset::Deep.plateau_policy();
+        let json = serde_json::to_string(&policy).unwrap();
+        let back: PlateauPolicy = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, policy);
+    }
+
+    #[test]
+    fn budget_target_policy_uses_default_band_and_boost() {
+        for p in CampaignPreset::ALL {
+            let policy = p.budget_target_policy();
+            assert_eq!(policy.band_width_bps, 500);
+            assert_eq!(policy.edge_priority_boost_bps, 2_000);
         }
     }
 }

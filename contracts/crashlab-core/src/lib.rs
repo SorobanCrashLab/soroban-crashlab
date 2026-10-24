@@ -6,10 +6,10 @@ pub mod fixture;
 pub mod fixture_classifier;
 pub mod health;
 pub mod prng;
+pub mod redact;
 pub mod regression_group;
 pub mod reproducer;
 pub mod retry;
-pub mod redact;
 pub mod runner;
 pub mod shrink;
 pub mod signature_hash;
@@ -20,9 +20,15 @@ pub use trace::{SeedTrace, TraceEvent, MAX_TRACE_BYTES, MAX_TRACE_EVENTS, TRACE_
 pub mod host_coverage;
 pub use host_coverage::{HostCoverage, HOST_FUNCTION_SURFACE};
 pub mod canon;
-pub use canon::{format_f64_canonical, is_byte_identical_round_trip, parse_canonical_line, write_canonical_line, PERSISTED_FORMATS_WITH_ROUND_TRIP_TEST};
+pub use canon::{
+    format_f64_canonical, is_byte_identical_round_trip, parse_canonical_line, write_canonical_line,
+    PERSISTED_FORMATS_WITH_ROUND_TRIP_TEST,
+};
 pub mod sandbox;
-pub use sandbox::{SandboxConfig, SandboxKill, DEFAULT_SEED_DEADLINE, MAX_HOST_RECURSION_DEPTH, MAX_XDR_DECODE_BYTES};
+pub use sandbox::{
+    SandboxConfig, SandboxKill, DEFAULT_SEED_DEADLINE, MAX_HOST_RECURSION_DEPTH,
+    MAX_XDR_DECODE_BYTES,
+};
 
 pub use runner::{create_runner, ContractRunner, MockRunner, RunnerCreationError, RunnerError};
 
@@ -88,8 +94,8 @@ mod rpc_runner_stub {
 }
 
 pub use auth_matrix::{
-    collect_mismatched, format_mismatch_summary, run_matrix, run_matrix_for_seeds, AuthMode,
-    MatrixReport, ModeResult,
+    collect_mismatched, format_mismatch_summary, run_matrix, run_matrix_for_seeds, AuthFrameEntry,
+    AuthMode, MatrixReport, ModeResult, SignerSet, MISSING_AUTH_CATEGORY,
 };
 pub use cors::{
     evaluate_cors, CorsConfig, CorsError, CorsEvaluation, HttpMethod, OriginAllowlist,
@@ -109,7 +115,10 @@ pub use reproducer::{
     filter_ci_pack, shrink_bundle_payload, shrink_bundle_with_lineage,
     shrink_seed_preserving_signature, FlakyDetector, ReproReport, StabilityVerdict,
 };
-pub use retry::{execute_with_retry, execute_with_retry_counting, simulation_error_for_fault, RetryConfig, SimulationError};
+pub use retry::{
+    execute_with_retry, execute_with_retry_counting, simulation_error_for_fault, RetryConfig,
+    SimulationError,
+};
 pub use signature_hash::{hash_category_payload, SignatureHasher};
 pub use suite_runner::{GroupStats, GroupSummary, SuiteRunnerConfig};
 pub use taxonomy::crash_signature_from_seed;
@@ -121,7 +130,9 @@ pub use taxonomy::{
 pub use host_runner::HostContractRunner;
 
 #[cfg(feature = "rpc-runner")]
-pub use rpc_runner::{CancelToken, LedgerTracker, RpcConfigError, RpcContractRunner, RpcPoolConfig};
+pub use rpc_runner::{
+    CancelToken, LedgerTracker, RpcConfigError, RpcContractRunner, RpcPoolConfig,
+};
 
 #[cfg(not(feature = "rpc-runner"))]
 pub use rpc_runner_stub::{RpcConfigError, RpcContractRunner};
@@ -147,6 +158,13 @@ pub mod campaign_presets;
 pub use campaign_presets::{
     CampaignClass, CampaignParameters, CampaignPreset, ParseCampaignPresetError,
 };
+pub mod budget_targeting;
+pub use budget_targeting::{
+    apply_budget_edge_priority, classify_exhaustion, is_exhausted, metering_dictionary, BandStatus,
+    BudgetEdge, BudgetKnobs, BudgetTargetConfig, BudgetTargetPolicy, BudgetTargeter,
+    ConsumptionSample, ExhaustionOrigin, ExhaustionRecord, KnobBounds, MeterDimension,
+    MeteringLimits, TargetBand,
+};
 pub mod capacity;
 pub use capacity::{
     check_admission, QuotaGuard, QuotaLimits, QuotaResource, QuotaUsage, QuotaViolation,
@@ -161,7 +179,7 @@ pub use replay::{
 
 pub mod env_fingerprint;
 pub use env_fingerprint::{
-    check_bundle_replay_environment, check_replay_environment, EnvironmentFingerprint,
+    check_bundle_replay_environment, check_replay_environment, EnvironmentFingerprint, ReplayAxis,
     ReplayEnvironmentReport,
 };
 pub mod boundary;
@@ -178,9 +196,11 @@ pub use decimal_precision::{
 
 pub mod bundle_persist;
 pub use bundle_persist::{
-    load_case_bundle_document_json, load_case_bundle_json, read_case_bundle_json,
-    save_case_bundle_document_json, save_case_bundle_json, write_case_bundle_json,
-    BundlePersistError, CaseBundleDocument, CASE_BUNDLE_SCHEMA_VERSION, SUPPORTED_BUNDLE_SCHEMAS,
+    load_case_bundle_document_json, load_case_bundle_json, load_sequence_bundle_json,
+    read_case_bundle_json, save_case_bundle_document_json, save_case_bundle_json,
+    save_sequence_bundle_json, write_case_bundle_json, BundlePersistError, CaseBundleDocument,
+    SequenceBundleDocument, CASE_BUNDLE_SCHEMA_VERSION, SEQUENCE_BUNDLE_ARTIFACT_CLASS,
+    SEQUENCE_BUNDLE_SCHEMA_VERSION, SUPPORTED_BUNDLE_SCHEMAS, SUPPORTED_SEQUENCE_BUNDLE_SCHEMAS,
 };
 
 pub mod run_metadata;
@@ -192,7 +212,8 @@ pub use artifact_compress::{compress_artifact, decompress_artifact};
 
 pub mod artifact_storage;
 pub use artifact_storage::{
-    ArtifactMetadata, ArtifactStore, LocalArtifactStore, StorageConfig, StorageError,
+    ArtifactMetadata, ArtifactStore, LocalArtifactStore, MemoryArtifactStore, StorageConfig,
+    StorageError, StorageErrorKind, TTL_EXPIRY_SLACK_SECONDS,
 };
 
 pub mod fixture_compat;
@@ -203,8 +224,9 @@ pub use fixture_compat::{
 
 pub mod fixture_manifest;
 pub use fixture_manifest::{
-    FixtureManifest, FixtureMetadata, FixturePairing, ManifestError, ProvenanceReport, ShrinkLineage,
-    FIXTURE_MANIFEST_SCHEMA_VERSION, SHRINK_LINEAGE_SCHEMA_VERSION, SUPPORTED_MANIFEST_SCHEMAS,
+    FixtureManifest, FixtureMetadata, FixturePairing, ManifestError, ProvenanceReport,
+    ShrinkLineage, FIXTURE_MANIFEST_SCHEMA_VERSION, SHRINK_LINEAGE_SCHEMA_VERSION,
+    SUPPORTED_MANIFEST_SCHEMAS,
 };
 
 pub mod provenance;
@@ -241,22 +263,33 @@ pub use fixture_sanitize::{
 
 pub mod checkpoint;
 pub use checkpoint::{
-    generation_path, load_checkpoint_file, load_run_checkpoint_atomic, load_run_checkpoint_json,
-    save_run_checkpoint_atomic, save_run_checkpoint_json, verify_checkpoint_generation,
-    write_checkpoint_file, CheckpointError, CheckpointIOError, CheckpointLoad, LoadedCheckpoint,
+    load_checkpoint_file, load_run_checkpoint_json, save_run_checkpoint_json,
+    verify_checkpoint_generation, write_checkpoint_file, CheckpointError, LoadedCheckpoint,
     RunCheckpoint, RUN_CHECKPOINT_SCHEMA_VERSION, SUPPORTED_RUN_CHECKPOINT_SCHEMAS,
 };
 
 pub mod corpus;
 pub use corpus::{
     corpus_archive_from_seeds, export_corpus_json, import_corpus_json, verify_corpus_integrity,
-    CorpusArchive, CorpusError, CorpusVerifyStatus, AddressedSeed,
-    CORPUS_ARCHIVE_SCHEMA_VERSION,
+    AddressedSeed, CorpusArchive, CorpusError, CorpusVerifyStatus, CORPUS_ARCHIVE_SCHEMA_VERSION,
 };
 
 pub mod corpus_import;
 pub use corpus_import::{
     import_seeds, import_seeds_with_schema, CorpusImportError, CorpusImportResult,
+};
+
+pub mod corpus_archive;
+pub use corpus_archive::{
+    compute_manifest_hash, current_engine_version, seed_content_hash, ArchiveEntry, ArchiveError,
+    ArchiveManifest, CorpusArchive as PortableCorpusArchive, CorpusStore, EngineVersionPolicy,
+    MergeReport, TaggedSeed, CORPUS_ARCHIVE_FORMAT_VERSION, SUPPORTED_ARCHIVE_FORMATS,
+};
+
+pub mod corpus_minimize;
+pub use corpus_minimize::{
+    apply_minimization, behavior_key, plan_minimization, ApplyReport, BehaviorGroup, BehaviorKey,
+    CorpusRecord, MinimizationPlan, MinimizeError, SeedId,
 };
 
 pub mod retention;
@@ -265,8 +298,19 @@ pub use retention::{RetentionPolicy, RetentionRecord};
 pub mod scenario_export;
 pub use scenario_export::{
     derive_test_name, export_crash_report_markdown, export_failing_seed_json,
-    export_rust_regression_fixture, export_scenario_json, export_suite_json,
-    write_rust_regression_snippet, FailureScenario,
+    export_rust_regression_fixture, export_scenario_json, export_sequence_scenario_json,
+    export_suite_json, write_rust_regression_snippet, FailureScenario,
+};
+
+pub mod sequence;
+pub use sequence::{
+    apply_structural, drive_sequence, evaluate_sequence, expectation_met, export_sequence_json,
+    import_sequence_json, mutate_step_payload, sequence_crash_signature, shrink_sequence,
+    structural_mutation, SequenceConfig, SequenceError, SequenceRun, SequenceScenario,
+    SequenceSeed, SequenceStep, SequenceVerdict, StepExecutor, StepExpectation, StepOutcome,
+    StepScenario, StructuralOp, DEFAULT_SEQUENCE_MAX_STEPS, DEFAULT_SEQUENCE_MIN_STEPS,
+    PRESET_SEQUENCE_MAX_STEPS, PRESET_SEQUENCE_MIN_STEPS, SEQUENCE_SCHEMA_VERSION,
+    SUPPORTED_SEQUENCE_SCHEMAS,
 };
 
 pub mod regression_suite;
@@ -315,8 +359,8 @@ pub use seed_novelty::{
 };
 pub mod stale_detector;
 pub use stale_detector::{
-    Heartbeat, RunDirLock, StaleDetectorConfig, StaleRunDetector, StaleStatus,
-    is_heartbeat_alive, read_heartbeat, write_heartbeat, write_heartbeat_at,
+    is_heartbeat_alive, read_heartbeat, write_heartbeat, write_heartbeat_at, Heartbeat, RunDirLock,
+    StaleDetectorConfig, StaleRunDetector, StaleStatus,
 };
 
 pub mod worker_partition;
@@ -327,19 +371,20 @@ pub use worker_partition::{
 
 pub mod health_snapshot;
 pub use health_snapshot::{
-    append_health_snapshot, classify_failure_message, health_snapshot_path, read_health_snapshots,
-    read_health_snapshot_log,
-    read_latest_health_snapshot, read_latest_health_snapshot_line, terminal_label, BudgetSnapshot, CampaignHealth, HealthSnapshot,
-    HealthSnapshotError, DEFAULT_SNAPSHOT_INTERVAL_SEEDS, HEALTH_SNAPSHOT_FILE,
-    HEALTH_SNAPSHOT_SCHEMA_VERSION, SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS,
+    append_health_snapshot, classify_failure_message, health_snapshot_path,
+    read_health_snapshot_log, read_health_snapshots, read_latest_health_snapshot,
+    read_latest_health_snapshot_line, terminal_label, BudgetSnapshot, CampaignHealth,
+    HealthSnapshot, HealthSnapshotError, SeedDiagnosticEcho, DEFAULT_SNAPSHOT_INTERVAL_SEEDS,
+    HEALTH_SNAPSHOT_FILE, HEALTH_SNAPSHOT_SCHEMA_VERSION, MAX_DIAGNOSTIC_FRAME_SUMMARY_BYTES,
+    MAX_SEED_DIAGNOSTIC_ECHOES, SUPPORTED_HEALTH_SNAPSHOT_SCHEMAS,
 };
 
 pub mod run_control;
 pub use run_control::{
     cancel_marker_path, cancel_requested, clear_cancel_request, default_state_dir, drive_run,
     drive_run_from_checkpoint, drive_run_partitioned, drive_run_partitioned_from_checkpoint,
-    drive_run_with_health, request_cancel_run, CancelSignal, RunId, RunProgress, RunResumeError,
-    RunSummary, RunTerminalState,
+    drive_run_with_health, drive_sequence_batch, request_cancel_run, CancelSignal, RunId,
+    RunProgress, RunResumeError, RunSummary, RunTerminalState,
 };
 
 pub mod rpc_envelope;
@@ -348,9 +393,12 @@ pub use rpc_envelope::{RpcEnvelopeCapture, RpcRequestEnvelope, RpcResponseEnvelo
 pub mod rpc_fault;
 pub use rpc_fault::{is_harness_error_message, RpcFault};
 
-pub mod stellar_address;
 pub mod address_neighbors;
+pub mod stellar_address;
 pub use address_neighbors::{generate_address_neighbors, AddressNeighbor, AddressNeighborStrategy};
+
+pub mod scval_mutator;
+pub use scval_mutator::{ScValDecodeError, ScValMutatorConfig};
 
 // Re-enable threat model tests (compile-only pass). Obsolete cases can be
 // ignored or updated as follow-ups (see ROADMAP-004).
@@ -401,11 +449,96 @@ pub struct CaseSeed {
 pub struct CrashSignature {
     pub category: String,
     pub digest: u64,
-    /// Stable hash derived solely from `category` and payload bytes.
+    /// Stable hash derived from category, payload, and, for host-runner
+    /// outcomes, the captured structured diagnostics.
     ///
     /// Two failures are considered equivalent when their `signature_hash` values
     /// are equal, regardless of which seed produced them.
     pub signature_hash: u64,
+}
+
+/// Typed host error family exposed by Soroban SDK 22.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostErrorType {
+    Contract,
+    WasmVm,
+    Context,
+    Storage,
+    Object,
+    Crypto,
+    Events,
+    Budget,
+    Value,
+    Auth,
+    Unknown,
+}
+
+impl HostErrorType {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Contract => "contract",
+            Self::WasmVm => "wasm_vm",
+            Self::Context => "context",
+            Self::Storage => "storage",
+            Self::Object => "object",
+            Self::Crypto => "crypto",
+            Self::Events => "events",
+            Self::Budget => "budget",
+            Self::Value => "value",
+            Self::Auth => "auth",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// An explicitly identified budget limit, when the host reports which limit
+/// was exhausted. SDK 22 reports a generic `Budget` error, so its host runner
+/// leaves this unset rather than guessing from consumed-cost measurements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BudgetExhaustion {
+    Cpu,
+    Memory,
+}
+
+/// Origin of a failed host invocation, as distinguished by SDK 22's typed
+/// invocation result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostTrapOrigin {
+    Contract,
+    Abort,
+}
+
+/// Structured diagnostics captured around a genuine Soroban host invocation.
+///
+/// SDK 22 exposes error code/type and aggregate CPU/memory costs through its
+/// test utilities. Its host invocation resource snapshot can also provide a
+/// ledger footprint count when available. It does not expose the nested
+/// invocation stack or a minimum builtin cost through this runner's SDK
+/// surface; those values remain optional.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub struct HostDiagnostics {
+    pub error_code: Option<u32>,
+    pub error_type: Option<HostErrorType>,
+    pub trap_origin: Option<HostTrapOrigin>,
+    /// The top-level contract entrypoint invoked; SDK 22 does not expose
+    /// nested frame details after an invocation.
+    pub frame_summary: Option<String>,
+    pub cpu_instruction_cost: Option<u64>,
+    pub memory_bytes_cost: Option<u64>,
+    pub minimum_builtin_cost: Option<u64>,
+    pub ledger_touch_count: Option<u64>,
+    /// Only set when the host provides an explicit CPU-versus-memory reason.
+    pub budget_exhaustion: Option<BudgetExhaustion>,
+}
+
+/// A genuine host-runner result with its structured execution diagnostics.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct HostInvocationOutcome {
+    pub signature: CrashSignature,
+    pub diagnostics: HostDiagnostics,
 }
 
 /// Computes a stable FNV-1a 64-bit hash from `category` and `payload`.

@@ -1,6 +1,5 @@
 import type { FuzzingRun } from '@/app/types';
 import { isTerminalStatus } from '@/lib/run-status';
-import type { RunStreamEnvelope, RunStreamEvent } from '@/lib/run-stream';
 import {
   BoundedStreamQueue,
   DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -8,6 +7,8 @@ import {
   encodeFrame,
   encodeHeartbeat,
   globalRunStreamRegistry,
+  type RunStreamEnvelope,
+  type RunStreamEvent,
   type RunStreamRegistry,
 } from '@/lib/sse-stream';
 import { selectRunStorageDriver } from '@/lib/storage';
@@ -131,7 +132,7 @@ export async function GET(
         // Only flush while the consumer has room. If desiredSize is
         // positive, the consumer is behind and we keep buffering in
         // the bounded queue instead of unbounded in-the-flight frames.
-        while (queue.size > 0 && controller.desiredSize > 0) {
+        while (queue.size > 0 && (controller.desiredSize ?? 0) > 0) {
           const next = queue.deQueue();
           if (next === undefined) break;
           try {

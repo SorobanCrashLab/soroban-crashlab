@@ -5,7 +5,9 @@ import path from 'node:path';
 const routeFiles = [
   'analytics/chart-builder',
   'analytics/environment-matrix',
+  'campaigns/[id]',
   'campaign-cost-estimator',
+  'compare',
   'dashboard',
   'integrations',
   'integrations/artifacts',
@@ -15,11 +17,13 @@ const routeFiles = [
   'integrations/webhooks/retry-dashboard',
   'maintainer',
   'maintainer/audit-log',
+  'replay/[id]',
   'runs/[id]/sequence',
   'settings',
   'settings/api',
   'settings/config-bundle',
   'start',
+  'triage/queue',
   'wasm-ingestion',
   '__fatal__',
 ];

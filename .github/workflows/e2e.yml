@@ -21,7 +21,7 @@ concurrency:
 
 env:
   NODE_VERSION: '20'
-  PNP_VERSION: '9'
+  PNP_VERSION: '10.30.2'
   # Visual gate ships report-only until the committed baselines have had a run
   # in the pinned container. Set the repository variable VISUAL_ENFORCE=true to
   # turn a screenshot diff into a red build.

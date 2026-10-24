@@ -143,6 +143,9 @@
             },
             "type": "array"
           },
+          "campaignId": {
+            "type": "string"
+          },
           "corpusStats": {
             "items": {
               "properties": {
@@ -216,7 +219,51 @@
           "duration": {
             "type": "number"
           },
+          "expensiveFailure": {
+            "type": "boolean"
+          },
+          "expensiveSuccess": {
+            "type": "boolean"
+          },
+          "fee": {
+            "properties": {
+              "cpuInstructions": {
+                "type": "number"
+              },
+              "expensiveFailure": {
+                "type": "boolean"
+              },
+              "expensiveSuccess": {
+                "type": "boolean"
+              },
+              "feeWarnThreshold": {
+                "type": "number"
+              },
+              "inclusionFee": {
+                "type": "number"
+              },
+              "memoryBytes": {
+                "type": "number"
+              },
+              "minBuiltinEntries": {
+                "type": "number"
+              },
+              "minResourceFee": {
+                "type": "number"
+              },
+              "rentBumps": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "feeWarnThreshold": {
+            "type": "number"
+          },
           "finishedAt": {
+            "type": "string"
+          },
+          "fixtureName": {
             "type": "string"
           },
           "id": {
@@ -271,6 +318,20 @@
               "components",
               "stampedAt"
             ],
+            "type": "object"
+          },
+          "resourceUsage": {
+            "properties": {
+              "cpuInstructions": {
+                "type": "number"
+              },
+              "memoryBytes": {
+                "type": "number"
+              },
+              "minBuiltinEntries": {
+                "type": "number"
+              }
+            },
             "type": "object"
           },
           "seedCount": {
@@ -448,6 +509,9 @@
                   },
                   "type": "array"
                 },
+                "campaignId": {
+                  "type": "string"
+                },
                 "corpusStats": {
                   "items": {
                     "properties": {
@@ -521,7 +585,51 @@
                 "duration": {
                   "type": "number"
                 },
+                "expensiveFailure": {
+                  "type": "boolean"
+                },
+                "expensiveSuccess": {
+                  "type": "boolean"
+                },
+                "fee": {
+                  "properties": {
+                    "cpuInstructions": {
+                      "type": "number"
+                    },
+                    "expensiveFailure": {
+                      "type": "boolean"
+                    },
+                    "expensiveSuccess": {
+                      "type": "boolean"
+                    },
+                    "feeWarnThreshold": {
+                      "type": "number"
+                    },
+                    "inclusionFee": {
+                      "type": "number"
+                    },
+                    "memoryBytes": {
+                      "type": "number"
+                    },
+                    "minBuiltinEntries": {
+                      "type": "number"
+                    },
+                    "minResourceFee": {
+                      "type": "number"
+                    },
+                    "rentBumps": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "feeWarnThreshold": {
+                  "type": "number"
+                },
                 "finishedAt": {
+                  "type": "string"
+                },
+                "fixtureName": {
                   "type": "string"
                 },
                 "id": {
@@ -576,6 +684,20 @@
                     "components",
                     "stampedAt"
                   ],
+                  "type": "object"
+                },
+                "resourceUsage": {
+                  "properties": {
+                    "cpuInstructions": {
+                      "type": "number"
+                    },
+                    "memoryBytes": {
+                      "type": "number"
+                    },
+                    "minBuiltinEntries": {
+                      "type": "number"
+                    }
+                  },
                   "type": "object"
                 },
                 "seedCount": {
@@ -1213,6 +1335,92 @@
           }
         ],
         "summary": "Create a fuzz campaign",
+        "tags": [
+          "campaigns"
+        ]
+      }
+    },
+    "/api/campaigns/{id}/fees": {
+      "get": {
+        "description": "Server-aggregated cpu/memory/fee histograms, threshold crossings, top expensive fixtures and a bounded trend series. ?top=<1-50>&buckets=<1-50>&trendPoints=<2-500>; legacy pre-W5-A12 runs are reported in coverage.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Campaign resource fee insight",
         "tags": [
           "campaigns"
         ]
@@ -2434,6 +2642,178 @@
         ]
       }
     },
+    "/api/replay-jobs/{id}": {
+      "get": {
+        "description": "Get a replay job",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Get a replay job",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/replay-jobs/{id}/stream": {
+      "get": {
+        "description": "Stream replay job progress (SSE)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Stream replay job progress (SSE)",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
     "/api/runs": {
       "get": {
         "description": "Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20). Envelope: { data: { runs, total, nextCursor, hasMore }, total }.",
@@ -2623,6 +3003,86 @@
           }
         ],
         "summary": "Create a fuzzing run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/search": {
+      "get": {
+        "description": "Ranked server-side search over run identifiers, signatures, contracts, and tags. ?q=<query>&limit=<1-200> (default 50). Results are capped at 200 with a truncation hint.",
+    "/api/runs/compare": {
+      "get": {
+        "description": "Side-by-side delta for ?base=<id>&candidate=<id>: metadata, coverage, crash signature and per-field verdicts.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Search fuzzing runs (ranked, bounded)",
         "tags": [
           "runs"
         ]
@@ -2963,6 +3423,116 @@
           }
         ],
         "summary": "Add a run annotation",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{id}/fee-summary": {
+      "get": {
+        "description": "Normalised W5-A12 fee envelope with a flat-metric fallback and an explicit fee-data-absent state for older runs.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_ID_REQUIRED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run ID is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_ID_REQUIRED"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Per-run resource fee summary",
         "tags": [
           "runs"
         ]
@@ -4141,6 +4711,158 @@
         "summary": "Rotate an API token",
         "tags": [
           "settings"
+        ]
+      }
+    },
+    "/api/triage/queue": {
+      "get": {
+        "description": "List the triage queue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "List the triage queue",
+        "tags": [
+          "runs"
+        ]
+      },
+      "post": {
+        "description": "Update a triage queue item",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "FORBIDDEN",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "You do not have permission to perform this action.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "FORBIDDEN"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "The requested resource was not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "write"
+            ]
+          }
+        ],
+        "summary": "Update a triage queue item",
+        "tags": [
+          "runs"
         ]
       }
     },

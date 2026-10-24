@@ -16,8 +16,21 @@ import {
 import { FuzzingRunSchema } from '@/lib/schemas/runs';
 import { isRedisConfigured } from '@/lib/redis';
 import { withCsrfProtection } from '@/lib/csrf';
+import { upsertRunInSearchIndex } from '@/lib/search/server-index';
 
 const DEFAULT_PAGE_LIMIT = 20;
+
+/**
+ * Hard ceiling for a single page (#1875). The virtualized runs table pages
+ * through 100k+ rows with cursors; an unbounded `limit` would let a single
+ * request materialize the whole dataset and defeat both keyset paging and the
+ * response-size budgets.
+ */
+const MAX_PAGE_LIMIT = 500;
+
+/** Default sort for the runs list (matches the historic keyset order). */
+const DEFAULT_SORT_FIELD: RunSortField = 'queuedAt';
+const DEFAULT_SORT_DIRECTION: RunSortDirection = 'desc';
 
 export const GET = withRouteErrorHandling('GET /api/runs', async (request: Request) => {
   const { searchParams } = new URL(request.url);
@@ -80,7 +93,17 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
   });
 
   const limitParam = parseInt(sanitizedSearchParams.get('limit') ?? '', 10);
-  const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : DEFAULT_PAGE_LIMIT;
+  const limit =
+    Number.isFinite(limitParam) && limitParam > 0
+      ? Math.min(limitParam, MAX_PAGE_LIMIT)
+      : DEFAULT_PAGE_LIMIT;
+
+  // Sort key + direction (#1875). Unknown keys fall back to the default so a
+  // hand-edited URL can never trigger an unindexed/slow comparator.
+  const rawSort = sanitizedSearchParams.get('sort');
+  const sortField: RunSortField = isRunSortField(rawSort) ? rawSort : DEFAULT_SORT_FIELD;
+  const sortDirection: RunSortDirection =
+    sanitizedSearchParams.get('order') === 'asc' ? 'asc' : DEFAULT_SORT_DIRECTION;
 
   let paginated;
   try {
@@ -125,6 +148,11 @@ export const POST = withRouteErrorHandling('POST /api/runs', withCsrfProtection(
   const driver = selectRunStorageDriver();
   if ('putRun' in driver && typeof driver.putRun === 'function') {
     await (driver as import('@/lib/storage/kv-run-driver').KVRunDriver).putRun(result.data);
+  }
+  try {
+    await upsertRunInSearchIndex(driver, result.data);
+  } catch (error) {
+    logger.warn('Failed to update run search index', { error });
   }
 
   return createdResponse({ run: result.data });

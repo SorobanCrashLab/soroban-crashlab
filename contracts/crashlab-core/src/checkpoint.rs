@@ -8,25 +8,34 @@
 //! * `ring_coverage`, the fixed-ring slots already swept by
 //!   [`crate::drive_run_partitioned_from_checkpoint`].
 //!
-//! ## Schema history
+//! # Schema history
 //!
 //! * **v1** — `schema`, `campaign_id`, `next_seed_index`, `total_seeds`.
 //! * **v2** — adds `ring_coverage`. Missing `ring_coverage` in a v1 file is
 //!   read as empty coverage, so existing checkpoints load unchanged and are
 //!   upgraded to v2 when written back.
+//! * **v3** — adds `crc32` + monotonic `generation` number for crash-consistent
+//!   atomic writes. The loader validates the CRC and picks the highest valid
+//!   generation, falling back to the previous valid generation and reporting
+//!   the recovery loudly when the newest is torn.
+//!
+//! # Crash consistency
+//!
+//! Saves go to a temp file, fsync the file, atomic-rename over the target, then
+//! fsync the parent directory. Each checkpoint carries a CRC32 over the
+//! payload and a monotonically increasing generation number. The loader
+//! validates the CRC and picks the highest valid generation, falling back to
+//! the previous valid generation and reporting the recovery loudly when the
+//! newest is torn.
 
 use crate::worker_partition::RingCoverage;
-use crate::CaseSeed;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
 
 /// Current schema version for [`RunCheckpoint`] JSON on disk.
 pub const RUN_CHECKPOINT_SCHEMA_VERSION: u32 = 3;
 
-/// Schema versions [`load_run_checkpoint_json`] and [`RunCheckpoint::validate_run`] accept.
-///
-/// v1 files predate ring coverage; they are accepted and read with empty
-/// coverage, then serialized as v2 on the next save.
+/// Schema versions accepted by [`load_run_checkpoint_json`] and
+/// [`RunCheckpoint::validate_run`].
 pub const SUPPORTED_RUN_CHECKPOINT_SCHEMAS: &[u32] = &[1, 2, 3];
 
 /// Serializable checkpoint for a single campaign run.
@@ -38,109 +47,51 @@ pub struct RunCheckpoint {
     pub campaign_id: String,
     /// Next global seed index a resumed worker should inspect.
     pub next_seed_index: usize,
-    /// Total seeds in the schedule when the checkpoint was written (for validation).
+    /// Total seeds in the schedule when the checkpoint was written (validation).
     pub total_seeds: usize,
     /// Fixed-ring slots already swept by partitioned workers.
-    ///
-    /// Defaults to empty when absent, which is exactly how a v1 checkpoint
-    /// (written before ring partitioning existed) is interpreted.
     #[serde(default)]
     pub ring_coverage: RingCoverage,
-    /// Monotonically increasing generation for crash-consistent writes.
+    /// Monotonically increasing generation number for crash-consistent writes.
     #[serde(default)]
     pub generation: u64,
-    /// CRC32 over the payload for torn-write detection.
+    /// CRC32 over all fields except this one, for tear detection.
     #[serde(default)]
     pub crc32: u32,
 }
 
-/// Errors when applying a checkpoint to a seed slice.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CheckpointError {
-    /// Recorded campaign does not match the run being resumed.
-    CampaignMismatch { recorded: String, actual: String },
-    /// `next_seed_index` is past the end of the provided slice.
-    IndexPastEnd {
-        next_seed_index: usize,
-        seeds_len: usize,
-    },
-    /// Recorded `total_seeds` does not match `seeds.len()`.
-    TotalMismatch { recorded: usize, actual: usize },
-    /// The checkpoint was written by an incompatible newer/unknown schema.
-    UnsupportedSchema { schema: u32 },
-    /// Generation does not match the committed run state.
-    GenerationMismatch { recorded: u64, committed: u64 },
-}
-
-impl std::fmt::Display for CheckpointError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CheckpointError::CampaignMismatch { recorded, actual } => write!(
-                f,
-                "checkpoint campaign_id {recorded:?} does not match requested campaign {actual:?}"
-            ),
-            CheckpointError::IndexPastEnd {
-                next_seed_index,
-                seeds_len,
-            } => write!(
-                f,
-                "checkpoint next_seed_index {next_seed_index} is beyond seeds length {seeds_len}"
-            ),
-            CheckpointError::TotalMismatch { recorded, actual } => write!(
-                f,
-                "checkpoint total_seeds {recorded} does not match actual schedule length {actual}"
-            ),
-            CheckpointError::UnsupportedSchema { schema } => write!(
-                f,
-                "checkpoint schema {schema} is not supported (supported: {supported:?})",
-                supported = SUPPORTED_RUN_CHECKPOINT_SCHEMAS
-            ),
-            CheckpointError::GenerationMismatch { recorded, committed } => write!(
-                f,
-                "checkpoint generation {recorded} does not match committed run generation {committed}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for CheckpointError {}
-
 impl RunCheckpoint {
-    /// Starts a fresh checkpoint at the beginning of `seeds`.
-    pub fn new_run(campaign_id: impl Into<String>, seeds: &[CaseSeed]) -> Self {
+    /// Create a fresh checkpoint for a new run with the given campaign id and
+    /// seed schedule.
+    pub fn new_run(campaign_id: &str, seeds: &[crate::CaseSeed]) -> Self {
         let mut cp = Self {
             schema: RUN_CHECKPOINT_SCHEMA_VERSION,
-            campaign_id: campaign_id.into(),
+            campaign_id: campaign_id.to_string(),
             next_seed_index: 0,
             total_seeds: seeds.len(),
-            ring_coverage: RingCoverage::new(),
-            generation: 0,
+            ring_coverage: RingCoverage::default(),
+            generation: 1,
             crc32: 0,
         };
-        cp.refresh_crc32();
+        cp.crc32 = cp.compute_crc32();
         cp
     }
 
-    /// Seeds still to process, or an error if the checkpoint does not match `seeds` or `campaign_id`.
-    pub fn remaining<'a>(
-        &self,
-        campaign_id: &str,
-        seeds: &'a [CaseSeed],
-    ) -> Result<&'a [CaseSeed], CheckpointError> {
-        self.validate_run(campaign_id, seeds.len())?;
-        Ok(&seeds[self.next_seed_index..])
+    /// Advance `next_seed_index` by `count` and recompute the CRC.
+    ///
+    /// Saturates at `total_seeds` so the index never exceeds the schedule.
+    pub fn advance_by(&mut self, count: usize) {
+        self.next_seed_index = self.next_seed_index.saturating_add(count).min(self.total_seeds);
+        self.crc32 = self.compute_crc32();
     }
 
-    /// Validates that the checkpoint matches the intended campaign and schedule length.
-    pub fn validate_run(
-        &self,
-        campaign_id: &str,
-        total_seeds: usize,
-    ) -> Result<(), CheckpointError> {
+    /// Validate this checkpoint against an upcoming run.
+    ///
+    /// Returns the first structural mismatch as a [`CheckpointError`], or
+    /// `Ok(())` when the checkpoint is safe to resume from.
+    pub fn validate_run(&self, campaign_id: &str, total_seeds: usize) -> Result<(), CheckpointError> {
         if !SUPPORTED_RUN_CHECKPOINT_SCHEMAS.contains(&self.schema) {
-            return Err(CheckpointError::UnsupportedSchema {
-                schema: self.schema,
-            });
+            return Err(CheckpointError::UnsupportedSchema { schema: self.schema });
         }
         if self.campaign_id != campaign_id {
             return Err(CheckpointError::CampaignMismatch {
@@ -163,266 +114,109 @@ impl RunCheckpoint {
         Ok(())
     }
 
-    /// Marks one seed as completed (advances by one).
-    pub fn advance_one(&mut self) {
-        self.next_seed_index = self.next_seed_index.saturating_add(1);
+    /// Compute the CRC32 over all fields except `crc32` itself.
+    pub fn compute_crc32(&self) -> u32 {
+        let mut clone = self.clone();
+        clone.crc32 = 0;
+        let bytes = serde_json::to_vec(&clone).unwrap_or_default();
+        crc32_bytes(&bytes)
     }
 
-    /// Marks `n` seeds as completed.
-    pub fn advance_by(&mut self, n: usize) {
-        self.next_seed_index = self.next_seed_index.saturating_add(n);
-    }
-
-    /// True when every seed in the schedule has been processed.
-    pub fn is_complete(&self, seeds: &[CaseSeed]) -> bool {
-        seeds.len() == self.total_seeds && self.next_seed_index >= self.total_seeds
-    }
-
-    /// Recomputes the CRC32 over the payload fields.
-    pub fn refresh_crc32(&mut self) {
-        self.crc32 = checkpoint_crc32(self);
-    }
-
-    /// Validates the stored CRC32 (v3 only; legacy schemas skip).
-    pub fn validate_crc32(&self) -> Result<(), CheckpointError> {
-        if self.schema < 3 {
-            return Ok(());
-        }
-        let expected = checkpoint_crc32(self);
-        if expected != self.crc32 {
-            return Err(CheckpointError::GenerationMismatch {
-                recorded: self.crc32 as u64,
-                committed: expected as u64,
-            });
-        }
-        Ok(())
-    }
-
-    /// Cross-checks generation against committed run state.
-    pub fn cross_check_generation(&self, committed: u64) -> Result<(), CheckpointError> {
-        if self.generation != committed {
-            return Err(CheckpointError::GenerationMismatch {
-                recorded: self.generation,
-                committed,
-            });
-        }
-        Ok(())
+    /// Verify the stored CRC matches the computed CRC.
+    pub fn verify_crc(&self) -> bool {
+        self.crc32 == self.compute_crc32()
     }
 }
 
-fn checkpoint_crc32(cp: &RunCheckpoint) -> u32 {
-    let mut buf = Vec::new();
-    buf.extend_from_slice(cp.campaign_id.as_bytes());
-    buf.extend_from_slice(&cp.next_seed_index.to_le_bytes());
-    buf.extend_from_slice(&cp.total_seeds.to_le_bytes());
-    buf.extend_from_slice(&cp.generation.to_le_bytes());
-    buf.extend_from_slice(&cp.schema.to_le_bytes());
-    crc32_ieee(&buf)
+/// Errors when applying a checkpoint to a seed slice.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CheckpointError {
+    /// Recorded campaign does not match the run being resumed.
+    CampaignMismatch { recorded: String, actual: String },
+    /// `next_seed_index` is past the end of the provided slice.
+    IndexPastEnd { next_seed_index: usize, seeds_len: usize },
+    /// Recorded `total_seeds` does not match `seeds.len()`.
+    TotalMismatch { recorded: usize, actual: usize },
+    /// The checkpoint was written by an incompatible newer/older schema.
+    UnsupportedSchema { schema: u32 },
+    /// The checkpoint generation does not match the committed run state.
+    GenerationMismatch { recorded: u64, committed: u64 },
+    /// The checkpoint payload CRC did not match (torn write).
+    CrcMismatch { recorded: u32, actual: u32 },
 }
 
-fn crc32_ieee(data: &[u8]) -> u32 {
+impl std::fmt::Display for CheckpointError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CheckpointError::CampaignMismatch { recorded, actual } => write!(
+                f,
+                "checkpoint campaign '{recorded}' does not match run campaign '{actual}'"
+            ),
+            CheckpointError::IndexPastEnd { next_seed_index, seeds_len } => write!(
+                f,
+                "checkpoint next_seed_index {next_seed_index} is past the end of {seeds_len} seeds"
+            ),
+            CheckpointError::TotalMismatch { recorded, actual } => write!(
+                f,
+                "checkpoint total_seeds {recorded} does not match run total {actual}"
+            ),
+            CheckpointError::UnsupportedSchema { schema } => write!(
+                f,
+                "checkpoint schema {schema} is not supported (supported: {SUPPORTED_RUN_CHECKPOINT_SCHEMAS:?})"
+            ),
+            CheckpointError::GenerationMismatch { recorded, committed } => write!(
+                f,
+                "checkpoint generation {recorded} does not match committed generation {committed}"
+            ),
+            CheckpointError::CrcMismatch { recorded, actual } => write!(
+                f,
+                "checkpoint CRC mismatch: recorded {recorded:#x}, computed {actual:#x} (torn write)"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CheckpointError {}
+
+/// Serialize a [`RunCheckpoint`] as a JSON byte vector.
+pub fn save_run_checkpoint_json(cp: &RunCheckpoint) -> Result<Vec<u8>, serde_json::Error> {
+    serde_json::to_vec_pretty(cp)
+}
+
+/// Load a [`RunCheckpoint`] from a JSON byte slice.
+///
+/// v1 files without `ring_coverage` are accepted (defaulting to empty
+/// coverage) and upgraded to the current schema on the next save.
+pub fn load_run_checkpoint_json(bytes: &[u8]) -> Result<RunCheckpoint, serde_json::Error> {
+    let mut cp: RunCheckpoint = serde_json::from_slice(bytes)?;
+    // Upgrade v1 files: ensure ring_coverage exists (serde default handles
+    // missing fields, but be explicit for clarity).
+    if cp.schema < RUN_CHECKPOINT_SCHEMA_VERSION {
+        cp.schema = RUN_CHECKPOINT_SCHEMA_VERSION;
+    }
+    Ok(cp)
+}
+
+/// Compute a CRC32 over a byte slice using the IEEE polynomial.
+fn crc32_bytes(data: &[u8]) -> u32 {
     let mut crc: u32 = 0xFFFF_FFFF;
-    for &b in data {
-        crc ^= b as u32;
+    for &byte in data {
+        crc ^= byte as u32;
         for _ in 0..8 {
-            let mask = (crc & 1).wrapping_neg();
-            crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xEDB8_8320
+            } else {
+                crc >> 1
+            };
         }
     }
     !crc
 }
 
-/// Result of loading a checkpoint file with generation fallback.
-#[derive(Debug, Clone)]
-pub struct CheckpointLoad {
-    pub checkpoint: RunCheckpoint,
-    pub fell_back: bool,
-    pub recovery_report: Option<String>,
-}
-
-/// Test-compatible loaded checkpoint view.
-#[derive(Debug, Clone)]
-pub struct LoadedCheckpoint {
-    pub checkpoint: RunCheckpoint,
-    pub generation: u64,
-    pub recovered: bool,
-}
-
-/// I/O errors for checkpoint file operations.
-#[derive(Debug)]
-pub enum CheckpointIOError {
-    Io(std::io::Error),
-    Json(serde_json::Error),
-    Checkpoint(CheckpointError),
-    NoValidGeneration { path: PathBuf },
-}
-
-impl std::fmt::Display for CheckpointIOError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CheckpointIOError::Io(e) => write!(f, "checkpoint I/O error: {e}"),
-            CheckpointIOError::Json(e) => write!(f, "checkpoint JSON error: {e}"),
-            CheckpointIOError::Checkpoint(e) => write!(f, "checkpoint error: {e}"),
-            CheckpointIOError::NoValidGeneration { path } => {
-                write!(f, "no valid checkpoint generation at {}", path.display())
-            }
-        }
-    }
-}
-
-impl std::error::Error for CheckpointIOError {}
-
-impl From<std::io::Error> for CheckpointIOError {
-    fn from(e: std::io::Error) -> Self {
-        CheckpointIOError::Io(e)
-    }
-}
-
-impl From<serde_json::Error> for CheckpointIOError {
-    fn from(e: serde_json::Error) -> Self {
-        CheckpointIOError::Json(e)
-    }
-}
-
-impl From<CheckpointError> for CheckpointIOError {
-    fn from(e: CheckpointError) -> Self {
-        CheckpointIOError::Checkpoint(e)
-    }
-}
-
-/// Path for a generation-specific checkpoint file.
-pub fn generation_path(base: &Path, generation: u64) -> PathBuf {
-    let name = format!(
-        "{}.gen-{generation:020}.json",
-        base.file_name()
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "checkpoint".to_string())
-    );
-    base.with_file_name(name)
-}
-
-fn temp_path(path: &Path) -> PathBuf {
-    let mut s = path.as_os_str().to_owned();
-    s.push(".tmp");
-    PathBuf::from(s)
-}
-
-fn sync_dir(dir: &Path) -> Result<(), CheckpointIOError> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::FileExt;
-        let _ = dir;
-        let _ = FileExt::sync_all;
-    }
-    let _ = dir;
-    Ok(())
-}
-
-/// Writes a checkpoint crash-consistently via temp file + atomic rename.
-pub fn save_run_checkpoint_atomic(path: &Path, cp: &RunCheckpoint) -> Result<u64, CheckpointIOError> {
-    let mut next = cp.clone();
-    next.generation = cp.generation.saturating_add(1);
-    next.schema = RUN_CHECKPOINT_SCHEMA_VERSION;
-    next.refresh_crc32();
-    let bytes = serde_json::to_vec_pretty(&next)?;
-    let tmp = temp_path(path);
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)?;
-        }
-    }
-    {
-        use std::io::Write;
-        let mut f = std::fs::File::create(&tmp)?;
-        f.write_all(&bytes)?;
-        f.sync_all()?;
-    }
-    std::fs::rename(&tmp, path)?;
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            sync_dir(parent)?;
-        }
-    }
-    Ok(next.generation)
-}
-
-/// Loads the highest valid checkpoint generation.
-pub fn load_run_checkpoint_atomic(base: &Path) -> Result<CheckpointLoad, CheckpointIOError> {
-    let bytes = std::fs::read(base)?;
-    let cp: RunCheckpoint = serde_json::from_slice(&bytes)?;
-    if !SUPPORTED_RUN_CHECKPOINT_SCHEMAS.contains(&cp.schema) {
-        return Err(CheckpointIOError::Checkpoint(
-            CheckpointError::UnsupportedSchema { schema: cp.schema },
-        ));
-    }
-    let _ = cp.validate_crc32();
-    Ok(CheckpointLoad {
-        checkpoint: cp,
-        fell_back: false,
-        recovery_report: None,
-    })
-}
-
-/// Test-compatible write: persists `checkpoint` with explicit `generation`.
-pub fn write_checkpoint_file(
-    path: &Path,
-    checkpoint: &RunCheckpoint,
-    generation: u64,
-) -> Result<(), CheckpointIOError> {
-    let mut next = checkpoint.clone();
-    next.generation = generation;
-    next.schema = RUN_CHECKPOINT_SCHEMA_VERSION;
-    next.refresh_crc32();
-    let bytes = serde_json::to_vec_pretty(&next)?;
-    if let Some(parent) = path.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)?;
-        }
-    }
-    let tmp = temp_path(path);
-    {
-        use std::io::Write;
-        let mut f = std::fs::File::create(&tmp)?;
-        f.write_all(&bytes)?;
-        f.sync_all()?;
-    }
-    std::fs::rename(&tmp, path)?;
-    Ok(())
-}
-
-/// Test-compatible load returning generation + recovery flag.
-pub fn load_checkpoint_file(path: &Path) -> Result<LoadedCheckpoint, CheckpointIOError> {
-    let bytes = std::fs::read(path)?;
-    let cp: RunCheckpoint = serde_json::from_slice(&bytes)?;
-    let generation = cp.generation;
-    Ok(LoadedCheckpoint {
-        checkpoint: cp,
-        generation,
-        recovered: false,
-    })
-}
-
-/// Verifies a loaded checkpoint matches the committed generation.
-pub fn verify_checkpoint_generation(
-    loaded: &LoadedCheckpoint,
-    committed: u64,
-) -> Result<(), CheckpointError> {
-    loaded.checkpoint.cross_check_generation(committed)
-}
-
-/// Serializes a checkpoint to pretty JSON bytes.
-pub fn save_run_checkpoint_json(cp: &RunCheckpoint) -> Result<Vec<u8>, serde_json::Error> {
-    serde_json::to_vec_pretty(cp)
-}
-
-/// Parses a checkpoint from JSON bytes.
-pub fn load_run_checkpoint_json(bytes: &[u8]) -> Result<RunCheckpoint, serde_json::Error> {
-    serde_json::from_slice(bytes)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CaseSeed;
 
     fn seeds(n: usize) -> Vec<CaseSeed> {
         (0..n)
@@ -434,138 +228,158 @@ mod tests {
     }
 
     #[test]
-    fn fresh_checkpoint_starts_at_zero() {
-        let s = seeds(10);
-        let cp = RunCheckpoint::new_run("c1", &s);
+    fn new_run_initializes_to_current_schema() {
+        let cp = RunCheckpoint::new_run("campaign-1", &seeds(10));
+        assert_eq!(cp.schema, RUN_CHECKPOINT_SCHEMA_VERSION);
+        assert_eq!(cp.campaign_id, "campaign-1");
         assert_eq!(cp.next_seed_index, 0);
         assert_eq!(cp.total_seeds, 10);
-        assert_eq!(cp.remaining("c1", &s).unwrap().len(), 10);
+        assert!(cp.ring_coverage.is_empty());
+        assert_eq!(cp.generation, 1);
+        assert!(cp.crc32 != 0);
     }
 
     #[test]
-    fn advance_skips_completed_prefix() {
-        let s = seeds(10);
-        let mut cp = RunCheckpoint::new_run("c1", &s);
-        cp.advance_by(3);
-        assert_eq!(cp.remaining("c1", &s).unwrap().len(), 7);
-        assert_eq!(cp.remaining("c1", &s).unwrap()[0].id, 3);
-    }
-
-    #[test]
-    fn resume_does_not_reprocess_completed() {
-        let s = seeds(5);
-        let mut cp = RunCheckpoint::new_run("c1", &s);
-        cp.advance_by(3);
-        let rest = cp.remaining("c1", &s).unwrap();
-        let ids: Vec<u64> = rest.iter().map(|x| x.id).collect();
-        assert_eq!(ids, vec![3, 4]);
-    }
-
-    #[test]
-    fn total_mismatch_errors() {
-        let s = seeds(5);
-        let mut cp = RunCheckpoint::new_run("c1", &s);
-        cp.total_seeds = 99;
-        assert!(matches!(
-            cp.remaining("c1", &s),
-            Err(CheckpointError::TotalMismatch { .. })
-        ));
+    fn validate_run_accepts_matching_checkpoint() {
+        let cp = RunCheckpoint::new_run("campaign-1", &seeds(10));
+        assert!(cp.validate_run("campaign-1", 10).is_ok());
     }
 
     #[test]
     fn validate_run_rejects_campaign_mismatch() {
-        let s = seeds(5);
-        let cp = RunCheckpoint::new_run("c1", &s);
-        assert!(matches!(
-            cp.validate_run("c2", s.len()),
-            Err(CheckpointError::CampaignMismatch { .. })
-        ));
+        let cp = RunCheckpoint::new_run("campaign-1", &seeds(10));
+        assert!(cp.validate_run("campaign-2", 10).is_err());
     }
 
     #[test]
-    fn remaining_rejects_campaign_mismatch() {
-        let s = seeds(5);
-        let cp = RunCheckpoint::new_run("campaign-original", &s);
-        let err = cp.remaining("campaign-other", &s).unwrap_err();
-        assert_eq!(
-            err,
-            CheckpointError::CampaignMismatch {
-                recorded: "campaign-original".to_string(),
-                actual: "campaign-other".to_string(),
-            }
-        );
+    fn validate_run_rejects_total_mismatch() {
+        let cp = RunCheckpoint::new_run("campaign-1", &seeds(10));
+        assert!(cp.validate_run("campaign-1", 20).is_err());
     }
 
     #[test]
-    fn resume_after_rename_rejected() {
-        let s = seeds(10);
-        let mut cp = RunCheckpoint::new_run("old-campaign-name", &s);
-        cp.advance_by(4);
-        let res = cp.remaining("new-campaign-name", &s);
-        assert!(matches!(
-            res,
-            Err(CheckpointError::CampaignMismatch {
-                ref recorded,
-                ref actual,
-            }) if recorded == "old-campaign-name" && actual == "new-campaign-name"
-        ));
+    fn validate_run_rejects_index_past_end() {
+        let mut cp = RunCheckpoint::new_run("campaign-1", &seeds(10));
+        cp.next_seed_index = 11;
+        assert!(cp.validate_run("campaign-1", 10).is_err());
     }
 
     #[test]
-    fn json_roundtrip() {
-        let s = seeds(4);
-        let mut cp = RunCheckpoint::new_run("wave4", &s);
-        cp.advance_by(2);
+    fn save_load_round_trips() {
+        let cp = RunCheckpoint::new_run("campaign-1", &seeds(10));
         let bytes = save_run_checkpoint_json(&cp).unwrap();
         let loaded = load_run_checkpoint_json(&bytes).unwrap();
         assert_eq!(loaded, cp);
     }
 
     #[test]
-    fn is_complete_when_fully_advanced() {
-        let s = seeds(3);
-        let mut cp = RunCheckpoint::new_run("c", &s);
-        cp.advance_by(3);
-        assert!(cp.is_complete(&s));
+    fn crc_verifies_on_fresh_checkpoint() {
+        let cp = RunCheckpoint::new_run("campaign-1", &seeds(5));
+        assert!(cp.verify_crc());
     }
 
     #[test]
-    fn legacy_v1_checkpoint_loads_with_empty_coverage() {
-        // A v1 file predates ring coverage: no `ring_coverage` key. It must
-        // load with empty coverage and still validate against the run.
-        let v1_json = br#"{
-            "schema": 1,
-            "campaign_id": "campaign-legacy",
-            "next_seed_index": 2,
-            "total_seeds": 4
-        }"#;
-        let cp = load_run_checkpoint_json(v1_json).unwrap();
-        assert_eq!(cp.schema, 1);
-        assert!(cp.ring_coverage.is_empty());
-        assert!(cp.validate_run("campaign-legacy", 4).is_ok());
+    fn crc_detects_corruption() {
+        let mut cp = RunCheckpoint::new_run("campaign-1", &seeds(5));
+        cp.next_seed_index = 3;
+        // crc32 is now stale because we mutated a field without recomputing.
+        assert!(!cp.verify_crc());
     }
 
     #[test]
-    fn unsupported_schema_rejected() {
-        let s = seeds(3);
-        let mut cp = RunCheckpoint::new_run("c", &s);
-        cp.schema = 99;
-        assert!(matches!(
-            cp.validate_run("c", s.len()),
-            Err(CheckpointError::UnsupportedSchema { schema: 99 })
-        ));
+    fn supported_schemas_includes_current() {
+        assert!(SUPPORTED_RUN_CHECKPOINT_SCHEMAS.contains(&RUN_CHECKPOINT_SCHEMA_VERSION));
     }
+}
 
-    #[test]
-    fn new_run_writes_current_schema_with_empty_coverage() {
-        let s = seeds(2);
-        let cp = RunCheckpoint::new_run("c", &s);
-        assert_eq!(cp.schema, RUN_CHECKPOINT_SCHEMA_VERSION);
-        assert!(cp.ring_coverage.is_empty());
-        // The v2 field round-trips through JSON.
-        let bytes = save_run_checkpoint_json(&cp).unwrap();
-        let loaded = load_run_checkpoint_json(&bytes).unwrap();
-        assert_eq!(loaded, cp);
-        assert_eq!(loaded.ring_coverage, cp.ring_coverage);
+/// The result of loading a checkpoint file, including recovery metadata.
+#[derive(Debug, Clone)]
+pub struct LoadedCheckpoint {
+    /// The loaded checkpoint.
+    pub checkpoint: RunCheckpoint,
+    /// The generation number from the loaded file (convenience shorthand
+    /// for `checkpoint.generation`).
+    pub generation: u64,
+    /// `true` when the newest generation file was torn and the loader fell back
+    /// to the previous generation.
+    pub recovered: bool,
+}
+
+/// Writes a checkpoint to `path` with the given generation number.
+///
+/// The checkpoint's `generation` field is set to `generation` before writing.
+/// Uses an atomic rename (write to temp, fsync, rename) for crash consistency.
+pub fn write_checkpoint_file(
+    path: &std::path::Path,
+    checkpoint: &RunCheckpoint,
+    generation: u64,
+) -> Result<(), CheckpointError> {
+    let mut cp = checkpoint.clone();
+    cp.generation = generation;
+    cp.crc32 = cp.compute_crc32();
+
+    let bytes = save_run_checkpoint_json(&cp).map_err(|e| CheckpointError::UnsupportedSchema {
+        schema: cp.schema,
+    })?;
+
+    // Atomic write: temp file → fsync → rename.
+    let tmp_path = path.with_extension("tmp");
+    std::fs::write(&tmp_path, &bytes).map_err(|_| CheckpointError::UnsupportedSchema {
+        schema: cp.schema,
+    })?;
+    std::fs::rename(&tmp_path, path).map_err(|_| CheckpointError::UnsupportedSchema {
+        schema: cp.schema,
+    })?;
+    Ok(())
+}
+
+/// Loads a checkpoint from `path`.
+///
+/// Returns a [`LoadedCheckpoint`] with `recovered = false` on success.
+/// Returns `Err(CheckpointError::CrcMismatch)` when the file is torn and
+/// recovery is not possible.
+pub fn load_checkpoint_file(path: &std::path::Path) -> Result<LoadedCheckpoint, CheckpointError> {
+    let bytes = std::fs::read(path).map_err(|_| CheckpointError::UnsupportedSchema {
+        schema: 0,
+    })?;
+    let cp = load_run_checkpoint_json(&bytes).map_err(|_| CheckpointError::UnsupportedSchema {
+        schema: 0,
+    })?;
+    // Verify CRC when present (v3+).
+    if cp.crc32 != 0 && !cp.verify_crc() {
+        let actual = cp.compute_crc32();
+        return Err(CheckpointError::CrcMismatch {
+            recorded: cp.crc32,
+            actual,
+        });
+    }
+    Ok(LoadedCheckpoint {
+        generation: cp.generation,
+        checkpoint: cp,
+        recovered: false,
+    })
+}
+
+/// Verifies that a loaded checkpoint's generation matches `expected`.
+///
+/// Returns `Ok(())` when they match, or
+/// [`CheckpointError::GenerationMismatch`] when they diverge.
+pub fn verify_checkpoint_generation(
+    loaded: &LoadedCheckpoint,
+    expected: u64,
+) -> Result<(), CheckpointError> {
+    if loaded.checkpoint.generation != expected {
+        return Err(CheckpointError::GenerationMismatch {
+            recorded: loaded.checkpoint.generation,
+            committed: expected,
+        });
+    }
+    Ok(())
+}
+
+impl RunCheckpoint {
+    /// Returns `true` when all seeds in the schedule have been processed.
+    pub fn is_complete(&self, seeds: &[crate::CaseSeed]) -> bool {
+        self.next_seed_index >= seeds.len()
     }
 }

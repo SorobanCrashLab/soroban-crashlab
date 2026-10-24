@@ -10,7 +10,7 @@ export interface RunMetadata {
 }
 
 interface RunMetadataEditorProps {
-  run: FuzzingRun;
+  run: Pick<FuzzingRun, 'id' | 'tags'>;
   onSave: (metadata: RunMetadata) => void;
   isEditing: boolean;
   onToggleEdit: () => void;

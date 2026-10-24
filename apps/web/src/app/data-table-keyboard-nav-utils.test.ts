@@ -46,6 +46,34 @@ function testHomeEndNavigation(): void {
   });
 }
 
+function testPageNavigation(): void {
+  // Default page size (10).
+  assert.deepEqual(resolveDataTableRowKeyDown("PageDown", 3, 1000), {
+    type: "focus",
+    index: 13,
+  });
+  assert.deepEqual(resolveDataTableRowKeyDown("PageUp", 30, 1000), {
+    type: "focus",
+    index: 20,
+  });
+  // Explicit page size (viewport-sized page for virtualized grids).
+  assert.deepEqual(resolveDataTableRowKeyDown("PageDown", 0, 100_000, 25), {
+    type: "focus",
+    index: 25,
+  });
+  assert.deepEqual(resolveDataTableRowKeyDown("PageUp", 10, 100_000, 25), {
+    type: "focus",
+    index: 0,
+  });
+  // Clamps at the list bounds.
+  assert.deepEqual(resolveDataTableRowKeyDown("PageDown", 90, 95), {
+    type: "focus",
+    index: 94,
+  });
+  assert.ok(DATA_TABLE_NAVIGATION_KEYS.has("PageUp"));
+  assert.ok(DATA_TABLE_NAVIGATION_KEYS.has("PageDown"));
+}
+
 function testEmptyTable(): void {
   assert.deepEqual(resolveDataTableRowKeyDown("ArrowDown", 0, 0), {
     type: "none",
@@ -69,6 +97,7 @@ function runAssertions(): void {
   testActivationKeys();
   testArrowNavigation();
   testHomeEndNavigation();
+  testPageNavigation();
   testEmptyTable();
   testRovingTabIndex();
   testUnhandledKeys();

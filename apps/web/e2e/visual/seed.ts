@@ -128,7 +128,7 @@ export async function mockRuns(page: Page, options: { nested?: boolean } = {}) {
     ? { data: { runs: VISUAL_RUNS } }
     : { runs: VISUAL_RUNS, total: VISUAL_RUNS.length };
 
-  await page.route('**/api/runs', async (route) => {
+  await page.route('**/api/runs*', async (route) => {
     const requestUrl = new URL(route.request().url());
     if (requestUrl.pathname !== '/api/runs') {
       await route.continue();

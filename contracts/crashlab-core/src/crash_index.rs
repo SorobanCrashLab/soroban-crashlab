@@ -103,12 +103,13 @@ impl CrashIndex {
     ///
     /// Returns `false` when the bundle was excluded from the corpus.
     pub fn try_insert(&mut self, bundle: CaseBundle) -> bool {
-        if let Some(class) = crate::taxonomy::FailureClass::from_category_label(&bundle.signature.category) {
+        if let Some(class) =
+            crate::taxonomy::FailureClass::from_category_label(&bundle.signature.category)
+        {
             if class.excludes_from_corpus() {
                 return false;
             }
         }
-        let key = bundle.signature.signature_hash;
         let key = bundle.signature.signature_hash;
         match self.groups.get_mut(&key) {
             Some(group) => {
@@ -322,7 +323,7 @@ mod tests {
             environment: None,
             failure_payload: Vec::new(),
             rpc_envelope: None,
-        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
+            engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         }); // empty-input
         idx.insert(bundle(2, vec![0x01])); // normal payload
         idx.insert(bundle(3, vec![0x01])); // normal payload (count=2)
