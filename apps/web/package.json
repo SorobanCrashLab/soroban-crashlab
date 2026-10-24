@@ -2,6 +2,7 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.30.2+sha512.36cdc707e7b7940a988c9c1ecf88d084f8514b5c3f085f53a2e244c2921d3b2545bc20dd4ebe1fc245feec463bb298aecea7a63ed1f7680b877dc6379d8d0cb4",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -24,9 +25,15 @@
     "test:e2e:update-snapshots": "playwright test --update-snapshots",
     "test:visual": "playwright test --config playwright.visual.config.ts",
     "test:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
-    "openapi:generate": "pnpm exec tsc scripts/generate-openapi.ts --module commonjs --target es2022 --rootDir . --outDir build/openapi --esModuleInterop --skipLibCheck --types node && node build/openapi/generate-openapi.js",
-    "openapi:update": "pnpm run openapi:generate",
-    "openapi:check": "pnpm run openapi:generate -- --check"
+    "test:confirm-dialog-utils": "npx tsc src/components/confirm-dialog-utils.ts src/components/confirm-dialog-utils.test.ts --skipLibCheck --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react  && node build/test-tmp/components/confirm-dialog-utils.test.js",
+    "test:e2e:run-detail-navigation": "playwright test e2e/run-detail-navigation.spec.ts",
+    "test:e2e:search": "playwright test e2e/search.spec.ts",
+    "test:e2e:dark-mode": "playwright test e2e/dark-mode.spec.ts",
+    "test:e2e:mobile-responsive": "playwright test e2e/mobile-responsive.spec.ts",
+    "test:e2e:settings-persistence": "playwright test e2e/settings-persistence.spec.ts",
+    "test:e2e:integrations": "playwright test e2e/integrations.spec.ts",
+    "test:e2e:maintainer": "playwright test e2e/maintainer.spec.ts",
+    "test:error-boundary": "npx tsc src/components/error-boundary-utils.ts src/components/error-boundary-utils.test.ts --skipLibCheck --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react && node build/test-tmp/components/error-boundary-utils.test.js"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.75.2",
@@ -64,7 +71,6 @@
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"
   },
-  "packageManager": "pnpm@10.30.2+sha512.36cdc707e7b7940a988c9c1ecf88d084f8514b5c3f085f53a2e244c2921d3b2545bc20dd4ebe1fc245feec463bb298aecea7a63ed1f7680b877dc6379d8d0cb4",
   "pnpm": {
     "onlyBuiltDependencies": [
       "@sentry/cli",

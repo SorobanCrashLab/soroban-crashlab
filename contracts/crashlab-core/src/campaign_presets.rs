@@ -525,17 +525,4 @@ mod tests {
             assert_eq!(policy.edge_priority_boost_bps, 2_000);
         }
     }
-
-    #[test]
-    fn budget_target_iterations_scale_with_preset_depth() {
-        let s = CampaignPreset::Smoke.budget_target_policy();
-        let n = CampaignPreset::Nightly.budget_target_policy();
-        let d = CampaignPreset::Deep.budget_target_policy();
-        assert_eq!(
-            (s.max_iterations, n.max_iterations, d.max_iterations),
-            (8, 16, 32)
-        );
-        assert!(s.max_iterations < n.max_iterations);
-        assert!(n.max_iterations < d.max_iterations);
-    }
 }

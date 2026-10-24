@@ -127,6 +127,11 @@ All error responses return a standardized JSON structure with an appropriate HTT
 | `POST` | `/api/settings/tokens/{id}/revoke` | Revoke an existing API token by ID |
 | `POST` | `/api/settings/tokens/{id}/rotate` | Rotate an API token, minting a successor and keeping the old secret valid for a grace window |
 
+### Audit
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/audit` | Query the org-scoped audit log (keyset paginated, filter-bound cursors) with integrity verification |
+
 ### Webhooks
 | Method | Path | Description |
 | --- | --- | --- |
@@ -197,9 +202,17 @@ List fuzzing runs with search, status filtering, severity, area, tags, and pagin
 | `contract` | `string` | Filter by contract identifier |
 | `tags` | `string` | Comma-separated list of tags to match |
 | `limit` | `number` | Maximum number of records to return (default: `20`) |
-| `offset` | `number` | Number of records to skip for pagination |
+| `cursor` | `string` | Opaque keyset cursor from a previous response's `nextCursor`. Versioned and bound to the sort + `status` filter: reusing it after changing filters returns `400 CURSOR_MISMATCH`. Legacy offset cursors (`offset`, plain integers) reset to page 1 |
+| `offset` | `number` | **Legacy** offset pagination (drifts under concurrent inserts; prefer `cursor`) |
 | `sort` | `string` | Field to sort by (`createdAt`, `duration`, `seedCount`, `crashCount`) |
 | `order` | `string` | Sort direction: `asc` or `desc` (default: `desc`) |
+
+**Pagination contract:** ordering is total — primary sort key with a mandatory
+`id` tiebreaker — so timestamp ties cannot reorder between pages. The data
+payload always carries `nextCursor` (opaque string or `null`) and `hasMore`
+alongside `runs` and `total`. Rows present for a full cursor scroll appear
+exactly once; see [`docs/adr/0012-keyset-pagination-snapshot-consistency.md`](adr/0012-keyset-pagination-snapshot-consistency.md)
+for the snapshot-consistency policy at page boundaries.
 
 **Response** `200 OK` (wrapped):
 
@@ -226,13 +239,17 @@ List fuzzing runs with search, status filtering, severity, area, tags, and pagin
           "replayAction": "crashlab replay seed --id 42"
         }
       }
-    ]
+    ],
+    "total": 1,
+    "nextCursor": null,
+    "hasMore": false
   },
   "total": 1
 }
 ```
 
 **Errors:**
+- `400 Bad Request` (`CURSOR_MISMATCH`): the cursor was issued under a different sort/filter set — restart pagination from page 1.
 - `503 Service Unavailable`: Backend configured but unreachable, or mock data disabled without backend configured.
 
 ---
@@ -388,25 +405,44 @@ Link external issue tracker URLs (GitHub, Jira, Linear) to a run. Proxies `GET` 
 
 ### `GET /api/artifacts`
 
-List all stored crash artifacts, execution logs, and case bundles.
+List stored crash artifacts, execution logs, and case bundles, newest first.
 
-**Response** `200 OK` (direct):
+**Query Parameters:**
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `limit` | `number` | Maximum number of records to return (default: `20`, max: `100`) |
+| `cursor` | `string` | Opaque keyset cursor from a previous response's `nextCursor`. Versioned and bound to the sort: a mismatched cursor returns `400 CURSOR_MISMATCH`. Legacy/invalid cursors reset to page 1 |
+
+**Pagination contract:** ordering is total — `(updatedAt|createdAt, id)` with a
+mandatory `id` tiebreaker — so identical timestamps cannot reorder between
+pages. `nextCursor` and `hasMore` are always present in the data payload.
+
+**Response** `200 OK` (wrapped):
 
 ```json
 {
-  "artifacts": [
-    {
-      "id": "artifact-401",
-      "name": "crash-seed-0xdead.bundle.json",
-      "type": "bundle",
-      "size": 4096,
-      "updatedAt": "2026-08-30T10:00:00.000Z",
-      "contentType": "json"
-    }
-  ],
+  "data": {
+    "artifacts": [
+      {
+        "id": "artifact-401",
+        "name": "crash-seed-0xdead.bundle.json",
+        "type": "bundle",
+        "size": 4096,
+        "updatedAt": "2026-08-30T10:00:00.000Z",
+        "contentType": "json"
+      }
+    ],
+    "total": 1,
+    "nextCursor": null,
+    "hasMore": false
+  },
   "total": 1
 }
 ```
+
+**Errors:**
+- `400 Bad Request` (`CURSOR_MISMATCH`): the cursor was issued under a different sort/filter set — restart pagination from page 1.
 
 ---
 
@@ -523,6 +559,35 @@ Validates a CrashLab `CaseBundle` JSON structure without persisting it. Enforces
 **Errors:**
 - `400 Bad Request`: Malformed JSON or missing `bundle` field.
 - `413 Payload Too Large`: Payload exceeds 1 MiB size limit.
+
+---
+
+## Audit API
+
+### `GET /api/audit`
+
+Query the caller org's audit log (append-only, hash-chained). The response
+includes a chain + checkpoint integrity report for the UI header.
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `actor` | `string` | Case-insensitive substring match on the actor |
+| `action` | `string` | Exact audit action (e.g. `token.revoke`, `run.delete`) |
+| `target` | `string` | Case-insensitive substring match on the target |
+| `since` | `string` | ISO timestamp, inclusive lower bound |
+| `until` | `string` | ISO timestamp, inclusive upper bound |
+| `limit` | `number` | Page size (default: `50`, max: `200`) |
+| `cursor` | `string` | Opaque keyset cursor from a previous response's `nextCursor`. Versioned and bound to the org + filter set: reusing it after changing filters returns `400 CURSOR_MISMATCH` |
+
+**Pagination contract:** keyset on the append-only `sequence`, newest first,
+so the page boundary stays stable while new entries arrive. The data payload
+carries `items`, `total` (filter match count), `nextCursor` and `hasMore`.
+
+**Errors:**
+- `400 Bad Request`: Malformed cursor or invalid query.
+- `400 Bad Request` (`CURSOR_MISMATCH`): the cursor was issued under a different org or filter set — restart pagination from page 1.
 
 ---
 

@@ -47,10 +47,11 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('GET', '/api/health/metrics', 'bearer', 'Scrape endpoint metrics', ['ops'], ['UNAUTHORIZED'], {
     description: 'Bearer scrape token (CRASHLAB_METRICS_SCRAPE_TOKEN). Prometheus-compatible.',
   }),
-  r('GET', '/api/runs', 'bearer', 'List fuzzing runs (keyset paginated)', ['runs'], ['UNAUTHORIZED', 'VALIDATION_ERROR'], {
+  r('GET', '/api/runs', 'bearer', 'List fuzzing runs (keyset paginated)', ['runs'], ['UNAUTHORIZED', 'VALIDATION_ERROR', 'CURSOR_MISMATCH'], {
     paginated: true,
     scopes: ['read'],
-    description: 'Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20). Envelope: { data: { runs, total, nextCursor, hasMore }, total }.',
+    description:
+      'Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20). Envelope: { data: { runs, total, nextCursor, hasMore }, total }. Cursors are versioned and bound to the sort + filter set (e.g. status): replaying a cursor after changing filters returns 400 CURSOR_MISMATCH. Legacy offset cursors reset to page 1. Ordering is total — (queuedAt, id) with a mandatory id tiebreaker — so timestamp ties cannot reorder between pages.',
   }),
   r('GET', '/api/runs/search', 'bearer', 'Search fuzzing runs (ranked, bounded)', ['runs'], ['UNAUTHORIZED', 'VALIDATION_ERROR'], {
     scopes: ['read'],
@@ -82,14 +83,21 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('POST', '/api/runs/{id}/replay', 'bearer-or-maintainer', 'Replay a crashed run (maintainer)', ['runs'], ['RUN_NOT_FOUND', 'FORBIDDEN'], { scopes: ['write'] }),
   r('GET', '/api/runs/{id}/replay-history', 'bearer', 'Replay history for a run', ['runs'], ['RUN_NOT_FOUND'], { scopes: ['read'] }),
   r('GET', '/api/runs/{id}/stream', 'bearer', 'Stream run progress (SSE)', ['runs'], ['RUN_NOT_FOUND'], { scopes: ['read'] }),
-  r('GET', '/api/replay-jobs/{id}', 'bearer', 'Get a replay job', ['runs'], ['NOT_FOUND', 'UNAUTHORIZED'], { scopes: ['read'] }),
-  r('GET', '/api/replay-jobs/{id}/stream', 'bearer', 'Stream replay job progress (SSE)', ['runs'], ['NOT_FOUND', 'UNAUTHORIZED'], { scopes: ['read'] }),
-  r('GET', '/api/triage/queue', 'bearer', 'List the triage queue', ['runs'], ['UNAUTHORIZED'], { scopes: ['read'] }),
-  r('POST', '/api/triage/queue', 'bearer-or-maintainer', 'Update a triage queue item', ['runs'], ['VALIDATION_ERROR', 'NOT_FOUND', 'FORBIDDEN'], { scopes: ['write'] }),
-  r('GET', '/api/artifacts', 'bearer', 'List artifacts', ['artifacts'], ['UNAUTHORIZED'], { paginated: true, scopes: ['read'] }),
+  r('GET', '/api/artifacts', 'bearer', 'List artifacts (keyset paginated)', ['artifacts'], ['UNAUTHORIZED', 'CURSOR_MISMATCH'], {
+    paginated: true,
+    scopes: ['read'],
+    description:
+      'Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20, max 100). Envelope: { data: { artifacts, total, nextCursor, hasMore }, total }. Cursors are versioned and bound to the sort; a mismatched cursor returns 400 CURSOR_MISMATCH. Ordering is total — (updatedAt|createdAt, id) with a mandatory id tiebreaker.',
+  }),
   r('POST', '/api/artifacts', 'bearer', 'Upload an artifact bundle', ['artifacts'], ['ARTIFACT_MISSING_BUNDLE_FIELD', 'ARTIFACT_PAYLOAD_TOO_LARGE'], { scopes: ['write'] }),
   r('GET', '/api/artifacts/{id}', 'bearer', 'Get an artifact', ['artifacts'], ['NOT_FOUND'], { scopes: ['read'] }),
   r('POST', '/api/artifacts/validate', 'bearer', 'Validate an artifact bundle', ['artifacts'], ['ARTIFACT_INVALID_BUNDLE', 'ARTIFACT_INVALID_JSON'], { scopes: ['write'] }),
+  r('GET', '/api/audit', 'bearer', 'Query the org-scoped audit log (keyset paginated)', ['audit'], ['UNAUTHORIZED', 'VALIDATION_ERROR', 'CURSOR_MISMATCH'], {
+    paginated: true,
+    scopes: ['read'],
+    description:
+      'Filters: ?actor=&action=&target=&since=&until=. Cursor pagination via ?cursor=<opaque>&limit=<n> (default 50, max 200) on the append-only sequence, newest first. Envelope: { data: { orgId, items, total, nextCursor, hasMore, integrity } }. Cursors are versioned and bound to the org + filter set: replaying a cursor after changing filters or org returns 400 CURSOR_MISMATCH.',
+  }),
   r('GET', '/api/campaigns', 'bearer-or-maintainer', 'List fuzz campaigns', ['campaigns'], ['UNAUTHORIZED'], { paginated: true, scopes: ['read'] }),
   r('GET', '/api/campaigns/{id}/fees', 'bearer', 'Campaign resource fee insight', ['campaigns'], ['UNAUTHORIZED', 'VALIDATION_ERROR'], {
     scopes: ['read'],

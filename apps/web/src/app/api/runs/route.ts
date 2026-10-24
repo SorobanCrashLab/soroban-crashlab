@@ -1,18 +1,18 @@
 import { NextResponse } from 'next/server';
 import { errorResponse, successResponse, createdResponse, status } from '@/lib/api-response-utils';
+import { codedErrorResponse } from '@/lib/error-codes';
 import { logger } from '@/lib/logger';
 import { withRouteErrorHandling, jsonError, readJsonBody } from '@/lib/route-handler';
 import { sanitizeSearchParams } from '@/lib/sanitize';
 import { withFixtureCaching } from '@/lib/fixture-caching';
 import { API_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
 import { selectRunStorageDriver } from '@/lib/storage';
-import { paginateKeyset, isLegacyOrInvalidCursor } from '@/app/pagination-utils';
 import {
-  getRunSortKeyset,
-  isRunSortField,
-  type RunSortDirection,
-  type RunSortField,
-} from '@/app/runs-sort-utils';
+  CursorMismatchError,
+  computeCursorScope,
+  getRunKeyset,
+  paginateKeyset,
+} from '@/app/pagination-utils';
 import { FuzzingRunSchema } from '@/lib/schemas/runs';
 import { isRedisConfigured } from '@/lib/redis';
 import { withCsrfProtection } from '@/lib/csrf';
@@ -83,16 +83,14 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
   });
 
   // Parse keyset pagination parameters from the query string.
-  // A legacy offset cursor is detected and reset gracefully to page 1.
-  const rawCursor = sanitizedSearchParams.get('cursor') ?? '';
-  const cursor = rawCursor && !isLegacyOrInvalidCursor(rawCursor) ? rawCursor : undefined;
-  const legacyCursorDetected = rawCursor && isLegacyOrInvalidCursor(rawCursor);
-
-  if (legacyCursorDetected) {
-    logger.warn('GET /api/runs: legacy or invalid cursor supplied, resetting to page 1', {
-      cursor: rawCursor,
-    });
-  }
+  // A legacy offset or v1 cursor is detected and reset gracefully to page 1;
+  // a v2 cursor bound to a different filter set is rejected with 400 (#1834).
+  const rawCursor = sanitizedSearchParams.get('cursor') ?? undefined;
+  const cursorScope = computeCursorScope({
+    route: 'runs',
+    sort: 'queuedAt:desc',
+    status: rawStatus ?? '',
+  });
 
   const limitParam = parseInt(sanitizedSearchParams.get('limit') ?? '', 10);
   const limit =
@@ -107,12 +105,28 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
   const sortDirection: RunSortDirection =
     sanitizedSearchParams.get('order') === 'asc' ? 'asc' : DEFAULT_SORT_DIRECTION;
 
-  const { items, total, nextCursor, hasMore } = paginateKeyset(allRuns, {
-    cursor,
-    limit,
-    getItemKeyset: (run) => getRunSortKeyset(run, sortField),
-    direction: sortDirection,
-  });
+  let paginated;
+  try {
+    paginated = paginateKeyset(allRuns, {
+      cursor: rawCursor,
+      limit,
+      getItemKeyset: getRunKeyset,
+      direction: 'desc',
+      scope: cursorScope,
+      onLegacyCursor: (offending) => {
+        logger.warn('GET /api/runs: legacy or invalid cursor supplied, resetting to page 1', {
+          cursor: offending,
+        });
+      },
+    });
+  } catch (error) {
+    if (error instanceof CursorMismatchError) {
+      logger.warn('GET /api/runs: cursor rejected (sort/filter mismatch)', { error: error.message });
+      return codedErrorResponse('CURSOR_MISMATCH');
+    }
+    throw error;
+  }
+  const { items, total, nextCursor, hasMore } = paginated;
 
   const data = { runs: items, total, nextCursor, hasMore };
   return withFixtureCaching(request, { data, total: data.total });
