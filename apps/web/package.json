@@ -33,7 +33,8 @@
     "test:e2e:settings-persistence": "playwright test e2e/settings-persistence.spec.ts",
     "test:e2e:integrations": "playwright test e2e/integrations.spec.ts",
     "test:e2e:maintainer": "playwright test e2e/maintainer.spec.ts",
-    "test:error-boundary": "npx tsc src/components/error-boundary-utils.ts src/components/error-boundary-utils.test.ts --skipLibCheck --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react && node build/test-tmp/components/error-boundary-utils.test.js"
+    "test:error-boundary": "npx tsc src/components/error-boundary-utils.ts src/components/error-boundary-utils.test.ts --skipLibCheck --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react && node build/test-tmp/components/error-boundary-utils.test.js",
+    "test:rate-limit": "vitest run src/lib/rate-limit.test.ts src/rate-limit.test.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.75.2",
@@ -48,7 +49,6 @@
     "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
     "uploadthing": "^7.7.4",
-    "yaml": "2.8.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -70,13 +70,5 @@
     "tailwindcss": "^4",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@sentry/cli",
-      "esbuild",
-      "sharp",
-      "unrs-resolver"
-    ]
   }
 }
