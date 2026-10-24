@@ -23,6 +23,8 @@ describe("Security Response Headers", () => {
     expect(headerMap.get("Permissions-Policy")).toContain("camera=()");
     expect(headerMap.get("Permissions-Policy")).toContain("microphone=()");
     expect(headerMap.get("Permissions-Policy")).toContain("geolocation=()");
+    expect(headerMap.get("Cross-Origin-Opener-Policy")).toBe("same-origin-allow-popups");
+    expect(headerMap.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
 
     // Content-Security-Policy is intentionally absent from the static headers
     // (issue #1545). A `headers()` value is fixed at build time and therefore
@@ -62,6 +64,8 @@ describe("Security Response Headers", () => {
       expect(headerMap.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
       expect(headerMap.get("Strict-Transport-Security")).toBe("max-age=63072000; includeSubDomains; preload");
       expect(headerMap.get("Permissions-Policy")).toContain("camera=()");
+      expect(headerMap.get("Cross-Origin-Opener-Policy")).toBe("same-origin-allow-popups");
+      expect(headerMap.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
       // The CSP moved to the per-request proxy (see src/proxy.ts); a static
       // edge header cannot express a per-request nonce. See src/lib/csp.test.ts.
       expect(headerMap.has("Content-Security-Policy")).toBe(false);

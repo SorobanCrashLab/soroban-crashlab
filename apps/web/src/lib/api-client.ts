@@ -8,8 +8,10 @@ import type { ZodIssue, ZodTypeAny } from 'zod';
 import {
   RunDetailResponseSchema,
   RunsListResponseSchema,
+  RunSearchResponseSchema,
   type RunDetailResponse,
   type RunsListResponse,
+  type RunSearchResponse,
 } from './schemas/runs';
 import {
   AnalyticsEventsResponseSchema,
@@ -25,6 +27,7 @@ import {
   WebhookHistoryResponseSchema,
   WebhooksResponseSchema,
 } from './schemas/api';
+import { CampaignFeeInsightSchema, RunFeeSummarySchema } from './schemas/fees';
 
 export type { ArtifactMetadata, NotificationFeedItem } from './schemas/api';
 
@@ -141,6 +144,8 @@ export const api = {
       const qs = new URLSearchParams();
       if (opts.cursor) qs.set('cursor', opts.cursor);
       if (opts.limit != null) qs.set('limit', String(opts.limit));
+      if (opts.sort) qs.set('sort', opts.sort);
+      if (opts.order) qs.set('order', opts.order);
       const path = qs.toString() ? `/runs?${qs.toString()}` : '/runs';
       return dedupedFetchJson<unknown>(apiUrl(path), resolvedSignal).then((payload) =>
         unwrapApiPayload(payload, apiUrl(path), RunsListResponseSchema),
@@ -150,6 +155,17 @@ export const api = {
       const path = `/runs/${encodeURIComponent(id)}`;
       return dedupedFetchJson<unknown>(apiUrl(path), signal).then((payload) =>
         unwrapApiPayload(payload, apiUrl(path), RunDetailResponseSchema),
+      );
+    },
+    search: (
+      query: string,
+      options?: { limit?: number; signal?: AbortSignal },
+    ): Promise<RunSearchResponse> => {
+      const qs = new URLSearchParams({ q: query });
+      if (options?.limit !== undefined) qs.set('limit', String(options.limit));
+      const path = `/runs/search?${qs.toString()}`;
+      return dedupedFetchJson<unknown>(apiUrl(path), options?.signal).then((payload) =>
+        unwrapApiPayload(payload, apiUrl(path), RunSearchResponseSchema),
       );
     },
     issues: {
@@ -190,6 +206,12 @@ export const api = {
           signal,
         }),
     },
+    feeSummary: (runId: string, signal?: AbortSignal) =>
+      apiFetch(
+        `/runs/${encodeURIComponent(runId)}/fee-summary`,
+        RunFeeSummarySchema,
+        { signal },
+      ),
     annotations: {
       list: (runId: string, signal?: AbortSignal) =>
         apiFetch(
@@ -257,6 +279,28 @@ export const api = {
         body: JSON.stringify(config),
         signal,
       }),
+    /**
+     * Server-aggregated resource fee insight for one campaign (#1883).
+     * Returns histograms, threshold crossings, top expensive fixtures and a
+     * bounded trend series. Pre-W5-A12 runs are reported in `coverage`.
+     */
+    fees: (
+      id: string,
+      options?: {
+        top?: number;
+        buckets?: number;
+        trendPoints?: number;
+        signal?: AbortSignal;
+      },
+    ) => {
+      const qs = new URLSearchParams();
+      if (options?.top !== undefined) qs.set('top', String(options.top));
+      if (options?.buckets !== undefined) qs.set('buckets', String(options.buckets));
+      if (options?.trendPoints !== undefined) qs.set('trendPoints', String(options.trendPoints));
+      const query = qs.toString();
+      const path = `/campaigns/${encodeURIComponent(id)}/fees${query ? `?${query}` : ''}`;
+      return apiFetch(path, CampaignFeeInsightSchema, { signal: options?.signal });
+    },
   },
   notifications: {
     list: (signal?: AbortSignal) =>
@@ -279,6 +323,14 @@ export interface FetchRunsOptions {
   cursor?: string | null;
   /** Maximum number of runs to return (default: server-side default). */
   limit?: number;
+  /**
+   * Server-side sort key (#1875). Must be one of `RUN_SORT_FIELDS`; the API
+   * falls back to `queuedAt` for unknown values. The keyset cursor is bound to
+   * the sort key, so change the sort only with a fresh cursor.
+   */
+  sort?: string;
+  /** Server-side sort direction (`asc` | `desc`, default `desc`). */
+  order?: 'asc' | 'desc';
 }
 
 /**

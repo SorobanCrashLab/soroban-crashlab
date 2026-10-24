@@ -10,8 +10,6 @@ import {
   applyBulkActionToRuns,
   getSelectedRuns,
   shouldClearSelectionAfterAction,
-  toggleAllRunSelection,
-  toggleRunSelection,
 } from '../runs-bulk-actions-utils';
 import { FuzzingRun } from '../types';
 import { recordAuditEvent } from '../../lib/audit/audit-sink';
@@ -26,7 +24,21 @@ import {
 import { getNextSortState, type SortOrder, type SortState } from '../run-history-sort-utils';
 import { applyRunFilters } from '../run-filter-utils';
 import type { RunArea, RunSeverity, RunStatus } from '../types';
-import { fetchRuns } from '../../lib/api-client';
+import { compareRuns, isRunSortField } from '../runs-sort-utils';
+import { useRunsPages } from './use-runs-pages';
+import {
+  applyFilterContext,
+  clearRunSelection,
+  createRunSelectionState,
+  getSelectAllLabel,
+  getSelectionAnnouncement,
+  getSelectionCount,
+  isRunSelected,
+  selectAllLoaded,
+  selectAllMatching,
+  toggleRunSelection as toggleStoredSelection,
+  type RunSelectionState,
+} from './selection-store';
 import { LoadingSpinner } from '../../components/LoadingSkeleton';
 import { ListState } from '../../components/ListState';
 import { PageHeader } from '../../components/PageHeader';
@@ -43,12 +55,11 @@ const VirtualizedRunTable = dynamic(
 
 const RUN_TABLE_COLUMNS = ['id', 'status', 'area', 'severity', 'duration', 'seedCount'];
 
+/** Rows requested per cursor page. Deep scrolls append 200 at a time. */
+const RUNS_PAGE_SIZE = 200;
+
 export default function RunsPage() {
   const router = useRouter();
-  const [dataState, setDataState] = useState<'loading' | 'success' | 'error'>('loading');
-  const [runs, setRuns] = useState<FuzzingRun[]>([]);
-  const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(new Set());
-  const [fetchAttempt, setFetchAttempt] = useState(0);
   // Starts at the default so server and client first paint agree; the URL is
   // read after mount, when `window.location` exists.
   const [viewState, setViewState] = useState<ViewState>(createDefaultViewState);
@@ -62,43 +73,32 @@ export default function RunsPage() {
     window.history.replaceState(null, '', `${window.location.pathname}?${encodeViewState(next)}`);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    const load = async () => {
-      setDataState('loading');
-      try {
-        const data = await fetchRuns(controller.signal);
-        if (!cancelled) {
-          const sorted = (data.runs ?? []).slice().sort((a: FuzzingRun, b: FuzzingRun) => {
-            const ta = a.queuedAt ?? a.startedAt ?? '';
-            const tb = b.queuedAt ?? b.startedAt ?? '';
-            return tb.localeCompare(ta);
-          });
-          setRuns(sorted);
-          setDataState('success');
-        }
-      } catch (err: unknown) {
-        if (!cancelled && (err as Error)?.name !== 'AbortError') {
-          setDataState('error');
-        }
-      }
-    };
-    void load();
+  // ── Data: cursor paging, server-side sort (#1875) ─────────────────────────
+  const {
+    runs,
+    total,
+    hasMore,
+    isLoadingMore,
+    dataState,
+    loadMore,
+    refresh,
+    mutateRuns,
+  } = useRunsPages({
+    sortKey: viewState.sort.key,
+    sortDirection: viewState.sort.direction,
+    pageSize: RUNS_PAGE_SIZE,
+  });
 
+  // Revalidate when the tab becomes visible again (stale rows after returning).
+  useEffect(() => {
     const handleVisibility = () => {
-      if (!cancelled && document.visibilityState === 'visible') {
-        void load();
+      if (document.visibilityState === 'visible') {
+        refresh();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [fetchAttempt]);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [refresh]);
 
   const currentSortState: SortState<string> = useMemo(
     () => ({
@@ -135,26 +135,65 @@ export default function RunsPage() {
       hasCrash: viewState.filters.hasCrash,
     });
 
-    if (!viewState.sort.key || viewState.sort.direction === 'none') {
+    if (viewState.sort.direction === 'none' || !isRunSortField(viewState.sort.key)) {
       return filtered;
     }
 
-    const direction = viewState.sort.direction === 'asc' ? 1 : -1;
-    return filtered.slice().sort((a, b) => {
-      const field = viewState.sort.key as keyof FuzzingRun;
-      const left = a[field];
-      const right = b[field];
-      if (typeof left === 'number' && typeof right === 'number') {
-        return (left - right) * direction;
-      }
-      return String(left ?? '').localeCompare(String(right ?? '')) * direction;
-    });
+    // Display sort mirrors the server comparator (including the id tiebreak) so
+    // a keyset page boundary can never show a different order than the cursor.
+    const field = viewState.sort.key;
+    const direction = viewState.sort.direction;
+    return filtered.slice().sort((a, b) => compareRuns(a, b, field, direction));
   }, [runs, viewState]);
+
+  // ── Selection: id-keyed, survives paging, query-based select-all (#1875) ──
+  const [selection, setSelection] = useState<RunSelectionState>(createRunSelectionState);
+
+  const filtersActive =
+    Boolean(viewState.search) ||
+    (viewState.filters.status?.length ?? 0) > 0 ||
+    (viewState.filters.area?.length ?? 0) > 0 ||
+    (viewState.filters.severity?.length ?? 0) > 0 ||
+    Boolean(viewState.filters.hasCrash);
+
+  const filterQueryKey = useMemo(
+    () =>
+      JSON.stringify({
+        status: viewState.filters.status,
+        area: viewState.filters.area,
+        severity: viewState.filters.severity,
+        search: viewState.search,
+        hasCrash: viewState.filters.hasCrash,
+      }),
+    [viewState.filters, viewState.search],
+  );
+
+  /**
+   * Number of runs a query-based selection covers. Filters are applied
+   * client-side, so with active filters we can only count loaded matches;
+   * without filters the API total is authoritative.
+   */
+  const selectionMatchTotal = filtersActive ? visibleRuns.length : (total ?? visibleRuns.length);
+
+  // Invalidate "all matching" selections when the filter identity changes.
+  useEffect(() => {
+    setSelection((previous) => applyFilterContext(previous, filterQueryKey, selectionMatchTotal));
+  }, [filterQueryKey, selectionMatchTotal]);
+
+  const selectedRunIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const run of visibleRuns) {
+      if (isRunSelected(selection, run.id)) ids.add(run.id);
+    }
+    return ids;
+  }, [visibleRuns, selection]);
 
   const selectedRuns = useMemo(
     () => getSelectedRuns(visibleRuns, selectedRunIds),
     [visibleRuns, selectedRunIds],
   );
+
+  const selectionCount = getSelectionCount(selection);
 
   // Declared after `visibleRuns` because it closes over it: hoisting the
   // callback above the `useMemo` read the binding in its temporal dead zone.
@@ -174,43 +213,64 @@ export default function RunsPage() {
     router.push(`/runs/${runId}`);
   }, [router, visibleRuns, viewState]);
 
-
   const handleToggleRunSelection = useCallback((runId: string) => {
-    setSelectedRunIds((prev) => toggleRunSelection(prev, runId));
+    setSelection((previous) => toggleStoredSelection(previous, runId));
   }, []);
 
   const handleToggleAllRunsSelection = useCallback((runIds: string[]) => {
-    setSelectedRunIds((prev) => toggleAllRunSelection(prev, runIds));
-  }, []);
+    setSelection((previous) => {
+      const everythingVisibleSelected =
+        runIds.length > 0 && runIds.every((id) => isRunSelected(previous, id));
+
+      if (everythingVisibleSelected) {
+        return clearRunSelection(previous);
+      }
+
+      // More rows exist than are loaded: select the whole matching query, with
+      // a count preview, instead of only the current page.
+      if (selectionMatchTotal > runIds.length) {
+        return selectAllMatching(previous, {
+          queryKey: filterQueryKey,
+          matchingCount: selectionMatchTotal,
+        });
+      }
+
+      return selectAllLoaded(previous, runIds);
+    });
+  }, [filterQueryKey, selectionMatchTotal]);
 
   const handleBulkAction = useCallback(
     (action: BulkAction, runIds: string[], data?: Record<string, unknown>) => {
       if (action === 'delete') {
         recordAuditEvent({ action: 'run.delete', target: 'runs', metadata: { runCount: runIds.length } });
       }
-      setRuns((prev) => applyBulkActionToRuns(prev, action, runIds));
+      mutateRuns((previous) => applyBulkActionToRuns(previous, action, runIds));
 
       if (action === 'export' || action === 'tag' || action === 'assign') {
         console.log('Bulk action:', action, runIds, data);
       }
 
       if (shouldClearSelectionAfterAction(action)) {
-        setSelectedRunIds(new Set());
+        setSelection((previous) => clearRunSelection(previous));
       }
     },
-    [],
+    [mutateRuns],
   );
 
   const handleRefresh = useCallback(async () => {
-    setFetchAttempt((n) => n + 1);
-    // Give the effect time to kick off before resolving
+    refresh();
+    // Give the request time to kick off before resolving the pull gesture.
     await new Promise<void>((resolve) => setTimeout(resolve, 600));
-  }, []);
+  }, [refresh]);
 
   const { isPulling, isRefreshing, pullDistance } = usePullToRefresh({
     onRefresh: handleRefresh,
     disabled: dataState === 'loading',
   });
+
+  const rowCountForAnnouncements = filtersActive
+    ? visibleRuns.length
+    : Math.max(total ?? 0, visibleRuns.length);
 
   return (
     <div className="container-full page-padding fade-in">
@@ -222,9 +282,9 @@ export default function RunsPage() {
           <>
             {dataState === 'success' && (
               <span className="chip text-xs sm:text-sm">
-                {visibleRuns.length === runs.length
+                {visibleRuns.length === runs.length && !hasMore
                   ? `${runs.length} Total Runs`
-                  : `${visibleRuns.length} of ${runs.length} Runs`}
+                  : `${visibleRuns.length} of ${rowCountForAnnouncements} Runs`}
               </span>
             )}
             <SavedViewsMenu state={viewState} onApply={applyView} />
@@ -239,7 +299,7 @@ export default function RunsPage() {
         {...(dataState === 'loading'
           ? { state: 'loading' }
           : dataState === 'error'
-          ? { state: 'error', message: 'Failed to load fuzzing runs', onRetry: () => setFetchAttempt((n) => n + 1) }
+          ? { state: 'error', message: 'Failed to load fuzzing runs', onRetry: refresh }
           : runs.length === 0
           ? {
               state: 'empty',
@@ -256,8 +316,9 @@ export default function RunsPage() {
       >
         <BulkActionsForRuns
           selectedRuns={selectedRuns}
+          selectionCount={selectionCount}
           onAction={handleBulkAction}
-          onClearSelection={() => setSelectedRunIds(new Set())}
+          onClearSelection={() => setSelection((previous) => clearRunSelection(previous))}
         />
         <VirtualizedRunTable
           runs={visibleRuns}
@@ -270,6 +331,15 @@ export default function RunsPage() {
           onToggleAllRunsSelection={handleToggleAllRunsSelection}
           sortState={currentSortState}
           onSort={handleSort}
+          totalCount={rowCountForAnnouncements}
+          hasMore={hasMore}
+          loadingMore={isLoadingMore}
+          onEndReached={loadMore}
+          scrollResetKey={`${filterQueryKey}|${viewState.sort.key}|${viewState.sort.direction}`}
+          selectedCount={selectionCount}
+          selectAllLabel={getSelectAllLabel(selection, visibleRuns.length, selectionMatchTotal)}
+          allMatchingSelected={selection.mode === 'all-matching'}
+          selectionAnnouncement={getSelectionAnnouncement(selection)}
         />
       </ListState>
     </div>

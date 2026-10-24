@@ -42,6 +42,8 @@ describe('Content-Security-Policy (issue #1545)', () => {
     expect(csp).toContain("form-action 'self'");
     expect(csp).toContain("base-uri 'self'");
     expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain('report-uri /api/csp-report');
+    expect(csp).toContain('report-to csp-endpoint');
     expect(csp).toContain('upgrade-insecure-requests');
   });
 

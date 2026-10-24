@@ -79,10 +79,24 @@ pub fn execute_with_retry<F, T>(
 where
     F: FnMut() -> Result<T, SimulationError>,
 {
+    execute_with_retry_counting(config, prng.as_deref_mut(), &mut f).0
+}
+
+/// Retry execution with an attempt counter for fault-injection assertions.
+pub fn execute_with_retry_counting<F, T>(
+    config: &RetryConfig,
+    mut prng: Option<&mut SeededPrng>,
+    f: &mut F,
+) -> (Result<T, SimulationError>, u32)
+where
+    F: FnMut() -> Result<T, SimulationError>,
+{
     let mut attempt = 0; // 0-indexed for calculation
+    let mut calls = 0u32;
     loop {
+        calls += 1;
         match f() {
-            Ok(val) => return Ok(val),
+            Ok(val) => return (Ok(val), calls),
             Err(e) if e.is_transient() && attempt + 1 < config.max_attempts => {
                 let backoff = calculate_backoff(config, attempt, prng.as_deref_mut());
 
@@ -93,8 +107,17 @@ where
 
                 attempt += 1;
             }
-            Err(e) => return Err(e),
+            Err(e) => return (Err(e), calls),
         }
+    }
+}
+
+/// Maps a typed [`RpcFault`] to a retryable [`SimulationError`].
+pub fn simulation_error_for_fault(fault: &crate::RpcFault) -> SimulationError {
+    if fault.is_retryable() {
+        SimulationError::Transient(fault.harness_message())
+    } else {
+        SimulationError::NonTransient(fault.harness_message())
     }
 }
 

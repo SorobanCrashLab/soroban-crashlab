@@ -207,6 +207,23 @@ This document provides a comprehensive threat model for artifact handling in Sor
 
 ## Threat Scenarios
 
+### Runtime artifact safety controls (#1811, #1812, #1818)
+
+Artifact inputs remain data throughout parsing and export. The CLI passes
+arguments to Rust path and parser APIs directly; imported seed/XDR bytes are
+never interpolated into shell commands, generated Rust source, or evaluation
+contexts. Artifact identifiers and ZIP entry names are constrained before
+filesystem or archive use, and generated ZIP readers and writers enforce entry,
+path, and aggregate-size limits. Gzip and bundle JSON loading are bounded to
+16 MiB compressed and 64 MiB decompressed/input data.
+
+Runtime logging, health snapshots, RPC envelope captures, persisted local
+bundles, and downloadable web bundles share key-based and inline-token
+redaction. User-uploaded text that still contains secret-like values is
+rejected and its temporary storage object is deleted; the uploader must remove
+the value before retrying. Sanitization can remove useful reproduction detail,
+so original sensitive artifacts should remain in access-controlled storage.
+
 ### T-1: Malicious Seed Causes Path Traversal
 
 **STRIDE Category**: Tampering, Information Disclosure  

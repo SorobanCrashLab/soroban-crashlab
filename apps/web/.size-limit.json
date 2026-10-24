@@ -1,20 +1,26 @@
 [
   {
     "name": "route-group: runtime-bootstrap",
-    "path": [".next/static/chunks/turbopack-*.js"],
+    "path": [
+      ".next/static/chunks/turbopack-*.js"
+    ],
     "gzip": true,
-    "limit": "50 kB"
+    "limit": "12 kB"
   },
   {
     "name": "route-group: shared-styles",
-    "path": [".next/static/chunks/*.css"],
+    "path": [
+      ".next/static/chunks/*.css"
+    ],
     "gzip": true,
-    "limit": "50 kB"
+    "limit": "40 kB"
   },
   {
     "name": "route-group: static-bundles",
-    "path": [".next/static/chunks/*.js"],
+    "path": [
+      ".next/static/chunks/*.js"
+    ],
     "gzip": true,
-    "limit": "1500 kB"
+    "limit": "1300 kB"
   }
 ]

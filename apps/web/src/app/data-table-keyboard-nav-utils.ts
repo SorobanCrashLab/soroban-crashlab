@@ -16,6 +16,8 @@ export type DataTableNavAction =
 export const DATA_TABLE_NAVIGATION_KEYS = new Set([
   "ArrowUp",
   "ArrowDown",
+  "PageUp",
+  "PageDown",
   "Home",
   "End",
 ]);
@@ -23,14 +25,22 @@ export const DATA_TABLE_NAVIGATION_KEYS = new Set([
 /** Keys that activate the focused row (open details, follow primary action). */
 export const DATA_TABLE_ACTIVATION_KEYS = new Set(["Enter", " "]);
 
+/** Default number of rows a PageUp/PageDown press travels. */
+export const DATA_TABLE_DEFAULT_PAGE_SIZE = 10;
+
 /**
  * Resolve the keyboard action for a focused table row.
  * Returns `none` for unhandled keys or empty tables.
+ *
+ * `pageSize` controls how many rows PageUp/PageDown traverse (default 10). For
+ * a virtualized grid the value should be the number of rows the viewport can
+ * actually show, so a page press roughly scrolls one screen.
  */
 export function resolveDataTableRowKeyDown(
   key: string,
   currentIndex: number,
   rowCount: number,
+  pageSize: number = DATA_TABLE_DEFAULT_PAGE_SIZE,
 ): DataTableNavAction {
   if (rowCount <= 0) {
     return { type: "none" };
@@ -51,6 +61,22 @@ export function resolveDataTableRowKeyDown(
     return {
       type: "focus",
       index: Math.max(currentIndex - 1, 0),
+    };
+  }
+
+  if (key === "PageDown") {
+    const step = Number.isFinite(pageSize) && pageSize > 0 ? Math.trunc(pageSize) : DATA_TABLE_DEFAULT_PAGE_SIZE;
+    return {
+      type: "focus",
+      index: Math.min(currentIndex + step, rowCount - 1),
+    };
+  }
+
+  if (key === "PageUp") {
+    const step = Number.isFinite(pageSize) && pageSize > 0 ? Math.trunc(pageSize) : DATA_TABLE_DEFAULT_PAGE_SIZE;
+    return {
+      type: "focus",
+      index: Math.max(currentIndex - step, 0),
     };
   }
 

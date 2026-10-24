@@ -5,7 +5,11 @@ import RunMetadataEditor from '../../../components/RunMetadataEditor';
 import type { FuzzingRun } from '../../types';
 import type { RunMetadata } from '../../../components/RunMetadataEditor';
 
-export default function RunMetadataEditorWrapper({ run }: { run: FuzzingRun }) {
+export default function RunMetadataEditorWrapper({
+  run,
+}: {
+  run: Pick<FuzzingRun, 'id' | 'tags'>;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [currentRun, setCurrentRun] = useState(run);
 

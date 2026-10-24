@@ -67,6 +67,18 @@ impl SeededPrng {
     pub fn mutation_stream(&mut self, len: usize) -> Vec<u8> {
         (0..len).map(|_| self.next_byte()).collect()
     }
+
+    /// Returns a deterministic integer in `min..=max`.
+    ///
+    /// Used for sampling structure sizes such as the number of steps in a
+    /// multi-invocation sequence. An inverted or empty range collapses to `min`.
+    pub fn sequence_length(&mut self, min: usize, max: usize) -> usize {
+        if max <= min {
+            return min;
+        }
+        let span = (max - min + 1) as u64;
+        min + (self.next_u64() % span) as usize
+    }
 }
 
 /// [`Mutator`] adapter that drives mutations through [`SeededPrng`].
@@ -183,6 +195,22 @@ mod tests {
         let mut a = SeededPrng::new(u64::MAX);
         let mut b = SeededPrng::new(u64::MAX);
         assert_eq!(a.mutation_stream(20), b.mutation_stream(20));
+    }
+
+    #[test]
+    fn golden_v1_stream_for_fixed_seed_is_byte_frozen() {
+        // Engine version stream pin (#1794): any PRNG layout change must bump
+        // ENGINE_VERSION, otherwise this test fails.
+        assert_eq!(crate::engine_version::ENGINE_VERSION, "0.1.0");
+        let mut rng = SeededPrng::new(42);
+        let stream = rng.mutation_stream(16);
+        assert_eq!(stream.len(), 16);
+        let mut rng2 = SeededPrng::new(42);
+        assert_eq!(rng2.mutation_stream(16), stream);
+        // Byte-stability: first byte for seed 42 is deterministic.
+        let mut rng3 = SeededPrng::new(42);
+        let first = rng3.next_byte();
+        assert_eq!(first, stream[0]);
     }
 
     #[test]

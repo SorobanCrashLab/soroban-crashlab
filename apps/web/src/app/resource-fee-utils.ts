@@ -142,3 +142,16 @@ export function formatMalformedFeeCaption(droppedCount: number): string | null {
   if (droppedCount === 0) return null;
   return `${droppedCount} malformed fee ${droppedCount === 1 ? 'row' : 'rows'} hidden`;
 }
+
+// Insight aggregation types live in ./resource-fee-insight-utils; re-exported
+// here (type-only, no runtime cycle) so fee consumers have one import site.
+export type {
+  CampaignFeeInsight,
+  ExpensiveFixture,
+  FeeDataCoverage,
+  FeeHistogram,
+  FeeTrendPoint,
+  MetricThresholdCrossing,
+  RunFeeSample,
+  RunFeeSummary,
+} from './resource-fee-insight-utils';

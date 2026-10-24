@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import { getConfirmDialogConfig } from '../../../components/confirm-dialog-utils';
+import { Can } from '../../../components/Can';
+import { explainGate, useEffectiveAccess } from '../../../lib/permissions';
 import { ApiTokenPublic, ApiTokenScope } from '../../../lib/storage/api-token-store';
 
 export default function ApiTokenManager() {
@@ -21,6 +23,10 @@ export default function ApiTokenManager() {
 
   const [rotateTargetId, setRotateTargetId] = useState<string | null>(null);
   const [isRotating, setIsRotating] = useState(false);
+
+  // Token writes need the tokens:manage capability (#1880). Reads stay open.
+  const { status: accessStatus, role, can: holdsCapability } = useEffectiveAccess();
+  const canManageTokens = holdsCapability('tokens:manage');
 
   const fetchTokens = useCallback(async () => {
     try {
@@ -63,6 +69,7 @@ export default function ApiTokenManager() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageTokens) return;
     setError(null);
     if (!name.trim()) {
       setError('Token name is required.');
@@ -97,7 +104,7 @@ export default function ApiTokenManager() {
   };
 
   const handleConfirmRotate = async () => {
-    if (!rotateTargetId) return;
+    if (!rotateTargetId || !canManageTokens) return;
     setIsRotating(true);
     setError(null);
     try {
@@ -129,7 +136,7 @@ export default function ApiTokenManager() {
   };
 
   const handleConfirmRevoke = async () => {
-    if (!revokeTargetId) return;
+    if (!revokeTargetId || !canManageTokens) return;
     setIsRevoking(true);
     try {
       const res = await fetch(`/api/settings/tokens/${revokeTargetId}/revoke`, {
@@ -164,6 +171,15 @@ export default function ApiTokenManager() {
         <p className="text-meta text-xs mt-1">
           Create and manage scoped API tokens for automated CI/CD and integrations.
         </p>
+        {!canManageTokens && (
+          <p
+            id="tokens-gate-note"
+            data-testid="tokens-gate-note"
+            className="text-xs text-amber-400 mt-2"
+          >
+            {explainGate('tokens:manage', accessStatus, role)}
+          </p>
+        )}
       </div>
 
       {createdSecret && (
@@ -239,9 +255,16 @@ export default function ApiTokenManager() {
           </div>
         </div>
         <div className="flex justify-end pt-2">
-          <button type="submit" className="btn-primary text-xs px-4 py-2" id="create-token-submit">
-            Create API Token
-          </button>
+          <Can
+            capability="tokens:manage"
+            mode="disabled"
+            showNote={false}
+            describedBy="tokens-gate-note"
+          >
+            <button type="submit" className="btn-primary text-xs px-4 py-2" id="create-token-submit">
+              Create API Token
+            </button>
+          </Can>
         </div>
       </form>
 
@@ -290,22 +313,36 @@ export default function ApiTokenManager() {
                       </td>
                       <td className="py-2.5 px-3 text-right">
                         {!token.revokedAt && (
-                          <button
-                            type="button"
-                            onClick={() => setRotateTargetId(token.id)}
-                            className="text-xs text-amber-400 hover:text-amber-300 font-medium mr-3"
+                          <Can
+                            capability="tokens:manage"
+                            mode="disabled"
+                            showNote={false}
+                            describedBy="tokens-gate-note"
                           >
-                            Rotate
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => setRotateTargetId(token.id)}
+                              className="text-xs text-amber-400 hover:text-amber-300 font-medium mr-3"
+                            >
+                              Rotate
+                            </button>
+                          </Can>
                         )}
                         {!token.revokedAt && (
-                          <button
-                            type="button"
-                            onClick={() => setRevokeTargetId(token.id)}
-                            className="text-xs text-red-400 hover:text-red-300 font-medium"
+                          <Can
+                            capability="tokens:manage"
+                            mode="disabled"
+                            showNote={false}
+                            describedBy="tokens-gate-note"
                           >
-                            Revoke
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => setRevokeTargetId(token.id)}
+                              className="text-xs text-red-400 hover:text-red-300 font-medium"
+                            >
+                              Revoke
+                            </button>
+                          </Can>
                         )}
                       </td>
                     </tr>

@@ -23,6 +23,12 @@ export interface SortableColumnHeaderProps<TField extends string = string> {
   buttonClassName?: string;
   /** Alignment of column content ('left' | 'right' | 'center') */
   align?: 'left' | 'right' | 'center';
+  /**
+   * 1-based column position inside an ARIA `grid` (#1875). When set, it is
+   * exposed as `aria-colindex` so virtualized grids can announce cell
+   * positions even though only a window of rows is mounted.
+   */
+  colIndex?: number;
 }
 
 /**
@@ -44,6 +50,7 @@ export function SortableColumnHeader<TField extends string = string>({
   className = '',
   buttonClassName = '',
   align = 'left',
+  colIndex,
 }: SortableColumnHeaderProps<TField>) {
   const content = label ?? children ?? field;
   const indicator = getSortIndicator(field, sortState);
@@ -67,6 +74,7 @@ export function SortableColumnHeader<TField extends string = string>({
     <th
       scope="col"
       aria-sort={indicator.ariaSort}
+      aria-colindex={colIndex}
       className={className}
     >
       <button

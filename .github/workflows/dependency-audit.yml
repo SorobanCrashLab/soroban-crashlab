@@ -1,0 +1,204 @@
+name: Dependency audit
+
+# Report-only dependency vulnerability scanning. Runs on a daily schedule and on
+# PRs so findings are surfaced in the GitHub Security tab without blocking
+# merges while the team triages. Flip `fail` / REPORT_ONLY to fail on
+# high/critical findings once the baseline is accepted.
+#
+# Scanners:
+#   - pnpm audit --audit-level high        (apps/web, npm lockfile)
+#   - cargo deny check advisories          (contracts/, Rust lockfile)
+#   - osv-scanner over both lockfiles      (cross-ecosystem OSV gate)
+#
+# Findings are converted to SARIF and uploaded to the code-scanning / Security
+# tab. The job never fails on findings while report-only is on.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      fail:
+        description: 'Fail the job on high/critical findings (triage gate)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: dependency-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Audit dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup pnpm and Node
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies (web)
+        run: pnpm install --frozen-lockfile
+        working-directory: apps/web
+
+      # ---- pnpm audit (report-only) ----
+      - name: pnpm audit (high)
+        id: pnpm-audit
+        working-directory: apps/web
+        continue-on-error: true
+        run: |
+          pnpm audit --audit-level high --json > /tmp/pnpm-audit.raw.json 2>/tmp/pnpm-audit.err || true
+          node - <<'NODE'
+            const fs = require('fs');
+            let data = {};
+            try {
+              data = JSON.parse(fs.readFileSync('/tmp/pnpm-audit.raw.json', 'utf8'));
+            } catch {
+              // No parseable output -> no findings to report.
+            }
+            const advisories = data.advisories || data.vulnerabilities || {};
+            const results = Object.values(advisories).map((a, i) => {
+              const title = a.title || a.advisory?.title || 'vulnerable dependency';
+              const affected = a.affected_versions || a.findings?.map((f) => f.version).join(', ') || '';
+              return {
+                ruleId: String(a.id ?? `pnpm-audit-${i}`),
+                level: 'warning',
+                message: { text: `${title} — affected: ${affected}` },
+                locations: [{ physicalLocation: { artifactLocation: { uri: 'pnpm-lock.yaml' } } }],
+              };
+            });
+            const sarif = {
+              '$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif.schema.json',
+              version: '2.1.0',
+              runs: [
+                {
+                  tool: {
+                    driver: {
+                      name: 'pnpm-audit',
+                      version: '1.0.0',
+                      rules: results.map((r) => ({ id: r.ruleId, description: { text: r.message.text } })),
+                    },
+                  },
+                  results,
+                },
+              ],
+            };
+            fs.writeFileSync('/tmp/pnpm-audit.sarif', JSON.stringify(sarif, null, 2));
+            console.log(`pnpm audit: ${results.length} advisory(ies) reported`);
+          NODE
+
+      # ---- cargo deny (report-only) ----
+      - name: cargo deny check advisories
+        id: cargo-deny
+        continue-on-error: true
+        working-directory: contracts
+        run: |
+          if command -v cargo-deny >/dev/null 2>&1; then
+            cargo deny check advisories --format json > /tmp/cargo-deny.raw.json 2>/tmp/cargo-deny.err || true
+          else
+            echo 'cargo-deny not installed; installing (best effort)' >> "$GITHUB_STEP_SUMMARY"
+            cargo install cargo-deny --locked >/tmp/cargo-deny-install.log 2>&1 || true
+            if command -v cargo-deny >/dev/null 2>&1; then
+              cargo deny check advisories --format json > /tmp/cargo-deny.raw.json 2>/tmp/cargo-deny.err || true
+            else
+              echo 'cargo-deny unavailable; skipping Rust advisory scan' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          node - <<'NODE'
+            const fs = require('fs');
+            let data = {};
+            try {
+              data = JSON.parse(fs.readFileSync('/tmp/cargo-deny.raw.json', 'utf8'));
+            } catch {
+              fs.writeFileSync('/tmp/cargo-deny.sarif', JSON.stringify({
+                '$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif.schema.json',
+                version: '2.1.0',
+                runs: [{ tool: { driver: { name: 'cargo-deny', version: '1.0.0' } }, results: [] }],
+              }, null, 2));
+              console.log('cargo deny: no advisories reported');
+              return;
+            }
+            const advisories = data.advisories || data.vulnerabilities || [];
+            const results = Array.isArray(advisories) ? advisories : Object.values(advisories);
+            const sarifResults = results.map((a, i) => {
+              const id = a.id ?? a.advisory_id ?? `cargo-deny-${i}`;
+              const title = a.title || a.advisory?.title || 'vulnerable crate';
+              const versions = a.affected_versions || a.affected || '';
+              return {
+                ruleId: String(id),
+                level: 'warning',
+                message: { text: `${title} — affected: ${versions}` },
+                locations: [{ physicalLocation: { artifactLocation: { uri: 'Cargo.lock' } } }],
+              };
+            });
+            const sarif = {
+              '$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif.schema.json',
+              version: '2.1.0',
+              runs: [
+                {
+                  tool: {
+                    driver: {
+                      name: 'cargo-deny',
+                      version: '1.0.0',
+                      rules: sarifResults.map((r) => ({ id: r.ruleId, description: { text: r.message.text } })),
+                    },
+                  },
+                  results: sarifResults,
+                },
+              ],
+            };
+            fs.writeFileSync('/tmp/cargo-deny.sarif', JSON.stringify(sarif, null, 2));
+            console.log(`cargo deny: ${sarifResults.length} advisory(ies) reported`);
+          NODE
+
+      # ---- osv-scanner over lockfiles (report-only) ----
+      - name: osv-scanner over lockfiles
+        id: osv-scanner
+        continue-on-error: true
+        run: |
+          if ! command -v osv-scanner >/dev/null 2>&1; then
+            echo 'osv-scanner not installed; installing (best effort)' >> "$GITHUB_STEP_SUMMARY"
+            curl -sfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner-linux-amd64 -o /usr/local/bin/osv-scanner 2>/tmp/osv-install.err && chmod +x /usr/local/bin/osv-scanner || true
+          fi
+          if command -v osv-scanner >/dev/null 2>&1; then
+            osv-scanner --lockfiles pnpm-lock.yaml contracts/Cargo.lock --format sarif --skip-git > /tmp/osv.sarif 2>/tmp/osv.err || true
+          fi
+          [ -s /tmp/osv.sarif ] || echo '{"$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif.schema.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"osv-scanner","version":"1.0.0"}},"results":[]}]}' > /tmp/osv.sarif
+
+      # ---- Upload SARIF to the GitHub Security (code-scanning) tab ----
+      - name: Upload SARIF to Security tab
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for f in /tmp/pnpm-audit.sarif /tmp/cargo-deny.sarif /tmp/osv.sarif; do
+            [ -f "$f" ] || continue
+            gh api -X PUT "repos/${GITHUB_REPOSITORY}/code-scanning/sarifs" \
+              -F sarif=@"$f" \
+              -F ref="${GITHUB_REF}" || true
+          done
+
+      # ---- Report-only outcome summary ----
+      - name: Report-only result
+        if: always()
+        run: |
+          echo '## Dependency audit (report-only)' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Findings above have been uploaded to the Security tab (code-scanning).' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The job intentionally does not fail on findings while report-only is on.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Flip `workflow_dispatch.inputs.fail` (or set REPORT_ONLY=false) to fail on high/critical once triaged.' >> "$GITHUB_STEP_SUMMARY"

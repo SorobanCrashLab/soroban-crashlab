@@ -86,7 +86,7 @@ const enableTour = async (page: Page) => {
 };
 
 const fulfillRunsRequest = async (page: Page, body: unknown) => {
-  await page.route('**/api/runs', async (route) => {
+  await page.route('**/api/runs*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

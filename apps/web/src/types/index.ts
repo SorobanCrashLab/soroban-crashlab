@@ -42,10 +42,37 @@ export interface RunIssueLink {
   href: string;
 }
 
+/**
+ * Resource/fee envelope recorded per seed outcome by W5-A12 (#1792).
+ *
+ * Every field is optional so readers can feature-detect runs produced before
+ * the envelope existed. The canonical keys are camelCase; the extractor in
+ * `resource-fee-insight-utils` also understands the snake_case envelope emitted
+ * by the Rust runner.
+ */
+export interface RunResourceUsage {
+  cpuInstructions?: number;
+  memoryBytes?: number;
+  minBuiltinEntries?: number;
+}
+
+export interface RunFeeSimulation extends RunResourceUsage {
+  minResourceFee?: number;
+  inclusionFee?: number;
+  rentBumps?: number;
+  feeWarnThreshold?: number;
+  expensiveSuccess?: boolean;
+  expensiveFailure?: boolean;
+}
+
 export interface FuzzingRun {
   id: string;
   parentId?: string;
   seedList?: number[];
+  /** Campaign this run belongs to (absent on pre-campaign-index data). */
+  campaignId?: string;
+  /** Contract fixture exercised by the run, when the runner knows it. */
+  fixtureName?: string;
   status: RunStatus;
   area: RunArea;
   severity: RunSeverity;
@@ -55,6 +82,14 @@ export interface FuzzingRun {
   cpuInstructions: number;
   memoryBytes: number;
   minResourceFee: number;
+  /** W5-A12 resource units; absent on older runs. */
+  resourceUsage?: RunResourceUsage;
+  /** W5-A12 fee simulation; absent on older runs. */
+  fee?: RunFeeSimulation;
+  /** Convenience mirror of `fee.feeWarnThreshold` for tolerant readers. */
+  feeWarnThreshold?: number;
+  expensiveSuccess?: boolean;
+  expensiveFailure?: boolean;
   queuedAt?: string;
   startedAt?: string;
   finishedAt?: string;

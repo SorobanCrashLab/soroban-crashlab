@@ -31,6 +31,11 @@ pub struct ReplayResult {
 pub enum ReplayError {
     Io(std::io::Error),
     Bundle(BundlePersistError),
+    EngineMismatch {
+        expected: String,
+        found: String,
+        drift: crate::engine_version::EngineDrift,
+    },
 }
 
 impl fmt::Display for ReplayError {
@@ -38,6 +43,14 @@ impl fmt::Display for ReplayError {
         match self {
             ReplayError::Io(err) => write!(f, "failed to read replay bundle: {err}"),
             ReplayError::Bundle(err) => write!(f, "failed to decode replay bundle: {err}"),
+            ReplayError::EngineMismatch {
+                expected,
+                found,
+                drift,
+            } => write!(
+                f,
+                "engine version mismatch: bundle={expected} current={found} drift={drift:?}; re-baseline or pass --accept-engine-mismatch"
+            ),
         }
     }
 }
@@ -47,6 +60,7 @@ impl std::error::Error for ReplayError {
         match self {
             ReplayError::Io(err) => Some(err),
             ReplayError::Bundle(err) => Some(err),
+            ReplayError::EngineMismatch { .. } => None,
         }
     }
 }
@@ -69,6 +83,15 @@ impl From<BundlePersistError> for ReplayError {
 /// compared with this host, so the result can name every axis on which the two
 /// platforms differ (#1799).
 pub fn replay_seed_bundle(bundle: &CaseBundle) -> ReplayResult {
+    replay_seed_bundle_checked(bundle, true).expect("engine check passed")
+}
+
+/// Checked replay with engine-version enforcement.
+pub fn replay_seed_bundle_checked(
+    bundle: &CaseBundle,
+    accept_mismatch: bool,
+) -> Result<ReplayResult, ReplayError> {
+    check_engine_version(bundle, accept_mismatch)?;
     let actual = classify(&bundle.seed);
     let actual_class = classify_failure(&bundle.seed);
     let expected = bundle.signature.clone();
@@ -77,7 +100,7 @@ pub fn replay_seed_bundle(bundle: &CaseBundle) -> ReplayResult {
     let signature_matches = signatures_match(&expected, &actual);
     let matches = class_matches && signature_matches;
     let environment = check_bundle_replay_environment(bundle, &EnvironmentFingerprint::capture());
-    ReplayResult {
+    Ok(ReplayResult {
         expected_class,
         actual_class,
         expected,
@@ -86,19 +109,53 @@ pub fn replay_seed_bundle(bundle: &CaseBundle) -> ReplayResult {
         signature_matches,
         matches,
         environment,
+    })
+}
+
+/// Enforces engine-version compatibility for a bundle.
+pub fn check_engine_version(bundle: &CaseBundle, accept_mismatch: bool) -> Result<(), ReplayError> {
+    let current = crate::engine_version::ENGINE_VERSION;
+    let found = if bundle.engine_version.is_empty() {
+        "unknown".to_string()
+    } else {
+        bundle.engine_version.clone()
+    };
+    if crate::engine_version::requires_override(&found, current) && !accept_mismatch {
+        return Err(ReplayError::EngineMismatch {
+            expected: found.clone(),
+            found: current.to_string(),
+            drift: crate::engine_version::drift_class(&found, current),
+        });
     }
+    Ok(())
 }
 
 /// Loads a persisted bundle from JSON bytes and replays it.
 pub fn replay_seed_bundle_json(bytes: &[u8]) -> Result<ReplayResult, ReplayError> {
+    replay_seed_bundle_json_checked(bytes, true)
+}
+
+/// Checked JSON replay with engine gate.
+pub fn replay_seed_bundle_json_checked(
+    bytes: &[u8],
+    accept_mismatch: bool,
+) -> Result<ReplayResult, ReplayError> {
     let bundle = load_case_bundle_json(bytes)?;
-    Ok(replay_seed_bundle(&bundle))
+    replay_seed_bundle_checked(&bundle, accept_mismatch)
 }
 
 /// Loads a persisted bundle from `path` and replays it.
 pub fn replay_seed_bundle_path(path: impl AsRef<Path>) -> Result<ReplayResult, ReplayError> {
+    replay_seed_bundle_path_checked(path, true)
+}
+
+/// Checked path replay with engine gate.
+pub fn replay_seed_bundle_path_checked(
+    path: impl AsRef<Path>,
+    accept_mismatch: bool,
+) -> Result<ReplayResult, ReplayError> {
     let bytes = fs::read(path)?;
-    replay_seed_bundle_json(&bytes)
+    replay_seed_bundle_json_checked(&bytes, accept_mismatch)
 }
 
 /// Appends the recorded-vs-current environment differences to a replay line.
@@ -191,6 +248,7 @@ mod tests {
             environment: None,
             failure_payload: Vec::new(),
             rpc_envelope: None,
+            engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
         let result = replay_seed_bundle(&bundle);
         // The category is now based on FailureClass, not "runtime-failure"
@@ -274,5 +332,33 @@ mod tests {
         assert!(result.environment.warnings.is_empty());
         assert!(result.environment.differing_axes.is_empty());
         assert!(!replay_success_message(&result).contains("environment"));
+    }
+
+    #[test]
+    fn replay_refuses_major_engine_mismatch_without_override() {
+        let mut bundle = to_bundle(CaseSeed {
+            id: 1,
+            payload: vec![1, 2, 3],
+        });
+        bundle.engine_version = "999.0.0".to_string();
+        match replay_seed_bundle_checked(&bundle, false) {
+            Err(ReplayError::EngineMismatch { expected, found, .. }) => {
+                assert_eq!(expected, "999.0.0");
+                assert_eq!(found, crate::engine_version::ENGINE_VERSION);
+            }
+            other => panic!("expected EngineMismatch, got {other:?}"),
+        }
+        assert!(replay_seed_bundle_checked(&bundle, true).is_ok());
+    }
+
+    #[test]
+    fn legacy_bundle_without_engine_version_is_unknown_major() {
+        let mut bundle = to_bundle(CaseSeed {
+            id: 2,
+            payload: vec![4, 5, 6],
+        });
+        bundle.engine_version = String::new();
+        assert!(replay_seed_bundle_checked(&bundle, false).is_err());
+        assert!(replay_seed_bundle_checked(&bundle, true).is_ok());
     }
 }

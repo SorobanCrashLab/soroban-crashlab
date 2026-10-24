@@ -3,8 +3,10 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { PageHeader } from '../../components/PageHeader';
+import { Can } from '../../components/Can';
 import { api } from '../../lib/api-client';
 import { createIdempotencyKeyTracker } from '../../lib/idempotency-key';
+import { explainGate, useEffectiveAccess } from '../../lib/permissions';
 import {
   parseContractWasmFile,
   proposeFuzzTargets,
@@ -33,6 +35,9 @@ export default function StartPage() {
   const [campaignId, setCampaignId] = useState<string | null>(null);
   // Relaunching the same config after a failure reuses its key (#1634).
   const idempotencyKeys = useRef(createIdempotencyKeyTracker());
+  // Launching a campaign is a server-side capability (#1880).
+  const { status: accessStatus, role, can: holdsCapability } = useEffectiveAccess();
+  const canLaunchCampaign = holdsCapability('campaigns:create');
 
   const stepIndex = phase === 'upload' ? 0 : phase === 'targets' ? 1 : 2;
 
@@ -68,6 +73,7 @@ export default function StartPage() {
   }
 
   async function handleLaunch() {
+    if (!canLaunchCampaign) return;
     if (selected.size === 0) {
       setError('Pick at least one target to fuzz.');
       return;
@@ -274,18 +280,36 @@ export default function StartPage() {
               />
             </div>
           </div>
+          {!canLaunchCampaign && (
+            <p
+              id="campaigns-gate-note"
+              data-testid="gate-note-campaigns:create"
+              className="text-xs text-meta"
+            >
+              {explainGate('campaigns:create', accessStatus, role)}
+            </p>
+          )}
           <div className="flex items-center gap-3">
             <button type="button" className="btn-ghost text-xs sm:text-sm" onClick={() => setPhase('targets')}>
               Back
             </button>
-            <button
-              type="button"
-              className="btn-primary text-xs sm:text-sm"
-              disabled={launching}
-              onClick={() => void handleLaunch()}
+            <Can
+              capability="campaigns:create"
+              mode="disabled"
+              showNote={false}
+              describedBy="campaigns-gate-note"
             >
-              {launching ? 'Launching…' : 'Launch campaign'}
-            </button>
+              {(gate) => (
+                <button
+                  type="button"
+                  className={`text-xs sm:text-sm ${gate.disabled ? 'btn-outline cursor-not-allowed opacity-60' : 'btn-primary'}`}
+                  disabled={launching || gate.disabled}
+                  onClick={() => void handleLaunch()}
+                >
+                  {launching ? 'Launching…' : 'Launch campaign'}
+                </button>
+              )}
+            </Can>
           </div>
         </div>
       )}

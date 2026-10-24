@@ -1,6 +1,6 @@
 import dynamic from 'next/dynamic';
 import type { ComponentProps, ReactElement } from 'react';
-import { AreaChart } from 'recharts';
+import type { AreaChart } from 'recharts';
 
 /**
  * Lazy-loaded AreaChart wrapper that only loads recharts when the chart
