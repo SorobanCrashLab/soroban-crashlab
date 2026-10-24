@@ -179,7 +179,7 @@ pub use replay::{
 
 pub mod env_fingerprint;
 pub use env_fingerprint::{
-    check_bundle_replay_environment, check_replay_environment, EnvironmentFingerprint,
+    check_bundle_replay_environment, check_replay_environment, EnvironmentFingerprint, ReplayAxis,
     ReplayEnvironmentReport,
 };
 pub mod boundary;
