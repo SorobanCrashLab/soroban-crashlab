@@ -3,10 +3,10 @@
   "private": true,
   "packageManager": "pnpm@10.30.2+sha512.36cdc707e7b7940a988c9c1ecf88d084f8514b5c3f085f53a2e244c2921d3b2545bc20dd4ebe1fc245feec463bb298aecea7a63ed1f7680b877dc6379d8d0cb4",
   "scripts": {
-    "dev": "pnpm --dir apps/web run dev",
-    "build": "pnpm --dir apps/web run build",
+    "dev": "node init && pnpm --dir apps/web run dev",
+    "build": "node init && pnpm --dir apps/web run build",
     "analyze": "pnpm --dir apps/web run analyze",
-    "start": "pnpm --dir apps/web run start",
+    "start": "node init && pnpm --dir apps/web run start",
     "lint": "pnpm --dir apps/web run lint",
     "test": "pnpm --dir apps/web run test",
     "e2e": "pnpm --dir apps/web run e2e"
