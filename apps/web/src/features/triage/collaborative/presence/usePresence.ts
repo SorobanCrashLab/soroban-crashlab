@@ -30,7 +30,7 @@ export function usePresence(roomId: string) {
     };
   }, [roomId]);
 
-  const setLocalState = useCallback((state: Partial<PresenceState>) => {
+  const updateLocalState = useCallback((state: Partial<PresenceState>) => {
     awarenessRef.current?.setLocalState(state);
   }, []);
 
@@ -42,5 +42,5 @@ export function usePresence(roomId: string) {
     awarenessRef.current?.markAway();
   }, []);
 
-  return { localState, remoteStates, setLocalState, markActive, markAway };
+  return { localState, remoteStates, setLocalState: updateLocalState, markActive, markAway };
 }

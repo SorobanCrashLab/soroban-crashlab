@@ -6,7 +6,7 @@
  * while remaining bookmarkable.
  */
 
-import type { FilterAST } from '../ast/FilterAST';
+import type { FilterAST, FilterNode } from '../ast/FilterAST';
 import { createEmptyAST, createCondition, createGroup, generateNodeId, isCondition, isGroup } from '../ast/FilterAST';
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from './compression';
 
@@ -24,7 +24,7 @@ interface SerializedNode {
   children?: SerializedNode[];
 }
 
-function serializeNode(node: FilterAST): SerializedNode {
+function serializeNode(node: FilterNode): SerializedNode {
   if (isCondition(node)) {
     return { id: node.id, type: 'condition', field: node.field, operator: node.operator, value: node.value };
   }
@@ -36,7 +36,7 @@ function serializeNode(node: FilterAST): SerializedNode {
   };
 }
 
-function deserializeNode(data: SerializedNode): FilterAST {
+function deserializeNode(data: SerializedNode): FilterNode {
   if (data.type === 'condition') {
     return {
       id: data.id ?? generateNodeId(),
@@ -71,7 +71,7 @@ export function decodeFilterAST(encoded: string): FilterAST | null {
     const json = decompressFromEncodedURIComponent(encoded);
     const parsed = JSON.parse(json) as { v?: number; ast?: SerializedNode };
     if (!parsed || parsed.v !== CODEC_VERSION || !parsed.ast) return null;
-    return deserializeNode(parsed.ast);
+    return deserializeNode(parsed.ast) as FilterAST;
   } catch {
     return null;
   }

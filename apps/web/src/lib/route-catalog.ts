@@ -28,7 +28,7 @@ export type AuthClass = 'public' | 'session' | 'token';
 export type RateLimitClass = 'default' | 'strict' | 'lenient' | 'none';
 
 export interface RouteCapability {
-  role: UserRole;
+  role?: UserRole;
   scopes?: ApiTokenScope[];
 }
 

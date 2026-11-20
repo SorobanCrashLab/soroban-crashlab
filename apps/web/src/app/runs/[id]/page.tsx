@@ -24,6 +24,9 @@ const AddRunReplayHistoryWithTimestamps = nextDynamic(
   () => import('../../../features/runs/add-run-replay-history-with-timestamps'),
 );
 const RunAnnotationThreads = nextDynamic(() => import('./annotation-threads/RunAnnotationThreads'));
+const RunWorkspace = nextDynamic(
+  () => import('../../../features/runs/detail/RunWorkspace'),
+);
 
 import { absoluteShort } from '../../utils/datetime';
 
@@ -214,6 +217,23 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                 </div>
 
                 <RunAnnotationThreads runId={run.id} />
+
+                <RunWorkspace
+                    runId={run.id}
+                    status={run.status}
+                    runs={buildMockRuns().map(({ id, queuedAt }) => ({ id, queuedAt }))}
+                    crashes={run.crashDetail ? [{
+                      id: `crash-${run.crashDetail.signatureHash ?? 0}`,
+                      message: run.crashDetail.failureCategory || run.crashDetail.signature,
+                    }] : []}
+                    logs={[]}
+                    artifacts={run.artifacts?.map((artifact) => ({
+                      id: artifact.id,
+                      name: artifact.name,
+                      sizeBytes: artifact.size,
+                      contentType: artifact.contentType,
+                    }))}
+                />
             </div>
         </div>
         </SwipeNavigationWrapper>

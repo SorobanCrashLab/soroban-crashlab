@@ -1,6 +1,11 @@
 import Link from 'next/link';
+import nextDynamic from 'next/dynamic';
 import BreadcrumbNav from '@/components/BreadcrumbNav';
 import { CampaignFeeInsightLoader } from './CampaignFeeInsightLoader';
+
+const CampaignConsole = nextDynamic(
+  () => import('../../../features/campaigns/console/CampaignConsole'),
+);
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +48,8 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
       </header>
 
       <CampaignFeeInsightLoader campaignId={id} />
+
+      <CampaignConsole campaignId={id} />
     </div>
   );
 }

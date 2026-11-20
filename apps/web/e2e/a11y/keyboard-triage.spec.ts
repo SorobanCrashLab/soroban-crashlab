@@ -9,8 +9,10 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
+// Native browser selectors only: Playwright's `:visible` pseudo-class is not
+// understood by `Element.matches` inside page.evaluate.
 const FOCUS_SELECTOR =
-  'a:visible, button:visible, input:visible, select:visible, textarea:visible, [tabindex]:not([tabindex="-1"]):visible';
+  'a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /** Return true if the currently focused element has a visible focus ring. */
 async function hasVisibleFocus(page: Page): Promise<boolean> {
@@ -28,21 +30,24 @@ async function hasVisibleFocus(page: Page): Promise<boolean> {
   });
 }
 
-/** Tab once until the focused element matches the predicate, or throw. */
+/** Tab once until the focused element matches the selector/text, or throw. */
 async function tabUntil(
   page: Page,
-  predicate: (el: HTMLElement) => boolean,
+  selector: string,
+  textPattern?: RegExp,
   maxTabs = 40,
 ): Promise<void> {
   for (let i = 0; i < maxTabs; i++) {
     await page.keyboard.press('Tab');
-    const matched = await page.evaluate((predSrc) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (!el) return false;
-      // eslint-disable-next-line no-new-Function
-      const fn = new Function('el', `return (${predSrc})(el);`) as (el: HTMLElement) => boolean;
-      return fn(el);
-    }, predicate.toString());
+    const matched = await page.evaluate(
+      ({ selector: selectorArg, patternSource }) => {
+        const el = document.activeElement as HTMLElement | null;
+        if (!el || !el.matches(selectorArg)) return false;
+        if (patternSource && !new RegExp(patternSource).test(el.textContent || '')) return false;
+        return true;
+      },
+      { selector, patternSource: textPattern?.source },
+    );
     if (matched) return;
   }
   throw new Error('Keyboard focus never reached target element');
@@ -58,7 +63,7 @@ test.describe('keyboard-only triage flow', () => {
     await page.keyboard.press('Tab');
     // Note: the first Tab may land on the document or a skip link. We
     // assert visible focus once we reach an interactive element.
-    await tabUntil(page, (el) => el.matches(FOCUS_SELECTOR));
+    await tabUntil(page, FOCUS_SELECTOR);
     expect(await hasVisibleFocus(page), 'visible focus on interactive element').toBeTruthy();
 
     // 2. Navigate to runs list directly (keyboard navigation is the
@@ -67,7 +72,7 @@ test.describe('keyboard-only triage flow', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // 3. Tab to the first run link and activate it with Enter.
-    await tabUntil(page, (el) => el.matches('a[href^="/runs/"]'));
+    await tabUntil(page, 'a[href^="/runs/"]');
     expect(await hasVisibleFocus(page), 'visible focus on run link').toBeTruthy();
     await page.keyboard.press('Enter');
     await page.waitForURL(/\/runs\/[^/]+/);
@@ -83,13 +88,11 @@ test.describe('keyboard-only triage flow', () => {
     test.skip(triageCount === 0, 'No triage control found on run detail');
 
     // Tab onto the triage control and verify visible focus.
-    await tabUntil(page, (el) => {
-      const text = (el.textContent || '').toLowerCase();
-      return (
-        (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') &&
-        /acknowledge|resolve|mark known|triage|status/.test(text)
-      );
-    });
+    await tabUntil(
+      page,
+      'button, [role="button"]',
+      /acknowledge|resolve|mark known|triage|status/i,
+    );
     expect(await hasVisibleFocus(page), 'visible focus on triage control').toBeTruthy();
 
     // Activate the triage control via keyboard and confirm the flow

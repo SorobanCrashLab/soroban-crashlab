@@ -94,17 +94,20 @@ export default function CampaignTimelineScrubber({
 
   // Keep the focus inside an updated range (e.g. after a live poll extends it).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clamp follows external poll range
     setFocusMs((current) => clampToWindow(current, full));
   }, [full]);
 
   // Live mode follows the newest sample unless the operator is scrubbing.
   useEffect(() => {
     if (!liveActive || scrubbing) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- live cursor follows newest sample
     setFocusMs(full.endMs);
     setNarrowWindow(null);
   }, [liveActive, scrubbing, full.endMs]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- external live flag changed
     if (live) setLivePausedLocally(false);
   }, [live]);
 
@@ -114,7 +117,9 @@ export default function CampaignTimelineScrubber({
   }, [full, focusMs, narrowWindow, zoomLevel]);
 
   const viewWindowRef = useRef<TimelineWindow>(viewWindow);
-  viewWindowRef.current = viewWindow;
+  useEffect(() => {
+    viewWindowRef.current = viewWindow;
+  }, [viewWindow]);
 
   const visibleBuckets = useMemo(() => sliceBuckets(series, viewWindow), [series, viewWindow]);
   const maxFailures = useMemo(
@@ -200,22 +205,16 @@ export default function CampaignTimelineScrubber({
     setAnnouncement(`Playhead at ${formatTimelineClockForSeries(series, focusMs)}`);
   };
 
-  const zoom = useCallback(
-    (direction: 1 | -1) => {
-      pauseLive();
-      setNarrowWindow(null);
-      setZoomLevel((current) => {
-        const next = nextZoomLevel(current, direction);
-        const label = formatWindowSpan(
-          timelineWindowSpan(windowForZoom(full, next, focusMs)),
-          fullSpan,
-        );
-        setAnnouncement(`Timeline zoom: ${label}`);
-        return next;
-      });
-    },
-    [focusMs, full, fullSpan, pauseLive],
-  );
+  const zoom = (direction: 1 | -1) => {
+    pauseLive();
+    setNarrowWindow(null);
+    setZoomLevel((current) => nextZoomLevel(current, direction));
+    const label = formatWindowSpan(
+      timelineWindowSpan(windowForZoom(full, nextZoomLevel(zoomLevel, direction), focusMs)),
+      fullSpan,
+    );
+    setAnnouncement(`Timeline zoom: ${label}`);
+  };
 
   const resetZoom = useCallback(() => {
     pauseLive();

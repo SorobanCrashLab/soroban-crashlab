@@ -68,8 +68,6 @@ class MetricsCollector {
     const lines: string[] = [];
     
     for (const [route, data] of Object.entries(this.getAllMetrics())) {
-      const sanitizedRoute = route.replace(/[^a-zA-Z0-9_]/g, '_');
-      
       lines.push(`# HELP crashlab_requests_total Total number of requests`);
       lines.push(`# TYPE crashlab_requests_total counter`);
       lines.push(`crashlab_requests_total{route="${route}"} ${data.requestCount}`);

@@ -785,7 +785,7 @@
     }
   },
   "info": {
-    "description": "Machine-readable contract for the CrashLab API. Global envelope: success is { data, total? }; errors are { error, code?, fieldErrors? }. Auth: `Authorization: Bearer <token>` with scopes `read`/`write` (tokens look like `scl_live_*`); maintainer-only routes additionally require role `maintainer`. Pagination is keyset-based via opaque `cursor` + `limit`.",
+    "description": "Machine-readable contract for the CrashLab API. Global envelope: success is { data, total? }; errors are { error, code?, fieldErrors? }. Auth: `Authorization: Bearer <token>` with scopes `read`/`write` (tokens look like `scl_live_*`); maintainer-only routes additionally require role `maintainer`. Pagination is keyset-based via opaque `cursor` + `limit`; every paginated list route returns `nextCursor` + `hasMore` in its data payload. Cursors are versioned and bound to the route's sort/filter set — replaying a cursor against a changed query returns 400 CURSOR_MISMATCH, and legacy offset cursors reset to page 1.",
     "title": "Soroban CrashLab API",
     "version": "1.0.0"
   },
@@ -793,7 +793,7 @@
   "paths": {
     "/api/artifacts": {
       "get": {
-        "description": "List artifacts",
+        "description": "Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20, max 100). Envelope: { data: { artifacts, total, nextCursor, hasMore }, total }. Cursors are versioned and bound to the sort; a mismatched cursor returns 400 CURSOR_MISMATCH. Ordering is total — (updatedAt|createdAt, id) with a mandatory id tiebreaker.",
         "parameters": [
           {
             "in": "query",
@@ -823,6 +823,30 @@
               }
             },
             "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "CURSOR_MISMATCH",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Cursor does not match this query's sort/filter; restart pagination from page 1.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "CURSOR_MISMATCH"
           },
           "401": {
             "content": {
@@ -856,7 +880,7 @@
             ]
           }
         ],
-        "summary": "List artifacts",
+        "summary": "List artifacts (keyset paginated)",
         "tags": [
           "artifacts"
         ]
@@ -1073,6 +1097,101 @@
         "summary": "Get an artifact",
         "tags": [
           "artifacts"
+        ]
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "description": "Filters: ?actor=&action=&target=&since=&until=. Cursor pagination via ?cursor=<opaque>&limit=<n> (default 50, max 200) on the append-only sequence, newest first. Envelope: { data: { orgId, items, total, nextCursor, hasMore, integrity } }. Cursors are versioned and bound to the org + filter set: replaying a cursor after changing filters or org returns 400 CURSOR_MISMATCH.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "CURSOR_MISMATCH",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Cursor does not match this query's sort/filter; restart pagination from page 1.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "CURSOR_MISMATCH"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "UNAUTHORIZED",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Authentication is required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "UNAUTHORIZED"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Query the org-scoped audit log (keyset paginated)",
+        "tags": [
+          "audit"
         ]
       }
     },
@@ -2642,181 +2761,9 @@
         ]
       }
     },
-    "/api/replay-jobs/{id}": {
-      "get": {
-        "description": "Get a replay job",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessEnvelope"
-                }
-              }
-            },
-            "description": "Success envelope { data, total? }"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "code": {
-                      "example": "UNAUTHORIZED",
-                      "type": "string"
-                    },
-                    "error": {
-                      "example": "Authentication is required.",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "code"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "UNAUTHORIZED"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "code": {
-                      "example": "NOT_FOUND",
-                      "type": "string"
-                    },
-                    "error": {
-                      "example": "The requested resource was not found.",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "code"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "NOT_FOUND"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": [
-              "read"
-            ]
-          }
-        ],
-        "summary": "Get a replay job",
-        "tags": [
-          "runs"
-        ]
-      }
-    },
-    "/api/replay-jobs/{id}/stream": {
-      "get": {
-        "description": "Stream replay job progress (SSE)",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessEnvelope"
-                }
-              }
-            },
-            "description": "Success envelope { data, total? }"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "code": {
-                      "example": "UNAUTHORIZED",
-                      "type": "string"
-                    },
-                    "error": {
-                      "example": "Authentication is required.",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "code"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "UNAUTHORIZED"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "code": {
-                      "example": "NOT_FOUND",
-                      "type": "string"
-                    },
-                    "error": {
-                      "example": "The requested resource was not found.",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "code"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "NOT_FOUND"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": [
-              "read"
-            ]
-          }
-        ],
-        "summary": "Stream replay job progress (SSE)",
-        "tags": [
-          "runs"
-        ]
-      }
-    },
     "/api/runs": {
       "get": {
-        "description": "Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20). Envelope: { data: { runs, total, nextCursor, hasMore }, total }.",
+        "description": "Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20). Envelope: { data: { runs, total, nextCursor, hasMore }, total }. Cursors are versioned and bound to the sort + filter set (e.g. status): replaying a cursor after changing filters returns 400 CURSOR_MISMATCH. Legacy offset cursors reset to page 1. Ordering is total — (queuedAt, id) with a mandatory id tiebreaker — so timestamp ties cannot reorder between pages.",
         "parameters": [
           {
             "in": "query",
@@ -2853,11 +2800,11 @@
                 "schema": {
                   "properties": {
                     "code": {
-                      "example": "VALIDATION_ERROR",
+                      "example": "CURSOR_MISMATCH",
                       "type": "string"
                     },
                     "error": {
-                      "example": "Request validation failed.",
+                      "example": "Cursor does not match this query's sort/filter; restart pagination from page 1.",
                       "type": "string"
                     }
                   },
@@ -2869,7 +2816,7 @@
                 }
               }
             },
-            "description": "VALIDATION_ERROR"
+            "description": "CURSOR_MISMATCH"
           },
           "401": {
             "content": {
@@ -3008,12 +2955,86 @@
         ]
       }
     },
-    "/api/runs/search": {
-      "get": {
-        "description": "Ranked server-side search over run identifiers, signatures, contracts, and tags. ?q=<query>&limit=<1-200> (default 50). Results are capped at 200 with a truncation hint.",
     "/api/runs/compare": {
       "get": {
         "description": "Side-by-side delta for ?base=<id>&candidate=<id>: metadata, coverage, crash signature and per-field verdicts.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Success envelope { data, total? }"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "VALIDATION_ERROR",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Request validation failed.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "example": "RUN_NOT_FOUND",
+                      "type": "string"
+                    },
+                    "error": {
+                      "example": "Run not found.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "RUN_NOT_FOUND"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "summary": "Compare two runs field by field",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/search": {
+      "get": {
+        "description": "Ranked server-side search over run identifiers, signatures, contracts, and tags. ?q=<query>&limit=<1-200> (default 50). Results are capped at 200 with a truncation hint.",
         "parameters": [],
         "responses": {
           "200": {
@@ -4714,158 +4735,6 @@
         ]
       }
     },
-    "/api/triage/queue": {
-      "get": {
-        "description": "List the triage queue",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessEnvelope"
-                }
-              }
-            },
-            "description": "Success envelope { data, total? }"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "code": {
-                      "example": "UNAUTHORIZED",
-                      "type": "string"
-                    },
-                    "error": {
-                      "example": "Authentication is required.",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "code"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "UNAUTHORIZED"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": [
-              "read"
-            ]
-          }
-        ],
-        "summary": "List the triage queue",
-        "tags": [
-          "runs"
-        ]
-      },
-      "post": {
-        "description": "Update a triage queue item",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessEnvelope"
-                }
-              }
-            },
-            "description": "Success envelope { data, total? }"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "code": {
-                      "example": "VALIDATION_ERROR",
-                      "type": "string"
-                    },
-                    "error": {
-                      "example": "Request validation failed.",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "code"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "VALIDATION_ERROR"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "code": {
-                      "example": "FORBIDDEN",
-                      "type": "string"
-                    },
-                    "error": {
-                      "example": "You do not have permission to perform this action.",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "code"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "FORBIDDEN"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "code": {
-                      "example": "NOT_FOUND",
-                      "type": "string"
-                    },
-                    "error": {
-                      "example": "The requested resource was not found.",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "code"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "NOT_FOUND"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": [
-              "write"
-            ]
-          }
-        ],
-        "summary": "Update a triage queue item",
-        "tags": [
-          "runs"
-        ]
-      }
-    },
     "/api/uploadthing": {
       "post": {
         "description": "Uploadthing callback",
@@ -5289,6 +5158,10 @@
     {
       "description": "Artifact bundles and validation",
       "name": "artifacts"
+    },
+    {
+      "description": "Org-scoped audit log with integrity verification",
+      "name": "audit"
     },
     {
       "description": "Fuzz campaigns",

@@ -38,11 +38,6 @@ function isObject(value: unknown): value is Json {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function typeOf(value: unknown): string {
-  if (Array.isArray(value)) return 'array';
-  if (value === null) return 'null';
-  return typeof value;
-}
 
 function resolveRef(ref: string | undefined, spec: Json): unknown {
   if (!ref || !ref.startsWith('#/')) return undefined;

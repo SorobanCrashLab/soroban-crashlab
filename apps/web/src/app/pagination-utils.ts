@@ -323,13 +323,15 @@ export function paginateKeyset<T>(
   if (cursor) {
     if (scope) {
       const decodedBound = decodeBoundCursor(cursor, scope);
-      if (decodedBound.reason === 'scope-mismatch') {
-        throw new CursorMismatchError();
-      }
-      if (decodedBound.reason === 'unsupported-version') {
-        throw new CursorMismatchError(
-          'Cursor was issued by an incompatible server version; restart pagination from page 1.',
-        );
+      if (!decodedBound.ok) {
+        if (decodedBound.reason === 'scope-mismatch') {
+          throw new CursorMismatchError();
+        }
+        if (decodedBound.reason === 'unsupported-version') {
+          throw new CursorMismatchError(
+            'Cursor was issued by an incompatible server version; restart pagination from page 1.',
+          );
+        }
       }
       if (decodedBound.ok) {
         const target = decodedBound.cursor;

@@ -33,7 +33,7 @@ const api: SortFilterWorkerAPI = {
       return { count: 0, sum: 0, avg: 0, min: 0, max: 0 };
     }
     const values = data.map((r) => {
-      const v = (r as Record<string, unknown>)[field];
+      const v = (r as unknown as Record<string, unknown>)[field];
       return typeof v === 'number' ? v : 0;
     });
     const sum = values.reduce((a, b) => a + b, 0);
@@ -56,7 +56,7 @@ if (typeof self !== 'undefined' && typeof (self as any).addEventListener === 'fu
     const data = event.data;
     if (!data || !data.__method || data.__correlationId === undefined) return;
 
-    const method = (api as Record<string, (...args: any[]) => any>)[data.__method];
+    const method = (api as unknown as Record<string, (...args: any[]) => any>)[data.__method];
     if (!method) {
       (self as unknown as Worker).postMessage({
         __correlationId: data.__correlationId,

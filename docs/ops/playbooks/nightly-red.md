@@ -7,7 +7,7 @@ the board (nothing downstream can trust last night's results).
 ## Symptoms
 
 - Auto-issue `Nightly fuzz campaign: regression suite failed` (fuzz-campaign.yml).
-- Auto-issue `CI failure: storage-driver-minio nightly` (storage-minio.yml).
+- Auto-issue `nightly health: storage-driver-minio` (storage-minio.yml).
 - Other scheduled workflows red in the Actions tab on the same date.
 
 ## Triage order

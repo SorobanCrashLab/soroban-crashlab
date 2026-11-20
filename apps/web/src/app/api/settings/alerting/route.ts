@@ -32,7 +32,6 @@ export async function GET() {
  * Replaces the alerting settings snapshot. Body: AlertingSettingsSnapshot JSON.
  */
 export const PUT = withCsrfGuard(
-  'write',
   withRouteErrorHandling('PUT /api/settings/alerting', async (request: NextRequest) => {
     let body: string;
     try {

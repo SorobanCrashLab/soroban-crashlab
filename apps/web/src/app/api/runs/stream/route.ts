@@ -14,7 +14,7 @@
 import { buildMockRuns } from '@/app/mockRuns';
 import type { FuzzingRun } from '@/app/types';
 import { isTerminalStatus } from '@/lib/run-status';
-import { encodeFrame, encodeHeartbeat } from '@/lib/sse-stream';
+import { encodeHeartbeat } from '@/lib/sse-stream';
 import { sanitizeSearchParams } from '@/lib/sanitize';
 
 export const dynamic = 'force-dynamic';
@@ -22,11 +22,6 @@ export const dynamic = 'force-dynamic';
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const POLL_INTERVAL_MS = 5_000;
 const encoder = new TextEncoder();
-
-function buildEvent(type: string, data: unknown): string {
-  const envelope = { seq: 0, event: { type, ...data } };
-  return encodeFrame(envelope);
-}
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
