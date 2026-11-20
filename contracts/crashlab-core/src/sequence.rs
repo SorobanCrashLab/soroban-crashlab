@@ -98,7 +98,7 @@ impl fmt::Display for StepExpectation {
 pub struct SequenceStep {
     /// Contract invocation payload for this step.
     pub invocation: Vec<u8>,
-    /// Stable [`AuthMode`] label (`enforce`, `record`, `record_allow_nonroot`).
+    /// Stable [`AuthMode`] label (all seven variants, see [`AuthMode::ALL`]).
     ///
     /// Stored as a string so the step document stays self-describing and
     /// serde-friendly without coupling to [`AuthMode`]'s derives.
@@ -121,6 +121,10 @@ impl SequenceStep {
     pub fn auth_mode(&self) -> Option<AuthMode> {
         match self.auth_mode.as_str() {
             "enforce" => Some(AuthMode::Enforce),
+            "enforce_admin" => Some(AuthMode::EnforceAdmin),
+            "enforce_other" => Some(AuthMode::EnforceOther),
+            "enforce_admin_other" => Some(AuthMode::EnforceAdminOther),
+            "enforce_mock_signed" => Some(AuthMode::EnforceMockSigned),
             "record" => Some(AuthMode::Record),
             "record_allow_nonroot" => Some(AuthMode::RecordAllowNonroot),
             _ => None,

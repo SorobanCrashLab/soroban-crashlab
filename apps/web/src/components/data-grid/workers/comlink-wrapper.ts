@@ -16,7 +16,7 @@ let correlationId = 0;
 /**
  * Wrap a Worker instance with a typed RPC interface.
  */
-export function wrap<T extends Record<string, (...args: any[]) => any>>(
+export function wrap<T extends object>(
   worker: Worker | null,
 ): T {
   const pending = new Map<number, PendingRequest>();

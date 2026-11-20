@@ -446,6 +446,13 @@ impl ArtifactStore for LocalArtifactStore {
         })
     }
 
+    // Read the on-disk bytes directly. The trait default routes through
+    // `retrieve_artifact`, which would recurse back into this method.
+    fn retrieve_artifact_bytes(&self, artifact_id: &str) -> Result<Vec<u8>, StorageError> {
+        let path = self.ensure_readable(artifact_id)?;
+        fs::read(path).map_err(StorageError::Io)
+    }
+
     fn get_artifact_metadata(&self, artifact_id: &str) -> Result<ArtifactMetadata, StorageError> {
         let path = self.ensure_readable(artifact_id)?;
         Self::metadata_from_file(artifact_id, &path)

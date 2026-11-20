@@ -6,7 +6,8 @@
  * token. This module validates the request and returns the principal.
  */
 
-import { type NextRequest, cookies } from 'next/headers';
+import { cookies } from 'next/headers';
+import type { NextRequest } from 'next/server';
 import {
   ANONYMOUS_PRINCIPAL,
   type RbacPrincipal,

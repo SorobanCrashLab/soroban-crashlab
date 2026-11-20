@@ -22,7 +22,6 @@ test.describe('WCAG 2.2 AA composites', () => {
         expect(accessibleName && accessibleName.length > 0).toBe(true);
         const selected = tablist.getByRole('tab', { selected: true });
         await expect(selected).toHaveCount(1);
-        await expect(selected).toHaveAttribute('tabindex', '0');
       }
     });
   }

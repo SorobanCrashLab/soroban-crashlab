@@ -27,7 +27,7 @@ must match the workflows exactly (checked by `scripts/check-ops-docs.mjs`).
 | Signal (auto-issue title) | Source | Default sev | Playbook |
 |---|---|---|---|
 | `Nightly fuzz campaign: regression suite failed` | [`fuzz-campaign.yml`](../../.github/workflows/fuzz-campaign.yml) | SEV3 (SEV2 if several nightlies red) | [Mass nightly red](playbooks/nightly-red.md) |
-| `CI failure: storage-driver-minio nightly` | [`storage-minio.yml`](../../.github/workflows/storage-minio.yml) | SEV3 | [Storage degraded / corrupt](playbooks/storage-degraded.md) |
+| `nightly health: storage-driver-minio` | [`storage-minio.yml`](../../.github/workflows/storage-minio.yml) | SEV3 | [Storage degraded / corrupt](playbooks/storage-degraded.md) |
 
 Signals without automation yet (watch for them by hand, or wire them when
 W5-I02 #1888 / W5-D08 #1826 land):

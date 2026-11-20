@@ -103,6 +103,14 @@ jobs:
           base_spec="$RUNNER_TEMP/openapi.base.json"
           if git show "$BASE_SHA:apps/web/src/lib/openapi/openapi.json" > "$base_spec" 2>/dev/null; then
             echo "Comparing against $BASE_SHA."
+            # A malformed committed spec on the base branch must not turn every
+            # PR into a hard failure; the drift check above still guarantees
+            # that the PR itself ships a valid generated spec.
+            if ! node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$base_spec" 2>/dev/null; then
+              echo "::warning::Base spec at $BASE_SHA is not valid JSON; skipping contract classification."
+              echo "breaking=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           else
             echo "No base spec at $BASE_SHA; nothing to compare. Skipping classification."
             echo "breaking=false" >> "$GITHUB_OUTPUT"

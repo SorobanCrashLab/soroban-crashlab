@@ -100,7 +100,7 @@ export function useVirtualizedTable<T>({
   );
 
   const virtualColumns = useMemo(
-    () => columnVirtualizer.measure(scrollLeft, viewportSize.width, columns, frozenColumnCount),
+    () => columnVirtualizer.measure(scrollLeft, viewportSize.width, columns as unknown as ColumnDef[], frozenColumnCount),
     [columnVirtualizer, scrollLeft, viewportSize.width, columns, frozenColumnCount],
   );
 
