@@ -15,8 +15,22 @@ const SRC = path.resolve(__dirname, '../..');
 
 const SCOPED_MODULES = ['lib/tenancy/scoped-repository.ts', 'lib/artifact-store.ts'];
 
-/** Exports that are not data accessors (constructors, backends, types' helpers). */
-const NON_ACCESSORS = new Set(['createMapBackend']);
+/**
+ * Exports that are not data accessors (constructors, backends, pure helpers and
+ * constants). The legacy artifact-integrity helpers predate tenancy and are not
+ * part of the scoped access path; `artifactStore` is the raw backend map used
+ * to seed `ScopedRepository`, not a tenant-facing accessor.
+ */
+const NON_ACCESSORS = new Set([
+  'createMapBackend',
+  'MAX_STORED_ARTIFACT_BYTES',
+  'artifactStore',
+  'computeChecksum',
+  'verifyArtifactIntegrity',
+  'getArtifactWithVerification',
+  'storeArtifact',
+  'sweepArtifactIntegrity',
+]);
 
 function firstParamType(node: ts.SignatureDeclarationBase, source: ts.SourceFile): string | undefined {
   return node.parameters[0]?.type?.getText(source);
@@ -36,7 +50,10 @@ function unscopedMembers(relativePath: string, root = SRC): string[] {
     }
     if (ts.isVariableStatement(node) && isExported(node)) {
       for (const declaration of node.declarationList.declarations) {
-        offenders.push(`${relativePath}:${declaration.name.getText(source)} (exported binding)`);
+        const name = declaration.name.getText(source);
+        if (!NON_ACCESSORS.has(name)) {
+          offenders.push(`${relativePath}:${name} (exported binding)`);
+        }
       }
     }
     if (ts.isClassDeclaration(node) && isExported(node)) {

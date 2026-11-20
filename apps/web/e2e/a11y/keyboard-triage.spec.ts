@@ -39,7 +39,7 @@ async function tabUntil(
     const matched = await page.evaluate((predSrc) => {
       const el = document.activeElement as HTMLElement | null;
       if (!el) return false;
-      // eslint-disable-next-line no-new-Function
+      // Test-only predicate evaluation; the source is a local helper string.
       const fn = new Function('el', `return (${predSrc})(el);`) as (el: HTMLElement) => boolean;
       return fn(el);
     }, predicate.toString());

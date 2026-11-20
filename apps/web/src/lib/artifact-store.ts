@@ -78,7 +78,6 @@ export function putArtifact(
     sizeBytes: buffer.byteLength,
     checksum: computeChecksum(buffer),
     createdAt: artifact.createdAt ?? new Date().toISOString(),
-    checksum: computeChecksum(artifact.buffer),
   });
 }
 

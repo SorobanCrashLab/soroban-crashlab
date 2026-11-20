@@ -54,7 +54,9 @@ export function useStaleData<T>(options: StaleDataOptions<T>): StaleDataState<T>
   const fetchingRef = useRef(false);
   // Stable ref to the latest fetcher so the interval doesn't close over a stale one.
   const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
 
   const doFetch = useCallback(
     (controller: AbortController) => {

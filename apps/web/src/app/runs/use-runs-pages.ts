@@ -159,6 +159,7 @@ export function useRunsPages(options: UseRunsPagesOptions = {}): UseRunsPagesRes
 
     // Stale rows from the previous ordering would show wrong order; clear them
     // so the table re-renders from an empty, loading state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset follows external sort/page changes
     setRuns([]);
     setTotal(null);
     setHasMore(false);

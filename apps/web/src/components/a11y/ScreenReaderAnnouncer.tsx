@@ -15,7 +15,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -29,11 +28,8 @@ const AnnouncerContext = createContext<Announcer | null>(null);
 
 export function useAnnouncer(): Announcer {
   const context = useContext(AnnouncerContext);
-  const fallbackRef = useRef<Announcer | null>(null);
-  if (fallbackRef.current === null) {
-    fallbackRef.current = createAnnouncer();
-  }
-  return context ?? fallbackRef.current;
+  const fallback = useMemo(() => createAnnouncer(), []);
+  return context ?? fallback;
 }
 
 export interface ScreenReaderAnnouncerProviderProps {
