@@ -2,6 +2,7 @@ import { withSizeLimitAndLogging } from '@/lib/route-handler';
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { successResponse } from "@/lib/api-response-utils";
+import { standardSizeLimitResponse } from "@/lib/request-size-limits";
 
 /**
  * CaseBundle schema version constant.
@@ -247,14 +248,7 @@ async function postHandler(request: NextRequest): Promise<NextResponse> {
   if (contentLength) {
     const size = parseInt(contentLength, 10);
     if (!isNaN(size) && size > 1024 * 1024) {
-      return successResponse(
-        {
-          valid: false,
-          errors: ["Request body exceeds 1 MiB limit."],
-          warnings: [],
-        },
-        { status: 413 }
-      );
+      return standardSizeLimitResponse("Request body exceeds 1 MiB limit.", 1024 * 1024, size);
     }
   }
 

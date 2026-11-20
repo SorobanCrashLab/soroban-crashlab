@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redisAdapter, getTriageChannel } from './redis-adapter';
 import { validateTriageSession } from './auth';
+import { readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,21 +89,22 @@ export async function GET(request: NextRequest): Promise<Response> {
 /**
  * POST handler for upstream messages (client -> server CRDT updates).
  */
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   const session = await validateTriageSession(request);
   if (!session.permissions.write) {
     return NextResponse.json({ error: 'Write permission required' }, { status: 403 });
   }
 
   try {
-    const body = await request.json();
-    const { runId, update } = body;
+    const parsed = await readJsonBody(request);
+    if ('error' in parsed) return parsed.error;
+    const { runId, update } = parsed.body as { runId?: unknown; update?: unknown };
     if (!runId) {
       return NextResponse.json({ error: 'Missing runId' }, { status: 400 });
     }
 
     // Broadcast the update to all subscribers (other clients).
-    const channel = getTriageChannel(runId);
+    const channel = getTriageChannel(String(runId));
     redisAdapter.publish(channel, { type: 'update', update, from: session.principal });
 
     return NextResponse.json({ success: true });
@@ -110,3 +112,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 }
+
+// CRDT updates are untrusted and can be large; bound them via the shared gate.
+export const POST = withRouteErrorHandling('POST /api/triage/collaborative/yjs-websocket', postHandler);

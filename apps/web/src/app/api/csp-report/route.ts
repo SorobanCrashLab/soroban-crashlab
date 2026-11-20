@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { structuredLogger } from '@/lib/structured-logger';
 import { redactText } from '@/lib/redaction';
+import { standardSizeLimitResponse } from '@/lib/request-size-limits';
 
 const MAX_REPORT_BYTES = 16 * 1024;
 
@@ -38,7 +39,7 @@ function extractViolation(body: unknown): CspViolation | null {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const declaredLength = Number(request.headers.get('content-length') ?? 0);
   if (declaredLength > MAX_REPORT_BYTES) {
-    return NextResponse.json({ error: 'Report too large' }, { status: 413 });
+    return standardSizeLimitResponse('Report too large', MAX_REPORT_BYTES, declaredLength);
   }
 
   const reader = request.body?.getReader();
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     received += value.byteLength;
     if (received > MAX_REPORT_BYTES) {
       await reader.cancel();
-      return NextResponse.json({ error: 'Report too large' }, { status: 413 });
+      return standardSizeLimitResponse('Report too large', MAX_REPORT_BYTES, received);
     }
     chunks.push(value);
   }
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'CSP report must be UTF-8' }, { status: 400 });
   }
   if (bytes.byteLength > MAX_REPORT_BYTES) {
-    return NextResponse.json({ error: 'Report too large' }, { status: 413 });
+    return standardSizeLimitResponse('Report too large', MAX_REPORT_BYTES, bytes.byteLength);
   }
 
   let parsed: unknown;

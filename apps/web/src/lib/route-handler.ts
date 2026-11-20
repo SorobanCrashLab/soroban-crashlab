@@ -7,7 +7,10 @@ import {
   requestBodyErrorResponse,
   requestBodyFailureResponse,
   requestSizeConfigFor,
+  requestSizeConfigForClass,
   RequestSizeLimitConfig,
+  RequestSizeRouteClass,
+  routeClassForRequest,
 } from './request-size-limits';
 
 function isResponseLike(value: unknown): value is Response {
@@ -77,8 +80,14 @@ export function withRouteErrorHandling<Args extends unknown[]>(
         requestId = request.headers.get('x-request-id') || undefined;
         if (enforceSizeLimit) {
           const sizeConfig = requestSizeConfigFor(request);
+          const routeClass = routeClassForRequest(request);
           const sizeError = checkRequestSize(request, sizeConfig);
           if (sizeError) {
+            logger.info(`${routeLabel} rejected (size limit)`, {
+              status: 413,
+              route_class: routeClass,
+              content_length: request.headers.get('content-length'),
+            });
             return sizeError;
           }
           guarded = limitRequestBody(request, sizeConfig);
@@ -131,6 +140,7 @@ export function withSizeLimitAndLogging<Args extends unknown[]>(
           const duration = Date.now() - startTime;
           logger.info(`${routeLabel} rejected (size limit)`, {
             status: 413,
+            route_class: routeClassForRequest(request),
             duration_ms: duration,
             content_length: request.headers.get('content-length'),
           });
@@ -180,6 +190,8 @@ import { z } from 'zod';
 export interface RouteConfig<BodySchema extends z.ZodTypeAny = z.ZodTypeAny> {
   label: string;
   bodySchema?: BodySchema;
+  /** Explicit request-size class; inferred from the pathname when omitted. */
+  routeClass?: RequestSizeRouteClass;
   sizeLimit?: RequestSizeLimitConfig | boolean;
   rateLimitClass?: string;
   fallbackMessage?: string;
@@ -207,11 +219,16 @@ export function createRouteHandler<
     let sizeConfig: RequestSizeLimitConfig | undefined;
     try {
       if (config.sizeLimit !== false) {
-        sizeConfig = { ...requestSizeConfigFor(request), ...(typeof config.sizeLimit === 'object' ? config.sizeLimit : {}) };
+        const routeClass = config.routeClass ?? routeClassForRequest(request);
+        sizeConfig = {
+          ...(config.routeClass ? requestSizeConfigForClass(config.routeClass) : requestSizeConfigFor(request)),
+          ...(typeof config.sizeLimit === 'object' ? config.sizeLimit : {}),
+        };
         const sizeCheckError = checkRequestSize(request, sizeConfig);
         if (sizeCheckError) {
           logger.info(`${config.label} rejected (size limit)`, {
             status: 413,
+            route_class: routeClass,
             duration_ms: Date.now() - startTime,
             content_length: request.headers.get('content-length'),
           });

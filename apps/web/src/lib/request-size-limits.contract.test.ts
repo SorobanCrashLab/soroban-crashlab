@@ -1,23 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  REQUEST_SIZE_LIMIT_CLASSES,
+  routeClassFor,
+  requestSizeConfigForClass,
+} from './request-size-limits';
 
 /**
- * Contract: every API route that consumes a request body must bound it.
+ * Contract (#1572): every API route that consumes a request body must declare
+ * a size limit at the shared choke point before reading it.
  *
- * Automatically walks `src/app/api` recursively and verifies that any route
- * exporting a mutating handler (POST/PUT/PATCH/DELETE) which reads the
- * request body carries at least one enforcement mechanism:
- *   - checkRequestSize(...) (uniform, content-length based), or
- *   - withRouteErrorHandling(...) (uniform choke point that now enforces
- *     the size limit itself), or
- *   - withSizeLimitAndLogging(...), or
- *   - an inline content-length guard (e.g. the artifact validator).
- *
- * GET-only routes and mutating handlers that ignore the body entirely are
- * exempt — there is nothing to bound.
+ * The walk covers `export async function POST(...)` as well as the
+ * `export const POST = withRouteErrorHandling(...)` / `createRouteHandler(...)`
+ * compositions used by current routes. GET-only handlers and mutating handlers
+ * that never read a body are exempt — there is nothing to bound.
  */
-
 const API_DIR = join(process.cwd(), 'src', 'app', 'api');
 
 function collectRouteFiles(dir: string): string[] {
@@ -39,14 +37,25 @@ const BODY_CONSUMING_PATTERNS = [
   /request\.text\(/,
   /request\.formData\(/,
   /request\.arrayBuffer\(/,
+  /request\.body\??\.getReader\(/,
+  /\.getReader\(\)/,
 ];
 
+/**
+ * Only shared enforcement or the standard response helper count. A bare
+ * `content-length` check with an ad-hoc envelope is not a valid declaration.
+ */
 const SIZE_GUARD_PATTERNS = [
-  /checkRequestSize\(/,
   /withRouteErrorHandling\(/,
   /withSizeLimitAndLogging\(/,
-  /content-length/,
+  /createRouteHandler\(/,
+  /checkRequestSize\(/,
+  /limitRequestBody\(/,
+  /standardSizeLimitResponse\(/,
 ];
+
+const MUTATING_HANDLER_PATTERN =
+  /export\s+(?:async\s+)?(?:function|const)\s+(POST|PUT|PATCH|DELETE)\b/;
 
 function hasBodyConsumption(source: string): boolean {
   return BODY_CONSUMING_PATTERNS.some((re) => re.test(source));
@@ -64,14 +73,7 @@ describe('request size limit contract', () => {
     const violations: string[] = [];
     for (const file of routeFiles) {
       const source = readFileSync(file, 'utf8');
-      const hasMutatingHandler =
-        /export async function (POST|PUT|PATCH|DELETE)/.test(source) ||
-        /export (async )?function (POST|PUT|PATCH|DELETE)/.test(source);
-
-      if (!hasMutatingHandler) {
-        continue;
-      }
-
+      if (!MUTATING_HANDLER_PATTERN.test(source)) continue;
       if (hasBodyConsumption(source) && !hasSizeGuard(source)) {
         violations.push(file.replace(join(process.cwd(), 'src'), 'src'));
       }
@@ -80,9 +82,36 @@ describe('request size limit contract', () => {
     expect(violations).toEqual([]);
   });
 
-  it('the uniform wrapper enforces the size limit by default', () => {
+  it('defines a bounded cap for every route class', () => {
+    expect(Object.keys(REQUEST_SIZE_LIMIT_CLASSES).sort()).toEqual([
+      'artifact',
+      'default',
+      'settings',
+      'webhook',
+    ]);
+    for (const config of Object.values(REQUEST_SIZE_LIMIT_CLASSES)) {
+      expect(config.maxBodySize).toBeGreaterThan(0);
+      expect(config.maxJsonSize).toBeGreaterThan(0);
+      expect(config.maxFormDataSize).toBeGreaterThan(0);
+      expect(config.maxJsonSize).toBeLessThanOrEqual(config.maxBodySize);
+      expect(config.maxFormDataSize).toBeLessThanOrEqual(config.maxBodySize);
+    }
+    expect(requestSizeConfigForClass('artifact').maxBodySize).toBe(20 * 1024 * 1024);
+  });
+
+  it('classifies webhook, artifact and settings paths explicitly', () => {
+    expect(routeClassFor('/api/webhooks/retry')).toBe('webhook');
+    expect(routeClassFor('/api/integrations/pagerduty/webhook')).toBe('webhook');
+    expect(routeClassFor('/api/artifacts/validate')).toBe('artifact');
+    expect(routeClassFor('/api/uploadthing')).toBe('artifact');
+    expect(routeClassFor('/api/settings/tokens')).toBe('settings');
+    expect(routeClassFor('/api/runs')).toBe('default');
+  });
+
+  it('the uniform wrappers enforce the size limit by default', () => {
     const routeHandler = readFileSync(join(process.cwd(), 'src', 'lib', 'route-handler.ts'), 'utf8');
-    expect(routeHandler).toMatch(/checkRequestSize\(request\)/);
+    expect(routeHandler).toMatch(/checkRequestSize\(request, (?:sizeConfig|effectiveConfig)\)/);
     expect(routeHandler).toMatch(/enforceSizeLimit = true/);
+    expect(routeHandler).toMatch(/route_class: /);
   });
 });
