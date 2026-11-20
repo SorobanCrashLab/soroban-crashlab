@@ -116,12 +116,10 @@ jobs:
           path: apps/web/.next
       - run: pnpm exec playwright install --with-deps chromium
         working-directory: apps/web
-      - name: Run a11y axe + config guardrails specs
-        run: pnpm --filter web exec playwright test e2e/a11y/a11y-config.spec.ts e2e/a11y/core-flows.spec.ts
-        env:
-          CI: 'true'
-      - name: Run keyboard triage spec
-        run: pnpm --filter web exec playwright test e2e/a11y/keyboard-triage.spec.ts
+      - name: Run WCAG 2.2 + keyboard a11y specs
+        # Upstream main removed a11y-config.spec.ts and core-flows.spec.ts;
+        # point the gate at the specs that still exist on this base.
+        run: pnpm --filter web exec playwright test e2e/a11y/wcag22-composites.spec.ts e2e/a11y/keyboard-triage.spec.ts
         env:
           CI: 'true'
       - name: Upload a11y axe HTML reports
