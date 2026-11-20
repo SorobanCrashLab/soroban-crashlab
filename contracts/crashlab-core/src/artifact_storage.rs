@@ -453,6 +453,38 @@ impl ArtifactStore for LocalArtifactStore {
         fs::read(path).map_err(StorageError::Io)
     }
 
+    fn store_artifact_with_ttl(
+        &self,
+        artifact_id: &str,
+        bundle: &CaseBundle,
+        ttl_secs: u64,
+    ) -> Result<ArtifactMetadata, StorageError> {
+        Self::validate_artifact_id(artifact_id)?;
+
+        let path = self.artifact_path(artifact_id);
+        let json_bytes = crate::save_sanitized_case_bundle_json(bundle)?;
+        if json_bytes.len() > MAX_ARTIFACT_JSON_BYTES {
+            return Err(StorageError::Persistence(BundlePersistError::SizeLimit {
+                limit: MAX_ARTIFACT_JSON_BYTES,
+            }));
+        }
+        Self::write_atomic(&path, &json_bytes)?;
+        let expires_at = Self::now_epoch_secs().saturating_add(ttl_secs);
+        Self::write_atomic(&self.ttl_path(artifact_id), expires_at.to_string().as_bytes())?;
+
+        Self::metadata_from_file(artifact_id, &path)
+    }
+
+    fn artifact_ttl_remaining(&self, artifact_id: &str) -> Option<u64> {
+        Self::validate_artifact_id(artifact_id).ok()?;
+        if self.purge_if_expired(artifact_id) {
+            return None;
+        }
+        let expiry = self.ttl_expiry_epoch(artifact_id)?;
+        let remaining = expiry.checked_sub(Self::now_epoch_secs())?;
+        (remaining > 0).then_some(remaining)
+    }
+
     fn get_artifact_metadata(&self, artifact_id: &str) -> Result<ArtifactMetadata, StorageError> {
         let path = self.ensure_readable(artifact_id)?;
         Self::metadata_from_file(artifact_id, &path)
