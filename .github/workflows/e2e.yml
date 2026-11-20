@@ -48,6 +48,10 @@ jobs:
           name: next-build
           path: apps/web/.next
           retention-days: 1
+          # .next is a hidden directory; upload-artifact v4 skips hidden
+          # files unless this is set, which left every downstream Playwright
+          # job with no build to test.
+          include-hidden-files: true
 
   e2e:
     name: e2e (chromium)

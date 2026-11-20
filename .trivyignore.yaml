@@ -74,3 +74,75 @@ vulnerabilities:
   - id: GHSA-wq5f-xc86-pv6w
     statement: "Accepted at baseline: HIGH in sharp (fs scan) — fix available (0.35.5). sharp : Vulnerability in librsvg dependency CVE-2026-96889"
     expired_at: 2027-01-15
+  - id: CVE-2026-121707
+    statement: "Accepted at baseline: HIGH in effect (fs scan) — fix available (3.22.1). Effect: ReDoS in Schema.TemplateLiteral compiled regex"
+    expired_at: 2027-01-15
+  - id: GHSA-2464-fhr4-w9xw
+    statement: "Accepted at baseline: CRITICAL in next (fs scan) — fix available (15.5.28, 16.4.1). Next.js: Unauthenticated Remote Code Execution in Image Optimization API when SVG files are used"
+    expired_at: 2027-01-15
+  - id: GHSA-673q-mjm6-r5xr
+    statement: "Accepted at baseline: CRITICAL in next (fs scan) — fix available (16.4.1). Next.js: Unauthenticated Remote Code Execution in `use cache` functions returning typed arrays"
+    expired_at: 2027-01-15
+  - id: CVE-2026-94482
+    statement: "Accepted at baseline: HIGH in next (fs scan) — fix available (15.5.28, 16.4.1). next: Next.js: Denial of Service via crafted requests targeting Server Actions"
+    expired_at: 2027-01-15
+  - id: CVE-2026-107891
+    statement: "Accepted at baseline: HIGH in musl (image scan) — fix available (1.2.6-r3). musl: musl: Arbitrary code execution via integer overflow in regcomp"
+    expired_at: 2027-01-15
+  - id: CVE-2026-85091
+    statement: "Accepted at baseline: HIGH in zlib (image scan) — fix available (1.3.2-r1). zlib: zlib: Heap buffer overflow in gz_vacate() allows arbitrary code execution"
+    expired_at: 2027-01-15
+  - id: CVE-2026-27903
+    statement: "Accepted at baseline: HIGH in minimatch (image scan) — fix available (10.2.3, 9.0.7, 8.0.6, 7.4.8, 6.2.2, 5.1.8, 4.2.5, 3.1.3). minimatch: minimatch: Denial of Service due to unbounded recursive backtracking via crafted glob patterns"
+    expired_at: 2027-01-15
+  - id: CVE-2026-27904
+    statement: "Accepted at baseline: HIGH in minimatch (image scan) — fix available (10.2.3, 9.0.7, 8.0.6, 7.4.8, 6.2.2, 5.1.8, 4.2.5, 3.1.4). minimatch: Minimatch: Denial of Service via catastrophic backtracking in glob expressions"
+    expired_at: 2027-01-15
+  - id: CVE-2026-50015
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.0, 11.4.0). pnpm: pnpm: Arbitrary file write/delete due to lack of path validation in patch files"
+    expired_at: 2027-01-15
+  - id: CVE-2026-50016
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.0, 11.4.0). pnpm: pnpm: Arbitrary code execution due to path traversal in dependency aliases"
+    expired_at: 2027-01-15
+  - id: CVE-2026-55487
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.2, 11.5.3). pnpm: pnpm: Supply chain compromise via manipulated package source strings"
+    expired_at: 2027-01-15
+  - id: CVE-2026-55697
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.2, 11.5.3). pnpm: pnpm: Arbitrary code execution via improper handling of config dependencies"
+    expired_at: 2027-01-15
+  - id: CVE-2026-55698
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.2, 11.5.3). pnpm: pnpm: Arbitrary code execution via malicious package-manager lockfile"
+    expired_at: 2027-01-15
+  - id: CVE-2026-82392
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.5, 11.11.0). pnpm: pnpm: Arbitrary Code Execution via Path Traversal"
+    expired_at: 2027-01-15
+  - id: CVE-2026-82393
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.5, 11.11.0). pnpm: pnpm: Arbitrary file write and code execution via path traversal in tarball dependency manifest"
+    expired_at: 2027-01-15
+  - id: GHSA-72r4-9c5j-mj57
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.4, 11.7.0). pnpm: `patch-remove` could delete project-selected files outside the patches directory"
+    expired_at: 2027-01-15
+  - id: GHSA-fr4h-3cph-29xv
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.4, 11.7.0). pnpm: Hoisted install imports lockfile alias outside node_modules"
+    expired_at: 2027-01-15
+  - id: GHSA-qrv3-253h-g69c
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (10.34.4, 11.8.0). pnpm: Path traversal in configDependencies env lockfile allows symlink creation outside node_modules/.pnpm-config"
+    expired_at: 2027-01-15
+  - id: GHSA-vx52-2968-3vc6
+    statement: "Accepted at baseline: HIGH in pnpm (image scan) — fix available (11.11.0, 10.34.5). pnpm: Environment secrets exfiltrated via env-placeholder expansion in proxy settings read from an untrusted pnpm-workspace.yaml"
+    expired_at: 2027-01-15
+  - id: CVE-2026-59873
+    statement: "Accepted at baseline: CRITICAL in tar (image scan) — fix available (7.5.19). tar: node-tar: Denial of Service via crafted gzip bomb"
+    expired_at: 2027-01-15
+  - id: CVE-2026-29786
+    statement: "Accepted at baseline: HIGH in tar (image scan) — fix available (7.5.10). node-tar: hardlink path traversal via drive-relative linkpath"
+    expired_at: 2027-01-15
+  - id: CVE-2026-31802
+    statement: "Accepted at baseline: HIGH in tar (image scan) — fix available (7.5.11). tar: tar: File overwrite via drive-relative symlink traversal"
+    expired_at: 2027-01-15
+  - id: CVE-2026-59874
+    statement: "Accepted at baseline: HIGH in tar (image scan) — fix available (7.5.18). tar: Node-tar: Denial of Service via malformed tar archive header"
+    expired_at: 2027-01-15
+  - id: CVE-2026-73566
+    statement: "Accepted at baseline: HIGH in tar (image scan) — fix available (7.5.21). tar: node-tar: Denial of Service via crafted long-path tar archive"
+    expired_at: 2027-01-15
