@@ -79,7 +79,7 @@ const PROVIDER_ICONS: Record<AuthProviderType, React.ReactNode> = {
 
 const STATUS_STYLES: Record<AuthProviderStatus, { badge: string; dot: string }> = {
   disconnected: {
-    badge: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
+    badge: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
     dot: 'bg-zinc-400',
   },
   connecting: {
@@ -97,9 +97,9 @@ const STATUS_STYLES: Record<AuthProviderStatus, { badge: string; dot: string }> 
 };
 
 const MODE_PROBE_STYLES: Record<AuthModeProbeResult['status'], string> = {
-  ok: 'text-emerald-600 dark:text-emerald-400',
+  ok: 'text-emerald-700 dark:text-emerald-300',
   diverged: 'text-rose-600 dark:text-rose-400',
-  untested: 'text-zinc-400 dark:text-zinc-500',
+  untested: 'text-zinc-600 dark:text-zinc-400',
 };
 
 const authAdapter = createExternalAuthAdapter();
@@ -182,7 +182,7 @@ export default function ExternalAuthenticationIntegration() {
             Manage external auth providers and validate Soroban auth-mode behaviour end-to-end.
           </p>
         </div>
-        <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${connectedCount > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+        <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${connectedCount > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'}`}>
           <span className={`w-2 h-2 rounded-full ${connectedCount > 0 ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
           {connectedCount} / {providers.length} connected
         </span>
@@ -217,7 +217,7 @@ export default function ExternalAuthenticationIntegration() {
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{provider.description}</p>
                   {provider.identity && (
-                    <p className="text-xs font-mono text-zinc-400 dark:text-zinc-500 mt-1">
+                    <p className="text-xs font-mono text-zinc-600 dark:text-zinc-400 mt-1">
                       {provider.identity}
                       {provider.lastVerified && (
                         <> · {formatVerified(provider.lastVerified)}</>
@@ -258,7 +258,7 @@ export default function ExternalAuthenticationIntegration() {
           <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             Soroban Auth Mode Probe
           </h3>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          <p className="text-xs text-zinc-600 dark:text-zinc-400">
             Runs a test seed across each auth mode to detect divergence.
           </p>
         </div>

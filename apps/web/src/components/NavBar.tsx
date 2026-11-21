@@ -100,7 +100,7 @@ export default function NavBar() {
           boxShadow: scrolled ? '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)' : 'none',
         }}
       >
-        <Link href="/dashboard" className="tablet-brand flex items-center gap-3 lg:gap-3.5 mr-6 lg:mr-10 shrink-0 group">
+        <Link href="/dashboard" aria-label="CrashLab dashboard" className="tablet-brand flex items-center gap-3 lg:gap-3.5 mr-6 lg:mr-10 shrink-0 group">
           <span className="hidden lg:block">
             <LogoMark size={40} />
           </span>

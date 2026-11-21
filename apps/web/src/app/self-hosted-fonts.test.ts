@@ -5,11 +5,10 @@ import path from 'node:path';
 /**
  * Guards the self-hosted font setup (issue #1406).
  *
- * Source Sans 3 and JetBrains Mono used to be pulled from Google at runtime
- * via a stylesheet <link> plus two preconnects. `next/font` now downloads and
- * subsets them at build time, so a visitor's browser must never contact
- * fonts.googleapis.com or fonts.gstatic.com. These assertions fail loudly if a
- * future change reintroduces the runtime dependency.
+ * The font files are committed under `src/app/fonts` and loaded via
+ * `next/font/local`. The browser never contacts fonts.googleapis.com or
+ * fonts.gstatic.com, and the build never depends on Google Fonts being
+ * reachable — a hard requirement for the offline Docker gate.
  */
 
 const WEB_ROOT = path.resolve(__dirname, '../..');
@@ -24,7 +23,7 @@ const nextConfig = read('next.config.ts');
 
 describe('self-hosted fonts', () => {
   it('does not reference Google font hosts anywhere in the app shell', () => {
-    for (const source of [layout, globalCss, nextConfig]) {
+    for (const source of [layout, globalCss, nextConfig, fontsModule]) {
       expect(source).not.toMatch(/fonts\.googleapis\.com/);
       expect(source).not.toMatch(/fonts\.gstatic\.com/);
     }
@@ -45,30 +44,31 @@ describe('self-hosted fonts', () => {
     expect(layout).toMatch(/<html lang="en" className=\{fontVariables\}/);
   });
 
-  it('loads all families through next/font', () => {
-    expect(fontsModule).toMatch(/from "next\/font\/google"/);
-    expect(fontsModule).toMatch(/Inter\(/);
-    expect(fontsModule).toMatch(/Lora\(/);
-    expect(fontsModule).toMatch(/Space_Grotesk\(/);
-    expect(fontsModule).toMatch(/JetBrains_Mono\(/);
-  });
+  it('loads all families from committed local font files', () => {
+    expect(fontsModule).toMatch(/from "next\/font\/local"/);
+    expect(fontsModule).not.toMatch(/from "next\/font\/google"/);
 
-  it('covers latin and latin-ext so accented UI strings render', () => {
-    const subsets = fontsModule.match(/subsets: \[[^\]]*\]/g) ?? [];
-    expect(subsets).toHaveLength(4);
-    for (const subset of subsets) {
-      expect(subset).toContain('"latin"');
-      expect(subset).toContain('"latin-ext"');
+    const fontFiles = [
+      'src/app/fonts/inter-variable.woff2',
+      'src/app/fonts/lora-variable.woff2',
+      'src/app/fonts/space-grotesk-variable.woff2',
+      'src/app/fonts/jetbrains-mono-variable.woff2',
+    ];
+    for (const file of fontFiles) {
+      expect(fs.existsSync(path.join(WEB_ROOT, file))).toBe(true);
+      expect(fs.statSync(path.join(WEB_ROOT, file)).size).toBeGreaterThan(1000);
+      expect(fontsModule).toContain(`./fonts/${path.basename(file)}`);
     }
   });
 
-  it('preserves the four body weights and three mono weights', () => {
-    const weights = fontsModule.match(/weight: \[[^\]]*\]/g) ?? [];
-    expect(weights).toHaveLength(4);
-    expect(weights[0]).toBe('weight: ["400", "500", "600", "700"]'); // Inter
-    expect(weights[1]).toBe('weight: ["400", "600"]'); // Lora
-    expect(weights[2]).toBe('weight: ["500", "600", "700"]'); // Space Grotesk
-    expect(weights[3]).toBe('weight: ["400", "500", "700"]'); // JetBrains Mono
+  it('covers the full variable weight range of each family', () => {
+    const weights = fontsModule.match(/weight: "[0-9]+ [0-9]+"/g) ?? [];
+    expect(weights).toEqual([
+      'weight: "100 900"', // Inter
+      'weight: "400 700"', // Lora
+      'weight: "300 700"', // Space Grotesk
+      'weight: "100 800"', // JetBrains Mono
+    ]);
   });
 
   it('leaves font-display to the next/font default (swap)', () => {

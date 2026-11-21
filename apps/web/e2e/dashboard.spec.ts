@@ -53,8 +53,14 @@ const mockRuns = [
   },
 ];
 
+/** The runs route now returns its payload under `data` (with a top-level total). */
+const runsEnvelope = (runs: typeof mockRuns) => ({
+  data: { runs, total: runs.length },
+  total: runs.length,
+});
+
 const fulfillRunsRequest = async (page: Page, body: unknown, status = 200) => {
-  await page.route('**/api/runs*', async (route) => {
+  await page.route(/\/api\/runs(?:\?|$)/, async (route) => {
     const requestUrl = new URL(route.request().url());
     if (requestUrl.pathname !== '/api/runs') {
       await route.continue();
@@ -71,22 +77,29 @@ const fulfillRunsRequest = async (page: Page, body: unknown, status = 200) => {
 
 test.describe('Dashboard page load', () => {
   test('loads dashboard and renders recent runs after API success', async ({ page }) => {
-    await fulfillRunsRequest(page, { runs: mockRuns, total: mockRuns.length });
+    await fulfillRunsRequest(page, runsEnvelope(mockRuns));
 
-    const runsResponse = page.waitForResponse(
+    const runsApiResponse = page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname === '/api/runs' && response.status() === 200,
     );
 
-    await page.goto('/');
-    await runsResponse;
+    await page.goto('/dashboard');
+    const response = await runsApiResponse;
+
+    // Accept both the current { data: ... } envelope and the legacy flat shape.
+    const json = await response.json();
+    const body = json.data ?? json;
+    expect(body.runs).toHaveLength(mockRuns.length);
+    expect(body.total).toBe(mockRuns.length);
 
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
     await expect(page.getByText('Fuzzing campaign overview')).toBeVisible();
     await expect(page.getByRole('link', { name: 'View All Runs' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Recent Runs' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recent Runs' }).first()).toBeVisible();
 
-    const table = page.getByRole('table');
+    // The dashboard renders several run tables; this is the ID/Status/Area one.
+    const table = page.getByRole('table', { name: 'Recent fuzzing runs overview' });
     await expect(table.getByRole('columnheader', { name: 'ID' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: 'Status' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: 'Area' })).toBeVisible();
@@ -101,9 +114,9 @@ test.describe('Dashboard page load', () => {
   test('shows connection error when the runs API fails', async ({ page }) => {
     await fulfillRunsRequest(page, { error: 'Internal server error' }, 500);
 
-    await page.goto('/');
+    await page.goto('/dashboard');
 
     await expect(page.getByText('Connection Error')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Recent Runs' })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recent Runs' })).toHaveCount(0);
   });
 });

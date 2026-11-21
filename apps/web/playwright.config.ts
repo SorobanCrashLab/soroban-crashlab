@@ -67,6 +67,10 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'http://localhost:3077',
+    /* The PWA service worker intercepts fetches and bypasses page.route(),
+     * which made API mocks leak live fixture data. No e2e spec exercises the
+     * worker directly, so block it here. */
+    serviceWorkers: 'block',
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     /* Screenshot on failure */
@@ -148,6 +152,16 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       NEXT_PUBLIC_APP_URL: 'http://localhost:3077',
+      // E2E intentionally issues far more API requests per minute than a real
+      // user. The production limiter is still exercised by its own unit tests;
+      // raising its limits here keeps the browser suite from failing with an
+      // unrelated 429 after a few dozen cases.
+      CRASHLAB_API_RATE_LIMIT_MAX_REQUESTS: '10000',
+      CRASHLAB_RATE_LIMIT_DEFAULT: '10000',
+      CRASHLAB_RATE_LIMIT_ARTIFACT_UPLOAD: '10000',
+      CRASHLAB_RATE_LIMIT_AUTH: '10000',
+      CRASHLAB_RATE_LIMIT_FUZZ_TRIGGER: '10000',
+      CRASHLAB_RATE_LIMIT_REPLAY: '10000',
     },
   },
 });

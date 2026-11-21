@@ -9,7 +9,7 @@
  * that route's first-load JavaScript budget.
  */
 
-import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition, type KeyboardEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -26,6 +26,7 @@ import { computeVirtualWindow } from './state/virtual-window';
 import { createArtifactPreview, formatArtifactSize, type ArtifactMetadata } from './state/artifact-preview';
 import { findRunNeighbors, type RunSummary } from './state/run-navigation';
 import { canTransition, type TriageStatus } from './state/triage';
+import { nextRovingIndex } from '@/lib/a11y/wcag22';
 
 export interface WorkspaceCrash {
   id: string;
@@ -125,6 +126,19 @@ export default function RunWorkspace({
   }, [pathname, router, searchParams, state]);
 
   const setPanel = (panel: WorkspacePanel) => navigate({}, (params) => params.set('ws.panel', panel));
+
+  /** WCAG 2.2 roving-tabindex keyboard support for the panel tabs. */
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'] as const;
+    if (!keys.includes(event.key as (typeof keys)[number])) return;
+    event.preventDefault();
+    const current = orderedPanels.indexOf(state.activePanel);
+    const next = nextRovingIndex(orderedPanels.length, current, event.key as (typeof keys)[number]);
+    if (next < 0) return;
+    const panel = orderedPanels[next];
+    setPanel(panel);
+    document.getElementById(`ws-tab-${panel}`)?.focus();
+  };
   const setLayout = (layout: 'investigation' | 'triage' | 'replay') =>
     navigate({}, (params) => params.set('ws.layout', layout));
 
@@ -185,7 +199,7 @@ export default function RunWorkspace({
         </label>
       </div>
 
-      <div role="tablist" aria-label="Investigation panels" className="flex flex-wrap gap-1 px-5 py-3 bg-zinc-50/60 dark:bg-zinc-950/30">
+      <div role="tablist" aria-label="Investigation panels" onKeyDown={handleTabKeyDown} className="flex flex-wrap gap-1 px-5 py-3 bg-zinc-50/60 dark:bg-zinc-950/30">
         {orderedPanels.map((panel) => (
           <button
             key={panel}
@@ -194,8 +208,9 @@ export default function RunWorkspace({
             id={`ws-tab-${panel}`}
             aria-selected={state.activePanel === panel}
             aria-controls={`ws-panel-${panel}`}
+            tabIndex={state.activePanel === panel ? 0 : -1}
             onClick={() => setPanel(panel)}
-            className={`rounded px-3 py-1.5 text-sm ${state.activePanel === panel ? 'bg-blue-600 text-white' : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700'}`}
+            className={`min-h-11 rounded px-3 py-1.5 text-sm ${state.activePanel === panel ? 'bg-blue-600 text-white' : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700'}`}
           >
             {PANEL_LABELS[panel]}
             {state.collapsed.includes(panel) ? ' (hidden)' : ''}

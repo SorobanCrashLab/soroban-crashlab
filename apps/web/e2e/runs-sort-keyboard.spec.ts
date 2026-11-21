@@ -54,11 +54,15 @@ const mockRuns = [
 ];
 
 const fulfillRunsRequest = async (page: Page) => {
-  await page.route('**/api/runs*', async (route) => {
+  await page.route(/\/api\/runs(?:\?|$)/, async (route) => {
+    // The runs route now wraps its payload in `data` plus a top-level total.
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ runs: mockRuns, total: mockRuns.length }),
+      body: JSON.stringify({
+        data: { runs: mockRuns, total: mockRuns.length },
+        total: mockRuns.length,
+      }),
     });
   });
 };
@@ -68,15 +72,18 @@ test.describe('Keyboard sorting and aria-sort semantics', () => {
     await fulfillRunsRequest(page);
     await page.goto('/runs');
 
-    const tableRegion = page.getByRole('region', { name: 'Virtualized fuzzing run table' });
-    await expect(tableRegion).toBeVisible();
+    const tableContainer = page.getByRole('region', { name: 'Virtualized fuzzing run table' });
+    await expect(tableContainer).toBeVisible();
+
+    // The header table keeps native th/aria-sort semantics; rows live in a grid.
+    const rows = tableContainer.getByRole('grid', { name: 'Fuzzing runs' }).getByRole('row');
 
     // Verify Run ID header column and inner button
-    const runIdTh = tableRegion.locator('th').filter({ hasText: /Run ID/i });
+    const runIdTh = tableContainer.getByRole('columnheader', { name: /Run ID/i });
     await expect(runIdTh).toBeVisible();
     await expect(runIdTh).toHaveAttribute('scope', 'col');
 
-    const runIdButton = runIdTh.getByRole('button', { name: /Run ID/i });
+    const runIdButton = runIdTh.getByRole('button', { name: /^Run ID/i });
     await expect(runIdButton).toBeVisible();
 
     // Initial default state is queuedAt desc, so Run ID has aria-sort="none"
@@ -90,27 +97,30 @@ test.describe('Keyboard sorting and aria-sort semantics', () => {
     await page.keyboard.press('Enter');
     await expect(runIdTh).toHaveAttribute('aria-sort', 'ascending');
 
-    const rowsAfterAsc = tableRegion.locator('tbody tr');
+    const rowsAfterAsc = rows;
     await expect(rowsAfterAsc.nth(0)).toContainText('run-1001');
     await expect(rowsAfterAsc.nth(1)).toContainText('run-1002');
     await expect(rowsAfterAsc.nth(2)).toContainText('run-1003');
 
-    // 2nd Enter: desc → desc sort, aria-sort="descending"
+    // 2nd Enter: desc → desc sort, aria-sort="descending". Sorting re-renders
+    // the header, so restore focus before pressing again.
+    await runIdButton.focus();
     await page.keyboard.press('Enter');
     await expect(runIdTh).toHaveAttribute('aria-sort', 'descending');
 
-    const rowsAfterDesc = tableRegion.locator('tbody tr');
+    const rowsAfterDesc = rows;
     await expect(rowsAfterDesc.nth(0)).toContainText('run-1003');
     await expect(rowsAfterDesc.nth(1)).toContainText('run-1002');
     await expect(rowsAfterDesc.nth(2)).toContainText('run-1001');
 
     // 3rd Enter: none → returns to default, aria-sort="none"
+    await runIdButton.focus();
     await page.keyboard.press('Enter');
     await expect(runIdTh).toHaveAttribute('aria-sort', 'none');
 
     // 4th: Switch to Duration column via keyboard
-    const durationTh = tableRegion.locator('th').filter({ hasText: /Duration/i });
-    const durationButton = durationTh.getByRole('button', { name: /Duration/i });
+    const durationTh = tableContainer.getByRole('columnheader', { name: /Duration/i });
+    const durationButton = durationTh.getByRole('button', { name: /^Duration/i });
     await durationButton.focus();
     await expect(durationButton).toBeFocused();
 
@@ -118,7 +128,7 @@ test.describe('Keyboard sorting and aria-sort semantics', () => {
     await expect(durationTh).toHaveAttribute('aria-sort', 'ascending');
     await expect(runIdTh).toHaveAttribute('aria-sort', 'none');
 
-    const rowsAfterDuration = tableRegion.locator('tbody tr');
+    const rowsAfterDuration = rows;
     await expect(rowsAfterDuration.nth(0)).toContainText('run-1003'); // 90000ms
     await expect(rowsAfterDuration.nth(1)).toContainText('run-1001'); // 180000ms
     await expect(rowsAfterDuration.nth(2)).toContainText('run-1002'); // 240000ms

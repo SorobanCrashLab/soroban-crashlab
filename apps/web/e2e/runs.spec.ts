@@ -53,8 +53,14 @@ const mockRuns = [
   },
 ];
 
+/** The runs route now returns its payload under `data` (with a top-level total). */
+const runsEnvelope = (runs: typeof mockRuns) => ({
+  data: { runs, total: runs.length },
+  total: runs.length,
+});
+
 const fulfillRunsRequest = async (page: Page, body: unknown, status = 200) => {
-  await page.route('**/api/runs*', async (route) => {
+  await page.route(/\/api\/runs(?:\?|$)/, async (route) => {
     const requestUrl = new URL(route.request().url());
     expect(requestUrl.pathname).toBe('/api/runs');
 
@@ -68,7 +74,7 @@ const fulfillRunsRequest = async (page: Page, body: unknown, status = 200) => {
 
 test.describe('Runs list', () => {
   test('loads and renders the fuzzing runs list', async ({ page }) => {
-    await fulfillRunsRequest(page, { runs: mockRuns, total: mockRuns.length });
+    await fulfillRunsRequest(page, runsEnvelope(mockRuns));
 
     const runsResponse = page.waitForResponse(
       (response) =>
@@ -80,15 +86,23 @@ test.describe('Runs list', () => {
 
     await expect(page.getByRole('heading', { name: 'Fuzzing Runs' })).toBeVisible();
     await expect(page.getByText(`${mockRuns.length} Total Runs`)).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Replay History' })).toBeVisible();
+    await expect(
+      page.getByText('Select runs to cancel, retry, delete, export, tag, or assign in bulk'),
+    ).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: `Select all ${mockRuns.length} runs` })).toBeVisible();
 
     const tableContainer = page.getByRole('region', { name: 'Virtualized fuzzing run table' });
-    await expect(tableContainer.locator('th').filter({ hasText: /Run ID|Run Identifier/i })).toBeVisible();
-    await expect(tableContainer.locator('th').filter({ hasText: /status/i })).toBeVisible();
-    await expect(tableContainer.locator('th').filter({ hasText: /severity/i })).toBeVisible();
+    await expect(tableContainer.getByRole('columnheader', { name: /Run ID/i })).toBeVisible();
+    await expect(tableContainer.getByRole('columnheader', { name: /Status/i })).toBeVisible();
+    await expect(tableContainer.getByRole('columnheader', { name: /Severity/i })).toBeVisible();
 
-    const rows = tableContainer.locator('tbody tr');
+    // The header is a separate table; data rows live in the virtualized grid.
+    const grid = tableContainer.getByRole('grid', { name: 'Fuzzing runs' });
+    const rows = grid.getByRole('row');
     await expect(rows).toHaveCount(mockRuns.length);
+    await expect(rows.nth(0)).toHaveAttribute('aria-rowindex', '1');
+    await expect(rows.nth(2)).toHaveAttribute('aria-rowindex', '3');
+    await expect(rows.first().getByRole('button', { name: 'run-1003' })).toBeVisible();
 
     await expect(rows.nth(0)).toContainText('run-1003');
     await expect(rows.nth(0)).toContainText('Running');
@@ -107,7 +121,7 @@ test.describe('Runs list', () => {
   test('shows an error state when the runs API fails and recovers after retry', async ({ page }) => {
     let requestCount = 0;
 
-    await page.route('**/api/runs*', async (route) => {
+    await page.route(/\/api\/runs(?:\?|$)/, async (route) => {
       requestCount += 1;
 
       if (requestCount === 1) {
@@ -122,7 +136,7 @@ test.describe('Runs list', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ runs: mockRuns, total: mockRuns.length }),
+        body: JSON.stringify(runsEnvelope(mockRuns)),
       });
     });
 
@@ -141,7 +155,10 @@ test.describe('Runs list', () => {
 
     await expect(page.getByRole('heading', { name: 'Fuzzing Runs' })).toBeVisible();
     await expect(
-      page.getByRole('region', { name: 'Virtualized fuzzing run table' }).locator('tbody tr'),
+      page
+        .getByRole('region', { name: 'Virtualized fuzzing run table' })
+        .getByRole('grid', { name: 'Fuzzing runs' })
+        .getByRole('row'),
     ).toHaveCount(mockRuns.length);
   });
 });

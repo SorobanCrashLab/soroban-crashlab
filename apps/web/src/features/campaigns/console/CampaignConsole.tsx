@@ -6,7 +6,7 @@
  * actions and bulk operations. Loaded lazily by the campaign detail page.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 import {
   BUILTIN_TEMPLATES,
   DEFAULT_DRAFT,
@@ -46,6 +46,7 @@ import {
   type CampaignListItem,
   type CampaignFilter,
 } from './campaign-list';
+import { nextRovingIndex } from '@/lib/a11y/wcag22';
 
 export interface CampaignConsoleProps {
   campaignId: string;
@@ -96,6 +97,18 @@ export default function CampaignConsole({
     if (result.snapshot !== snapshot) setLastAudit(lifecycleAuditAction(action));
   }
 
+  /** WCAG 2.2 roving-tabindex keyboard support for the console tabs. */
+  function handleTabKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'] as const;
+    if (!keys.includes(event.key as (typeof keys)[number])) return;
+    event.preventDefault();
+    const next = nextRovingIndex(TABS.length, TABS.indexOf(tab), event.key as (typeof keys)[number]);
+    if (next < 0) return;
+    const target = TABS[next];
+    setTab(target);
+    document.getElementById(`campaign-console-tab-${target}`)?.focus();
+  }
+
   return (
     <section className="mt-8 rounded-2xl border border-zinc-200 dark:border-zinc-800" aria-labelledby="campaign-console-heading">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
@@ -105,16 +118,18 @@ export default function CampaignConsole({
             {campaignId} · {snapshot.state} · last audit: {lastAudit}
           </p>
         </div>
-        <div role="tablist" aria-label="Campaign console sections" className="flex flex-wrap gap-1">
+        <div role="tablist" aria-label="Campaign console sections" onKeyDown={handleTabKeyDown} className="flex flex-wrap gap-1">
           {TABS.map((entry) => (
             <button
               key={entry}
               type="button"
               role="tab"
+              id={`campaign-console-tab-${entry}`}
               aria-selected={tab === entry}
               aria-controls={`campaign-console-${entry}`}
+              tabIndex={tab === entry ? 0 : -1}
               onClick={() => setTab(entry)}
-              className={`rounded px-3 py-1.5 text-xs capitalize ${tab === entry ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800'}`}
+              className={`min-h-11 rounded px-3 py-1.5 text-xs capitalize ${tab === entry ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800'}`}
             >
               {entry}
             </button>
@@ -122,7 +137,13 @@ export default function CampaignConsole({
         </div>
       </header>
 
-      <div id={`campaign-console-${tab}`} role="tabpanel" className="p-5">
+      <div
+        id={`campaign-console-${tab}`}
+        role="tabpanel"
+        aria-labelledby={`campaign-console-tab-${tab}`}
+        tabIndex={0}
+        className="p-5"
+      >
         {tab === 'list' && (
           <div>
             <label className="mb-3 block text-xs">

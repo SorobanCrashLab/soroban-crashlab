@@ -170,8 +170,15 @@ test.describe('Resource fee insight panel', () => {
     );
 
     await page.goto('/campaigns/campaign-fixture');
-    await expect(page.getByText('No runs in this campaign yet')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Start a campaign' })).toBeVisible();
+    // The campaign shell renders its own "Start a campaign" header link; scope
+    // to the fee panel's empty state so this checks the guidance itself.
+    const emptyState = page
+      .getByRole('heading', { name: 'No runs in this campaign yet' })
+      .locator('..');
+    await expect(emptyState).toBeVisible();
+    await expect(emptyState).toContainText('Start a run for campaign-fixture');
+    await expect(emptyState.getByRole('link', { name: 'Start a campaign' })).toBeVisible();
+    await expect(emptyState.getByRole('link', { name: 'Browse runs' })).toBeVisible();
   });
 
   test('explains fee-data-absent runs recorded before W5-A12', async ({ page }) => {
@@ -191,7 +198,12 @@ test.describe('Resource fee insight panel', () => {
     );
 
     await page.goto('/campaigns/campaign-fixture');
-    await expect(page.getByText('No fee tracking data for this campaign')).toBeVisible();
-    await expect(page.getByText(/W5-A12/).first()).toBeVisible();
+    const emptyState = page
+      .getByRole('heading', { name: 'No fee tracking data for this campaign' })
+      .locator('..');
+    await expect(emptyState).toBeVisible();
+    // The campaign header also mentions W5-A12; assert the fee panel's own
+    // explanation rather than page-wide copy.
+    await expect(emptyState).toContainText('W5-A12');
   });
 });

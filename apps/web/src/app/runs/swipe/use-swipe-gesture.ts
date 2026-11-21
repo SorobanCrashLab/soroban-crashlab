@@ -60,7 +60,10 @@ export function useSwipeGesture({ onSwipeLeft, onSwipeRight, enabled = true }: U
       };
       axisLockedRef.current = null;
 
-      target.setPointerCapture(e.pointerId);
+      // Do not capture the pointer yet: capturing on pointerdown retargets the
+      // subsequent click to this wrapper, which breaks ordinary links/buttons
+      // (for example the run-detail "Back to Dashboard" link). Capture only
+      // once the gesture is clearly horizontal.
     },
     [enabled],
   );
@@ -84,6 +87,14 @@ export function useSwipeGesture({ onSwipeLeft, onSwipeRight, enabled = true }: U
       }
 
       if (axisLockedRef.current === 'vertical') return;
+
+      // Once the gesture is horizontal, capture the pointer so the swipe still
+      // tracks when the finger leaves the wrapper. Capturing only at this point
+      // keeps ordinary taps/clicks targeting their original element.
+      const target = e.currentTarget as HTMLElement;
+      if (!target.hasPointerCapture(e.pointerId)) {
+        target.setPointerCapture(e.pointerId);
+      }
 
       const direction: SwipeDirection = dx > 0 ? 'right' : 'left';
       const resistance = 0.4;

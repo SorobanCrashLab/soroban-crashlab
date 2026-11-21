@@ -276,7 +276,7 @@ export default function LandingPage() {
               <span
                 key={tech}
                 className="text-xs font-semibold tracking-widest uppercase"
-                style={{ color: "var(--text-secondary)", opacity: 0.6 }}
+                style={{ color: "var(--text-secondary)" }}
               >
                 {tech}
               </span>

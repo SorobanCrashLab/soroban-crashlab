@@ -350,7 +350,7 @@ export default function RunAnnotationThreads({ runId, gateway }: RunAnnotationTh
         </div>
       )}
 
-      <p className="mt-4 text-xs text-zinc-400 dark:text-zinc-500">
+      <p className="mt-4 text-xs text-zinc-600 dark:text-zinc-400">
         Roster: {MENTION_ROSTER.join(', ')}
       </p>
     </section>

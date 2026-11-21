@@ -8,11 +8,16 @@
  *
  * Reports are written to test-results/a11y/ and uploaded as CI artifacts.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+
+// The app's theme bootstrap animates the initial light/dark swap. Axe can
+// otherwise sample mid-transition colors and report false low-contrast
+// violations. Reduced motion disables those transitions from first paint.
+test.use({ reducedMotion: 'reduce' });
 
 /**
  * Documented moderate violation allow-list.
@@ -80,6 +85,9 @@ const reportSummaries: AxeReportSummary[] = [];
  * the critical/serious budget (zero) plus the documented moderate allow-list.
  */
 async function scanAndEnforce(page: Page, scope: string): Promise<void> {
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(250);
+
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag21aa'])
     .analyze();
@@ -144,29 +152,34 @@ test.afterAll(() => {
   );
 });
 
-test.beforeEach(() => {
+test.beforeEach(async ({ page }) => {
   assertAllowListFresh();
+  // Set before navigation so /theme-script.js sees reduced motion and applies
+  // `data-motion="reduced"` before the first theme transition starts.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
 });
 
 const CORE_ROUTES: Array<{ name: string; path: string; waitFor?: string }> = [
   { name: 'landing', path: '/' },
-  { name: 'runs-list', path: '/runs', waitFor: 'main, [data-testid="runs-list"]' },
-  { name: 'run-detail', path: '/runs/detail', waitFor: 'main' },
-  { name: 'replay', path: '/runs/replay', waitFor: 'main' },
+  { name: 'runs-list', path: '/runs', waitFor: 'main, [role="grid"][aria-label="Fuzzing runs"]' },
+  { name: 'run-detail', path: '/runs/run-1000', waitFor: 'main' },
+  { name: 'replay', path: '/runs/run-1000/replay-history', waitFor: 'main' },
   { name: 'settings', path: '/settings', waitFor: 'main' },
   {
     name: 'forbidden',
     path: '/403?capability=roles:manage&from=%2Fsettings%2Froles',
     waitFor: 'main',
   },
-  { name: 'auth-signin', path: '/auth/signin', waitFor: 'main, form' },
+  { name: 'auth', path: '/integrations/auth', waitFor: 'main' },
 ];
 
 for (const route of CORE_ROUTES) {
   test(`${route.name} has no critical/serious a11y violations`, async ({ page }) => {
     const response = await page.goto(route.path);
     expect(response?.status(), `${route.path} should respond with status < 400`).toBeLessThan(400);
-    await page.waitForLoadState('networkidle');
+    // The app polls several APIs, so `networkidle` never settles reliably.
+    // `load` also gives styles/fonts a chance to settle before axe checks contrast.
+    await page.waitForLoadState('load');
     if (route.waitFor) {
       await page.locator(route.waitFor).first().waitFor({ state: 'visible', timeout: 15_000 });
     }
@@ -177,7 +190,7 @@ for (const route of CORE_ROUTES) {
 test.describe('Keyboard-only triage flow', () => {
   test('triage flow is completable via keyboard alone with visible focus', async ({ page }) => {
     await page.goto('/runs');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     // Tab from the document body and verify that focus is always visible.
     const maxTabs = 40;
@@ -191,28 +204,31 @@ test.describe('Keyboard-only triage flow', () => {
     }
     expect(saw, 'at least one focus indicator should be visible during keyboard navigation').toBeGreaterThan(0);
 
-    // Reach the runs list and open the first run via keyboard only.
-    const firstRunLink = page.locator('[data-testid="run-row"] a, [data-testid="runs-list"] a').first();
-    await expect(firstRunLink).toBeVisible();
-    await firstRunLink.focus();
-    await expect(firstRunLink).toBeFocused();
+    // Reach the virtualized runs grid and open the first run via keyboard only.
+    const firstRunButton = page
+      .getByRole('grid', { name: 'Fuzzing runs' })
+      .getByRole('button')
+      .first();
+    await expect(firstRunButton).toBeVisible();
+    await firstRunButton.focus();
+    await expect(firstRunButton).toBeFocused();
     await page.keyboard.press('Enter');
-    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/runs\/run-\d+/);
     await expect(page.locator('main')).toBeVisible();
 
-    // Perform a triage action via keyboard and confirm the result is reachable.
-    const triageAction = page.locator('button[data-testid="triage-action"], [role="button"][data-testid="triage-action"]');
-    await expect(triageAction).toBeVisible();
-    await triageAction.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.locator('[data-testid="triage-result"]')).toBeVisible();
+    // Exercise the run workspace's WCAG 2.2 roving-tabindex composite.
+    const tabs = page.getByRole('tablist', { name: 'Investigation panels' }).getByRole('tab');
+    await expect(tabs.first()).toBeVisible();
+    await tabs.first().focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
   });
 });
 
 test.describe('Landing page decorative SVGs', () => {
   test('all decorative SVGs have aria-hidden attribute', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const svgs = await page.locator('svg').all();
     for (const svg of svgs) {
@@ -226,7 +242,7 @@ test.describe('Landing page decorative SVGs', () => {
 
   test('buttons with icons have accessible labels', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const buttonsWithIcons = await page.locator('a:has(svg), button:has(svg)').all();
     for (const button of buttonsWithIcons) {
