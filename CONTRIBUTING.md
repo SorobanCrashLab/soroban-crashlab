@@ -8,6 +8,26 @@ These steps assume a brand-new contributor machine. After completing them,
 you should be able to run the web verification commands and the Rust test
 suite in under 20 minutes on a typical broadband connection.
 
+### 0. Quick Start with the CLI (Recommended)
+
+The CrashLab CLI provides a unified interface for development tasks:
+
+```bash
+# Check your environment
+pnpm run doctor
+
+# Start the development server
+pnpm run dev
+
+# Run tests
+pnpm run test
+
+# Interactive onboarding
+pnpm run onboard
+```
+
+See [docs/contributors/cli-guide.md](docs/contributors/cli-guide.md) for full CLI documentation.
+
 ### 1. Install Git
 
 Make sure `git` is available in your shell:
