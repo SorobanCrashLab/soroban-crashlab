@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader, StatCard } from "../../components";
+import { analyzeCorpus, type CorpusAnalysisResult } from "../../lib/analysis-engine/api";
 
 type Seed = {
   id: string;
@@ -28,6 +29,19 @@ export default function CorpusExplorerPage() {
   const [status, setStatus] = useState("all");
   const [selected, setSelected] = useState<Seed>(seeds[0]);
   const [notice, setNotice] = useState("");
+  const [wasmAnalysis, setWasmAnalysis] = useState<CorpusAnalysisResult | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    analyzeCorpus(seeds)
+      .then((envelope) => {
+        if (!cancelled) setWasmAnalysis(envelope.result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = useMemo(() => seeds.filter((seed) => {
     const matchesQuery = `${seed.id} ${seed.contract} ${seed.source} ${seed.mutation}`.toLowerCase().includes(query.toLowerCase());
@@ -38,19 +52,36 @@ export default function CorpusExplorerPage() {
     setNotice(`${selected.id} moved to ${nextStatus}`);
   };
 
+  const runWasmDedupe = () => {
+    analyzeCorpus(seeds)
+      .then((envelope) => {
+        setWasmAnalysis(envelope.result);
+        setNotice(
+          `WASM dedupe completed (${envelope.backend}): ${envelope.result.uniqueSignatures} unique signatures (${(envelope.result.redundancyRatio * 100).toFixed(1)}% redundant, digest ${envelope.result.digest.slice(0, 8)})`,
+        );
+      })
+      .catch(() => {
+        setNotice("Dedupe analysis started");
+      });
+  };
+
   return (
     <div className="container-full page-padding fade-in">
       <PageHeader
         title="Seed & Corpus Explorer"
         description="Browse high-scale inputs, inspect mutation lineage, and curate valuable seeds."
-        actions={<button type="button" className="btn-outline" onClick={() => setNotice("Dedupe analysis started")}>Dedupe corpus</button>}
+        actions={<button type="button" className="btn-outline" onClick={runWasmDedupe}>Dedupe corpus</button>}
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <StatCard label="Corpus seeds" value="48,291" subtext="Across 12 contracts" />
         <StatCard label="Promoted" value="1,842" subtext="+126 this week" />
         <StatCard label="Quarantined" value="327" subtext="Needs review" />
-        <StatCard label="Redundant" value="8.4%" subtext="Dedupe candidate" />
+        <StatCard
+          label="Redundant"
+          value={wasmAnalysis ? `${(wasmAnalysis.redundancyRatio * 100).toFixed(1)}%` : "8.4%"}
+          subtext={wasmAnalysis ? `WASM digest ${wasmAnalysis.digest.slice(0, 8)}` : "Dedupe candidate"}
+        />
       </div>
 
       {notice && <div className="mb-4 rounded-lg border border-[var(--border-color)] px-4 py-3 text-sm" role="status">{notice}</div>}

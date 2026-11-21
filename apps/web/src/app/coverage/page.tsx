@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader, StatCard } from "../../components";
+import { analyzeSummaryStatistics, type SummaryStatisticsResult } from "../../lib/analysis-engine/api";
 
 const contracts = [
   { name: "token_contract", path: "src/token.rs", coverage: 86, edges: "214/248", color: 86 },
@@ -20,7 +21,20 @@ const hotspotRows = [
 export default function CoverageMapPage() {
   const [contract, setContract] = useState(contracts[0].name);
   const [view, setView] = useState("Blocks");
+  const [coverageSummary, setCoverageSummary] = useState<SummaryStatisticsResult | null>(null);
   const active = contracts.find((item) => item.name === contract) ?? contracts[0];
+
+  useEffect(() => {
+    let cancelled = false;
+    analyzeSummaryStatistics(contracts.map((item) => item.coverage))
+      .then((envelope) => {
+        if (!cancelled) setCoverageSummary(envelope.result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const blocks = useMemo(() => Array.from({ length: 96 }, (_, index) => {
     const hit = ((index * 7 + index / 3) % 100) < active.coverage;
     return hit ? "hit" : "miss";
@@ -39,7 +53,11 @@ export default function CoverageMapPage() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <StatCard label="Line coverage" value={`${active.coverage}%`} subtext="+4.2% in 7d" />
+        <StatCard
+          label="Line coverage"
+          value={`${active.coverage}%`}
+          subtext={coverageSummary ? `p50 ${coverageSummary.p50}% · p95 ${coverageSummary.p95}%` : "+4.2% in 7d"}
+        />
         <StatCard label="Discovered edges" value={active.edges} subtext="Across selected target" />
         <StatCard label="New this run" value="18" subtext="7 linked crashes" />
         <StatCard label="Coverage plateau" value="6 runs" subtext="Review hotspots" />
