@@ -19,8 +19,6 @@ __pycache__/
 .mypy_cache/
 
 # Env and logs
-.env
-.env.*
 !.env.docker.example
 *.log
 
@@ -43,3 +41,4 @@ flake-report.json
 flake-report.md
 flake-quarantine.proposed.json
 flake-attempts/
+config.bat
