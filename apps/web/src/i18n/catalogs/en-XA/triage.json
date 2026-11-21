@@ -1,0 +1,26 @@
+{
+  "title": "[Tríágé]",
+  "description": "[Çrásh tríágé áñd áñálýsís]",
+  "priority": {
+    "critical": "[Çrítíçál]",
+    "high": "[Hígh]",
+    "medium": "[Médíúm]",
+    "low": "[Lów]"
+  },
+  "actions": {
+    "acknowledge": "[Áçkñówlédgé]",
+    "assignTo": "[Ássígñ Tó]",
+    "markResolved": "[Márk Résólvéd]",
+    "reopenIssue": "[Réópéñ Íssúé]"
+  },
+  "filters": {
+    "unacknowledged": "[Úñáçkñówlédgéd]",
+    "inProgress": "[Íñ Prógrésş]",
+    "resolved": "[Résólvéd]",
+    "all": "[Áll Íssúés]"
+  },
+  "empty": {
+    "title": "[Ñó íssúés tó tríágé]",
+    "description": "[Áll çáúght íssúés hávé béé áddrésséd]"
+  }
+}

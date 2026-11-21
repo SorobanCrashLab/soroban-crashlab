@@ -1,0 +1,79 @@
+{
+  "hero": {
+    "title": "Rompe tus contratos Soroban",
+    "titleLine2": "antes de que alguien más lo haga.",
+    "description": "CrashLab lanza miles de entradas mutadas a tus contratos inteligentes de Stellar y observa qué se rompe. Atrapa los pánicos, desbordamientos de recursos y omisiones de autenticación que las pruebas manuales pasan por alto.",
+    "openApp": "Abrir Aplicación",
+    "viewSource": "Ver Código Fuente"
+  },
+  "technologies": {
+    "stellar": "Stellar",
+    "soroban": "Soroban",
+    "rust": "Rust",
+    "webAssembly": "WebAssembly",
+    "typeScript": "TypeScript"
+  },
+  "howItWorks": {
+    "eyebrow": "Cómo funciona",
+    "title": "De WASM a fallo clasificado",
+    "titleLine2": "en cinco pasos.",
+    "step01Title": "Apúntalo a tu contrato",
+    "step01Body": "Arrastra un archivo WASM o pega un ID de contrato Stellar. CrashLab lee las funciones exportadas y descubre qué romper. No se necesita configuración para comenzar.",
+    "step02Title": "Configura la campaña de fuzz",
+    "step02Body": "Elige qué funciones estresar, establece la profundidad de mutación, límites de recursos y cuánto tiempo ejecutar. O simplemente presiona iniciar y deja que lo resuelva por sí solo.",
+    "step03Title": "Muta, ejecuta, observa",
+    "step03Body": "El fuzzer genera miles de entradas mutadas, las envía a tu contrato en un nodo Stellar local o de testnet, y observa pánicos, lecturas fuera de límites y desbordamientos de recursos.",
+    "step04Title": "Clasifica lo que se rompió",
+    "step04Body": "Los fallos se agrupan por firma. El tablero agrupa fallos idénticos, muestra la secuencia de llamadas exacta que desencadenó cada uno y enlaza a los cambios del ledger.",
+    "step05Title": "Envía la corrección con prueba",
+    "step05Body": "Exporta un fragmento de reproducción, abre un issue de GitHub directamente desde el panel, o alimenta el fallo en CI. Cada fallo viene con una prueba reproducible."
+  },
+  "sandbox": {
+    "eyebrow": "Sandbox en vivo",
+    "title": "Observa una ejecución de fuzzing encontrar un fallo real.",
+    "body": "Repetición de fixture preparado — sin backend ni cuenta. Las mutaciones se transmiten, aparece una firma de fallo y se genera un fragmento de reproductor.",
+    "play": "Reproducir demo",
+    "pause": "Pausar demo"
+  },
+  "features": {
+    "eyebrow": "Características",
+    "title": "Todo lo que necesitas para encontrar",
+    "titleLine2": "los errores que tus pruebas pasan por alto.",
+    "mutationFuzzingTitle": "Fuzzing de mutación",
+    "mutationFuzzingBody": "Sin escribir pruebas manuales. El fuzzer genera miles de entradas rotas por sí solo y encuentra los casos extremos que nunca pensaste probar.",
+    "failureClusteringTitle": "Agrupación de fallos",
+    "failureClusteringBody": "Los fallos idénticos se agrupan por firma. En lugar de mirar quinientos fallos, ves doce errores distintos. Clasifica en minutos, no en días.",
+    "replayReproduceTitle": "Repetir y reproducir",
+    "replayReproduceBody": "Cada fallo viene con una secuencia de llamadas determinista. Repítela en tu máquina, aliméntala en CI y demuestra que la corrección realmente funciona.",
+    "analyticsHeatmapsTitle": "Análisis y mapas de calor",
+    "analyticsHeatmapsBody": "Mapas de calor de rendimiento, líneas de tiempo de tendencia de fallos y detección de anomalías te dan la imagen completa de un vistazo. Detecta patrones antes de que se conviertan en incidentes.",
+    "ciCdIntegrationTitle": "Integración de CI y CD",
+    "ciCdIntegrationBody": "GitHub Actions, webhooks y tokens de API te permiten conectar CrashLab en tu pipeline de despliegue. Rompe la construcción antes de que el error se envíe a producción.",
+    "builtForSorobanTitle": "Construido para Soroban",
+    "builtForSorobanBody": "No es un fuzzer genérico con Soroban atornillado. Construido desde cero para la VM Soroban de Stellar. Entiende tarifas de recursos, árboles de autenticación y almacenamiento de contratos."
+  },
+  "whyMatters": {
+    "eyebrow": "Por qué esto importa",
+    "title": "Los contratos inteligentes contienen dinero real.",
+    "titleLine2": "Un error puede drenar todo.",
+    "problem1Title": "Las pruebas manuales pierden casos extremos",
+    "problem1Text": "Las pruebas unitarias cubren los caminos en los que pensaste. El fuzzing cubre los que no. Ahí es donde viven las explotaciones.",
+    "problem2Title": "Los ataques ahora están automatizados",
+    "problem2Text": "Los bots escanean nuevos contratos minutos después del despliegue. Si tu contrato tiene un desbordamiento de recursos u omisión de autenticación, lo encontrarán antes que tú.",
+    "problem3Title": "Las herramientas existen, úsalas",
+    "problem3Text": "CrashLab es gratuito y de código abierto. No hay razón para enviar un contrato sin ejecutarlo primero a través de pruebas de mutación automatizadas."
+  },
+  "bottomCta": {
+    "title": "¿Listo para romper tus contratos?",
+    "description": "CrashLab es gratuito y de código abierto. Apúntalo a un contrato y ve qué encuentra el fuzzer. Toma unos cinco minutos obtener tus primeros resultados.",
+    "openApp": "Abrir Aplicación"
+  },
+  "footer": {
+    "appName": "CrashLab",
+    "forSoroban": "para Soroban",
+    "statusLabel": "Stellar Testnet",
+    "runtime": "Soroban Runtime",
+    "github": "GitHub",
+    "powered": "Impulsado por Stellar, Soroban, Rust y WebAssembly"
+  }
+}

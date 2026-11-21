@@ -1,0 +1,63 @@
+{
+  "page": {
+    "title": "Iniciar una ejecución de fuzzing",
+    "description": "Sube un contrato, elige qué romper, lanza. Tres pasos, unos dos minutos."
+  },
+  "breadcrumb": {
+    "dashboard": "Panel",
+    "start": "Iniciar"
+  },
+  "steps": {
+    "uploadContract": "Subir contrato",
+    "pickTargets": "Elegir objetivos",
+    "launch": "Lanzar"
+  },
+  "upload": {
+    "heading": "Paso 1 — Sube tu contrato",
+    "description": "Arrastra el archivo .wasm compilado de tu contrato Soroban. CrashLab lee sus funciones exportadas y propone objetivos de fuzz en el siguiente paso.",
+    "labelFile": "Archivo WASM del contrato",
+    "maxSize": "Tamaño máximo: 16MB. Solo se aceptan archivos .wasm.",
+    "reading": "Leyendo contrato…"
+  },
+  "targets": {
+    "heading": "Paso 2 — Elige qué romper",
+    "exportsCount": "{fileName} exporta {count} {count, plural, one {función} other {funciones}} invocable. Marca las que el fuzzer debería martillar.",
+    "noFunctions": "No se encontraron funciones exportadas en este contrato.",
+    "argCount": "{count} {count, plural, one {arg} other {args}}",
+    "startOver": "Empezar de nuevo",
+    "continueWith": "Continuar con {count} {count, plural, one {objetivo} other {objetivos}}"
+  },
+  "launch": {
+    "heading": "Paso 3 — Lanzar la campaña",
+    "description": "Fuzzing de {count} {count, plural, one {objetivo} other {objetivos}} desde {fileName}. Los resultados aparecen en la página de Ejecuciones a medida que llegan los fallos.",
+    "labelSeed": "Fuente de semilla",
+    "seedRandom": "Mutación aleatoria",
+    "seedCorpus": "Corpus existente",
+    "seedReplay": "Repetición específica",
+    "labelAuth": "Modo de autenticación",
+    "authNone": "Ninguno (público)",
+    "authMock": "Autenticación de ledger simulada",
+    "authKeypair": "Par de claves firmado",
+    "labelParallelism": "Trabajadores paralelos (1–32)",
+    "labelTimeout": "Tiempo de espera (segundos)",
+    "back": "Atrás",
+    "launchButton": "Lanzar campaña",
+    "launching": "Lanzando…"
+  },
+  "done": {
+    "eyebrow": "Campaña en cola",
+    "title": "Tu fuzzer está trabajando",
+    "description": "Obsérvalo en vivo en Ejecuciones, luego clasifica lo que se rompa en el tablero de Triaje.",
+    "watchRuns": "Ver ejecuciones",
+    "openTriage": "Abrir triaje",
+    "startAnother": "Iniciar otro"
+  },
+  "errors": {
+    "noFile": "No se pudo leer ese archivo WASM.",
+    "atLeastOne": "Elige al menos un objetivo para fuzz.",
+    "launchFailed": "No se pudo lanzar la campaña."
+  },
+  "progress": {
+    "label": "Progreso"
+  }
+}

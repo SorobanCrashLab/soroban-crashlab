@@ -1,0 +1,58 @@
+{
+  "actions": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "finish": "Finalizar",
+    "retry": "Reintentar",
+    "refresh": "Actualizar",
+    "export": "Exportar",
+    "import": "Importar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "clear": "Limpiar",
+    "apply": "Aplicar",
+    "reset": "Restablecer",
+    "submit": "Enviar",
+    "upload": "Subir",
+    "download": "Descargar"
+  },
+  "status": {
+    "loading": "Cargando...",
+    "saving": "Guardando...",
+    "success": "Éxito",
+    "error": "Error",
+    "warning": "Advertencia",
+    "info": "Información"
+  },
+  "time": {
+    "now": "Ahora",
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "tomorrow": "Mañana",
+    "thisWeek": "Esta semana",
+    "lastWeek": "Semana pasada",
+    "thisMonth": "Este mes",
+    "lastMonth": "Mes pasado"
+  },
+  "validation": {
+    "required": "Este campo es obligatorio",
+    "invalid": "Valor inválido",
+    "tooShort": "Demasiado corto",
+    "tooLong": "Demasiado largo",
+    "emailInvalid": "Correo electrónico inválido",
+    "urlInvalid": "URL inválida"
+  },
+  "pagination": {
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "page": "Página",
+    "of": "de",
+    "showing": "Mostrando {start} a {end} de {total} elementos"
+  }
+}

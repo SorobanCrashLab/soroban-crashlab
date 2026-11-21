@@ -1,0 +1,28 @@
+{
+  "title": "[Séttíñgs]",
+  "description": "[Áççóúñt áñd wórkspáçé séttíñgs]",
+  "tabs": {
+    "general": "[Géñérál]",
+    "notifications": "[Ñótífíçátíóñs]",
+    "api": "[ÁPÍ]",
+    "team": "[Téám]",
+    "billing": "[Bíllíñg]"
+  },
+  "general": {
+    "language": "[Láñgúágé]",
+    "theme": "[Thémé]",
+    "timezone": "[Tímézoné]"
+  },
+  "notifications": {
+    "emailNotifications": "[Émáíl Ñótífíçátíóñs]",
+    "pushNotifications": "[Púsh Ñótífíçátíóñs]",
+    "weeklyDigest": "[Wéékly Dígést]"
+  },
+  "api": {
+    "apiKeys": "[ÁPÍ Kéýs]",
+    "createKey": "[Çréáté ÁPÍ Kéý]",
+    "revokeKey": "[Révóké Kéý]"
+  },
+  "saveChanges": "[Sávé Çháñgés]",
+  "changesSaved": "[Çháñgés sávéd súççéssfúllý]"
+}

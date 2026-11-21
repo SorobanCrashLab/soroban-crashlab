@@ -1,0 +1,35 @@
+{
+  "title": "Runs",
+  "description": "Fuzzing run history and details",
+  "columns": {
+    "id": "ID",
+    "status": "Status",
+    "area": "Area",
+    "severity": "Severity",
+    "duration": "Duration",
+    "seedCount": "Seeds",
+    "timestamp": "Timestamp"
+  },
+  "status": {
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled"
+  },
+  "actions": {
+    "viewDetails": "View Details",
+    "exportCsv": "Export CSV",
+    "retry": "Retry Run",
+    "cancel": "Cancel Run"
+  },
+  "empty": {
+    "title": "No runs yet",
+    "description": "Start a fuzzing campaign to see runs here"
+  },
+  "filters": {
+    "all": "All Runs",
+    "active": "Active",
+    "completed": "Completed",
+    "failed": "Failed"
+  }
+}

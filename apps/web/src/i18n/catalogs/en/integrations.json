@@ -1,0 +1,24 @@
+{
+  "title": "Integrations",
+  "description": "Connected services and webhooks",
+  "connect": "Connect",
+  "disconnect": "Disconnect",
+  "configure": "Configure",
+  "test": "Test Connection",
+  "status": {
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "error": "Connection Error"
+  },
+  "types": {
+    "github": "GitHub",
+    "slack": "Slack",
+    "jira": "Jira",
+    "sentry": "Sentry",
+    "webhook": "Webhook"
+  },
+  "empty": {
+    "title": "No integrations",
+    "description": "Connect external services to enhance your workflow"
+  }
+}
