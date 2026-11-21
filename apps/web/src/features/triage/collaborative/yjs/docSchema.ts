@@ -5,7 +5,7 @@
  * notes (CRDT text), and issue links (CRDT map). All are mocked.
  */
 
-import { MockYArray, MockYText, MockYMap, type MockYDoc } from './yjsProvider';
+import { MockYArray, MockYText, MockYMap, MockYDoc } from './yjsProvider';
 
 export interface TriageDocSchema {
   tags: MockYArray<string>;

@@ -7,8 +7,8 @@
  * that is the dispatcher's job — so the routing matrix is testable on its own.
  */
 
-import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
+import { parseYamlLite } from './yaml-lite';
 
 export const ALERT_SEVERITIES = ['critical', 'error', 'warning', 'info'] as const;
 export const ALERT_CHANNELS = ['pagerduty', 'slack', 'email'] as const;
@@ -120,7 +120,7 @@ export interface RoutingDecision {
 
 /** Throws with every schema violation listed, so CI output is actionable. */
 export function parseAlertPolicy(source: string): AlertPolicy {
-  const result = AlertPolicySchema.safeParse(parseYaml(source));
+  const result = AlertPolicySchema.safeParse(parseYamlLite(source));
   if (!result.success) {
     const problems = result.error.issues.map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`);
     throw new Error(`Invalid alert policy:\n  ${problems.join('\n  ')}`);

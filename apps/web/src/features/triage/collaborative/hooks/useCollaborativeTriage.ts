@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { YjsProvider, type MockYDoc, type MockYArray, type MockYText, type MockYMap } from '../yjs/yjsProvider';
+import { YjsProvider, type MockYDoc as _MockYDoc, type MockYArray, type MockYText, type MockYMap } from '../yjs/yjsProvider';
 import { getTriageDocSchema } from '../yjs/docSchema';
 import { AwarenessManager, type PresenceState } from '../yjs/awareness';
 import { loadDoc, persistDoc } from '../yjs/persistence';
@@ -59,6 +59,7 @@ export function useCollaborativeTriage(
 
     const doc = provider.getDoc();
     const schema = getTriageDocSchema(doc);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     setTags(schema.tags);
     setNotes(schema.notes);
     setIssueLinks(schema.issueLinks);
@@ -122,7 +123,7 @@ export function useCollaborativeTriage(
     if (issueLinks) issueLinks.delete(id);
   }, [issueLinks]);
 
-  const resolveConflict = useCallback((action: 'accept' | 'merge' | 'dismiss') => {
+  const resolveConflict = useCallback((_action: 'accept' | 'merge' | 'dismiss') => {
     setConflict(null);
   }, []);
 

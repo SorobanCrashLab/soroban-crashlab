@@ -10,7 +10,7 @@
  */
 
 import type { FuzzingRun } from '@/app/types';
-import type { FilterAST, FilterCondition, FilterGroup, FilterNode } from './FilterAST';
+import type { FilterAST, FilterCondition, FilterGroup as _FilterGroup, FilterNode } from './FilterAST';
 import { isCondition, isGroup } from './FilterAST';
 
 function getRunValue(run: FuzzingRun, field: string): unknown {

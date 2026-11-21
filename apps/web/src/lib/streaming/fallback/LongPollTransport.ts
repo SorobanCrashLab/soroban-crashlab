@@ -73,7 +73,7 @@ export class LongPollTransport {
         }
         this.onMessage?.(data);
       }
-    } catch (err) {
+    } catch {
       // Network errors are expected; keep polling.
     } finally {
       this.polling = false;

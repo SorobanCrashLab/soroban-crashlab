@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import type { FilterAST } from '../ast/FilterAST';
-import { type SavedView, type ViewVisibility, readSavedViews, saveView, deleteView } from '../persistence/SavedViewStore';
+import { type SavedView, type ViewVisibility, readSavedViews, saveView, deleteView, createSavedView } from '../persistence/SavedViewStore';
 
 export function useSavedViews() {
   const [views, setViews] = useState<SavedView[]>([]);
@@ -16,12 +16,13 @@ export function useSavedViews() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     refresh();
   }, [refresh]);
 
   const createView = useCallback(
     (name: string, description: string, ast: FilterAST, visibility: ViewVisibility = 'private') => {
-      const { createSavedView } = require('../persistence/SavedViewStore');
+      
       const view = createSavedView(name, description, ast, visibility);
       const updated = saveView(view);
       setViews(updated);

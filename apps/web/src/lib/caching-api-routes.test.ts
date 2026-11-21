@@ -4,7 +4,7 @@ import { GET as getRuns } from '../app/api/runs/route';
 
 describe('Caching and Conditional Headers in API Routes', () => {
   it('sets Cache-Control: no-store on GET /api/artifacts', async () => {
-    const res = await getArtifacts();
+    const res = await getArtifacts(new Request('http://localhost/api/artifacts'));
     expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 

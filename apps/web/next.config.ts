@@ -22,9 +22,7 @@ export const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60,
   },
-  turbopack: {
-    root: path.resolve(__dirname, "../../"),
-  },
+
   experimental: {
     optimizePackageImports: ["recharts", "react-markdown", "remark-gfm"],
   },

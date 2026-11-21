@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const allRuns = buildMockRuns();
   const values = new Set<string>();
   for (const run of allRuns) {
-    const value = (run as Record<string, unknown>)[field];
+    const value = (run as unknown as Record<string, unknown>)[field];
     if (value !== undefined && value !== null) {
       values.add(String(value));
     }

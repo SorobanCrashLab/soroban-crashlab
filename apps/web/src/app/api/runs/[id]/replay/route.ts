@@ -16,39 +16,11 @@ import { replayJobStore } from '@/lib/replay/job-store';
 import { buildReplayResult, type ReplayDiagnostics } from '@/lib/replay/result';
 import { parseReplayRunner, type ReplayRunner } from '@/lib/replay/runners';
 import { standardSizeLimitResponse } from '@/lib/request-size-limits';
+import { buildReplayBundleDocument, serializeReplayBundleDocument, buildReplayCliInvocation, type ReplayBundleDocument } from './replay-bundle';
 
 export const runtime = 'nodejs';
 
 const execFileAsync = promisify(execFile);
-const FNV64_OFFSET = 0xcbf29ce484222325n;
-const FNV64_PRIME = 0x100000001b3n;
-const FIELD_SEPARATOR = 0x1en;
-
-type ReplayCategory =
-  | 'auth'
-  | 'budget'
-  | 'state'
-  | 'xdr'
-  | 'invalid-enum-tag'
-  | 'empty-input'
-  | 'oversized-input'
-  | 'unknown';
-
-interface ReplayBundleDocument {
-  schema: number;
-  seed: {
-    id: number;
-    payload: number[];
-  };
-  signature: {
-    category: string;
-    digest: bigint;
-    signature_hash: bigint;
-  };
-  environment: null;
-  failure_payload: number[];
-  rpc_envelope: null;
-}
 
 interface ReplayInvocationResult {
   command: string;
@@ -59,163 +31,9 @@ interface ReplayInvocationResult {
   /** Node error code, e.g. `ENOENT` when the runner is not installed. */
   errorCode?: string;
 }
-
-export function findRunById(id: string): FuzzingRun | undefined {
+function findRunById(id: string): FuzzingRun | undefined {
   return buildMockRuns().find((run) => run.id === id);
 }
-
-function stableRunIdSeed(runId: string): number {
-  const trailingDigits = runId.match(/(\d+)$/)?.[1];
-  if (trailingDigits) {
-    return Number.parseInt(trailingDigits, 10);
-  }
-
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < runId.length; index += 1) {
-    hash ^= runId.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash;
-}
-
-function classifyReplayPayload(payload: Uint8Array): ReplayCategory {
-  if (payload.length === 0) {
-    return 'empty-input';
-  }
-
-  if (payload.length > 64) {
-    return 'oversized-input';
-  }
-
-  const first = payload[0];
-  if (first <= 0x1f) {
-    return 'xdr';
-  }
-  if (first <= 0x5f) {
-    return 'state';
-  }
-  if (first <= 0x9f) {
-    return 'budget';
-  }
-  return 'auth';
-}
-
-function fnv1a64(bytes: Iterable<number>, initialState = FNV64_OFFSET): bigint {
-  let hash = initialState;
-  for (const byte of bytes) {
-    hash ^= BigInt(byte);
-    hash = (hash * FNV64_PRIME) & 0xffffffffffffffffn;
-  }
-  return hash;
-}
-
-function utf8Bytes(value: string): Uint8Array {
-  return new TextEncoder().encode(value);
-}
-
-function hexBytes(payload: Uint8Array): Uint8Array {
-  const hex = Buffer.from(payload).toString('hex');
-  return utf8Bytes(hex);
-}
-
-function computeSignatureHash(category: string, payload: Uint8Array): bigint {
-  let hash = fnv1a64(utf8Bytes(category));
-  hash = fnv1a64([Number(FIELD_SEPARATOR)], hash);
-  hash = fnv1a64(utf8Bytes('__payload__'), hash);
-  hash = fnv1a64([Number(FIELD_SEPARATOR)], hash);
-  return fnv1a64(hexBytes(payload), hash);
-}
-
-function computeDigest(seedId: number, payload: Uint8Array): bigint {
-  let digest = BigInt(seedId) & 0xffffffffffffffffn;
-  for (const byte of payload) {
-    digest = (digest * FNV64_PRIME + BigInt(byte)) & 0xffffffffffffffffn;
-  }
-  return digest;
-}
-
-function indentBlock(value: string, indent: string): string {
-  return value
-    .split('\n')
-    .map((line) => `${indent}${line}`)
-    .join('\n');
-}
-
-export function buildReplayBundleDocument(run: FuzzingRun): ReplayBundleDocument {
-  if (!run.crashDetail) {
-    throw new Error(`run ${run.id} does not include crash details`);
-  }
-
-  const payload = utf8Bytes(run.crashDetail.payload);
-  const category = classifyReplayPayload(payload);
-  const seedId = stableRunIdSeed(run.id);
-  const digest = computeDigest(seedId, payload);
-  const signatureHash = computeSignatureHash(category, payload);
-
-  return {
-    schema: 2,
-    seed: {
-      id: seedId,
-      payload: Array.from(payload),
-    },
-    signature: {
-      category,
-      digest,
-      signature_hash: signatureHash,
-    },
-    environment: null,
-    failure_payload: Array.from(payload),
-    rpc_envelope: null,
-  };
-}
-
-export function serializeReplayBundleDocument(document: ReplayBundleDocument): string {
-  const seedJson = JSON.stringify(document.seed, null, 2);
-  const failurePayloadJson = JSON.stringify(document.failure_payload, null, 2);
-
-  return [
-    '{',
-    `  "schema": ${document.schema},`,
-    `  "seed": ${indentBlock(seedJson, '  ')},`,
-    '  "signature": {',
-    `    "category": ${JSON.stringify(document.signature.category)},`,
-    `    "digest": ${document.signature.digest.toString()},`,
-    `    "signature_hash": ${document.signature.signature_hash.toString()}`,
-    '  },',
-    '  "environment": null,',
-    `  "failure_payload": ${indentBlock(failurePayloadJson, '  ')},`,
-    '  "rpc_envelope": null',
-    '}',
-  ].join('\n');
-}
-
-export function buildReplayCliInvocation(bundlePath: string): { command: string; args: string[] } {
-  const manifestPath = path.resolve(
-    process.cwd(),
-    '..',
-    '..',
-    'contracts',
-    'crashlab-core',
-    'Cargo.toml',
-  );
-
-  return {
-    command: 'cargo',
-    args: [
-      'run',
-      '--quiet',
-      '--manifest-path',
-      manifestPath,
-      '--bin',
-      'crashlab',
-      '--',
-      'replay',
-      'seed',
-      bundlePath,
-    ],
-  };
-}
-
 async function writeReplayBundleFile(run: FuzzingRun): Promise<{ bundlePath: string; document: ReplayBundleDocument }> {
   const document = buildReplayBundleDocument(run);
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'crashlab-replay-'));

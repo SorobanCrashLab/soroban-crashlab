@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const TAG_LENGTH = 16;
+const _TAG_LENGTH = 16;
 const IV_LENGTH = 12;
 const SALT_LENGTH = 16;
 
@@ -18,7 +18,7 @@ export interface EnvelopeConfig {
   previous_key_id?: string;
 }
 
-let masterKeys: Map<string, Buffer> = new Map();
+const masterKeys: Map<string, Buffer> = new Map();
 let envelopeConfig: EnvelopeConfig = {
   current_key_id: 'default',
 };

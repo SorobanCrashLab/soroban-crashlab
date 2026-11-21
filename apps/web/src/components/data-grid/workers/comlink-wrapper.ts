@@ -16,6 +16,7 @@ let correlationId = 0;
 /**
  * Wrap a Worker instance with a typed RPC interface.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function wrap<T extends Record<string, (...args: any[]) => any>>(
   worker: Worker | null,
 ): T {
@@ -63,6 +64,7 @@ export function wrap<T extends Record<string, (...args: any[]) => any>>(
 /**
  * Expose an API object from the worker side (receives messages, calls methods).
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function expose(api: Record<string, (...args: any[]) => any>): void {
   if (typeof self === 'undefined') return;
   const workerSelf = self as unknown as Worker;

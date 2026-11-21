@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+// Import the pure cron helpers directly: the barrel also re-exports the
+// server-only distributed lock, which pulls node:crypto into the client bundle.
+import { humanizeCron } from "@/lib/cron/humanize";
 import {
-  humanizeCron,
   nextRunForSchedule,
   validateCron,
   validateScheduleName,
   type Schedule,
   type ScheduledRun,
-} from "@/lib/cron";
+} from "@/lib/cron/schedule-store";
 import { useDataTableKeyboardNav } from "../use-data-table-keyboard-nav";
 
 interface SchedulerPayload {

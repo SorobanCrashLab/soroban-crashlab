@@ -7,7 +7,7 @@
  */
 
 import { connectionManager, type ConnectionHealth } from './connectionManager';
-import type { AllEventTypes, StreamEventType, StreamEnvelope } from './eventTypes';
+import type { AllEventTypes as _AllEventTypes, StreamEventType, StreamEnvelope } from './eventTypes';
 import { selectBestTransport, type TransportType } from './fallback/transportFactory';
 
 type EventCallback = (envelope: StreamEnvelope) => void;

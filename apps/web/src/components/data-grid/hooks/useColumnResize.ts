@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { COLUMN_RESIZE_STORAGE_KEY } from '../constants';
+import { safeStorage } from '@/lib/local-storage';
 
 interface ColumnWidths {
   [columnId: string]: number;
@@ -23,8 +24,9 @@ export function useColumnResize(initialColumns: { id: string; width?: number }[]
   // Load persisted widths on mount.
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(COLUMN_RESIZE_STORAGE_KEY);
+      const stored = safeStorage.getItem(COLUMN_RESIZE_STORAGE_KEY);
       if (stored) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
         setColumnWidths(JSON.parse(stored) as ColumnWidths);
       }
     } catch {
@@ -34,6 +36,7 @@ export function useColumnResize(initialColumns: { id: string; width?: number }[]
 
   // Initialize default widths for columns without persisted values.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     setColumnWidths((prev) => {
       const next = { ...prev };
       for (const col of initialColumns) {
@@ -50,7 +53,7 @@ export function useColumnResize(initialColumns: { id: string; width?: number }[]
       setColumnWidths((prev) => {
         const next = { ...prev, [columnId]: Math.max(50, newWidth) };
         try {
-          localStorage.setItem(COLUMN_RESIZE_STORAGE_KEY, JSON.stringify(next));
+          safeStorage.setItem(COLUMN_RESIZE_STORAGE_KEY, JSON.stringify(next));
         } catch {
           // Storage may be full or unavailable.
         }
@@ -100,7 +103,7 @@ export function useColumnResize(initialColumns: { id: string; width?: number }[]
     }
     setColumnWidths(defaults);
     try {
-      localStorage.setItem(COLUMN_RESIZE_STORAGE_KEY, JSON.stringify(defaults));
+      safeStorage.setItem(COLUMN_RESIZE_STORAGE_KEY, JSON.stringify(defaults));
     } catch {
       // Ignore.
     }

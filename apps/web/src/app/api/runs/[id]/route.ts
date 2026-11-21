@@ -6,7 +6,7 @@ import { API_FETCH_TIMEOUT_MS } from '@/lib/timeouts';
 import { selectRunStorageDriver } from '@/lib/storage';
 import { codedErrorResponse } from '@/lib/error-codes';
 
-export async function findRunById(id: string): Promise<FuzzingRun | undefined> {
+async function findRunById(id: string): Promise<FuzzingRun | undefined> {
   return (await selectRunStorageDriver().getRun(id)) ?? undefined;
 }
 

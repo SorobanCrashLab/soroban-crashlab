@@ -17,8 +17,8 @@ export function useRemoteCursors(roomId: string, awareness: AwarenessManager | n
   useEffect(() => {
     if (!awareness) return;
 
-    const unsub = awareness.onStatesChange(() => {
-      const remoteStates = awareness.getRemoteStates();
+    const unsub = awareness!.onStatesChange(() => {
+      const remoteStates = awareness!.getRemoteStates();
       const newCursors: RemoteCursorData[] = [];
       remoteStates.forEach((state: PresenceState) => {
         if (state.cursor) {
@@ -41,7 +41,7 @@ export function useRemoteCursors(roomId: string, awareness: AwarenessManager | n
     (field: string, position: number) => {
       const localState = awareness?.getLocalState();
       if (localState) {
-        awareness.setLocalState({ ...localState, cursor: { field, position } });
+        awareness!.setLocalState({ ...localState, cursor: { field, position } });
       }
     },
     [awareness],

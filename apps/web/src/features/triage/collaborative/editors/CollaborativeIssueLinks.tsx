@@ -47,6 +47,7 @@ function CollaborativeIssueLinksBase({
     issueLinks.forEach((v) => {
       if (v) initial.push(v as IssueLink);
     });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     setLinks(initial);
     return unsub;
   }, [issueLinks]);

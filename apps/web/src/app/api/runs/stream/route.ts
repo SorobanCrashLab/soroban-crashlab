@@ -12,8 +12,8 @@
  */
 
 import { buildMockRuns } from '@/app/mockRuns';
-import type { FuzzingRun } from '@/app/types';
-import { isTerminalStatus } from '@/lib/run-status';
+import type { FuzzingRun as _FuzzingRun } from '@/app/types';
+import { isTerminalStatus as _isTerminalStatus } from '@/lib/run-status';
 import { encodeFrame, encodeHeartbeat } from '@/lib/sse-stream';
 import { sanitizeSearchParams } from '@/lib/sanitize';
 
@@ -23,16 +23,16 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
 const POLL_INTERVAL_MS = 5_000;
 const encoder = new TextEncoder();
 
-function buildEvent(type: string, data: unknown): string {
-  const envelope = { seq: 0, event: { type, ...data } };
+function _buildEvent(_type: string, _data: unknown): string {
+  const envelope = { seq: 0, runId: '', event: { type: 'RUN_STATUS', status: 'queued', metrics: { seedCount: 0, duration: 0 } } } as unknown as import('@/lib/sse-stream').RunStreamEnvelope;
   return encodeFrame(envelope);
 }
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const campaignId = sanitizeSearchParams(url.searchParams).get('campaignId');
-  const heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-  const pollTimer: ReturnType<typeof setTimeout> | null = null;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let closed = false;
   let lastSeq = 0;
 
@@ -58,7 +58,7 @@ export async function GET(request: Request): Promise<Response> {
       // Send initial snapshot.
       for (const run of filteredRuns.slice(0, 5)) {
         lastSeq++;
-        const event = `event: run.created\ndata: ${JSON.stringify({ seq: lastSeq, event: { type: 'run.created', run } })}\n\n`;
+        const event = `event: run.created\ndata: ${encodeFrame({ seq: lastSeq, runId: run.id, event: { type: 'RUN_STATUS', status: run.status, metrics: { seedCount: 0, duration: 0 } } })}\n\n`;
         try {
           controller.enqueue(encoder.encode(event));
         } catch {
@@ -68,7 +68,7 @@ export async function GET(request: Request): Promise<Response> {
       }
 
       // Heartbeat.
-      const hbTimer = setInterval(() => {
+      heartbeatTimer = setInterval(() => {
         if (closed) return;
         try {
           controller.enqueue(encoder.encode(encodeHeartbeat()));
@@ -85,7 +85,7 @@ export async function GET(request: Request): Promise<Response> {
         if (!closed) {
           const timer = setTimeout(() => void doPoll(), POLL_INTERVAL_MS);
           // Store timer reference for cleanup.
-          (close as any)._pollTimer = timer;
+          pollTimer = timer;
         }
       };
 

@@ -14,8 +14,8 @@
  * a rotation story before this grows unbounded.
  */
 
-import { createHash } from 'node:crypto';
 import { redactMetadata } from './redaction';
+import { sha256Hex } from './sha256';
 
 export const GENESIS_HASH = '0'.repeat(64);
 
@@ -135,7 +135,7 @@ export function entryPreimage(entry: Omit<AuditEntry, 'hash'>): string {
 }
 
 export function hashEntry(entry: Omit<AuditEntry, 'hash'>): string {
-  return createHash('sha256').update(entryPreimage(entry), 'utf8').digest('hex');
+  return sha256Hex(entryPreimage(entry));
 }
 
 export type ChainStatus = 'intact' | 'broken' | 'empty';

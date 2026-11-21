@@ -133,7 +133,7 @@ interface FluentBuilder {
 export function filter(): FluentBuilder {
   const root: FilterGroup = createGroup('and');
   let currentGroup: FilterGroup = root;
-  const groupStack: FilterGroup[] = [];
+  const _groupStack: FilterGroup[] = [];
 
   function createBuilder(): FluentBuilder {
     return {

@@ -45,7 +45,7 @@ function VirtualizedDataGridBase<T>({
   sortState,
   onSort,
   selectedIds = new Set(),
-  onToggleSelection,
+  onToggleSelection: _onToggleSelection,
   getRowId,
   frozenColumnCount = FROZEN_COLUMN_COUNT,
   scrollResetKey,
@@ -56,8 +56,7 @@ function VirtualizedDataGridBase<T>({
     virtualColumns,
     viewportRef,
     sortState: internalSort,
-    handleSort,
-    rowVirtualizer,
+    handleSort,
   } = useVirtualizedTable<T>({
     columns,
     data,

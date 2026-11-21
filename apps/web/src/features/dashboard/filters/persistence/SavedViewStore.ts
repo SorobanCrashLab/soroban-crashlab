@@ -88,7 +88,7 @@ export function getView(viewId: string): SavedView | undefined {
   return readSavedViews().find((v) => v.id === viewId);
 }
 
-export function revertToVersion(viewId: string, targetVersion: number): SavedView | null {
+export function revertToVersion(viewId: string, _targetVersion: number): SavedView | null {
   // Version history is kept in the server-side store; for local-only,
   // we return the current view as-is.
   const view = getView(viewId);
