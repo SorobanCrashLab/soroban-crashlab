@@ -170,7 +170,15 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('POST', '/api/webhooks/retry', 'token', { role: 'maintainer', scopes: ['webhook:write'] }, 'default'),
   r('GET', '/api/webhooks/signing-secrets', 'token', { scopes: ['webhook:read'] }, 'default'),
   r('POST', '/api/webhooks/signing-secrets/[keyId]/revoke-grace', 'token', { role: 'maintainer', scopes: ['webhook:write'] }, 'default'),
-  r('POST', '/api/webhooks/signing-secrets/rotate', 'token', { role: 'maintainer', scopes: ['webhook:write'] }, 'default'),];
+  r('POST', '/api/webhooks/signing-secrets/rotate', 'token', { role: 'maintainer', scopes: ['webhook:write'] }, 'default'),
+
+  // Admin API routes
+  r('GET', '/api/admin/quotas', 'token', { role: 'maintainer', scopes: ['admin:read'] }, 'default'),
+  r('POST', '/api/admin/quotas', 'token', { role: 'maintainer', scopes: ['admin:write'] }, 'default'),
+  r('DELETE', '/api/admin/quotas', 'token', { role: 'maintainer', scopes: ['admin:write'] }, 'default'),
+  r('GET', '/api/admin/abuse', 'token', { role: 'maintainer', scopes: ['admin:read'] }, 'default'),
+  r('POST', '/api/admin/abuse', 'token', { role: 'maintainer', scopes: ['admin:write'] }, 'default'),
+  r('DELETE', '/api/admin/abuse', 'token', { role: 'maintainer', scopes: ['admin:write'] }, 'default'),];
 
 /**
  * True when `pathname` matches a catalog `path`, treating `[param]` segments as

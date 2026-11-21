@@ -18,5 +18,8 @@
       "sharp",
       "unrs-resolver"
     ]
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
   }
 }

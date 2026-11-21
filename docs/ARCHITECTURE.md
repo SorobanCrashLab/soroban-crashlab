@@ -154,12 +154,101 @@ section.
 
 ```
 apps/web/                 Next.js dashboard + /api routes + storage/migration
+├── src/lib/artifact-security/  Multi-layer artifact security
+│   ├── scanning/           ClamAV + YARA malware scanning
+│   ├── verification/       Sigstore/cosign + Ed25519 signatures
+│   ├── sandbox/            gVisor/Kata reproduction sandbox
+│   ├── supplychain/        SLSA, SBOM, vulnerability scanning
+│   └── quarantine/         Quarantine workflow & review UI
 contracts/crashlab-core/  Rust engine (mutators, runners, campaigns, replay)
+├── src/sandbox/          Core sandbox enhancements
+│   ├── gvisor.rs         gVisor integration
+│   ├── kata.rs           Kata Containers
+│   ├── seccomp.rs        Seccomp profile generation
+│   ├── attestation.rs    Result signing
+│   └── resource_limits.rs cgroups v2 limits
 contracts/soroban-example Example Soroban contract (WASM)
 docs/                     Canonical docs (this file, DEPLOYMENT, ENV, …)
 scripts/                  Maintainer + CI audit scripts
 .github/workflows/        GitHub Actions (no GitLab CI)
+infrastructure/           Deployment artifacts
+├── sandbox/              gVisor/Kata Dockerfiles, seccomp, containerd config
+├── scanning/             ClamAV, YARA rules & Dockerfiles
+└── supplychain/          slsa-verifier, cosign Dockerfiles
 ```
+
+---
+
+## Artifact Security Architecture
+
+### Defense in Depth Layers
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Artifact Security                                    [🔒 Quarantine: 3]    │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  UPLOAD PIPELINE                                                        │ │
+│  │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐  │ │
+│  │  │ Upload  │──▶│ ClamAV  │──▶│ YARA    │──▶│ Sig     │──▶| Quarantine│  │ │
+│  │  │         │   │ Scan    │   │ Rules   │   │ Verify  │   │ / Release │  │ │
+│  │  └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘  │ │
+│  │       │            │            │            │            │             │ │
+│  │       ▼            ▼            ▼            ▼            ▼             │ │
+│  │  Chunked      Multi-engine   Custom rules  Cosign/     Policy:         │ │
+│  │  upload       (ClamAV +      (packers,      Sigstore    - Malware→Q     │ │
+│  │  + resumable  custom)        cryptominers)  verify      - YARA→Q        │ │
+│  │                                                                      │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  REPRODUCTION SANDBOX                                                   │ │
+│  │  ┌───────────────────────────────────────────────────────────────────┐  │ │
+│  │  │  gVisor / Kata Containers                                         │  │ │
+│  │  │  ├── No host network                                              │  │ │
+│  │  │  ├── Read-only rootfs                                             │  │ │
+│  │  │  ├── CPU/memory limits (cgroups v2)                               │  │ │
+│  │  │  ├── Seccomp profile (minimal syscalls)                           │  │ │
+│  │  │  ├── No capability (CAP_DROP=ALL)                                 │  │ │
+│  │  │  └── Ephemeral storage (tmpfs, no persist)                        │  │ │
+│  │  └───────────────────────────────────────────────────────────────────┘  │ │
+│  │  Reproducer Verification:  Sigstore cosign verify --certificate...     │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  SUPPLY CHAIN INTEGRITY                                                 │ │
+│  │  SLSA Level 3:  ✓ Provenance  ✓ Reproducible  ✓ Signed  ✓ Verified    │ │
+│  │  SBOM:  CycloneDX + SPDX  |  Vulnerability Scan:  Grype/Trivy          │ │
+│  │  [Generate Attestation] [Verify Attestation] [View SBOM]               │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Upload Pipeline
+
+1. **Chunked Upload**: Artifacts uploaded via UploadThing with resumable chunks
+2. **ClamAV Scan**: Multi-engine malware detection via clamd daemon
+3. **YARA Rules**: Custom rules for packers, cryptominers, exploit kits
+4. **Signature Verification**: Cosign/Sigstore for reproducers, Ed25519 for crash bundles
+5. **Quarantine Decision**: Policy-based (strict/standard/permissive) with review queue
+
+### Reproduction Sandbox
+
+- **Runtime**: gVisor (ptrace/KVM) or Kata Containers (hardware virtualization)
+- **Isolation**: No network, read-only rootfs, minimal syscalls (seccomp), no capabilities
+- **Resources**: CPU/memory/pids limits via cgroups v2, ephemeral tmpfs storage
+- **Attestation**: Execution results signed by sandbox for verification
+
+### Supply Chain Integrity
+
+- **SLSA Level 3**: Provenance generation, reproducible builds, signed artifacts, verification
+- **SBOM**: CycloneDX 1.6 + SPDX 2.3 for all artifacts
+- **Vulnerability Scanning**: Grype + Trivy integration
+- **Verification**: slsa-verifier and cosign for artifact verification
+
+### Quarantine Management
+
+- **Review Queue**: UI for security team to inspect quarantined artifacts
+- **Approval Workflow**: 2-person approval required for release
+- **Retention**: 90-day auto-delete with manual override
+- **Safe Inspection**: Base64 encoding for web viewing, no direct execution
 
 ---
 
@@ -169,3 +258,5 @@ scripts/                  Maintainer + CI audit scripts
 - [`ENV.md`](ENV.md) — environment variable contract
 - [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) — deterministic replay guarantees
 - [`API.md`](API.md) — HTTP surface of the dashboard
+- [`SECURITY.md`](SECURITY.md) — Security policy and artifact handling procedures
+- [`THREAT_MODEL_ARTIFACT_HANDLING.md`](THREAT_MODEL_ARTIFACT_HANDLING.md) — STRIDE threat model
