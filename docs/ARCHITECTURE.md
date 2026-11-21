@@ -150,6 +150,38 @@ section.
 
 ---
 
+## Cross-run comparison workbench
+
+The `/analytics/comparison` page lazy-loads
+`apps/web/src/features/runs/comparison/ComparisonWorkbench.tsx`, which replaces
+the legacy two-run side-by-side view. State lives in `comparisonState.ts`
+(2–5 slots, pinned baseline, reorder/remove) and is mirrored into the URL
+(`?runs=…&baseline=…&panel=…&artifact=…`) by `hooks/useComparisonURL.ts` so
+views are shareable.
+
+```
+ComparisonWorkbench
+├── panels/MetricsDeltaPanel   ← metrics.ts (delta %, better/worse classification)
+├── panels/ArtifactDiffPanel   ← hooks/useArtifactDiff.ts → diffing/diffWorkers.ts
+│                                  ├─ diffing/textDiff.ts   (LCS + unified patch)
+│                                  ├─ diffing/jsonDiff.ts   (structural deep diff)
+│                                  └─ diffing/binaryDiff.ts (byte-level chunks/hex)
+├── panels/ReplaySyncPanel     ← sync/ReplaySyncController.ts (one normalised ratio)
+│                                  └─ sync/CrashCorrelator.ts (fingerprint/signature match)
+├── panels/SummaryPanel        ← crash + delta rollups
+└── campaign/CampaignComparisonMode ← campaign/AggregationEngine.ts (p50/p95/p99)
+```
+
+Diff modules are dynamically imported on first use to keep the comparison
+bundle small; `diffWorkers.ts` exposes a queued task API so a wasm bsdiff
+worker can replace the pure-TS binary scanner without changing callers.
+Artifact bytes come from `GET /api/artifacts/:id` via
+`lib/artifact-content-utils.ts`. Exporters are dependency-free: CSV and unified
+patch files download via Blob URLs, and the PDF report uses the browser print
+pipeline (`export/PDFExporter.ts`).
+
+---
+
 ## Directory map (high level)
 
 ```
