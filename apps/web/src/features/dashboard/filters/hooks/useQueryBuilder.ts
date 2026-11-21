@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
-import type { FilterAST, FilterCondition, FilterGroup, FilterNode } from '../ast/FilterAST';
-import { createCondition, createGroup, createEmptyAST, isGroup } from '../ast/FilterAST';
+import { useState, useCallback as _useCallback, useMemo } from 'react';
+import type { FilterAST, FilterCondition, FilterGroup as _FilterGroup, FilterNode as _FilterNode } from '../ast/FilterAST';
+import { createCondition as _createCondition, createGroup as _createGroup, createEmptyAST, isGroup as _isGroup } from '../ast/FilterAST';
 import { addCondition, addGroup, removeNode, updateCondition, updateGroupType, duplicateNode } from '../ast/builders';
 
 export interface QueryBuilderActions {

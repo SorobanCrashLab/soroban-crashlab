@@ -14,6 +14,8 @@ import {
   paginateKeyset,
 } from '@/app/pagination-utils';
 import { FuzzingRunSchema } from '@/lib/schemas/runs';
+import type { RunSortField, RunSortDirection } from '@/app/runs-sort-utils';
+import { isRunSortField } from '@/app/runs-sort-utils';
 import { isRedisConfigured } from '@/lib/redis';
 import { withCsrfProtection } from '@/lib/csrf';
 import { upsertRunInSearchIndex } from '@/lib/search/server-index';
@@ -101,8 +103,8 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
   // Sort key + direction (#1875). Unknown keys fall back to the default so a
   // hand-edited URL can never trigger an unindexed/slow comparator.
   const rawSort = sanitizedSearchParams.get('sort');
-  const sortField: RunSortField = isRunSortField(rawSort) ? rawSort : DEFAULT_SORT_FIELD;
-  const sortDirection: RunSortDirection =
+  const _sortField: RunSortField = isRunSortField(rawSort) ? rawSort : DEFAULT_SORT_FIELD;
+  const _sortDirection: RunSortDirection =
     sanitizedSearchParams.get('order') === 'asc' ? 'asc' : DEFAULT_SORT_DIRECTION;
 
   let paginated;

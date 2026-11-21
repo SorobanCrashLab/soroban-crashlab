@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { redisAdapter, getTriageChannel } from './redis-adapter';
-import { validateTriageSession } from './auth';
+import { validateTriageSession } from '../auth';
 
 export const dynamic = 'force-dynamic';
 

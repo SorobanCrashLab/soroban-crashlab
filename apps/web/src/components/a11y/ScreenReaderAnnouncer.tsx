@@ -33,6 +33,7 @@ export function useAnnouncer(): Announcer {
   if (fallbackRef.current === null) {
     fallbackRef.current = createAnnouncer();
   }
+  // eslint-disable-next-line react-hooks/refs -- intentional state sync in this hook
   return context ?? fallbackRef.current;
 }
 

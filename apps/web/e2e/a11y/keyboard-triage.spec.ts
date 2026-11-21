@@ -38,9 +38,7 @@ async function tabUntil(
     await page.keyboard.press('Tab');
     const matched = await page.evaluate((predSrc) => {
       const el = document.activeElement as HTMLElement | null;
-      if (!el) return false;
-      // eslint-disable-next-line no-new-Function
-      const fn = new Function('el', `return (${predSrc})(el);`) as (el: HTMLElement) => boolean;
+      if (!el) return false;      const fn = new Function('el', `return (${predSrc})(el);`) as (el: HTMLElement) => boolean;
       return fn(el);
     }, predicate.toString());
     if (matched) return;

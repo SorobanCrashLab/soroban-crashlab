@@ -14,7 +14,7 @@ export interface FilterExecutionState {
 }
 
 export function useFilterExecution(): FilterExecutionState {
-  const [results, setResults] = useState<FuzzingRun[]>([]);
+  const [results, _setResults] = useState<FuzzingRun[]>([]);
   const [count, setCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [duration, setDuration] = useState(0);

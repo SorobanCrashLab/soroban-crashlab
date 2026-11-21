@@ -78,8 +78,8 @@ describe("POST /api/artifacts/validate", () => {
     const response = await POST(request);
     expect(response.status).toBe(413);
     const json = await response.json();
-    expect(json.data.valid).toBe(false);
-    expect(json.data.errors[0]).toContain("1 MiB");
+    expect(json.code).toBe("PAYLOAD_TOO_LARGE");
+    expect(json.limit).toBe(1024 * 1024);
   });
 
   it("returns 422 for payload with constraint violations", async () => {

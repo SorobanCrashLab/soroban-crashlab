@@ -27,7 +27,7 @@ interface CollaborativeTriageSessionProps {
 
 function CollaborativeTriageSessionBase({
   runId,
-  run,
+  run: _run,
   userRole = 'analyst',
   user = { id: 'anonymous', name: 'Anonymous' },
 }: CollaborativeTriageSessionProps) {
@@ -125,7 +125,7 @@ function CollaborativeTriageSessionBase({
         )}
         {issueLinks && (
           <CollaborativeIssueLinks
-            issueLinks={issueLinks as MockYMap<IssueLink>}
+            issueLinks={issueLinks as unknown as import("./yjs/yjsProvider").MockYMap<IssueLink>}
             readOnly={!canWrite}
             onAdd={(link) => addIssueLink(link.id, link)}
             onRemove={(id) => removeIssueLink(id)}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FilterAST } from '../ast/FilterAST';
 import { createEmptyAST } from '../ast/FilterAST';
-import { encodeFilterAST, decodeFilterAST, extractFilterASTFromURL } from '../url/FilterURLCodec';
+import { encodeFilterAST, decodeFilterAST as _decodeFilterAST, extractFilterASTFromURL } from '../url/FilterURLCodec';
 
 const PARAM_NAME = 'f';
 
@@ -17,6 +17,7 @@ export function useFilterURLSync() {
     const url = window.location.href;
     const decoded = extractFilterASTFromURL(url);
     if (decoded) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
       setAST(decoded);
     }
     setInitialized(true);

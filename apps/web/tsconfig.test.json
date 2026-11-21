@@ -42,6 +42,20 @@
     "src/app/settings/accessibility/page.test.tsx",
     "src/app/settings/alerting/page.test.tsx",
     "src/app/settings/notifications/page.test.tsx",
-    "src/app/webhook-manager.test.ts"
+    "src/app/webhook-manager.test.ts",
+    "src/app/alerting-settings-page-utils.test.ts",
+    "src/app/api/campaigns/route.test.ts",
+    "src/app/api/integrations/datadog/metrics/route.test.ts",
+    "src/app/api/runs/[id]/stream/route.test.ts",
+    "src/app/pagination-property.test.ts",
+    "src/components/SortableColumnHeader.test.tsx",
+    "src/features/analytics/create-advanced-dashboard-filters-page.test.tsx",
+    "src/features/misc/add-a-fuzzy-query-builder-page.test.ts",
+    "src/features/misc/add-accessible-keyboard-nav-blueprint.test.ts",
+    "src/lib/github-session.test.ts",
+    "src/lib/github-webhook-verify.test.ts",
+    "src/lib/integrations/slack-interactivity.test.ts",
+    "src/lib/replay-diff/replay-diff.test.ts",
+    "src/lib/safe-storage.test.ts"
   ]
 }

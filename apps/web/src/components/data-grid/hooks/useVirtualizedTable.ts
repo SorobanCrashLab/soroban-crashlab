@@ -12,7 +12,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { ColumnDef, SortState } from '../types';
 import { createRowVirtualizer, type RowVirtualizer } from '../virtualizer/rowVirtualizer';
 import { createColumnVirtualizer, type ColumnVirtualizer } from '../virtualizer/columnVirtualizer';
-import { createViewportSync, type ViewportSync } from '../virtualizer/viewportSync';
+import { createViewportSync, type ViewportSync as _ViewportSync } from '../virtualizer/viewportSync';
 import { DEFAULT_ROW_HEIGHT, DEFAULT_OVERSCAN, DEFAULT_VIEWPORT_HEIGHT } from '../constants';
 
 export interface UseVirtualizedTableOptions<T> {
@@ -25,7 +25,7 @@ export interface UseVirtualizedTableOptions<T> {
   scrollResetKey?: string;
 }
 
-export interface UseVirtualizedTableResult<T> {
+export interface UseVirtualizedTableResult<_T> {
   virtualRows: { firstIndex: number; lastIndex: number; count: number; totalHeight: number; offsetTop: number };
   virtualColumns: { visibleColumns: string[]; firstIndex: number; lastIndex: number; totalWidth: number };
   viewportRef: React.RefObject<HTMLDivElement | null>;
@@ -100,7 +100,7 @@ export function useVirtualizedTable<T>({
   );
 
   const virtualColumns = useMemo(
-    () => columnVirtualizer.measure(scrollLeft, viewportSize.width, columns, frozenColumnCount),
+    () => columnVirtualizer.measure(scrollLeft, viewportSize.width, columns as unknown as import("../types").ColumnDef<unknown>[], frozenColumnCount),
     [columnVirtualizer, scrollLeft, viewportSize.width, columns, frozenColumnCount],
   );
 
