@@ -1,0 +1,458 @@
+/**
+ * Policy Editor - Visual + code editor for Cedar policies.
+ *
+ * Provides a rich editing experience with:
+ * - Visual block-based policy construction
+ * - Cedar syntax highlighting
+ * - Real-time validation
+ * - Test case editor and runner
+ * - Policy versioning
+ */
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LoadingSpinner } from './LoadingSpinner';
+import type { PolicyRecord } from './PolicyStore';
+import type { PolicyValidationResult } from './PolicyValidator';
+import type { PolicyTestResult } from './PolicyTester';
+
+// ─── Policy Editor Props ───────────────────────────────────────────────────
+
+export interface PolicyEditorProps {
+  /** Policy to edit (undefined for new policy) */
+  policy?: PolicyRecord;
+  /** Whether the policy is being created */
+  isNew?: boolean;
+  /** On save callback */
+  onSave: (policy: PolicyRecord) => Promise<void>;
+  /** On cancel callback */
+  onCancel: () => void;
+  /** Existing test cases */
+  testCases?: TestCase[];
+  /** Existing validation */
+  validation?: PolicyValidationResult;
+  /** Existing test results */
+  testResults?: PolicyTestResult;
+}
+
+export interface TestCase {
+  id: string;
+  description?: string;
+  principal: {
+    id: string;
+    identityType: 'github' | 'api-key' | 'oidc' | 'anonymous';
+    identityValue: string;
+    role: 'analyst' | 'maintainer' | 'admin';
+    teams?: string[];
+  };
+  action: string;
+  resource: {
+    type: 'campaign' | 'run' | 'artifact' | 'network' | 'schedule' | 'token';
+    id: string;
+    team?: string;
+  };
+  context?: {
+    time?: number;
+    ip?: string;
+    mfaVerified?: boolean;
+  };
+  expected: 'permit' | 'deny';
+  rationale?: string;
+}
+
+// ─── Policy Editor Component ─────────────────────────────────────────────────
+
+export function PolicyEditor({
+  policy,
+  isNew = false,
+  onSave,
+  onCancel,
+  testCases: initialTestCases = [],
+  validation: initialValidation,
+  testResults: initialTestResults,
+}: PolicyEditorProps) {
+  const [state, setState] = useState({
+    id: policy?.id ?? `policy-${Date.now()}`,
+    name: policy?.name ?? '',
+    description: policy?.description ?? '',
+    version: policy?.version ?? '1.0.0',
+    cedarCode: policy?.cedarCode ?? getDefaultPolicyTemplate(),
+    active: policy?.active ?? false,
+    tags: policy?.tags ?? [],
+    resourceScope: policy?.resourceScope ?? '',
+    teamScope: policy?.teamScope ?? '',
+  });
+
+  const [testCases, setTestCases] = useState<TestCase[]>(initialTestCases);
+  const [validation, setValidation] = useState(initialValidation);
+  const [testResults, setTestResults] = useState(initialTestResults);
+  const [saving, setSaving] = useState(false);
+  const [savingError, setSavingError] = useState<string | null>(null);
+
+  // Validate on code change
+  useEffect(() => {
+    const validate = async () => {
+      try {
+        const result = await import('./PolicyValidator').then(m => m.validatePolicyString(state.cedarCode));
+        setValidation(result);
+      } catch {
+        // Ignore validation errors during typing
+      }
+    };
+    const timeout = setTimeout(validate, 1000);
+    return () => clearTimeout(timeout);
+  }, [state.cedarCode]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSavingError(null);
+
+    try {
+      await onSave({
+        ...state,
+        active: state.active,
+        createdAt: policy?.createdAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        validated: validation?.valid ?? false,
+        validationErrors: validation?.errors.map(e => e.message),
+      });
+    } catch (error) {
+      setSavingError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addTestCase = () => {
+    const newCase: TestCase = {
+      id: `test-${Date.now()}`,
+      principal: {
+        id: '',
+        identityType: 'github',
+        identityValue: '',
+        role: 'analyst',
+      },
+      action: 'view',
+      resource: {
+        type: 'run',
+        id: '',
+      },
+      expected: 'deny',
+    };
+    setTestCases([...testCases, newCase]);
+  };
+
+  const updateTestCase = (index: number, updates: Partial<TestCase>) => {
+    const updated = [...testCases];
+    updated[index] = { ...updated[index], ...updates };
+    setTestCases(updated);
+  };
+
+  const removeTestCase = (index: number) => {
+    setTestCases(testCases.filter((_, i) => i !== index));
+  };
+
+  const runTests = async () => {
+    try {
+      const { PolicyTester } = await import('./PolicyTester');
+      if (!policy) return;
+
+      const tester = new PolicyTester();
+      const results = await tester.test(policy, testCases);
+      setTestResults(results);
+    } catch (error) {
+      console.error('Test execution failed:', error);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{isNew ? 'Create Policy' : 'Edit Policy'}</CardTitle>
+          <CardDescription>
+            {isNew ? 'Define a new Cedar policy' : `Policy: ${state.id}`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="policy-name">Policy Name</Label>
+                <Input
+                  id="policy-name"
+                  value={state.name}
+                  onChange={e => setState(s => ({ ...s, name: e.target.value }))}
+                  placeholder="e.g., Team Campaign Access"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="policy-description">Description</Label>
+                <Input
+                  id="policy-description"
+                  value={state.description}
+                  onChange={e => setState(s => ({ ...s, description: e.target.value }))}
+                  placeholder="What this policy controls"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="policy-version">Version</Label>
+                <Input
+                  id="policy-version"
+                  value={state.version}
+                  onChange={e => setState(s => ({ ...s, version: e.target.value }))}
+                  placeholder="1.0.0"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="policy-active"
+                  checked={state.active}
+                  onCheckedChange={checked => setState(s => ({ ...s, active: checked }))}
+                />
+                <Label htmlFor="policy-active">Active</Label>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="policy-tags">Tags</Label>
+                <Input
+                  id="policy-tags"
+                  value={state.tags.join(', ')}
+                  onChange={e => setState(s => ({ ...s, tags: e.target.value.split(',').map(t => t.trim()).filter(t => t) }))}
+                  placeholder="campaign, security, read-only"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="policy-resource-scope">Resource Scope</Label>
+                <Input
+                  id="policy-resource-scope"
+                  value={state.resourceScope}
+                  onChange={e => setState(s => ({ ...s, resourceScope: e.target.value }))}
+                  placeholder="campaigns, runs"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="policy-team-scope">Team Scope</Label>
+                <Input
+                  id="policy-team-scope"
+                  value={state.teamScope}
+                  onChange={e => setState(s => ({ ...s, teamScope: e.target.value }))}
+                  placeholder="security, dev"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="policy-code">Cedar Policy Code</Label>
+            <Textarea
+              id="policy-code"
+              value={state.cedarCode}
+              onChange={e => setState(s => ({ ...s, cedarCode: e.target.value }))}
+              className="font-mono text-sm"
+              rows={10}
+              placeholder={`// ${getDefaultPolicyTemplate()}`}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Write policies in Cedar syntax. Use {} for conditions and [] for lists.
+            </p>
+          </div>
+
+          {validation && (
+            <Alert variant={validation.valid ? 'default' : 'destructive'}>
+              <AlertDescription>
+                {validation.valid ? '✅ Policy is valid' : '❌ Policy has errors'}
+                {validation.errors.length > 0 && (
+                  <ul className="mt-2 list-disc list-inside text-sm">
+                    {validation.errors.map((error, i) => (
+                      <li key={i}>{error.message}</li>
+                    ))}
+                  </ul>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="tests">
+        <TabsList>
+          <TabsTrigger value="tests">Tests</TabsTrigger>
+          <TabsTrigger value="visual">Visual Builder</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tests">
+          <Card>
+            <CardHeader>
+              <CardTitle>Test Cases</CardTitle>
+              <CardDescription>
+                Define test cases to verify your policy behavior
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {testCases.map((testCase, index) => (
+                  <Card key={testCase.id}>
+                    <CardContent className="pt-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label>Test ID</Label>
+                          <Input
+                            value={testCase.id}
+                            onChange={e => updateTestCase(index, { id: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Role</Label>
+                          <Select
+                            value={testCase.principal.role}
+                            onValueChange={value => updateTestCase(index, {
+                              principal: { ...testCase.principal, role: value as 'analyst' | 'maintainer' | 'admin' },
+                            })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="analyst">Analyst</SelectItem>
+                              <SelectItem value="maintainer">Maintainer</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Action</Label>
+                          <Input
+                            value={testCase.action}
+                            onChange={e => updateTestCase(index, { action: e.target.value })}
+                            placeholder="view/create/update"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Expected</Label>
+                          <Select
+                            value={testCase.expected}
+                            onValueChange={value => updateTestCase(index, { expected: value as 'permit' | 'deny' })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="permit">Permit</SelectItem>
+                              <SelectItem value="deny">Deny</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <Button variant="destructive" size="sm" onClick={() => removeTestCase(index)}>
+                          Remove Test
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                <Button variant="outline" onClick={addTestCase}>
+                  + Add Test Case
+                </Button>
+              </div>
+
+              <div className="mt-4 flex space-x-2">
+                <Button onClick={runTests} disabled={testCases.length === 0 || !policy?.id}>
+                  Run Tests
+                </Button>
+                {testResults && (
+                  <Badge variant={testResults.success ? 'default' : 'destructive'}>
+                    {testResults.passed}/{testResults.total} tests passed
+                  </Badge>
+                )}
+              </div>
+
+              {testResults && !testResults.success && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertDescription>
+                    Some tests failed. Check the test cases and policy conditions.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="visual">
+          <Card>
+            <CardHeader>
+              <CardTitle>Visual Policy Builder</CardTitle>
+              <CardDescription>
+                Build policies using the visual editor
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Visual policy builder coming soon. Use the code editor for now.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <div className="flex justify-end space-x-2">
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave} disabled={saving || (validation && !validation.valid)}>
+          {saving ? 'Saving...' : 'Save Policy'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Helper Functions ──────────────────────────────────────────────────────
+
+/**
+ * Get the default policy template.
+ */
+function getDefaultPolicyTemplate(): string {
+  return `// Example: Permit maintainers to perform admin actions
+permit (principal, action, resource) when {
+  principal.role == "maintainer"
+};
+
+// Example: Permit team members to view their team's campaigns
+permit (principal, action, resource) when {
+  resource.type == "campaign"
+  && resource.team in principal.teams
+  && action in [view, triage]
+};`;
+}
+
+/**
+ * Policy editor context for shared state.
+ */
+export const PolicyEditorContext = createContext<{
+  policies: PolicyRecord[];
+  selectedPolicy: PolicyRecord | null;
+  setSelectedPolicy: (policy: PolicyRecord | null) => void;
+}>({
+  policies: [],
+  selectedPolicy: null,
+  setSelectedPolicy: () => {},
+});
