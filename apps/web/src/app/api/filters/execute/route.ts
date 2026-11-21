@@ -10,13 +10,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildMockRuns } from '@/app/mockRuns';
 import { evaluate } from '@/features/dashboard/filters/ast/visitors';
 import type { FilterAST } from '@/features/dashboard/filters/ast/FilterAST';
+import { readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
-    const body = await request.json();
-    const ast = body.ast as FilterAST;
+    const parsed = await readJsonBody(request);
+    if ('error' in parsed) return parsed.error;
+    const body = parsed.body as { ast?: FilterAST; limit?: unknown };
+    const ast = body.ast;
     const limit = typeof body.limit === 'number' ? Math.min(body.limit, 1000) : 100;
 
     if (!ast || typeof ast !== 'object' || ast.type !== 'group') {
@@ -35,3 +38,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
+
+// Shared wrapper bounds and streams the body with the standardized 413/408 envelopes.
+export const POST = withRouteErrorHandling('POST /api/filters/execute', postHandler);

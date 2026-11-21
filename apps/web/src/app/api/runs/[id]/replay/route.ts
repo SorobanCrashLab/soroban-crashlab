@@ -15,6 +15,7 @@ import { classifyReplayFailure, describeReplayFailure } from '@/lib/replay/failu
 import { replayJobStore } from '@/lib/replay/job-store';
 import { buildReplayResult, type ReplayDiagnostics } from '@/lib/replay/result';
 import { parseReplayRunner, type ReplayRunner } from '@/lib/replay/runners';
+import { standardSizeLimitResponse } from '@/lib/request-size-limits';
 
 export const runtime = 'nodejs';
 
@@ -320,13 +321,13 @@ interface ReplayRequestOptions {
 }
 
 async function parseReplayRequest(request: NextRequest): Promise<
-  { ok: true; options: ReplayRequestOptions } | { ok: false; message: string }
+  { ok: true; options: ReplayRequestOptions } | { ok: false; message: string; tooLarge?: boolean }
 > {
   let body: Record<string, unknown> = {};
   try {
     const raw = await request.text();
     if (raw.length > MAX_REPLAY_BODY_BYTES) {
-      return { ok: false, message: 'The replay request body is too large.' };
+      return { ok: false, message: 'The replay request body is too large.', tooLarge: true };
     }
     if (raw.trim()) {
       const parsed = JSON.parse(raw) as unknown;
@@ -387,6 +388,9 @@ export async function POST(
 
   const parsedRequest = await parseReplayRequest(request);
   if (!parsedRequest.ok) {
+    if (parsedRequest.tooLarge) {
+      return standardSizeLimitResponse(parsedRequest.message, MAX_REPLAY_BODY_BYTES);
+    }
     return errorResponse(parsedRequest.message, status.badRequest);
   }
   const { runner, environment, acknowledged, actor } = parsedRequest.options;
