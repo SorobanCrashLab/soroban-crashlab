@@ -1,0 +1,355 @@
+{
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "architectures": [
+    "SCMP_ARCH_X86_64",
+    "SCMP_ARCH_X86",
+    "SCMP_ARCH_X32",
+    "SCMP_ARCH_ARM64"
+  ],
+  "syscalls": [
+    {
+      "names": [
+        "exit",
+        "exit_group"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "read",
+        "write",
+        "pread64",
+        "pwrite64",
+        "readv",
+        "writev",
+        "preadv",
+        "pwritev"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "open",
+        "openat",
+        "close",
+        "close_range"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "lseek",
+        "llseek"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "stat",
+        "fstat",
+        "lstat",
+        "newfstatat",
+        "statx"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "access",
+        "faccessat",
+        "faccessat2"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "mmap",
+        "mmap2",
+        "munmap",
+        "mprotect",
+        "madvise",
+        "mremap",
+        "mincore",
+        "mlock",
+        "munlock",
+        "mlock2",
+        "munlockall"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "brk",
+        "sbrk"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "getpid",
+        "getppid",
+        "getuid",
+        "geteuid",
+        "getgid",
+        "getegid",
+        "gettid",
+        "getrandom"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "times",
+        "clock_gettime",
+        "clock_getres",
+        "nanosleep",
+        "clock_nanosleep"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "sched_yield",
+        "sched_getaffinity",
+        "sched_setaffinity"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "fstatfs",
+        "statfs",
+        "fstatvfs",
+        "statvfs",
+        "sync",
+        "fsync",
+        "fdatasync",
+        "sync_file_range"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "fcntl",
+        "fcntl64",
+        "ioctl",
+        "ioctl32"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "dup",
+        "dup2",
+        "dup3",
+        "pipe",
+        "pipe2",
+        "eventfd",
+        "eventfd2",
+        "signalfd",
+        "signalfd4",
+        "timerfd_create",
+        "timerfd_settime",
+        "timerfd_gettime"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "mkdir",
+        "mkdirat",
+        "rmdir",
+        "unlink",
+        "unlinkat",
+        "rename",
+        "renameat",
+        "renameat2",
+        "link",
+        "linkat",
+        "symlink",
+        "symlinkat",
+        "readlink",
+        "readlinkat"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "getdents",
+        "getdents64",
+        "fdopendir"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "chdir",
+        "fchdir",
+        "getcwd",
+        "getwd"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "chmod",
+        "fchmod",
+        "fchmodat",
+        "chown",
+        "fchown",
+        "lchown",
+        "fchownat",
+        "umask"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "rt_sigaction",
+        "rt_sigprocmask",
+        "rt_sigpending",
+        "rt_sigsuspend",
+        "rt_sigqueueinfo",
+        "rt_sigtimedwait",
+        "sigaltstack",
+        "kill",
+        "tkill",
+        "tgkill",
+        "restart_syscall"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "time",
+        "gettimeofday",
+        "settimeofday",
+        "adjtimex",
+        "clock_settime"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "uname",
+        "sysinfo",
+        "getrusage",
+        "getrlimit",
+        "setrlimit",
+        "prlimit64"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "futex",
+        "futex_time64",
+        "set_robust_list",
+        "get_robust_list"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "clone",
+        "clone3",
+        "set_tid_address",
+        "gettid",
+        "tgkill",
+        "exit",
+        "exit_group",
+        "wait4",
+        "waitid"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "socket",
+        "socketpair",
+        "bind",
+        "listen",
+        "accept",
+        "accept4",
+        "connect",
+        "getsockname",
+        "getpeername",
+        "sendto",
+        "recvfrom",
+        "sendmsg",
+        "recvmsg",
+        "shutdown",
+        "setsockopt",
+        "getsockopt"
+      ],
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "names": [
+        "epoll_create",
+        "epoll_create1",
+        "epoll_ctl",
+        "epoll_wait",
+        "epoll_pwait",
+        "epoll_pwait2"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "inotify_init",
+        "inotify_init1",
+        "inotify_add_watch",
+        "inotify_rm_watch"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "mount",
+        "umount",
+        "umount2",
+        "pivot_root"
+      ],
+      "action": "SCMP_ACT_ERRNO"
+    },
+    {
+      "names": [
+        "setxattr",
+        "lsetxattr",
+        "fsetxattr",
+        "getxattr",
+        "lgetxattr",
+        "fgetxattr",
+        "listxattr",
+        "llistxattr",
+        "flistxattr",
+        "removexattr",
+        "lremovexattr",
+        "fremovexattr"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "shmget",
+        "shmctl",
+        "shmat",
+        "shmdt",
+        "semget",
+        "semctl",
+        "semop",
+        "semtimedop",
+        "msgget",
+        "msgctl",
+        "msgsnd",
+        "msgrcv"
+      ],
+      "action": "SCMP_ACT_ERRNO"
+    }
+  ],
+  "flags": [
+    "SECCOMP_FILTER_FLAG_TSYNC",
+    "SECCOMP_FILTER_FLAG_LOG"
+  ]
+}

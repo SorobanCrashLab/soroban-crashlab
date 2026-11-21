@@ -1,0 +1,35 @@
+# gVisor Runtime for CrashLab Sandbox
+# 
+# This image provides the gVisor (runsc) runtime for sandboxed reproduction execution.
+# Based on distroless for minimal attack surface.
+
+FROM gcr.io/distroless/base-debian12 AS base
+
+# Install runsc (gVisor)
+FROM golang:1.22 AS builder
+
+ARG GVISOR_VERSION=20240619.0
+RUN go install github.com/google/gvisor/runsc@${GVISOR_VERSION}
+
+# Final image
+FROM base
+
+COPY --from=builder /go/bin/runsc /usr/local/bin/runsc
+
+# Create sandbox user
+RUN groupadd -g 1000 sandbox && \
+    useradd -u 1000 -g 1000 -m -s /bin/bash sandbox
+
+# Create workspace directory
+RUN mkdir -p /workspace && chown sandbox:sandbox /workspace
+
+# Set up tmpfs directories
+RUN mkdir -p /tmp /var/tmp && \
+    chmod 1777 /tmp /var/tmp
+
+USER sandbox
+WORKDIR /workspace
+
+# Default entrypoint
+ENTRYPOINT ["/usr/local/bin/runsc"]
+CMD ["--help"]
