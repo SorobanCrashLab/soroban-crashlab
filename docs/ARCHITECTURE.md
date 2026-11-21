@@ -105,6 +105,25 @@ start campaign (preset / CLI)
 Web surfaces: run history, triage, replay controls, analytics. Artifacts land in
 the configured storage driver or `CRASHLAB_ARTIFACT_DIR`.
 
+## Command palette
+
+The global Cmd/Ctrl+K palette is mounted with the deferred app chrome and uses
+the server-safe singleton in `apps/web/src/lib/command-palette/registry.ts`.
+Features register static commands through `registerCommand` or
+`useCommandRegistration`; async providers contribute query-driven results and
+can restrict themselves with a route context predicate. The registry applies
+weighted fuzzy matching (title, description, keywords), filters commands by
+the current pathname, and merges recently used ids from browser storage into
+the ranking. Providers receive an abort signal so stale searches are discarded.
+
+The client palette owns keyboard navigation, nested command menus, argument
+prompts, async execution feedback, and accessible combobox announcements.
+Run search is a route-scoped provider in
+`apps/web/src/app/command-palette-runs-provider.ts`; built-in navigation and
+actions are registered from `command-palette-static-entries.ts`. Command
+registration itself does not access browser globals, so the registry and
+feature contributions remain usable during server rendering.
+
 **Capacity (#1904).** `POST /api/campaigns` admits a campaign only if its class
 window is open and the scope's quotas allow it, then records a lease in the
 capacity ledger (`apps/web/src/lib/capacity/`). Runners report progress to
