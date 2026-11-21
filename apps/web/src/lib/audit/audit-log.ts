@@ -36,12 +36,11 @@ export type AuditAction =
   | 'auth.login.denied'
   | 'auth.role.grant'
   | 'tenant.access.denied'
-  | 'quota.override';
+  | 'quota.override'
   | 'triage.status'
   | 'triage.assign'
   | 'triage.priority'
-  | 'triage.bulk'
-  | 'tenant.access.denied';
+  | 'triage.bulk';
 
 /** Used when no principal could be resolved — availability over attribution. */
 export const SYSTEM_ACTOR = 'system';

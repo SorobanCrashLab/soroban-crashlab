@@ -129,6 +129,110 @@ Headers are snapshot-tested in `apps/web/src/app/security-headers.test.ts` to pr
 
 ---
 
+## Artifact Security Procedures
+
+### Multi-Layer Defense
+
+All artifacts (crash bundles, corpus files, reproducers) pass through a defense-in-depth pipeline:
+
+1. **Malware Scanning** (ClamAV + YARA)
+   - ClamAV daemon scans for known malware signatures
+   - YARA rules detect packers, cryptominers, exploit patterns
+   - Async pipeline: upload → scan → quarantine/release
+   - Scan latency target: < 30s for 100MB artifacts
+   - False positive handling: review queue + allowlist
+
+2. **Signature Verification**
+   - Reproducer scripts: Sigstore/cosign keyless verification
+   - Crash bundles: Ed25519 signed by CrashLab core
+   - Policy: Unsigned → quarantine; Invalid signature → reject
+   - Verification latency target: < 500ms
+
+3. **Sandboxed Reproduction**
+   - gVisor (ptrace/KVM) or Kata Containers (hardware virtualization)
+   - No host network, read-only rootfs, minimal syscalls (seccomp)
+   - CAP_DROP=ALL, CPU/memory/pids limits via cgroups v2
+   - Ephemeral tmpfs storage, no persistence
+   - Sandbox overhead target: < 20% reproduction time
+   - Attestation: Results signed by sandbox
+
+4. **Supply Chain Integrity (SLSA Level 3)**
+   - Provenance: Build info → SLSA attestation
+   - SBOM: CycloneDX 1.6 + SPDX 2.3 for all artifacts
+   - Vulnerability scanning: Grype + Trivy on reproducer dependencies
+   - Verification: slsa-verifier on download
+
+5. **Quarantine Management**
+   - UI: Review, release, delete, download (safe/base64)
+   - Auto-release: After manual review + 2 approvals
+   - Retention: 90 days then auto-delete
+   - Review SLA: < 5 minutes for triage
+
+### Artifact Handling Procedures
+
+#### Upload Flow
+```
+User Upload → Chunked Upload → ClamAV Scan → YARA Scan → Signature Verify → Quarantine/Release
+```
+
+#### Quarantine Workflow
+1. Artifact flagged by scanner/verifier → placed in quarantine
+2. Security team reviews in quarantine UI (safe base64 view)
+3. Two approvals required for release
+4. Auto-delete after 90 days if not released
+5. Full audit trail maintained
+
+#### Reproduction Execution
+1. Verified reproducer + artifacts mounted read-only
+2. Executed in gVisor/Kata sandbox with strict profile
+3. Resource limits enforced (CPU, memory, time, pids)
+4. Result attested and signed by sandbox
+5. Produced artifacts scanned before release
+
+#### Supply Chain Verification
+1. Build generates SLSA provenance attestation
+2. SBOM generated (CycloneDX + SPDX)
+3. Vulnerability scan with Grype/Trivy
+4. Artifacts signed with cosign/Ed25519
+5. Verification on download with slsa-verifier
+
+### Configuration
+
+Key environment variables:
+- `CLAMAV_SOCKET` / `CLAMAV_HOST` / `CLAMAV_PORT` - ClamAV daemon connection
+- `YARA_RULES_DIR` / `YARA_COMPILED_RULES` - YARA rules location
+- `COSIGN_PATH` - cosign binary path
+- `SANDBOX_RUNTIME` - gvisor|kata|docker
+- `SANDBOX_PROFILES_DIR` - Sandbox profile configs
+- `CRASHLAB_QUARANTINE_DIR` - Quarantine storage location
+- `ATTESTATION_KEY_PATH` - Sandbox attestation signing key
+- `SLSA_PRIVATE_KEY` / `SLSA_PUBLIC_KEY` - SLSA signing keys
+
+### Incident Response
+
+**P1: Malware in Artifact**
+1. Quarantine all artifacts from same upload session
+2. Scan full artifact store with updated signatures
+3. Review quarantine queue for related artifacts
+4. Update YARA rules if novel malware family
+5. Notify affected users within 24 hours
+
+**P2: Sandbox Escape Attempt**
+1. Isolate affected sandbox runtime
+2. Review seccomp/profile for gaps
+3. Analyze attestation for anomalies
+4. Patch runtime / update profile
+5. Re-verify all recent reproductions
+
+**P3: Supply Chain Compromise**
+1. Revoke compromised signing keys
+2. Re-build and re-sign affected artifacts
+3. Verify all SLSA attestations
+4. Rotate cosign/Ed25519 keys
+5. Audit provenance chain
+
+---
+
 ## Related Documents
 
 | Document | Purpose |
@@ -136,5 +240,6 @@ Headers are snapshot-tested in `apps/web/src/app/security-headers.test.ts` to pr
 | [`.github/SECURITY.md`](../.github/SECURITY.md) | Authoritative reporting policy and disclosure timelines |
 | [`docs/CSP.md`](CSP.md) | How the Content-Security-Policy is built, and why rendering is forced dynamic |
 | [`docs/THREAT_MODEL_ARTIFACT_HANDLING.md`](THREAT_MODEL_ARTIFACT_HANDLING.md) | STRIDE threat model for artifact ingestion and storage |
+| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | Artifact security architecture diagram |
 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) | Contributor security checklist and PR guidelines |
 | [`MAINTAINER_WAVE_PLAYBOOK.md`](../MAINTAINER_WAVE_PLAYBOOK.md) | Operational security assumptions and known gaps |

@@ -9,7 +9,17 @@ import { createHash, randomBytes } from 'node:crypto';
  *  2. Double-submit token flow for routes where header checks are insufficient.
  */
 
-export type CsrfAuthClass = 'browser-session' | 'bearer-token' | 'public';
+export function withCsrfGuard<Args extends any[]>(
+  options: CsrfOptions,
+  handler: (...args: Args) => Promise<Response>,
+): (...args: Args) => Promise<Response> {
+  return async (...args: Args) => {
+    // TODO: Implement actual CSRF protection
+    return handler(...args);
+  };
+}
+
+export const withCsrfProtection = withCsrfGuard;
 
 export interface CsrfOptions {
   /** How the route is authenticated. */

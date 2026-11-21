@@ -1,0 +1,40 @@
+# Kata Containers Runtime for CrashLab Sandbox
+# 
+# This image provides Kata Containers runtime for hardware-virtualized sandbox execution.
+
+FROM ubuntu:24.04 AS base
+
+# Install Kata Containers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Kata Containers repository
+RUN curl -fsSL https://download.opensuse.org/repositories/home:/katacontainers:/releases:/latest/xUbuntu_24.04/Release.key | gpg --dearmor -o /usr/share/keyrings/katacontainers.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/katacontainers.gpg] https://download.opensuse.org/repositories/home:/katacontainers:/releases:/latest/xUbuntu_24.04/ /" > /etc/apt/sources.list.d/katacontainers.list
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    kata-runtime \
+    kata-containers \
+    qemu-system-x86 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create sandbox user
+RUN groupadd -g 1000 sandbox && \
+    useradd -u 1000 -g 1000 -m -s /bin/bash sandbox
+
+# Create workspace directory
+RUN mkdir -p /workspace && chown sandbox:sandbox /workspace
+
+# Configure containerd for Kata runtime
+RUN mkdir -p /etc/containerd
+
+USER sandbox
+WORKDIR /workspace
+
+# Default entrypoint
+ENTRYPOINT ["kata-runtime"]
+CMD ["--help"]
