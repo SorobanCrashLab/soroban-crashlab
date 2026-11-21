@@ -1,0 +1,23 @@
+{
+  "title": "Campaigns",
+  "description": "Fuzzing campaigns and milestones",
+  "create": "Create Campaign",
+  "edit": "Edit Campaign",
+  "delete": "Delete Campaign",
+  "status": {
+    "active": "Active",
+    "paused": "Paused",
+    "completed": "Completed"
+  },
+  "fields": {
+    "name": "Campaign Name",
+    "target": "Target Contract",
+    "strategy": "Fuzzing Strategy",
+    "budget": "Resource Budget",
+    "duration": "Max Duration"
+  },
+  "empty": {
+    "title": "No campaigns",
+    "description": "Create your first fuzzing campaign"
+  }
+}

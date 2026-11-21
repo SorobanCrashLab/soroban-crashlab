@@ -1,0 +1,23 @@
+{
+  "title": "Campañas",
+  "description": "Campañas de fuzzing e hitos",
+  "create": "Crear Campaña",
+  "edit": "Editar Campaña",
+  "delete": "Eliminar Campaña",
+  "status": {
+    "active": "Activa",
+    "paused": "Pausada",
+    "completed": "Completada"
+  },
+  "fields": {
+    "name": "Nombre de Campaña",
+    "target": "Contrato Objetivo",
+    "strategy": "Estrategia de Fuzzing",
+    "budget": "Presupuesto de Recursos",
+    "duration": "Duración Máxima"
+  },
+  "empty": {
+    "title": "Sin campañas",
+    "description": "Crea tu primera campaña de fuzzing"
+  }
+}

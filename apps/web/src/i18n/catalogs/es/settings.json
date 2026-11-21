@@ -1,0 +1,28 @@
+{
+  "title": "Configuración",
+  "description": "Configuración de cuenta y espacio de trabajo",
+  "tabs": {
+    "general": "General",
+    "notifications": "Notificaciones",
+    "api": "API",
+    "team": "Equipo",
+    "billing": "Facturación"
+  },
+  "general": {
+    "language": "Idioma",
+    "theme": "Tema",
+    "timezone": "Zona Horaria"
+  },
+  "notifications": {
+    "emailNotifications": "Notificaciones por Correo",
+    "pushNotifications": "Notificaciones Push",
+    "weeklyDigest": "Resumen Semanal"
+  },
+  "api": {
+    "apiKeys": "Claves API",
+    "createKey": "Crear Clave API",
+    "revokeKey": "Revocar Clave"
+  },
+  "saveChanges": "Guardar Cambios",
+  "changesSaved": "Cambios guardados exitosamente"
+}

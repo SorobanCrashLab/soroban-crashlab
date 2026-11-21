@@ -1,0 +1,23 @@
+{
+  "title": "[Çámpáígñs]",
+  "description": "[Fúzzíñg çámpáígñs áñd mílestóñés]",
+  "create": "[Çréáté Çámpáígñ]",
+  "edit": "[Édít Çámpáígñ]",
+  "delete": "[Déléte Çámpáígñ]",
+  "status": {
+    "active": "[Áçtívé]",
+    "paused": "[Páúséd]",
+    "completed": "[Çómplétéd]"
+  },
+  "fields": {
+    "name": "[Çámpáígñ Ñámé]",
+    "target": "[Tárgét Çóñtráçt]",
+    "strategy": "[Fúzzíñg Strátégý]",
+    "budget": "[Résóúrçé Búdgét]",
+    "duration": "[Máx Dúrátíóñ]"
+  },
+  "empty": {
+    "title": "[Ñó çámpáígñs]",
+    "description": "[Çréáté ýóúr fírst fúzzíñg çámpáígñ]"
+  }
+}

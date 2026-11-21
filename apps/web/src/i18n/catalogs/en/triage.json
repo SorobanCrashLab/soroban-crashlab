@@ -1,0 +1,26 @@
+{
+  "title": "Triage",
+  "description": "Crash triage and analysis",
+  "priority": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "actions": {
+    "acknowledge": "Acknowledge",
+    "assignTo": "Assign To",
+    "markResolved": "Mark Resolved",
+    "reopenIssue": "Reopen Issue"
+  },
+  "filters": {
+    "unacknowledged": "Unacknowledged",
+    "inProgress": "In Progress",
+    "resolved": "Resolved",
+    "all": "All Issues"
+  },
+  "empty": {
+    "title": "No issues to triage",
+    "description": "All caught issues have been addressed"
+  }
+}
