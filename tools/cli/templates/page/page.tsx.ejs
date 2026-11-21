@@ -1,0 +1,89 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button, LoadingSpinner } from '@/components';
+import { useToast } from '@/hooks';
+import { PageHeader } from '@/components/PageHeader';
+import { ListState } from '@/components/ListState';
+
+interface ${PascalCaseName}PageProps {
+  // Add your props here based on route parameters
+  // params?: { id: string };
+}
+
+export default function ${PascalCaseName}Page(props: ${PascalCaseName}PageProps) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [data, setData] = useState<null | any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // TODO: Implement data fetching
+      // const response = await fetch('/api/${kebabCaseName}');
+      // const result = await response.json();
+      // setData(result);
+      console.log('Loading ${kebabCaseName} data...');
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAction = () => {
+    // TODO: Implement action
+    toast.success('Action triggered');
+  };
+
+  return (
+    <div className="container-full page-padding">
+      <PageHeader
+        title="${TemplateName} Page"
+        description="Manage your ${kebabCaseName} settings"
+      />
+
+      <ListState
+        {...(loading
+          ? { state: 'loading' }
+          : error
+          ? { state: 'error', message: error.message, onRetry: fetchData }
+          : data
+          ? { state: 'success' }
+          : { state: 'empty', message: 'No data available' })}
+      >
+        {loading ? (
+          <LoadingSpinner />
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-600 dark:text-red-400 mb-4">{error.message}</p>
+            <Button onClick={fetchData}>Retry</Button>
+          </div>
+        ) : data ? (
+          <div>
+            {/* Render your data here */}
+            <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded">
+              {JSON.stringify(data, null, 2)}
+            </pre>
+            <Button onClick={handleAction} className="mt-4">
+              Trigger Action
+            </Button>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-600 dark:text-gray-400">No ${kebabCaseName} data available.</p>
+          </div>
+        )}
+      </ListState>
+    </div>
+  );
+}
