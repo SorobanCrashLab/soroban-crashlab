@@ -24,6 +24,7 @@ function runToEntry(run: FuzzingRun, navigate: (path: string) => void): CommandE
 export function createRunsProvider(navigate: (path: string) => void): CommandProvider {
   return {
     id: 'runs-provider',
+    when: ({ pathname }) => pathname === '/runs' || pathname.startsWith('/runs/'),
     async suggest(query: string, signal: AbortSignal): Promise<CommandEntry[]> {
       const { results } = await api.runs.search(query, {
         limit: PALETTE_RESULT_LIMIT,
