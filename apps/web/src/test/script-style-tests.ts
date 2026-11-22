@@ -52,7 +52,6 @@ export const QUARANTINED_TESTS: readonly string[] = [
   'src/app/components/OnboardingWizard.test.ts',
   'src/app/create-advanced-dashboard-filters-page.test.tsx',
   'src/app/dependency-update-policy.test.ts',
-  'src/app/integrations/page.test.ts',
   'src/app/maintainer-mode-utils.test.ts',
   'src/app/page.integration.test.ts',
   'src/app/page.test.tsx',
