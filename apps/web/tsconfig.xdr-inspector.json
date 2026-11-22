@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "plugins": [],
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "src/lib/xdr/**/*.ts",
+    "src/features/xdr-inspector/**/*.ts",
+    "src/features/xdr-inspector/**/*.tsx",
+    "src/app/xdr-inspector/*.tsx",
+    "src/app/runs/*/payloads/*.tsx",
+    "e2e/xdr-inspector.spec.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

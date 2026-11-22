@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { buildMockRuns } from "@/fixtures";
 import {
   generateReproductionSnippet,
@@ -38,6 +39,7 @@ export default function ReproductionSnippetPage() {
           </p>
         </div>
 
+        <Link href={selectedRunId ? `/runs/${encodeURIComponent(selectedRunId)}/payloads?context=reproducer` : "/xdr-inspector?context=reproducer"} className="mb-4 inline-block underline">Inspect and export an XDR reproducer fixture</Link>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
             <div className="bg-[var(--surface)] border border-zinc-200 dark:border-zinc-700 rounded-lg p-6">
