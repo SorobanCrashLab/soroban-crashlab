@@ -1,0 +1,8 @@
+[
+  {
+    "seed_id": 4242,
+    "input_payload": "",
+    "mode": "invoker",
+    "failure_class": "budget"
+  }
+]

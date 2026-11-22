@@ -1,0 +1,170 @@
+name: flake-watch
+
+# Issue #1825.
+#
+# Flakes are currently handled by re-running CI until it goes green, which
+# trains everyone to ignore red and hides real regressions. This workflow
+# re-runs the suite up to K times *with every result recorded*, marks a test
+# that both passed and failed as **flaky** (never green), and ranks the worst
+# offenders. Tests that cross the flake threshold get a proposed quarantine
+# entry with an expiry that can never exceed the policy cap.
+#
+# It is deliberately report-only: a flaky test surfaces as a summary, an
+# artifact, a PR comment and (nightly) a tracking issue — it never blocks a
+# merge by itself. The one thing that can fail is the committed quarantine
+# config, because a malformed or unexpired-forever quarantine is a policy bug.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    # Nightly, after the fuzz and e2e nightly runs.
+    - cron: '25 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: flake-watch-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+env:
+  # Number of repeat attempts per run (K). Overridable via repository variables.
+  FLAKE_RETRIES: ${{ vars.FLAKE_RETRIES != '' && vars.FLAKE_RETRIES || '3' }}
+  FLAKE_RATE_THRESHOLD: ${{ vars.FLAKE_RATE_THRESHOLD != '' && vars.FLAKE_RATE_THRESHOLD || '5' }}
+  FLAKE_WINDOW_RUNS: ${{ vars.FLAKE_WINDOW_RUNS != '' && vars.FLAKE_WINDOW_RUNS || '20' }}
+
+jobs:
+  quarantine-config:
+    name: Quarantine config
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Unit-test the flake policy logic
+        run: node --test scripts/flake/*.test.mjs
+      - name: Validate the committed quarantine list
+        run: node scripts/flake/check-quarantine.mjs
+      - name: Escalate any expired quarantine (nightly only)
+        if: github.event_name == 'schedule'
+        run: node scripts/flake/check-quarantine.mjs --fail-on-expired
+
+  flake-probe:
+    name: Flake probe
+    needs: quarantine-config
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install workspace dependencies
+        continue-on-error: true
+        run: pnpm install --frozen-lockfile
+
+      - name: Run K attempts, recording every outcome
+        # A failing attempt must not abort the probe: the *disagreement* between
+        # attempts is the signal we are after.
+        continue-on-error: true
+        run: |
+          set -eu
+          case "$FLAKE_RETRIES" in
+            ''|*[!0-9]*) echo "Invalid FLAKE_RETRIES '$FLAKE_RETRIES'; using 3"; K=3 ;;
+            *) K="$FLAKE_RETRIES" ;;
+          esac
+          mkdir -p "$GITHUB_WORKSPACE/flake-attempts"
+          for i in $(seq 1 "$K"); do
+            echo "::group::attempt $i/$K"
+            pnpm --dir apps/web exec vitest run \
+              --reporter=json \
+              --outputFile "$GITHUB_WORKSPACE/flake-attempts/attempt-$i.json" || true
+            echo "::endgroup::"
+          done
+          ls -l "$GITHUB_WORKSPACE/flake-attempts" || true
+
+      - name: Summarize flake report
+        continue-on-error: true
+        run: |
+          set -eu
+          node scripts/flake/summarize-runs.mjs \
+            --attempts-dir "$GITHUB_WORKSPACE/flake-attempts" \
+            --threshold "$FLAKE_RATE_THRESHOLD" \
+            --window "$FLAKE_WINDOW_RUNS" \
+            --stack web \
+            --out flake-report.json \
+            --markdown flake-report.md \
+            --quarantine-out flake-quarantine.proposed.json
+          if [ -f flake-report.md ]; then
+            cat flake-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Comment the flake report on the PR
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          if [ ! -f flake-report.json ]; then exit 0; fi
+          flaky=$(node -e "console.log(require('./flake-report.json').totals.flaky)")
+          if [ "$flaky" = "0" ]; then
+            echo "No flaky tests above threshold; not commenting."
+            exit 0
+          fi
+          marker="<!-- flake-watch -->"
+          body="$(printf '%s\n\n%s\n' "$marker" "$(cat flake-report.md)")"
+          existing=$(gh api \
+            "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/comments" \
+            --paginate \
+            --jq '.[] | select(.body | contains("<!-- flake-watch -->")) | .id' | head -n 1 || true)
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -f body="$body" >/dev/null
+            echo "Updated existing flake-watch comment $existing"
+          else
+            gh pr comment "${{ github.event.pull_request.number }}" --body "$body"
+          fi
+
+      - name: File or update the nightly tracking issue
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          if [ ! -f flake-report.json ]; then exit 0; fi
+          flaky=$(node -e "console.log(require('./flake-report.json').totals.flaky)")
+          if [ "$flaky" = "0" ]; then
+            echo "No flaky tests above threshold; nothing to file."
+            exit 0
+          fi
+          title="Flaky test quarantine report"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "in:title \"$title\"" --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file flake-report.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+              --body-file flake-report.md
+          fi
+
+      - name: Upload flake report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flake-report
+          path: |
+            flake-report.json
+            flake-report.md
+            flake-quarantine.proposed.json
+            ${{ github.workspace }}/flake-attempts
+          if-no-files-found: ignore

@@ -1,0 +1,40 @@
+[package]
+name = "crashlab-core-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+crashlab-core = { path = ".." }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "classify_payload"
+path = "fuzz_targets/classify_payload.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "load_bundle_document"
+path = "fuzz_targets/load_bundle_document.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "import_corpus"
+path = "fuzz_targets/import_corpus.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse_regression_group"
+path = "fuzz_targets/parse_regression_group.rs"
+test = false
+doc = false
+bench = false

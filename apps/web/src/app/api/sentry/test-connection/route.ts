@@ -1,0 +1,37 @@
+import { NextRequest } from 'next/server';
+import { checkRequestSize } from '@/lib/request-size-limits';
+import { withSizeLimitAndLogging } from '@/lib/route-handler';
+import { testSentryConnection } from '@/lib/integrations/sentry-store';
+import { errorResponse, successResponse } from '@/lib/api-response-utils';
+
+/**
+ * POST /api/sentry/test-connection
+ * Checks whether a given DSN looks like a valid, reachable Sentry endpoint.
+ * Body: { dsn: string }
+ */
+async function postHandler(request: NextRequest) {
+  const sizeError = checkRequestSize(request);
+  if (sizeError) {
+    return sizeError;
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse('Request body must be valid JSON.', 400);
+  }
+
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    typeof (body as Record<string, unknown>).dsn !== 'string'
+  ) {
+    return errorResponse('Field "dsn" must be a string.', 400);
+  }
+
+  const result = testSentryConnection((body as { dsn: string }).dsn);
+  return successResponse(result, { status: result.success ? 200 : 422 });
+}
+
+export const POST = withSizeLimitAndLogging('POST /api/sentry/test-connection', postHandler);

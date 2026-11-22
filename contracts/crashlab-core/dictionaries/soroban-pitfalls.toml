@@ -1,0 +1,287 @@
+# Soroban pitfall dictionary — curated value pools for crashlab core mutation.
+# Each entry is injected into structurally-aware slots with high probability so that
+# every campaign exercises the known-hard edges by default.
+#
+# Format:
+#   schema_version = 1
+#   engine_version = "<soroban-engine-version>" # W5-B02 binding
+#   [[pools]]
+#    name = "..."
+#    class = "ttl" | "archival" | "depth" | "metering" | "address" | "sequence"
+#    description = "..."
+#    reference = "..."
+#    values = [...]
+
+schema_version = 1
+engine_version = "20.0.0"
+
+# -----------------------------------------------------------------------------
+# TL thresholds (Time-to-Live extension boundaries)
+# -----------------------------------------------------------------------------
+
+[[pools]]
+name = "ttl_min_ledgers"
+class = "ttl"
+description = "Minimum TTL extension in ledgers (boundary value)."
+reference = "Soroban docs: state expiration / TTL extension - minimum ledgers"
+values = [1, 2, 5, 10]
+
+[[pools]]
+name = "ttl_max_ledgers"
+class = "ttl"
+description = "Maximum TTL extension in ledgers (boundary value)."
+reference = "Soroban docs: state expiration / TTL extension - maximum ledgers"
+values = [631000, 631001, 631002]
+
+[[pools]]
+name = "ttl_extension_border"
+class = "ttl"
+description = "TTL extension just below / at the maximum allowed extension."
+reference = "Soroban docs: TTLextended - max extension edge"
+values = [630999, 631000, 631001]
+
+# -----------------------------------------------------------------------------
+# Archival / ledger-sequence edges
+# -----------------------------------------------------------------------------
+
+[[pools]]
+name = "ledger_sequence_zero"
+class = "sequence"
+description = "Ledger sequence at zero (genesis / archival edge)."
+reference = "Soroban docs: Ledger sequence boundaries"
+values = [0, 1]
+
+[[pools]]
+name = "ledger_sequence_max"
+class = "sequence"
+description = "Ledger sequence at u32 max (overflow edge)."
+reference = "Soroban docs: Ledger sequence u32 range"
+values = [4294967295, 4294967294]
+
+[[pools]]
+name = "archival_live_until_border"
+class = "archival"
+description = "liveUntilLedger values at archival boundary (current ledger border)."
+reference = "Soroban docs: archived entry access / restoration"
+values = [0, 1, 2]
+
+[[pools]]
+name = "archival_restore_border"
+class = "archival"
+description = "Restore extension just at / below minimum (archival restore footgun)."
+reference = "Soroban docs: restore footgun - min restore extension"
+values = [0, 1, 2]
+
+# -----------------------------------------------------------------------------
+# Recursion / host-fn depth limits
+# -----------------------------------------------------------------------------
+
+[[pools]]
+name = "depth_limit_minus_one"
+class = "depth"
+description = "Host-fn recursion depth at limit minus one (last successful call)."
+reference = "Soroban docs: host function recursion depth limit"
+values = [63, 64]
+
+[[pools]]
+name = "depth_limit"
+class = "depth"
+description = "Host-fn recursion depth at the limit (exceeds on next call)."
+reference = "Soroban docs: host function recursion depth limit"
+values = [64, 65]
+
+[[pools]]
+name = "depth_limit_plus_one"
+class = "depth"
+description = "Host-fn recursion depth one past the limit (should trap)."
+reference = "Soroban docs: host function recursion depth limit"
+values = [65, 66, 128]
+
+# -----------------------------------------------------------------------------
+# Metering / budget-saturating numbers
+# -----------------------------------------------------------------------------
+
+[[pools]]
+name = "budget_saturating_instructions"
+class = "metering"
+description = "Instruction count budget values that saturate or exceed the budget."
+reference = "Soroban docs: resource limits - instructions"
+values = [10000000, 10000001, 4294967295]
+
+[[pools]]
+name = "budget_saturating_bytes"
+class = "metering"
+description = "Byte budget values that saturate or exceed the budget."
+reference = "Soroban docs: resource limits - bytes"
+values = [65536, 65537, 1048576]
+
+[[pools]]
+name = "budget_zero_edge"
+class = "metering"
+description = "Zero-budget edge values (min-builtin resource edges)."
+reference = "Soroban docs: min-builtin resource edges"
+values = [0, 1, 2]
+
+[[pools]]
+name = "metering_cpt_instructions_max"
+class = "metering"
+description = "CPU instructions at u64 max (overflow edge)."
+reference = "Soroban docs: metering - CPU instructions u64"
+values = [18446744073709551615, 18446744073709551616]
+
+# -----------------------------------------------------------------------------
+# Address edges (muxed / contract address classes)
+# ------------------------------------------------------------------------------
+
+[[pools]]
+name = "address_class_contract"
+class = "address"
+description = "Contract address class byte (Strellar address discriminant)."
+reference = "Soroban docs: Address - contract class"
+values = [1, 2]
+
+[[pools]]
+name = "address_class_account"
+class = "address"
+description = "Account address class byte (Strellar address discriminant)."
+reference = "Soroban docs: Address - account class"
+values = [0, 3]
+
+[[pools]]
+name = "address_class_muxed"
+class = "address"
+description = "Muxed account address class byte (classic muxed-account footgun)."
+reference = "Soroban docs: muxed accounts / muxed address handling"
+values = [256, 257]
+
+[[pools]]
+name = "address_class_invalid"
+class = "address"
+description = "Invalid / unknown address class byte (rejection edge)."
+reference = "Soroban docs: Address - invalid class rejection"
+values = [255, 254]
+
+[[pools]]
+name = "address_bytes_zero"
+class = "address"
+description = "All-zero address bytes (null / zero address edge)."
+reference = "Soroban docs: Address - zero address edge"
+values = [0]
+
+[[pools]]
+name = "address_bytes_max"
+class = "address"
+description = "All-0xFF address bytes (max address edge)."
+reference = "Soroban docs: Address - max address edge"
+values = [255]
+
+# -----------------------------------------------------------------------------
+# Additional TTR / expiration edges
+# -----------------------------------------------------------------------------
+
+[[pools]]
+name = "ttl_expired_entry"
+class = "ttl"
+description = "TTL expired entry access (archived entry read)."
+reference = "Soroban docs: archived entry access - expired TTL"
+values = [0, 1]
+
+[[pools]]
+name = "ttl_live_until_current"
+class = "ttl"
+description = "liveUntilLedger equal to current ledger (expiration border)."
+reference = "Soroban docs: TTL expiration boundary"
+values = [1000, 1001]
+
+[[pools]]
+name = "ttl_extension_zero"
+class = "ttl"
+description = "TTL extension of zero (no extension footgun)."
+reference = "Soroban docs: TTL extension - zero edge"
+values = [0]
+
+# -----------------------------------------------------------------------------
+# Additional depth / recursion edges
+# -----------------------------------------------------------------------------
+
+[[pools]]
+name = "depth_zero"
+class = "depth"
+description = "Host-fn recursion depth at zero (root call)."
+reference = "Soroban docs: host fn recursion - root depth"
+values = [0]
+
+# -----------------------------------------------------------------------------
+# Additional metering edges
+# -----------------------------------------------------------------------------
+
+[[pools]]
+name = "memory_budget_saturating"
+class = "metering"
+description = "Memory budget values that saturate or exceed the budget."
+reference = "Soroban docs: resource limits - memory"
+values = [4194304, 4194305]
+
+[[pools]]
+name = "ledger_entry_count_max"
+class = "metering"
+description = "Ledger entry count at max (budget saturation)."
+reference = "Soroban docs: resource limits - ledger entries"
+values = [1024, 1025]
+
+[[pools]]
+name = "events_budget_saturating"
+class = "metering"
+description = "Events budget values that saturate or exceed the budget."
+reference = "Soroban docs: resource limits - events"
+values = [1024, 1025]
+
+[[pools]]
+name = "sub_invocations_budget_saturating"
+class = "metering"
+description = "Sub-invocations budget values that saturate or exceed the budget."
+reference = "Soroban docs: resource limits - sub-invocations"
+values = [64, 65]
+
+# -----------------------------------------------------------------------------
+# Additional archival edges
+# -----------------------------------------------------------------------------
+
+[[pools]]
+name = "archival_entry_read"
+class = "archival"
+description = "Archived entry read footgun (read after expiry)."
+reference = "Soroban docs: archived entry access - read footgun"
+values = [0, 1]
+
+[[pools]]
+name = "archival_entry_write"
+class = "archival"
+description = "Archived entry write footgun (write after expiry)."
+reference = "Soroban docs: archived entry access - write footgun"
+values = [0, 1]
+
+[[pools]]
+name = "archival_restore_extension_max"
+class = "archival"
+description = "Restore extension at max (archival restore overflow edge)."
+reference = "Soroban docs: restore footgun - max restore extension"
+values = [631000, 631001]
+
+# -----------------------------------------------------------------------------
+# Additional sequence edges
+# -----------------------------------------------------------------------------
+
+[[pools]]
+name = "sequence_gap_border"
+class = "sequence"
+description = "Ledger sequence gap at border (out-of-order sequence footgun)."
+reference = "Soroban docs: ledger sequence gap handling"
+values = [0, 1]
+
+[[pools]]
+name = "sequence_high_bit"
+class = "sequence"
+description = "Ledger sequence with high bit set (sign bit / overflow edge)."
+reference = "Soroban docs: ledger sequence u32 range"
+values = [2147483648, 2147483647]

@@ -8,6 +8,10 @@
 //! crash-index <bundle.json> [bundle2.json ...]
 //! ```
 //!
+//! # Environment variables
+//! - `CRASHLAB_OUTPUT_FORMAT` — Set to `json` to output JSON instead of a CLI table.
+//!   Used for the Rust ↔ Next.js data bridge.
+//!
 //! # Exit codes
 //! - `0` — summary printed successfully.
 //! - `2` — a file could not be read or parsed.
@@ -45,9 +49,23 @@ fn main() {
     }
 
     let summary = index.summary();
-    print!("{}", summary.to_cli_table());
-    println!(
-        "--- {} unique signature(s), {} total crash(es) ---",
-        summary.unique_signatures, summary.total_crashes
-    );
+
+    // Check for JSON output format (used for Rust ↔ Next.js data bridge)
+    if std::env::var("CRASHLAB_OUTPUT_FORMAT").as_deref() == Ok("json") {
+        match summary.to_json() {
+            Ok(json_bytes) => {
+                print!("{}", String::from_utf8_lossy(&json_bytes));
+            }
+            Err(e) => {
+                eprintln!("error: failed to serialize JSON: {e}");
+                std::process::exit(2);
+            }
+        }
+    } else {
+        print!("{}", summary.to_cli_table());
+        println!(
+            "--- {} unique signature(s), {} total crash(es) ---",
+            summary.unique_signatures, summary.total_crashes
+        );
+    }
 }

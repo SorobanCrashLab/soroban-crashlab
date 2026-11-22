@@ -1,0 +1,2205 @@
+{
+  "issues": [
+    {
+      "roadmap_id": 1,
+      "title": "[contracts] Unify classify() with classify_failure() for bundle signatures",
+      "slug": "unify-classify-entrypoint",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:contracts",
+        "type:refactor",
+        "priority:p0",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-001`\n\n## Description\nThe legacy `classify()` in `lib.rs` produces categories that diverge from `taxonomy::classify_failure()`, causing replay mismatches when bundles are created via `to_bundle()`. Unify so signatures and taxonomy align.\n\n## Requirements\n- Delegate `classify()` category selection to `classify_failure()` mapping\n- Preserve `signature_hash` stability rules documented in lib.rs\n- Add regression test covering previously mismatched payload\n\n## Possible affected files\n- `contracts/crashlab-core/src/lib.rs` \u2014 **edit** \u2014 Unify classify implementation\n- `contracts/crashlab-core/src/taxonomy.rs` \u2014 **edit** \u2014 Export mapping helper if needed\n- `contracts/crashlab-core/src/lib.rs` \u2014 **edit** \u2014 Add/extend unit tests in mod tests\n\n## Checklist\n- [ ] Implementation complete\n- [ ] Unit tests pass\n- [ ] No change to public JSON schema without version bump note in PR\n\n## PR guide\n- Create branch: `issue/1-unify-classify-entrypoint`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-001)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 2,
+      "title": "[contracts] Add signature builder from FailureClass",
+      "slug": "signature-from-failure-class",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:contracts",
+        "type:refactor",
+        "priority:p0",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-002`\n\n## Description\nIntroduce a single function that builds `CrashSignature` from seed bytes using taxonomy only.\n\n## Requirements\n- New helper used by `to_bundle` paths\n- Document stability guarantees in rustdoc\n\n## Possible affected files\n- `contracts/crashlab-core/src/signature_hash.rs` \u2014 **edit** \u2014 Use helper for hash\n- `contracts/crashlab-core/src/lib.rs` \u2014 **edit** \u2014 Wire helper\n\n## Checklist\n- [ ] Helper covered by tests\n- [ ] No duplicate hash logic elsewhere\n\n## PR guide\n- Create branch: `issue/2-signature-from-failure-class`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-002)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 3,
+      "title": "[contracts] Expand to_bundle tests for taxonomy alignment",
+      "slug": "to-bundle-tests-taxonomy",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:contracts",
+        "type:refactor",
+        "priority:p0",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-003`\n\n## Description\nAdd fixtures proving bundle signatures match replay expectations.\n\n## Requirements\n- Add regression tests\n- Use existing fixtures where possible\n\n## Possible affected files\n- `contracts/crashlab-core/fixtures/` \u2014 **edit** \u2014 Add fixture if needed\n- `contracts/crashlab-core/src/lib.rs` \u2014 **edit** \u2014 Tests only\n\n## Checklist\n- [ ] cargo test green\n\n## PR guide\n- Create branch: `issue/3-to-bundle-tests-taxonomy`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-003)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 4,
+      "title": "[contracts] Re-enable threat_model_tests module (compile-only pass)",
+      "slug": "threat-model-tests-skeleton",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:contracts",
+        "type:refactor",
+        "priority:p0",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-004`\n\n## Description\nModule is disabled due to API drift. Restore compile, skip obsolete cases with TODO referencing ROADMAP follow-ups.\n\n## Requirements\n- Re-export module\n- Fix imports to current FailureClass\n\n## Possible affected files\n- `contracts/crashlab-core/src/lib.rs` \u2014 **edit** \u2014 Re-export mod\n- `contracts/crashlab-core/src/threat_model_tests.rs` \u2014 **edit** \u2014 Fix imports\n\n## Checklist\n- [ ] Module compiles\n- [ ] Tests run or are ignored with ticket refs\n\n## PR guide\n- Create branch: `issue/4-threat-model-tests-skeleton`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-004)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 5,
+      "title": "[contracts] Define ContractRunner trait for Soroban integrators",
+      "slug": "runner-trait-contract",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:contracts",
+        "type:refactor",
+        "priority:p0",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-005`\n\n## Description\nFormalize the integration hook for executing seeds against a contract host.\n\n## Requirements\n- Define trait and error types\n- Document integration contract\n\n## Possible affected files\n- `contracts/crashlab-core/src/runner.rs` \u2014 **create** \u2014 Trait + error types\n- `contracts/crashlab-core/src/lib.rs` \u2014 **edit** \u2014 pub mod runner\n\n## Checklist\n- [ ] Trait documented\n- [ ] Example mock runner in tests\n\n## PR guide\n- Create branch: `issue/5-runner-trait-contract`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-005)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 6,
+      "title": "[contracts] Bridge simulation module to ContractRunner",
+      "slug": "simulation-runner-bridge",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:contracts",
+        "type:refactor",
+        "priority:p0",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-006`\n\n## Description\nAllow `run_simulation_with_timeout` to accept runner injection.\n\n## Requirements\n- Inject runner into simulation\n- Tests with mock runner\n\n## Possible affected files\n- `contracts/crashlab-core/src/simulation.rs` \u2014 **edit** \u2014 Inject runner\n- `contracts/crashlab-core/src/runner.rs` \u2014 **edit** \u2014 Use trait\n\n## Checklist\n- [ ] Tests with mock runner\n\n## PR guide\n- Create branch: `issue/6-simulation-runner-bridge`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-006)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 7,
+      "title": "[frontend] Shared artifact store for API routes",
+      "slug": "shared-artifact-store-module",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:frontend",
+        "type:bug",
+        "priority:p0",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-007`\n\n## Description\nCompleted in foundation prep; verify tests document singleton behavior.\n\n## Requirements\n- Implement as described\n- No lockfile commits\n\n## Possible affected files\n- `apps/web/src/lib/artifact-store.ts` \u2014 **edit** \u2014 Primary file\n\n## Checklist\n- [ ] Done\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/7-shared-artifact-store-module`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-007)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 8,
+      "title": "[frontend] Settings routes for accessibility and alerting",
+      "slug": "settings-routes-stub",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:frontend",
+        "type:bug",
+        "priority:p0",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-008`\n\n## Description\nStub routes prevent 404 from header nav.\n\n## Requirements\n- Implement as described\n- No lockfile commits\n\n## Possible affected files\n- `apps/web/src/app/settings/accessibility/page.tsx` \u2014 **edit** \u2014 Primary file\n- `apps/web/src/app/settings/alerting/page.tsx` \u2014 **edit** \u2014 Primary file\n\n## Checklist\n- [ ] Done\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/8-settings-routes-stub`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-008)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 9,
+      "title": "[scripts] Roadmap issue catalog generator script",
+      "slug": "roadmap-issue-generator",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:scripts",
+        "type:bug",
+        "priority:p0",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-009`\n\n## Description\nGenerate issues.json for bulk GitHub creation.\n\n## Requirements\n- Implement as described\n- No lockfile commits\n\n## Possible affected files\n- `scripts/roadmap/generate_catalog.py` \u2014 **edit** \u2014 Primary file\n\n## Checklist\n- [ ] Done\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/9-roadmap-issue-generator`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-009)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 10,
+      "title": "[scripts] Bulk create GitHub issues script",
+      "slug": "roadmap-create-issues-script",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:scripts",
+        "type:chore",
+        "priority:p0",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-010`\n\n## Description\nUses gh api with labels and milestones.\n\n## Requirements\n- Implement as described\n- No lockfile commits\n\n## Possible affected files\n- `scripts/roadmap/create_github_issues.sh` \u2014 **edit** \u2014 Primary file\n\n## Checklist\n- [ ] Done\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/10-roadmap-create-issues-script`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-010)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 11,
+      "title": "[scripts] Create GitHub labels script",
+      "slug": "roadmap-labels-script",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:scripts",
+        "type:chore",
+        "priority:p0",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-011`\n\n## Description\nIdempotent label creation.\n\n## Requirements\n- Implement as described\n- No lockfile commits\n\n## Possible affected files\n- `scripts/roadmap/create_labels.sh` \u2014 **edit** \u2014 Primary file\n\n## Checklist\n- [ ] Done\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/11-roadmap-labels-script`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-011)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 12,
+      "title": "[scripts] Archive ops TSV backlog with GitHub issue pointer",
+      "slug": "ops-backlog-archive",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:ops",
+        "type:chore",
+        "priority:p0",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-012`\n\n## Description\nMark ops TSV as archived; link to milestones.\n\n## Requirements\n- Implement as described\n- No lockfile commits\n\n## Possible affected files\n- `ops/README.md` \u2014 **edit** \u2014 Primary file\n\n## Checklist\n- [ ] Done\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/12-ops-backlog-archive`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-012)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 13,
+      "title": "[frontend] Use buildMockRuns on dashboard home",
+      "slug": "consolidate-mock-runs-home",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:frontend",
+        "type:bug",
+        "priority:p0",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-013`\n\n## Description\nSingle generator for run shape.\n\n## Requirements\n- Implement as described\n- No lockfile commits\n\n## Possible affected files\n- `apps/web/src/app/page.tsx` \u2014 **edit** \u2014 Primary file\n\n## Checklist\n- [ ] Done\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/13-consolidate-mock-runs-home`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-013)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 14,
+      "title": "[frontend] Apply dashboardFilters in filteredRuns",
+      "slug": "wire-dashboard-filters-logic",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:frontend",
+        "type:bug",
+        "priority:p0",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-014`\n\n## Description\nAdvanced filters must affect list.\n\n## Requirements\n- Implement as described\n- No lockfile commits\n\n## Possible affected files\n- `apps/web/src/app/page.tsx` \u2014 **edit** \u2014 Primary file\n\n## Checklist\n- [ ] Done\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/14-wire-dashboard-filters-logic`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-014)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 15,
+      "title": "[frontend] Remove simulated network failure on home",
+      "slug": "remove-random-fetch-failure",
+      "milestone": "P0 Foundation",
+      "labels": [
+        "area:frontend",
+        "type:bug",
+        "priority:p0",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-015`\n\n## Description\nKeep loading state demo optional via query flag.\n\n## Requirements\n- Implement as described\n- No lockfile commits\n\n## Possible affected files\n- `apps/web/src/app/page.tsx` \u2014 **edit** \u2014 Primary file\n\n## Checklist\n- [ ] Done\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/15-remove-random-fetch-failure`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-015)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 16,
+      "title": "[soroban] Scaffold contracts/soroban-example workspace",
+      "slug": "soroban-workspace-scaffold",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:soroban",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-016`\n\n## Description\nSoroban credibility track: Scaffold contracts/soroban-example workspace.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/soroban-example/Cargo.toml` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/16-soroban-workspace-scaffold`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-016)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 17,
+      "title": "[soroban] Add example token contract lib.rs",
+      "slug": "soroban-token-contract",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:soroban",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-017`\n\n## Description\nSoroban credibility track: Add example token contract lib.rs.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/soroban-example/src/lib.rs` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/17-soroban-token-contract`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-017)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 18,
+      "title": "[soroban] Add contract unit tests",
+      "slug": "soroban-contract-tests",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:soroban",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-018`\n\n## Description\nSoroban credibility track: Add contract unit tests.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/soroban-example/src/test.rs` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/18-soroban-contract-tests`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-018)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 19,
+      "title": "[soroban] Script build wasm32 for example contract",
+      "slug": "soroban-build-wasm-script",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:soroban",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-019`\n\n## Description\nSoroban credibility track: Script build wasm32 for example contract.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `scripts/contracts/build-soroban-example.sh` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/19-soroban-build-wasm-script`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-019)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 20,
+      "title": "[soroban] Document deploy targets in contract README",
+      "slug": "soroban-deploy-docs-target",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:soroban",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-020`\n\n## Description\nSoroban credibility track: Document deploy targets in contract README.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/soroban-example/README.md` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/20-soroban-deploy-docs-target`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-020)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 21,
+      "title": "[contracts] Implement HostContractRunner using soroban-sdk testutils",
+      "slug": "host-runner-impl",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-021`\n\n## Description\nSoroban credibility track: Implement HostContractRunner using soroban-sdk testutils.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/crashlab-core/src/host_runner.rs` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/21-host-runner-impl`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-021)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 22,
+      "title": "[contracts] Use host runner in auth_matrix tests",
+      "slug": "host-runner-wire-matrix",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-022`\n\n## Description\nSoroban credibility track: Use host runner in auth_matrix tests.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/crashlab-core/src/auth_matrix.rs` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/22-host-runner-wire-matrix`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-022)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 23,
+      "title": "[contracts] Add RpcContractRunner stub for RPC URL",
+      "slug": "rpc-runner-trait-impl",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-023`\n\n## Description\nSoroban credibility track: Add RpcContractRunner stub for RPC URL.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/crashlab-core/src/rpc_runner.rs` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/23-rpc-runner-trait-impl`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-023)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 24,
+      "title": "[contracts] Select runner via env CRASHLAB_RUNNER",
+      "slug": "runner-select-config",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-024`\n\n## Description\nSoroban credibility track: Select runner via env CRASHLAB_RUNNER.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/crashlab-core/src/runner.rs` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/24-runner-select-config`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-024)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 25,
+      "title": "[contracts] CLI export wasm hash artifact",
+      "slug": "export-wasm-artifact-cli",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-025`\n\n## Description\nSoroban credibility track: CLI export wasm hash artifact.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/crashlab-core/src/bin/export-wasm-hash.rs` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/25-export-wasm-artifact-cli`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-025)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 26,
+      "title": "[contracts] CI job build soroban example wasm",
+      "slug": "ci-soroban-build-job",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-026`\n\n## Description\nSoroban credibility track: CI job build soroban example wasm.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `.github/workflows/ci.yml` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/26-ci-soroban-build-job`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-026)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 27,
+      "title": "[contracts] Integrator guide for runner wiring",
+      "slug": "integrate-runner-readme",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-027`\n\n## Description\nSoroban credibility track: Integrator guide for runner wiring.\n\n## Requirements\n- Working Rust/Soroban build\n- Tests in CI where applicable\n\n## Possible affected files\n- `contracts/crashlab-core/README.md` \u2014 **edit** \u2014 Owned file\n\n## Checklist\n- [ ] cargo build/test pass\n\n## PR guide\n- Create branch: `issue/27-integrate-runner-readme`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-027)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 28,
+      "title": "[contracts] Export run index JSON from crash_index",
+      "slug": "run-index-json-export",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-028`\n\n## Description\nImplement **Export run index JSON from crash_index** as part of the Rust \u2194 Next.js data bridge. This issue owns only `contracts/crashlab-core/src/bin/crash-index.rs` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `contracts/crashlab-core/src/bin/crash-index.rs`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `contracts/crashlab-core/src/bin/crash-index.rs` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/28-run-index-json-export`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-028)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 29,
+      "title": "[contracts] Add crashlab runs list CLI subcommand",
+      "slug": "runs-index-cli-list",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-029`\n\n## Description\nImplement **Add crashlab runs list CLI subcommand** as part of the Rust \u2194 Next.js data bridge. This issue owns only `contracts/crashlab-core/src/bin/crashlab.rs` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `contracts/crashlab-core/src/bin/crashlab.rs`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `contracts/crashlab-core/src/bin/crashlab.rs` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/29-runs-index-cli-list`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-029)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 30,
+      "title": "[frontend] Add TypeScript API types for runs",
+      "slug": "api-types-runs",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-030`\n\n## Description\nImplement **Add TypeScript API types for runs** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/lib/api/runs.ts` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/lib/api/runs.ts`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/lib/api/runs.ts` \u2014 **create** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/30-api-types-runs`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-030)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 31,
+      "title": "[frontend] Implement GET /api/runs from index file",
+      "slug": "api-get-runs",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-031`\n\n## Description\nImplement **Implement GET /api/runs from index file** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/api/runs/route.ts` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/api/runs/route.ts`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/api/runs/route.ts` \u2014 **create** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/31-api-get-runs`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-031)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 32,
+      "title": "[frontend] Implement GET /api/runs/[id]",
+      "slug": "api-get-run-by-id",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-032`\n\n## Description\nImplement **Implement GET /api/runs/[id]** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/api/runs/[id]/route.ts` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/api/runs/[id]/route.ts`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/api/runs/[id]/route.ts` \u2014 **create** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/32-api-get-run-by-id`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-032)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 33,
+      "title": "[frontend] Add runs-client fetch helper",
+      "slug": "runs-client-fetch",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-033`\n\n## Description\nImplement **Add runs-client fetch helper** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/lib/runs-client.ts` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/lib/runs-client.ts`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/lib/runs-client.ts` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/33-runs-client-fetch`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-033)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 34,
+      "title": "[frontend] Replace home MOCK_RUNS with API",
+      "slug": "home-fetch-api-runs",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-034`\n\n## Description\nImplement **Replace home MOCK_RUNS with API** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/page.tsx` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/page.tsx`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/page.tsx` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/34-home-fetch-api-runs`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-034)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 35,
+      "title": "[frontend] Wire triage page to runs API",
+      "slug": "triage-fetch-api-runs",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-035`\n\n## Description\nImplement **Wire triage page to runs API** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/triage/page.tsx` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/triage/page.tsx`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/triage/page.tsx` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/35-triage-fetch-api-runs`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-035)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 36,
+      "title": "[frontend] Wire trends page to runs API",
+      "slug": "trends-fetch-api-runs",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-036`\n\n## Description\nImplement **Wire trends page to runs API** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/trends/page.tsx` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/trends/page.tsx`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/trends/page.tsx` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/36-trends-fetch-api-runs`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-036)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 37,
+      "title": "[frontend] Wire run detail to GET /api/runs/[id]",
+      "slug": "run-detail-api",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-037`\n\n## Description\nImplement **Wire run detail to GET /api/runs/[id]** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/runs/[id]/page.tsx` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/runs/[id]/page.tsx`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/runs/[id]/page.tsx` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/37-run-detail-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-037)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 38,
+      "title": "[frontend] Filesystem artifact adapter for API",
+      "slug": "artifact-fs-adapter",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-038`\n\n## Description\nImplement **Filesystem artifact adapter for API** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/lib/artifact-fs-adapter.ts` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/lib/artifact-fs-adapter.ts`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/lib/artifact-fs-adapter.ts` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/38-artifact-fs-adapter`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-038)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 39,
+      "title": "[frontend] List artifacts from CRASHLAB_ARTIFACT_DIR",
+      "slug": "api-artifacts-fs-get",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-039`\n\n## Description\nImplement **List artifacts from CRASHLAB_ARTIFACT_DIR** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/api/artifacts/route.ts` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/api/artifacts/route.ts`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/api/artifacts/route.ts` \u2014 **create** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/39-api-artifacts-fs-get`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-039)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 40,
+      "title": "[frontend] Download artifact from filesystem",
+      "slug": "api-artifacts-fs-download",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-040`\n\n## Description\nImplement **Download artifact from filesystem** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/api/artifacts/[id]/route.ts` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/api/artifacts/[id]/route.ts`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/api/artifacts/[id]/route.ts` \u2014 **create** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/40-api-artifacts-fs-download`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-040)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 41,
+      "title": "[frontend] Add .env.example for CRASHLAB paths",
+      "slug": "env-example-crashlab",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-041`\n\n## Description\nImplement **Add .env.example for CRASHLAB paths** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/.env.example` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/.env.example`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/.env.example` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/41-env-example-crashlab`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-041)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 42,
+      "title": "[frontend] Align buildMockRuns with index schema",
+      "slug": "mock-runs-align-index",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-042`\n\n## Description\nImplement **Align buildMockRuns with index schema** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/mockRuns.ts` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/mockRuns.ts`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/mockRuns.ts` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/42-mock-runs-align-index`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-042)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 43,
+      "title": "[frontend] Add /integrations/artifacts page route",
+      "slug": "integrate-artifacts-route",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-043`\n\n## Description\nImplement **Add /integrations/artifacts page route** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/integrations/artifacts/page.tsx` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/integrations/artifacts/page.tsx`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/integrations/artifacts/page.tsx` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/43-integrate-artifacts-route`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-043)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 44,
+      "title": "[frontend] Mount storage integration component on route",
+      "slug": "mount-storage-integration",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-044`\n\n## Description\nImplement **Mount storage integration component on route** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/integrations/artifacts/page.tsx` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/integrations/artifacts/page.tsx`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/integrations/artifacts/page.tsx` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/44-mount-storage-integration`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-044)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 45,
+      "title": "[frontend] Wire ArtifactExplorer to /api/artifacts",
+      "slug": "artifact-explorer-api",
+      "milestone": "P1 Data bridge",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-045`\n\n## Description\nImplement **Wire ArtifactExplorer to /api/artifacts** as part of the Rust \u2194 Next.js data bridge. This issue owns only `apps/web/src/app/add-artifact-explorer.tsx` to minimize merge conflicts.\n\n## Requirements\n- Deliver working code in `apps/web/src/app/add-artifact-explorer.tsx`\n- Add or update focused tests\n- Document env vars in PR if applicable\n\n## Possible affected files\n- `apps/web/src/app/add-artifact-explorer.tsx` \u2014 **edit** \u2014 Primary ownership for this issue\n\n## Checklist\n- [ ] Implementation merged\n- [ ] Tests pass\n- [ ] No lockfile changes\n\n## PR guide\n- Create branch: `issue/45-artifact-explorer-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-045)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 46,
+      "title": "[frontend] Extract dashboard shell layout component",
+      "slug": "dashboard-shell-layout",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-046`\n\n## Description\nProduct UI revamp task: Extract dashboard shell layout component. Owns exclusively `apps/web/src/app/dashboard/DashboardShell.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/dashboard/DashboardShell.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/46-dashboard-shell-layout`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-046)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 47,
+      "title": "[frontend] Reduce home page to runs overview only",
+      "slug": "dashboard-home-runs-only",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-047`\n\n## Description\nProduct UI revamp task: Reduce home page to runs overview only. Owns exclusively `apps/web/src/app/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/47-dashboard-home-runs-only`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-047)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 48,
+      "title": "[frontend] Create /runs list route",
+      "slug": "route-runs-list",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-048`\n\n## Description\nProduct UI revamp task: Create /runs list route. Owns exclusively `apps/web/src/app/runs/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/runs/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/48-route-runs-list`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-048)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 49,
+      "title": "[frontend] Create /analytics route for charts",
+      "slug": "route-analytics",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-049`\n\n## Description\nProduct UI revamp task: Create /analytics route for charts. Owns exclusively `apps/web/src/app/analytics/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/analytics/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/49-route-analytics`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-049)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 50,
+      "title": "[frontend] Create /integrations hub route",
+      "slug": "route-integrations-hub",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-050`\n\n## Description\nProduct UI revamp task: Create /integrations hub route. Owns exclusively `apps/web/src/app/integrations/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/integrations/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/50-route-integrations-hub`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-050)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 51,
+      "title": "[frontend] Create /settings hub route",
+      "slug": "route-settings-hub",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-051`\n\n## Description\nProduct UI revamp task: Create /settings hub route. Owns exclusively `apps/web/src/app/settings/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/settings/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/51-route-settings-hub`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-051)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 52,
+      "title": "[frontend] Remove duplicate VirtualizedRunTable from home",
+      "slug": "remove-virtualized-duplicate-table",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-052`\n\n## Description\nProduct UI revamp task: Remove duplicate VirtualizedRunTable from home. Owns exclusively `apps/web/src/app/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/52-remove-virtualized-duplicate-table`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-052)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 53,
+      "title": "[frontend] Consolidate to one timeline on run views",
+      "slug": "single-timeline-component",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-053`\n\n## Description\nProduct UI revamp task: Consolidate to one timeline on run views. Owns exclusively `apps/web/src/app/runs/[id]/RunTimeline.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/runs/[id]/RunTimeline.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/53-single-timeline-component`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-053)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 54,
+      "title": "[frontend] Move TimelineScrubber to /runs only",
+      "slug": "remove-scrubber-from-home",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-054`\n\n## Description\nProduct UI revamp task: Move TimelineScrubber to /runs only. Owns exclusively `apps/web/src/app/TimelineScrubber.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/TimelineScrubber.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/54-remove-scrubber-from-home`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-054)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 55,
+      "title": "[frontend] Unify logs with shared log provider",
+      "slug": "logs-page-shared-fetch",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-055`\n\n## Description\nProduct UI revamp task: Unify logs with shared log provider. Owns exclusively `apps/web/src/app/logs/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/logs/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/55-logs-page-shared-fetch`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-055)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 56,
+      "title": "[frontend] Extract LogViewer data hook",
+      "slug": "log-viewer-extract",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-056`\n\n## Description\nProduct UI revamp task: Extract LogViewer data hook. Owns exclusively `apps/web/src/app/hooks/useLogEntries.ts`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/hooks/useLogEntries.ts` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/56-log-viewer-extract`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-056)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 57,
+      "title": "[frontend] Apply AdvancedDashboardFilters to query",
+      "slug": "wire-dashboard-filters",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-057`\n\n## Description\nProduct UI revamp task: Apply AdvancedDashboardFilters to query. Owns exclusively `apps/web/src/app/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/57-wire-dashboard-filters`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-057)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 58,
+      "title": "[frontend] Sync dashboard filters to URL params",
+      "slug": "filters-url-sync",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-058`\n\n## Description\nProduct UI revamp task: Sync dashboard filters to URL params. Owns exclusively `apps/web/src/app/hooks/useDashboardFilters.ts`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/hooks/useDashboardFilters.ts` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/58-filters-url-sync`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-058)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 59,
+      "title": "[frontend] Remove random 10% home fetch failure",
+      "slug": "remove-simulated-fetch-error",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-059`\n\n## Description\nProduct UI revamp task: Remove random 10% home fetch failure. Owns exclusively `apps/web/src/app/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/59-remove-simulated-fetch-error`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-059)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 60,
+      "title": "[frontend] Isolate maintainer widgets route",
+      "slug": "maintainer-mode-layout",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-060`\n\n## Description\nProduct UI revamp task: Isolate maintainer widgets route. Owns exclusively `apps/web/src/app/maintainer/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/maintainer/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/60-maintainer-mode-layout`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-060)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 61,
+      "title": "[frontend] Update header nav to product routes",
+      "slug": "nav-primary-routes",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-061`\n\n## Description\nProduct UI revamp task: Update header nav to product routes. Owns exclusively `apps/web/src/app/layout.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/layout.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/61-nav-primary-routes`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-061)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 62,
+      "title": "[frontend] Link footer to GitHub roadmap milestone",
+      "slug": "footer-roadmap-link",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-062`\n\n## Description\nProduct UI revamp task: Link footer to GitHub roadmap milestone. Owns exclusively `apps/web/src/app/layout.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/layout.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/62-footer-roadmap-link`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-062)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 63,
+      "title": "[frontend] Move onboarding modal to /onboarding",
+      "slug": "onboarding-route",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-063`\n\n## Description\nProduct UI revamp task: Move onboarding modal to /onboarding. Owns exclusively `apps/web/src/app/onboarding/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/onboarding/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/63-onboarding-route`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-063)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 64,
+      "title": "[frontend] POST /api/campaigns stub",
+      "slug": "campaign-launch-api",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-064`\n\n## Description\nProduct UI revamp task: POST /api/campaigns stub. Owns exclusively `apps/web/src/app/api/campaigns/route.ts`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/api/campaigns/route.ts` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/64-campaign-launch-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-064)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 65,
+      "title": "[frontend] Wire CampaignConfigForm to API",
+      "slug": "campaign-form-api-wire",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-065`\n\n## Description\nProduct UI revamp task: Wire CampaignConfigForm to API. Owns exclusively `apps/web/src/app/CampaignConfigForm.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/CampaignConfigForm.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/65-campaign-form-api-wire`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-065)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 66,
+      "title": "[frontend] Move cluster viz to /analytics/clusters",
+      "slug": "cluster-view-route",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-066`\n\n## Description\nProduct UI revamp task: Move cluster viz to /analytics/clusters. Owns exclusively `apps/web/src/app/analytics/clusters/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/analytics/clusters/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/66-cluster-view-route`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-066)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 67,
+      "title": "[frontend] Single heatmap page with metric toggle",
+      "slug": "heatmap-single-route",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-067`\n\n## Description\nProduct UI revamp task: Single heatmap page with metric toggle. Owns exclusively `apps/web/src/app/analytics/heatmap/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/analytics/heatmap/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/67-heatmap-single-route`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-067)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 68,
+      "title": "[frontend] Show ledger diff on run detail from API",
+      "slug": "state-diff-run-detail",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-068`\n\n## Description\nProduct UI revamp task: Show ledger diff on run detail from API. Owns exclusively `apps/web/src/app/runs/[id]/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/runs/[id]/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/68-state-diff-run-detail`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-068)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 69,
+      "title": "[frontend] One reporting templates route",
+      "slug": "reporting-templates-route",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-069`\n\n## Description\nProduct UI revamp task: One reporting templates route. Owns exclusively `apps/web/src/app/settings/reporting/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/settings/reporting/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/69-reporting-templates-route`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-069)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 70,
+      "title": "[frontend] Remove duplicate template manager from home",
+      "slug": "remove-duplicate-templates",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-070`\n\n## Description\nProduct UI revamp task: Remove duplicate template manager from home. Owns exclusively `apps/web/src/app/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/70-remove-duplicate-templates`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-070)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 71,
+      "title": "[frontend] Move workflow board to /triage/board",
+      "slug": "workflow-board-route",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-071`\n\n## Description\nProduct UI revamp task: Move workflow board to /triage/board. Owns exclusively `apps/web/src/app/triage/board/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/triage/board/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/71-workflow-board-route`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-071)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 72,
+      "title": "[frontend] Move fuzzy builder to /runs/query",
+      "slug": "fuzzy-query-route",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-072`\n\n## Description\nProduct UI revamp task: Move fuzzy builder to /runs/query. Owns exclusively `apps/web/src/app/runs/query/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/runs/query/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/72-fuzzy-query-route`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-072)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 73,
+      "title": "[frontend] Bulk actions on /runs only",
+      "slug": "bulk-actions-runs-page",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-073`\n\n## Description\nProduct UI revamp task: Bulk actions on /runs only. Owns exclusively `apps/web/src/app/runs/page.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/runs/page.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/73-bulk-actions-runs-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-073)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 74,
+      "title": "[frontend] Export JSON from /runs toolbar",
+      "slug": "export-json-runs-page",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-074`\n\n## Description\nProduct UI revamp task: Export JSON from /runs toolbar. Owns exclusively `apps/web/src/app/add-export-run-json.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/add-export-run-json.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/74-export-json-runs-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-074)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 75,
+      "title": "[frontend] Export CSV from /runs toolbar",
+      "slug": "export-csv-runs-page",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-075`\n\n## Description\nProduct UI revamp task: Export CSV from /runs toolbar. Owns exclusively `apps/web/src/app/add-export-run-csv.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/add-export-run-csv.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/75-export-csv-runs-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-075)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 76,
+      "title": "[frontend] Persist annotations via API",
+      "slug": "run-annotations-api",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-076`\n\n## Description\nProduct UI revamp task: Persist annotations via API. Owns exclusively `apps/web/src/app/api/runs/[id]/annotations/route.ts`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/api/runs/[id]/annotations/route.ts` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/76-run-annotations-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-076)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 77,
+      "title": "[frontend] Persist tags via API",
+      "slug": "tagging-labels-api",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-077`\n\n## Description\nProduct UI revamp task: Persist tags via API. Owns exclusively `apps/web/src/app/api/runs/[id]/tags/route.ts`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/api/runs/[id]/tags/route.ts` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/77-tagging-labels-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-077)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 78,
+      "title": "[frontend] Optional notifications feed API",
+      "slug": "notification-center-api",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-078`\n\n## Description\nProduct UI revamp task: Optional notifications feed API. Owns exclusively `apps/web/src/app/api/notifications/route.ts`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/api/notifications/route.ts` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/78-notification-center-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-078)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 79,
+      "title": "[frontend] Fix dark mode hydration flash",
+      "slug": "dark-mode-no-flash",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-079`\n\n## Description\nProduct UI revamp task: Fix dark mode hydration flash. Owns exclusively `apps/web/src/app/add-dark-mode-support.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/add-dark-mode-support.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/79-dark-mode-no-flash`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-079)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 80,
+      "title": "[frontend] Enhance skip link targeting #main-content",
+      "slug": "accessibility-skip-link",
+      "milestone": "P2 Product UI",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-080`\n\n## Description\nProduct UI revamp task: Enhance skip link targeting #main-content. Owns exclusively `apps/web/src/app/add-accessible-keyboard-nav-blueprint.tsx`.\n\n## Requirements\n- Implement UX per description\n- No new mock data paths\n- Match existing Tailwind patterns\n\n## Possible affected files\n- `apps/web/src/app/add-accessible-keyboard-nav-blueprint.tsx` \u2014 **edit** \u2014 Single-file ownership\n\n## Checklist\n- [ ] Visually verified in dev\n- [ ] lint/build pass\n\n## PR guide\n- Create branch: `issue/80-accessibility-skip-link`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-080)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 81,
+      "title": "[frontend] Implement MetricsExportDependencies adapter",
+      "slug": "prometheus-deps-impl",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-081`\n\n## Description\nIntegration deliverable: Implement MetricsExportDependencies adapter.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/lib/integrations/prometheus-adapter.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/81-prometheus-deps-impl`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-081)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 82,
+      "title": "[frontend] Wire Prometheus UI to adapter",
+      "slug": "prometheus-ui-wire",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-082`\n\n## Description\nIntegration deliverable: Wire Prometheus UI to adapter.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrate-metrics-export-to-prometheus.tsx` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/82-prometheus-ui-wire`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-082)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 83,
+      "title": "[frontend] GitHub issue link adapter",
+      "slug": "issue-link-github-adapter",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-083`\n\n## Description\nIntegration deliverable: GitHub issue link adapter.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/lib/integrations/github-issues.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/83-issue-link-github-adapter`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-083)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 84,
+      "title": "[frontend] Jira issue link adapter stub",
+      "slug": "issue-link-jira-adapter",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-084`\n\n## Description\nIntegration deliverable: Jira issue link adapter stub.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/lib/integrations/jira-issues.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/84-issue-link-jira-adapter`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-084)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 85,
+      "title": "[frontend] Linear issue link adapter stub",
+      "slug": "issue-link-linear-adapter",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-085`\n\n## Description\nIntegration deliverable: Linear issue link adapter stub.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/lib/integrations/linear-issues.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/85-issue-link-linear-adapter`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-085)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 86,
+      "title": "[frontend] Wire issue link integration UI",
+      "slug": "issue-link-ui-wire",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-086`\n\n## Description\nIntegration deliverable: Wire issue link integration UI.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrate-run-issue-link-integration-tests.tsx` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/86-issue-link-ui-wire`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-086)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 87,
+      "title": "[frontend] API route persist run issue links",
+      "slug": "issue-link-api-persist",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-087`\n\n## Description\nIntegration deliverable: API route persist run issue links.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/api/runs/[id]/issues/route.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/87-issue-link-api-persist`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-087)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 88,
+      "title": "[frontend] GET/PUT /api/settings/alerting",
+      "slug": "alerting-api-get-put",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-088`\n\n## Description\nIntegration deliverable: GET/PUT /api/settings/alerting.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/api/settings/alerting/route.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/88-alerting-api-get-put`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-088)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 89,
+      "title": "[frontend] Wire create alerting page to API",
+      "slug": "alerting-ui-api-wire",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-089`\n\n## Description\nIntegration deliverable: Wire create alerting page to API.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/create-alerting-settings-page-page.tsx` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/89-alerting-ui-api-wire`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-089)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 90,
+      "title": "[frontend] Remove mock fetch from alerting page 54",
+      "slug": "remove-mock-alerting-54",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-090`\n\n## Description\nIntegration deliverable: Remove mock fetch from alerting page 54.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/implement-alerting-settings-page-54.tsx` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/90-remove-mock-alerting-54`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-090)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 91,
+      "title": "[frontend] Add @sentry/nextjs integration",
+      "slug": "sentry-sdk-install",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-091`\n\n## Description\nIntegration deliverable: Add @sentry/nextjs integration.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/lib/integrations/sentry-client.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/91-sentry-sdk-install`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-091)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 92,
+      "title": "[frontend] Wire Sentry settings UI",
+      "slug": "sentry-ui-wire",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-092`\n\n## Description\nIntegration deliverable: Wire Sentry settings UI.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrate-sentry-integration-for-crash-reporting.tsx` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/92-sentry-ui-wire`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-092)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 93,
+      "title": "[frontend] Persist webhooks via API",
+      "slug": "webhook-api-persist",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-093`\n\n## Description\nIntegration deliverable: Persist webhooks via API.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/api/webhooks/route.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/93-webhook-api-persist`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-093)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 94,
+      "title": "[frontend] Wire webhook manager to API",
+      "slug": "webhook-ui-persist",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-094`\n\n## Description\nIntegration deliverable: Wire webhook manager to API.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrate-webhook-manager-for-run-events.tsx` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/94-webhook-ui-persist`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-094)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 95,
+      "title": "[frontend] POST /api/runs/[id]/replay invoking CLI",
+      "slug": "replay-api-invoke",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-095`\n\n## Description\nIntegration deliverable: POST /api/runs/[id]/replay invoking CLI.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/api/runs/[id]/replay/route.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/95-replay-api-invoke`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-095)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 96,
+      "title": "[frontend] Replace simulateSeedReplay with API",
+      "slug": "replay-ui-real",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-096`\n\n## Description\nIntegration deliverable: Replace simulateSeedReplay with API.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/replay.ts` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/96-replay-ui-real`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-096)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 97,
+      "title": "[frontend] Mount CI replay integration page",
+      "slug": "ci-replay-integration-page",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-097`\n\n## Description\nIntegration deliverable: Mount CI replay integration page.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrations/ci-replay/page.tsx` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/97-ci-replay-integration-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-097)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 98,
+      "title": "[frontend] Mount DB migration integration page",
+      "slug": "db-migration-integration-page",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-098`\n\n## Description\nIntegration deliverable: Mount DB migration integration page.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrations/db-migrations/page.tsx` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/98-db-migration-integration-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-098)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 99,
+      "title": "[frontend] Mount external auth integration page",
+      "slug": "external-auth-integration-page",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-099`\n\n## Description\nIntegration deliverable: Mount external auth integration page.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrations/auth/page.tsx` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/99-external-auth-integration-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-099)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 100,
+      "title": "[frontend] Mount regression deploy integration page",
+      "slug": "regression-deploy-page",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-100`\n\n## Description\nIntegration deliverable: Mount regression deploy integration page.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrations/regression-deploy/page.tsx` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/100-regression-deploy-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-100)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 101,
+      "title": "[frontend] Mount UI flow harness page",
+      "slug": "ui-harness-page",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-101`\n\n## Description\nIntegration deliverable: Mount UI flow harness page.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrations/ui-harness/page.tsx` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/101-ui-harness-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-101)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 102,
+      "title": "[frontend] Mount replay E2E integration page",
+      "slug": "replay-e2e-page",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-102`\n\n## Description\nIntegration deliverable: Mount replay E2E integration page.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrations/replay-e2e/page.tsx` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/102-replay-e2e-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-102)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 103,
+      "title": "[frontend] Mount sanity check pipeline page",
+      "slug": "sanity-check-page",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-103`\n\n## Description\nIntegration deliverable: Mount sanity check pipeline page.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrations/sanity-check/page.tsx` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/103-sanity-check-page`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-103)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 104,
+      "title": "[frontend] Mount API error report page",
+      "slug": "api-error-report-page-route",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-104`\n\n## Description\nIntegration deliverable: Mount API error report page.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrations/api-errors/page.tsx` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/104-api-error-report-page-route`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-104)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 105,
+      "title": "[frontend] Mount run issue link creator page",
+      "slug": "run-issue-link-page-route",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-105`\n\n## Description\nIntegration deliverable: Mount run issue link creator page.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/integrations/issue-links/page.tsx` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/105-run-issue-link-page-route`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-105)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 106,
+      "title": "[frontend] API route exporter health check",
+      "slug": "prometheus-api-health",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-106`\n\n## Description\nIntegration deliverable: API route exporter health check.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/api/integrations/prometheus/health/route.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/106-prometheus-api-health`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-106)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 107,
+      "title": "[contracts] Export HealthSummary JSON from Rust",
+      "slug": "health-metrics-rust-export",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-107`\n\n## Description\nIntegration deliverable: Export HealthSummary JSON from Rust.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `contracts/crashlab-core/src/health.rs` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/107-health-metrics-rust-export`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-107)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 108,
+      "title": "[frontend] Expose /api/health/metrics",
+      "slug": "health-metrics-api",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-108`\n\n## Description\nIntegration deliverable: Expose /api/health/metrics.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/api/health/metrics/route.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/108-health-metrics-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-108)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 109,
+      "title": "[frontend] Background webhook delivery util",
+      "slug": "webhook-delivery-worker",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-109`\n\n## Description\nIntegration deliverable: Background webhook delivery util.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/lib/webhook-delivery-worker.ts` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/109-webhook-delivery-worker`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-109)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 110,
+      "title": "[frontend] Sentry server instrumentation",
+      "slug": "integrate-sentry-server",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-110`\n\n## Description\nIntegration deliverable: Sentry server instrumentation.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/instrumentation.ts` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/110-integrate-sentry-server`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-110)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 111,
+      "title": "[frontend] GitHub OAuth callback route stub",
+      "slug": "oauth-github-callback",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-111`\n\n## Description\nIntegration deliverable: GitHub OAuth callback route stub.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/api/auth/github/callback/route.ts` \u2014 **create** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/111-oauth-github-callback`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-111)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 112,
+      "title": "[frontend] Document OAuth secrets in .env.example",
+      "slug": "oauth-secrets-env",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-112`\n\n## Description\nIntegration deliverable: Document OAuth secrets in .env.example.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/.env.example` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/112-oauth-secrets-env`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-112)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 113,
+      "title": "[ci] Run integration utils tests in CI",
+      "slug": "integration-test-deps-ci",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:ci",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-113`\n\n## Description\nIntegration deliverable: Run integration utils tests in CI.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `.github/workflows/ci.yml` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/113-integration-test-deps-ci`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-113)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 114,
+      "title": "[frontend] Show associated issues on run detail",
+      "slug": "issue-link-detail-wire",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-114`\n\n## Description\nIntegration deliverable: Show associated issues on run detail.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/runs/[id]/page.tsx` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/114-issue-link-detail-wire`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-114)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 115,
+      "title": "[frontend] Wire triage board to issues API",
+      "slug": "triage-board-api",
+      "milestone": "P3 Integrations",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-115`\n\n## Description\nIntegration deliverable: Wire triage board to issues API.\n\n## Requirements\n- Implement real adapter or API\n- Remove mock timers where applicable\n- Utils tests updated\n\n## Possible affected files\n- `apps/web/src/app/triage/page.tsx` \u2014 **edit** \u2014 Exclusive file\n\n## Checklist\n- [ ] Manual test steps in PR\n- [ ] build/test pass\n\n## PR guide\n- Create branch: `issue/115-triage-board-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-115)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 116,
+      "title": "[frontend] Add Playwright e2e scaffold",
+      "slug": "e2e-playwright-scaffold",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-116`\n\n## Description\nHardening: Add Playwright e2e scaffold.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/e2e/home.spec.ts` \u2014 **create** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/116-e2e-playwright-scaffold`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-116)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 117,
+      "title": "[frontend] E2E runs list loads",
+      "slug": "e2e-runs-list",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-117`\n\n## Description\nHardening: E2E runs list loads.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/e2e/runs.spec.ts` \u2014 **create** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/117-e2e-runs-list`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-117)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 118,
+      "title": "[frontend] E2E artifact upload/download",
+      "slug": "e2e-artifact-upload",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-118`\n\n## Description\nHardening: E2E artifact upload/download.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/e2e/artifacts.spec.ts` \u2014 **create** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/118-e2e-artifact-upload`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-118)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 119,
+      "title": "[contracts] Complete threat_model_tests refactor",
+      "slug": "threat-model-tests-full",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-119`\n\n## Description\nHardening: Complete threat_model_tests refactor.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `contracts/crashlab-core/src/threat_model_tests.rs` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/119-threat-model-tests-full`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-119)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 120,
+      "title": "[frontend] Surface flaky rate in UI",
+      "slug": "flaky-detector-dashboard",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-120`\n\n## Description\nHardening: Surface flaky rate in UI.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/src/app/analytics/flaky/page.tsx` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/120-flaky-detector-dashboard`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-120)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 121,
+      "title": "[frontend] Show regression suite status badge",
+      "slug": "regression-suite-badge",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-121`\n\n## Description\nHardening: Show regression suite status badge.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/src/components/RegressionStatusBadge.tsx` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/121-regression-suite-badge`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-121)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 122,
+      "title": "[frontend] Validate CaseBundle uploads",
+      "slug": "bundle-schema-validation-api",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-122`\n\n## Description\nHardening: Validate CaseBundle uploads.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/src/app/api/artifacts/validate/route.ts` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/122-bundle-schema-validation-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-122)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 123,
+      "title": "[frontend] Rate limit public API routes",
+      "slug": "rate-limit-api-middleware",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-123`\n\n## Description\nHardening: Rate limit public API routes.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/src/middleware.ts` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/123-rate-limit-api-middleware`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-123)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 124,
+      "title": "[frontend] Add security headers",
+      "slug": "security-headers-middleware",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-124`\n\n## Description\nHardening: Add security headers.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/next.config.ts` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/124-security-headers-middleware`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-124)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 125,
+      "title": "[ci] axe a11y check in CI",
+      "slug": "a11y-axe-ci",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:ci",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-125`\n\n## Description\nHardening: axe a11y check in CI.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `.github/workflows/ci.yml` \u2014 **create** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/125-a11y-axe-ci`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-125)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 126,
+      "title": "[frontend] Ensure virtualization on large lists only",
+      "slug": "perf-virtualize-runs-only",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-126`\n\n## Description\nHardening: Ensure virtualization on large lists only.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/src/app/runs/page.tsx` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/126-perf-virtualize-runs-only`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-126)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 127,
+      "title": "[frontend] Structured logs for API handlers",
+      "slug": "structured-logging-api",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-127`\n\n## Description\nHardening: Structured logs for API handlers.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/src/lib/logger.ts` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/127-structured-logging-api`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-127)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 128,
+      "title": "[contracts] RUST_LOG filter in CLI bins",
+      "slug": "rust-log-env-filter",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-128`\n\n## Description\nHardening: RUST_LOG filter in CLI bins.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `contracts/crashlab-core/src/bin/crashlab.rs` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/128-rust-log-env-filter`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-128)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 129,
+      "title": "[contracts] Retention sweep CLI command",
+      "slug": "retention-policy-job",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-129`\n\n## Description\nHardening: Retention sweep CLI command.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `contracts/crashlab-core/src/bin/crashlab.rs` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/129-retention-policy-job`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-129)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 130,
+      "title": "[frontend] Crash index dedup stats component",
+      "slug": "crash-index-dedup-ui",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:frontend",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "stack:nextjs",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-130`\n\n## Description\nHardening: Crash index dedup stats component.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `apps/web/src/components/CrashIndexStats.tsx` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/130-crash-index-dedup-ui`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-130)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 131,
+      "title": "[contracts] Integration test CLI replay bridge",
+      "slug": "replay-cli-api-bridge-test",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:contracts",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:rust",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-131`\n\n## Description\nHardening: Integration test CLI replay bridge.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `contracts/crashlab-core/tests/api_replay_bridge.rs` \u2014 **edit** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/131-replay-cli-api-bridge-test`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-131)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 132,
+      "title": "[ci] Migrate CI from npm to pnpm",
+      "slug": "pnpm-ci-migration",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:ci",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-132`\n\n## Description\nHardening: Migrate CI from npm to pnpm.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `.github/workflows/ci.yml` \u2014 **create** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/132-pnpm-ci-migration`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-132)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 133,
+      "title": "[ci] Add pull request template",
+      "slug": "contributor-pr-template",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:ci",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-133`\n\n## Description\nHardening: Add pull request template.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `.github/pull_request_template.md` \u2014 **create** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/133-contributor-pr-template`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-133)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 134,
+      "title": "[ci] Add CODEOWNERS for areas",
+      "slug": "codeowners-file",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:ci",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-134`\n\n## Description\nHardening: Add CODEOWNERS for areas.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `.github/CODEOWNERS` \u2014 **create** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/134-codeowners-file`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-134)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 135,
+      "title": "[ci] Configure stale issue workflow",
+      "slug": "stale-bot-config",
+      "milestone": "P4 Hardening",
+      "labels": [
+        "area:ci",
+        "type:feature",
+        "priority:p1",
+        "touch:single-file",
+        "stack:typescript",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-135`\n\n## Description\nHardening: Configure stale issue workflow.\n\n## Requirements\n- Production-quality implementation\n- Tests or CI verification\n\n## Possible affected files\n- `.github/workflows/stale.yml` \u2014 **create** \u2014 Owned path\n\n## Checklist\n- [ ] CI green\n- [ ] Documented in PR\n\n## PR guide\n- Create branch: `issue/135-stale-bot-config`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-135)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 136,
+      "title": "[docs] Add docs/VISION.md product vision",
+      "slug": "vision-md",
+      "milestone": "P5 Documentation",
+      "labels": [
+        "area:docs",
+        "type:docs",
+        "priority:p2",
+        "touch:single-file",
+        "stack:markdown",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-136`\n\n## Description\nDefine 90% done criteria aligned with roadmap.\n\n## Requirements\n- Complete markdown\n- Cross-link from README\n- Reviewed for accuracy\n\n## Possible affected files\n- `docs/VISION.md` \u2014 **create** \u2014 New documentation file\n\n## Checklist\n- [ ] Doc merged\n- [ ] Links valid\n\n## PR guide\n- Create branch: `issue/136-vision-md`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-136)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 137,
+      "title": "[docs] Add CONTRIBUTING.md with PR policy",
+      "slug": "contributing-md",
+      "milestone": "P5 Documentation",
+      "labels": [
+        "area:docs",
+        "type:docs",
+        "priority:p2",
+        "touch:single-file",
+        "stack:markdown",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-137`\n\n## Description\nBranch naming, lockfile policy, one-issue-per-PR.\n\n## Requirements\n- Complete markdown\n- Cross-link from README\n- Reviewed for accuracy\n\n## Possible affected files\n- `CONTRIBUTING.md` \u2014 **create** \u2014 New documentation file\n\n## Checklist\n- [ ] Doc merged\n- [ ] Links valid\n\n## PR guide\n- Create branch: `issue/137-contributing-md`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-137)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 138,
+      "title": "[docs] Add docs/API.md for Next routes",
+      "slug": "api-contract-md",
+      "milestone": "P5 Documentation",
+      "labels": [
+        "area:docs",
+        "type:docs",
+        "priority:p2",
+        "touch:single-file",
+        "stack:markdown",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-138`\n\n## Description\nDocument /api/runs, artifacts, settings.\n\n## Requirements\n- Complete markdown\n- Cross-link from README\n- Reviewed for accuracy\n\n## Possible affected files\n- `docs/API.md` \u2014 **create** \u2014 New documentation file\n\n## Checklist\n- [ ] Doc merged\n- [ ] Links valid\n\n## PR guide\n- Create branch: `issue/138-api-contract-md`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-138)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 139,
+      "title": "[docs] Add docs/ENV.md",
+      "slug": "env-configuration-md",
+      "milestone": "P5 Documentation",
+      "labels": [
+        "area:docs",
+        "type:docs",
+        "priority:p2",
+        "touch:single-file",
+        "stack:markdown",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-139`\n\n## Description\nCRASHLAB_ARTIFACT_DIR, runners, OAuth.\n\n## Requirements\n- Complete markdown\n- Cross-link from README\n- Reviewed for accuracy\n\n## Possible affected files\n- `docs/ENV.md` \u2014 **create** \u2014 New documentation file\n\n## Checklist\n- [ ] Doc merged\n- [ ] Links valid\n\n## PR guide\n- Create branch: `issue/139-env-configuration-md`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-139)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    },
+    {
+      "roadmap_id": 140,
+      "title": "[docs] Add docs/ROADMAP.md index",
+      "slug": "roadmap-index-md",
+      "milestone": "P5 Documentation",
+      "labels": [
+        "area:docs",
+        "type:docs",
+        "priority:p2",
+        "touch:single-file",
+        "stack:markdown",
+        "roadmap"
+      ],
+      "body": "## Roadmap ID\n`ROADMAP-140`\n\n## Description\nMilestone table linking to GitHub milestones.\n\n## Requirements\n- Complete markdown\n- Cross-link from README\n- Reviewed for accuracy\n\n## Possible affected files\n- `docs/ROADMAP.md` \u2014 **create** \u2014 New documentation file\n\n## Checklist\n- [ ] Doc merged\n- [ ] Links valid\n\n## PR guide\n- Create branch: `issue/140-roadmap-index-md`\n- Open **one PR per issue** targeting `main`\n- PR title format: `type(area): short summary (ROADMAP-140)` using [Conventional Commits](https://www.conventionalcommits.org/)\n- Link this issue in the PR body: `Closes #<issue_number>`\n- Do **not** commit changes to `pnpm-lock.yaml` or `package-lock.json`\n- Changes to `package.json` require a **Maintainer approval** section in the PR describing why\n- Keep scope limited to files listed above to avoid merge conflicts\n\n## Dependencies\n- None\n"
+    }
+  ],
+  "count": 140
+}

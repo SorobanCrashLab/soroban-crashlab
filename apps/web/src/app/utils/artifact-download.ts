@@ -1,6 +1,4 @@
-/**
- * Utility functions for downloading run artifacts as JSON files.
- */
+import { triggerBrowserDownload } from './browser-download';
 
 export interface RunArtifacts {
   metadata: {
@@ -52,15 +50,5 @@ export function downloadArtifacts(
     type: 'application/json',
   });
 
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  // Clean up the object URL
-  URL.revokeObjectURL(url);
+  triggerBrowserDownload(blob, filename);
 }

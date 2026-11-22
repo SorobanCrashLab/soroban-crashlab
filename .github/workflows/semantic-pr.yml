@@ -1,0 +1,45 @@
+name: Semantic PR Title
+
+# pull_request_target (not pull_request): fork PRs run with a read-only
+# token under pull_request. pull_request_target runs the base-branch
+# workflow instead. This is safe: nothing checks out or executes PR code,
+# the title string is read from the event payload and checked inline —
+# no third-party action, no API calls, no token scopes beyond read.
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint-title:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const title = context.payload.pull_request.title ?? '';
+            const types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert'];
+            const match = title.match(/^([a-z]+)(\([a-z0-9,-]+\))?(!)?: (.+)$/);
+            const errors = [];
+            if (!match) {
+              errors.push(`Title "${title}" must look like "type: subject" or "type(scope): subject".`);
+            } else {
+              const [, type, , , subject] = match;
+              if (!types.includes(type)) {
+                errors.push(`Type "${type}" is not allowed. Use one of: ${types.join(', ')}.`);
+              }
+              if (/^[A-Z]/.test(subject)) {
+                errors.push('Subject must start with a lowercase letter.');
+              }
+              if (subject.endsWith('.')) {
+                errors.push('Subject must not end with a period.');
+              }
+            }
+            if (errors.length > 0) {
+              core.setFailed(errors.join(' '));
+            } else {
+              core.info(`Title OK: "${title}"`);
+            }

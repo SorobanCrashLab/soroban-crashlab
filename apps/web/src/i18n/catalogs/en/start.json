@@ -1,0 +1,63 @@
+{
+  "page": {
+    "title": "Start a fuzzing run",
+    "description": "Upload a contract, pick what to break, launch. Three steps, about two minutes."
+  },
+  "breadcrumb": {
+    "dashboard": "Dashboard",
+    "start": "Start"
+  },
+  "steps": {
+    "uploadContract": "Upload contract",
+    "pickTargets": "Pick targets",
+    "launch": "Launch"
+  },
+  "upload": {
+    "heading": "Step 1 — Upload your contract",
+    "description": "Drop in the compiled .wasm file for your Soroban contract. CrashLab reads its exported functions and proposes fuzz targets on the next step.",
+    "labelFile": "Contract WASM file",
+    "maxSize": "Maximum size: 16MB. Only .wasm files are accepted.",
+    "reading": "Reading contract…"
+  },
+  "targets": {
+    "heading": "Step 2 — Pick what to break",
+    "exportsCount": "{fileName} exports {count} callable {count, plural, one {function} other {functions}}. Tick the ones the fuzzer should hammer.",
+    "noFunctions": "No exported functions found in this contract.",
+    "argCount": "{count} {count, plural, one {arg} other {args}}",
+    "startOver": "Start over",
+    "continueWith": "Continue with {count} {count, plural, one {target} other {targets}}"
+  },
+  "launch": {
+    "heading": "Step 3 — Launch the campaign",
+    "description": "Fuzzing {count} {count, plural, one {target} other {targets}} from {fileName}. Results land on the Runs page as crashes stream in.",
+    "labelSeed": "Seed source",
+    "seedRandom": "Random mutation",
+    "seedCorpus": "Existing corpus",
+    "seedReplay": "Specific replay",
+    "labelAuth": "Auth mode",
+    "authNone": "None (public)",
+    "authMock": "Mock ledger auth",
+    "authKeypair": "Signed keypair",
+    "labelParallelism": "Parallel workers (1–32)",
+    "labelTimeout": "Timeout (seconds)",
+    "back": "Back",
+    "launchButton": "Launch campaign",
+    "launching": "Launching…"
+  },
+  "done": {
+    "eyebrow": "Campaign queued",
+    "title": "Your fuzzer is off to work",
+    "description": "Watch it live on Runs, then triage whatever breaks on the Triage board.",
+    "watchRuns": "Watch runs",
+    "openTriage": "Open triage",
+    "startAnother": "Start another"
+  },
+  "errors": {
+    "noFile": "Could not read that WASM file.",
+    "atLeastOne": "Pick at least one target to fuzz.",
+    "launchFailed": "Could not launch the campaign."
+  },
+  "progress": {
+    "label": "Progress"
+  }
+}

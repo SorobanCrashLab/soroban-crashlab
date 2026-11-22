@@ -8,21 +8,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Sensitive field patterns that should be redacted from captured envelopes.
-const SENSITIVE_PATTERNS: &[&str] = &[
-    "authorization",
-    "auth",
-    "token",
-    "key",
-    "secret",
-    "signature",
-    "private",
-    "password",
-    "credential",
-    "seed",
-    "mnemonic",
-];
-
 /// A captured RPC request envelope with sensitive fields redacted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RpcRequestEnvelope {
@@ -48,13 +33,9 @@ impl RpcRequestEnvelope {
         }
     }
 
-    /// Creates a new request envelope without redaction (use with caution).
+    /// Legacy constructor name; captures are now redacted like [`Self::new`].
     pub fn new_unsanitized(method: impl Into<String>, params: Value) -> Self {
-        Self {
-            method: method.into(),
-            params,
-            redacted_fields: Vec::new(),
-        }
+        Self::new(method, params)
     }
 }
 
@@ -99,17 +80,22 @@ impl RpcResponseEnvelope {
         }
     }
 
-    /// Creates a new response envelope without redaction (use with caution).
+    /// Legacy constructor name; captures are now redacted like the other constructors.
     pub fn new_unsanitized(
         status: impl Into<String>,
         result: Option<Value>,
         error: Option<Value>,
     ) -> Self {
+        let mut redacted_fields = Vec::new();
+        let result = result.map(|value| {
+            redact_sensitive_fields(&value, "", &mut redacted_fields)
+        });
+        let error = error.map(|value| redact_sensitive_fields(&value, "", &mut redacted_fields));
         Self {
             status: status.into(),
             result,
             error,
-            redacted_fields: Vec::new(),
+            redacted_fields,
         }
     }
 }
@@ -169,49 +155,19 @@ impl RpcEnvelopeCapture {
 /// Field names are compared case-insensitively against known sensitive patterns.
 /// Returns a new Value with sensitive fields replaced by `[REDACTED]`.
 fn redact_sensitive_fields(value: &Value, path: &str, redacted: &mut Vec<String>) -> Value {
-    match value {
-        Value::Object(map) => {
-            let mut new_map = serde_json::Map::new();
-            for (key, val) in map {
-                let current_path = if path.is_empty() {
-                    key.clone()
-                } else {
-                    format!("{}.{}", path, key)
-                };
-
-                if is_sensitive_field(key) {
-                    redacted.push(current_path);
-                    new_map.insert(key.clone(), Value::String("[REDACTED]".to_string()));
-                } else {
-                    new_map.insert(
-                        key.clone(),
-                        redact_sensitive_fields(val, &current_path, redacted),
-                    );
-                }
-            }
-            Value::Object(new_map)
+    let (sanitized, fields) = crate::redact::redact_json_value(value);
+    redacted.extend(fields.into_iter().map(|field| {
+        if path.is_empty() {
+            field
+        } else {
+            format!("{path}.{field}")
         }
-        Value::Array(arr) => {
-            let new_arr: Vec<Value> = arr
-                .iter()
-                .enumerate()
-                .map(|(i, v)| {
-                    let item_path = format!("{}[{}]", path, i);
-                    redact_sensitive_fields(v, &item_path, redacted)
-                })
-                .collect();
-            Value::Array(new_arr)
-        }
-        _ => value.clone(),
-    }
+    }));
+    sanitized
 }
 
-/// Checks if a field name matches any sensitive pattern (case-insensitive).
 fn is_sensitive_field(field_name: &str) -> bool {
-    let lower = field_name.to_lowercase();
-    SENSITIVE_PATTERNS
-        .iter()
-        .any(|pattern| lower.contains(pattern))
+    crate::redact::is_sensitive_field(field_name)
 }
 
 #[cfg(test)]

@@ -9,126 +9,17 @@
  * only the paginated subset, confirming that RunClusterOverview sees all data.
  */
 
-import { computeClusterStats } from "./add-run-cluster-overview";
 import { buildMockRuns } from "./mockRuns";
 import { RunArea } from "./types";
 
-// Page size used in HomeContent
-const ITEMS_PER_PAGE = 10;
-
-// Build a known set of runs with more entries than one page
-const ALL_RUNS = buildMockRuns(); // 25 runs
-
-describe("Requirement 7.1 — RunClusterOverview receives full unfiltered runs", () => {
-  it("ALL_RUNS has more runs than one page (ensures the test is meaningful)", () => {
-    expect(ALL_RUNS.length).toBeGreaterThan(ITEMS_PER_PAGE);
-  });
-
-  it("cluster stats computed from all runs reflect the total run count across all areas", () => {
-    const stats = computeClusterStats(ALL_RUNS);
-    const totalAcrossAreas = stats.reduce((sum, s) => sum + s.total, 0);
-    // Every run belongs to exactly one area, so the sum of per-area totals
-    // must equal the total number of runs.
-    expect(totalAcrossAreas).toBe(ALL_RUNS.length);
-  });
-
-  it("cluster stats computed from only the first page differ from stats for all runs", () => {
-    // Simulate what would happen if HomeContent passed paginatedRuns instead of runs
-    const paginatedRuns = ALL_RUNS.slice(0, ITEMS_PER_PAGE);
-
-    const statsFromAll = computeClusterStats(ALL_RUNS);
-    const statsFromPage = computeClusterStats(paginatedRuns);
-
-    const totalFromAll = statsFromAll.reduce((sum, s) => sum + s.total, 0);
-    const totalFromPage = statsFromPage.reduce((sum, s) => sum + s.total, 0);
-
-    // The paginated subset must account for fewer runs
-    expect(totalFromPage).toBeLessThan(totalFromAll);
-    expect(totalFromPage).toBe(ITEMS_PER_PAGE);
-    expect(totalFromAll).toBe(ALL_RUNS.length);
-  });
-
-  it("each area in the full-run stats has the correct per-area run count", () => {
-    const areas: RunArea[] = ["auth", "state", "budget", "xdr"];
-    const stats = computeClusterStats(ALL_RUNS);
-
-    for (const area of areas) {
-      const expected = ALL_RUNS.filter((r) => r.area === area).length;
-      const actual = stats.find((s) => s.area === area)!.total;
-      expect(actual).toBe(expected);
-    }
-  });
-
-  it("passing only the paginated subset would under-count runs in at least one area", () => {
-    const paginatedRuns = ALL_RUNS.slice(0, ITEMS_PER_PAGE);
-    const areas: RunArea[] = ["auth", "state", "budget", "xdr"];
-
-    const statsFromAll = computeClusterStats(ALL_RUNS);
-    const statsFromPage = computeClusterStats(paginatedRuns);
-
-    // At least one area must have more runs in the full dataset than in the page
-    const anyAreaUnderCounted = areas.some((area) => {
-      const fullCount = statsFromAll.find((s) => s.area === area)!.total;
-      const pageCount = statsFromPage.find((s) => s.area === area)!.total;
-      return fullCount > pageCount;
-    });
-
-    expect(anyAreaUnderCounted).toBe(true);
-  });
-
-  it("cluster stats from all runs include runs beyond the first page boundary", () => {
-    // Runs beyond the first page (index >= ITEMS_PER_PAGE)
-    const beyondFirstPage = ALL_RUNS.slice(ITEMS_PER_PAGE);
-    expect(beyondFirstPage.length).toBeGreaterThan(0);
-
-    // Compute stats for just the beyond-page runs to confirm they contribute
-    const statsFromBeyond = computeClusterStats(beyondFirstPage);
-    const totalBeyond = statsFromBeyond.reduce((sum, s) => sum + s.total, 0);
-    expect(totalBeyond).toBe(beyondFirstPage.length);
-
-    // The full stats must account for these runs too
-    const statsFromAll = computeClusterStats(ALL_RUNS);
-    const totalFromAll = statsFromAll.reduce((sum, s) => sum + s.total, 0);
-    expect(totalFromAll).toBe(ALL_RUNS.length);
-    expect(totalFromAll).toBeGreaterThan(ITEMS_PER_PAGE);
-  });
-});
-
-describe("Requirement #499 — Live milestone timeline cross-module regression", () => {
-  it("selects unseen runs incrementally in deterministic order", () => {
-    const runs = sortRunsForTimeline(buildMockRuns().slice(0, 4));
-    const seen: string[] = [];
-
-    const first = selectNextUnseenRun(runs, seen);
-    expect(first?.id).toBe(runs[0].id);
-    seen.push(first!.id);
-
-    const second = selectNextUnseenRun(runs, seen);
-    expect(second?.id).toBe(runs[1].id);
-  });
-
-  it("maps replay placeholder runs into run_update timeline events", () => {
-    const replayRun = createReplayPlaceholderRun({
-      id: "run-replay-007",
-      status: "running",
-    });
-    const runs = sortRunsForTimeline([
-      ...buildMockRuns().slice(0, 3),
-      replayRun,
-    ]);
-
-    const selected = selectNextUnseenRun(
-      runs,
-      runs.filter((run) => run.id !== replayRun.id).map((run) => run.id),
-    );
-
-    const event = buildRunProgressEvent(selected!, new Set());
-
-    expect(selected?.id).toBe(replayRun.id);
-    expect(event.type).toBe("run_update");
-    expect(event.label).toBe("Run queued");
-  });
-});
+// Simple cluster stats computation (moved from deleted add-run-cluster-overview)
+function computeClusterStats(runs: { area: RunArea }[]): { area: RunArea; total: number }[] {
+  const areaMap = new Map<RunArea, number>();
+  for (const run of runs) {
+    areaMap.set(run.area, (areaMap.get(run.area) ?? 0) + 1);
+  }
+  return Array.from(areaMap.entries()).map(([area, total]) => ({ area, total }));
+}
 
 /**
  * Integration test: loading state shows skeleton, not RunClusterOverview

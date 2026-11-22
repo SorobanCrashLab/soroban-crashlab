@@ -62,6 +62,7 @@ impl RegressionGroup {
             "oversized-input" => FailureClass::OversizedInput,
             "unknown" => FailureClass::Unknown,
             "timeout" => FailureClass::Timeout,
+            "internal-panic" => FailureClass::InternalPanic,
             _ => return None,
         };
 

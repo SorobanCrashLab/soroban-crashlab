@@ -1,0 +1,25 @@
+name: runbook-docs
+
+# Links in the ops, security, self-hosting and reproducibility docs resolve,
+# and every alert in the incident-response signal table is opened by a
+# workflow that links its runbook (#1896, #1898, #1899).
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/**'
+      - 'scripts/check-runbook-docs.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65 # v4.0.0
+        with:
+          node-version: 22
+      - run: node scripts/check-runbook-docs.mjs

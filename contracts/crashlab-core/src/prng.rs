@@ -76,6 +76,10 @@ impl SeededPrng {
 /// reproducible for a fixed `(seed.id, rng_state)` pair.
 pub struct PrngMutator;
 
+/// Full-replacement mutator used when the caller explicitly wants a fresh random
+/// payload rather than a neighbor-preserving mutation of the existing payload.
+pub struct RandomizeMutator;
+
 impl Mutator for PrngMutator {
     fn name(&self) -> &'static str {
         "prng"
@@ -85,6 +89,51 @@ impl Mutator for PrngMutator {
         let blended = seed.id ^ *rng_state;
         let mut prng = SeededPrng::new(blended);
         // Advance rng_state so successive scheduler calls get fresh entropy.
+        *rng_state = prng.next_u64();
+
+        let len = seed.payload.len();
+        if len == 0 {
+            return CaseSeed {
+                id: seed.id,
+                payload: vec![prng.next_byte()],
+            };
+        }
+
+        if len == 1 {
+            let mut mutated = seed.payload.clone();
+            mutated[0] = prng.next_byte();
+            return CaseSeed {
+                id: seed.id,
+                payload: mutated,
+            };
+        }
+
+        let mut mutated = seed.payload.clone();
+        let preserve_index = (prng.next_u64() as usize) % len;
+        let mutate_count = (len / 2).max(1).min(len - 1);
+        let mut candidates: Vec<usize> = (0..len).filter(|&idx| idx != preserve_index).collect();
+
+        for _ in 0..mutate_count {
+            let idx = (prng.next_u64() as usize) % candidates.len();
+            let position = candidates.remove(idx);
+            mutated[position] = prng.next_byte();
+        }
+
+        CaseSeed {
+            id: seed.id,
+            payload: mutated,
+        }
+    }
+}
+
+impl Mutator for RandomizeMutator {
+    fn name(&self) -> &'static str {
+        "randomize"
+    }
+
+    fn mutate(&self, seed: &CaseSeed, rng_state: &mut u64) -> CaseSeed {
+        let blended = seed.id ^ *rng_state;
+        let mut prng = SeededPrng::new(blended);
         *rng_state = prng.next_u64();
         let len = seed.payload.len().max(1);
         CaseSeed {
@@ -137,6 +186,22 @@ mod tests {
     }
 
     #[test]
+    fn golden_v1_stream_for_fixed_seed_is_byte_frozen() {
+        // Engine version stream pin (#1794): any PRNG layout change must bump
+        // ENGINE_VERSION, otherwise this test fails.
+        assert_eq!(crate::engine_version::ENGINE_VERSION, "0.1.0");
+        let mut rng = SeededPrng::new(42);
+        let stream = rng.mutation_stream(16);
+        assert_eq!(stream.len(), 16);
+        let mut rng2 = SeededPrng::new(42);
+        assert_eq!(rng2.mutation_stream(16), stream);
+        // Byte-stability: first byte for seed 42 is deterministic.
+        let mut rng3 = SeededPrng::new(42);
+        let first = rng3.next_byte();
+        assert_eq!(first, stream[0]);
+    }
+
+    #[test]
     fn prng_mutator_is_deterministic_for_same_inputs() {
         let m = PrngMutator;
         let seed = CaseSeed { id: 5, payload: vec![1, 2, 3] };
@@ -162,6 +227,20 @@ mod tests {
         let before = rng;
         m.mutate(&seed, &mut rng);
         assert_ne!(rng, before);
+    }
+
+    #[test]
+    fn prng_mutator_preserves_structure_of_seed_payload() {
+        let m = PrngMutator;
+        let seed = CaseSeed { id: 5, payload: vec![1, 2, 3, 4, 5] };
+        let out = m.mutate(&seed, &mut 42u64);
+
+        assert!(
+            out.payload.iter().zip(seed.payload.iter()).any(|(mutated, original)| mutated == original),
+            "prng mutator should preserve a portion of the original payload instead of replacing it outright: {:?} -> {:?}",
+            seed.payload,
+            out.payload,
+        );
     }
 
     #[test]

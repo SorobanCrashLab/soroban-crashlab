@@ -1,0 +1,5 @@
+{
+  "note": "Size budget for the web Docker image built by .github/workflows/docker-build.yml (#1829). Budgets are a ratchet: scripts/check-docker-image-size.mjs fails a PR that raises a number over what is on the base branch unless ratchetJustification is updated, so the ceiling can only shrink or be justified in the diff. Lower both numbers whenever a change makes the image smaller.",
+  "imageMaxBytes": 1073741824,
+  "standaloneMaxBytes": 629145600
+}

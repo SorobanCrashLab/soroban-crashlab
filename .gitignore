@@ -2,14 +2,26 @@
 target/
 **/*.rs.bk
 
+# Soroban testutils runtime snapshots (written by the Env on drop unless disabled)
+test_snapshots/
+
 # Node / Next
 node_modules/
 apps/web/node_modules/
 apps/web/.next/
+*.tsbuildinfo
+test-results/
+playwright-report/
+
+# Python
+__pycache__/
+*.pyc
+.mypy_cache/
 
 # Env and logs
 .env
 .env.*
+!.env.docker.example
 *.log
 
 .agents/
@@ -19,3 +31,15 @@ issue.md
 AGENTS.md
 GEMINI.md
 skills-lock.json
+
+# Automation artifacts
+*_PR_DESCRIPTION*.md
+IMPLEMENTATION_SUMMARY*.md
+tmp_*
+*_output.txt
+
+# flake-watch outputs
+flake-report.json
+flake-report.md
+flake-quarantine.proposed.json
+flake-attempts/

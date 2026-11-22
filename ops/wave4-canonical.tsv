@@ -1,0 +1,164 @@
+title|complexity|area|type|summary|acceptance|status
+Add issue dependency mapping guide|trivial|area:docs|type:task|Explain how to track blocking and blocked relationships across issues.|Guide standardizes dependency notation in issue bodies.|
+Create architecture diagram documentation|trivial|area:docs|type:task|Document system architecture including data flow between fuzzer generator and web.|Diagram and text are included in repository docs.|
+Create maintainer onboarding checklist|trivial|area:docs|type:task|Add checklist for new maintainers joining project operations during wave.|Checklist covers labels triage review SLA and resolution policy.|
+Document wave issue complexity rubric|trivial|area:docs|type:task|Publish rubric for assigning trivial medium and high complexity accurately.|Rubric includes examples from current backlog areas.|
+Write contributor local setup guide|trivial|area:docs|type:task|Provide step by step setup for Node Rust and tooling prerequisites.|New contributor can run web and core tests in under 20 minutes.|
+Add contributor debugging playbook|medium|area:docs|type:feature|Document debugging steps for common build test and replay failures.|Playbook maps symptoms to likely fixes with commands.|
+Write mutation strategy handbook|medium|area:docs|type:feature|Describe each mutator goal risk coverage and usage guidance.|Handbook links strategy choices to realistic contract failure classes.|
+Write release process documentation|medium|area:docs|type:feature|Document release tagging changelog and backward compatibility workflow.|Release process can be executed by a new maintainer without guesswork.|
+Write reproducibility guarantees documentation|medium|area:docs|type:feature|Document deterministic guarantees and known limits across environments.|Docs include examples and troubleshooting for mismatched replay outcomes.|
+Add corpus seed export command|trivial|area:fuzzer|type:task|Export current corpus to portable seed archive for sharing.|Archive can be re-imported and preserves deterministic order.|implemented
+Add fuzz campaign preset profiles|trivial|area:fuzzer|type:task|Define campaign presets for smoke nightly and deep runs.|Preset selection changes runtime budget and mutation intensity predictably.|
+Implement seed schema validator|trivial|area:fuzzer|type:task|Validate incoming seed payloads against a strict schema before execution.|Reject malformed fields with clear errors and accept valid payloads.|
+Add bytestring entropy mutator|medium|area:fuzzer|type:feature|Generate high and low entropy byte patterns for payload stress cases.|Entropy profile appears in run metadata and tests cover edge ranges.|
+Add corpus seed import command|medium|area:fuzzer|type:feature|Import external seed files into the local mutation corpus with validation.|Import rejects malformed files and reports accepted seed counts.|
+Add decimal precision mutation strategy|medium|area:fuzzer|type:feature|Fuzz decimal scale and precision boundaries used in token math.|Boundary cases include rounding traps and overflow near limits.|implemented
+Add deterministic PRNG adapter|medium|area:fuzzer|type:feature|Provide deterministic pseudo random generation keyed by seed id.|Same seed always produces same mutation stream across runs.|
+Add enum variant flip mutator|medium|area:fuzzer|type:feature|Mutate enum-like inputs by switching variants and invalid tags.|Runner records invalid tag failures distinctly from runtime faults.|implemented
+Add mutation budget limiter per run|medium|area:fuzzer|type:feature|Cap mutation attempts per run to avoid runaway jobs via MutationBudget with configurable budget.|Limiter stops at configured budget and BudgetReport surfaces attempts_made and skipped counts.|implemented
+Add Stellar address mutation strategy|medium|area:fuzzer|type:feature|Mutate account contract and muxed address formats with validity toggles.|Supports valid and invalid address generation paths with unit coverage.|
+Add vec and map size stress mutator|medium|area:fuzzer|type:feature|Exercise container growth and sparse key patterns for host function inputs.|Configurable min and max sizes with deterministic generation.|
+Create numeric boundary mutator for i128 and u128|medium|area:fuzzer|type:feature|Generate edge values near overflow and underflow ranges.|Mutator emits boundary vectors and test asserts include min max neighbors.|implemented
+Add authorization mode matrix runner|high|area:fuzzer|type:feature|Run each seed across enforce record and record_allow_nonroot modes.|Output stores per mode result and mismatch summary.|
+Add deterministic parallel worker partitioning|high|area:fuzzer|type:feature|Split seed execution across workers while preserving deterministic replay.|Replay output remains stable with one or many workers.|implemented
+Implement seed prioritization by novelty|high|area:fuzzer|type:feature|Prioritize seeds that produce unseen crash signatures or state diffs.|Prioritizer improves unique signature discovery rate in benchmark run.|implemented
+Implement weighted mutator scheduler|high|area:fuzzer|type:feature|Schedule mutators by configurable weights to balance exploration and exploitation.|Run stats show mutator usage distribution matches configured weights.|implemented
+Add deterministic ordering for exported suites|trivial|area:generator|type:task|Ensure stable fixture order across exports for clean diffs.|Consecutive exports produce byte-identical ordering when unchanged.|
+Add fixture lint command|trivial|area:generator|type:task|Lint fixture files for schema and naming conventions.|Lint fails on malformed fixture metadata or duplicate ids.|
+Add markdown crash report exporter|trivial|area:generator|type:task|Export crash details to markdown for issue attachments.|Report includes signature context and replay command.|implemented
+Export failing seed as JSON scenario|trivial|area:generator|type:task|Allow exporting normalized JSON scenario for cross tool reuse.|Scenario includes seed id input payload mode and expected failure class.|
+Add crash signature hashing|medium|area:generator|type:feature|Create stable signature hash from category stack and key fields.|Equivalent failures produce identical signature hash.|
+Add duplicate crash de-dup index|medium|area:generator|type:feature|Group repeated failures by signature to reduce noise.|Dashboard and CLI report grouped counts and newest sample.|
+Add fixture compatibility checker|medium|area:generator|type:feature|Check whether fixture set matches current engine schema and capabilities.|Checker reports actionable migration warnings.|
+Add fixture sanitization pipeline|medium|area:generator|type:feature|Sanitize fixtures to remove unsafe payload fragments before sharing publicly.|Sanitized fixtures preserve repro value without leaking sensitive data.|
+Add regression suite loader|medium|area:generator|type:feature|Load previously exported fixtures and execute as regression pack.|Suite runner returns pass fail summary and per case status.|implemented
+Generate TypeScript reproducer snippets|medium|area:generator|type:feature|Export failing case as TypeScript reproducer helper for web tests.|Generated snippet executes with documented dependencies and expected assertion.|
+Implement fixture metadata manifest|medium|area:generator|type:feature|Store fixture metadata in manifest for indexing and compatibility checks.|Manifest validates fixture presence and schema version at load time.|
+Implement flaky reproducer detector|medium|area:generator|type:feature|Detect non-deterministic repro cases and flag them for quarantine.|Detector reports flake rate and excludes unstable fixtures from CI pack.|
+Add baseline snapshot comparison|high|area:generator|type:feature|Compare current run signatures against baseline snapshot to detect regressions.|Comparison output distinguishes new fixed and recurring signatures.|
+Add reproducer shrinking algorithm|high|area:generator|type:feature|Minimize failing inputs while preserving failure signature.|Shrunk case is smaller and still reproduces same signature.|
+Create automatic regression grouping|high|area:generator|type:feature|Group regression fixtures by domain risk area and expected failure mode.|Suite runner can execute selected groups independently.|
+Export failing seed as Rust regression fixture|high|area:generator|type:feature|Generate a Rust test snippet from a failing bundle for contract suites.|Output compiles in sample harness and fails before patch succeeds after patch.|
+Integrate: Automated regression deploy integration|medium|area:integration|type:feature|Add integration for Automated regression deploy integration.|Automated regression deploy integration works end-to-end.|
+Integrate: CI integration for run replay tests|medium|area:integration|type:feature|Add integration for CI integration for run replay tests.|CI integration for run replay tests works end-to-end.|
+Integrate: Database migration integration tests|medium|area:integration|type:feature|Add integration for Database migration integration tests.|Database migration integration tests works end-to-end.|
+Integrate: External authentication integration|medium|area:integration|type:feature|Add integration for External authentication integration.|External authentication integration works end-to-end.|
+Integrate: GitHub PR link automation|medium|area:integration|type:feature|Add integration for GitHub PR link automation.|GitHub PR link automation works end-to-end.|
+Integrate: Integration test harness for UI flows|medium|area:integration|type:feature|Add integration for Integration test harness for UI flows.|Integration test harness for UI flows works end-to-end.|
+Integrate: Metrics export to Prometheus|medium|area:integration|type:feature|Add integration for Metrics export to Prometheus.|Metrics export to Prometheus works end-to-end.|
+Integrate: Replay end-to-end integration test|medium|area:integration|type:feature|Add integration for Replay end-to-end integration test.|Replay end-to-end integration test works end-to-end.|
+Integrate: Run->issue link integration tests|medium|area:integration|type:feature|Add integration for Run->issue link integration tests.|Run->issue link integration tests works end-to-end.|
+Integrate: Sentry integration for crash reporting|medium|area:integration|type:feature|Add integration for Sentry integration for crash reporting.|Sentry integration for crash reporting works end-to-end.|
+Integrate: Storage backend integration for artifacts|medium|area:integration|type:feature|Add integration for Storage backend integration for artifacts.|Storage backend integration for artifacts works end-to-end.|
+Integrate: Webhook manager for run events|medium|area:integration|type:feature|Add integration for Webhook manager for run events.|Webhook manager for run events works end-to-end.|
+Add CODEOWNERS for review routing|trivial|area:ops|type:task|Define ownership paths for web core and docs to speed review assignment.|Pull requests auto-request maintainers based on changed paths.|
+Add label bootstrap automation|trivial|area:ops|type:task|Automate creation of standard labels used by backlog and triage.|Script is idempotent and safe for repeated execution.|
+Add maintainer response-time dashboard query|trivial|area:ops|type:task|Create query set to track first response and review turnaround metrics.|Queries are documented and reusable across wave cycles.|
+Add RFC template for high-complexity work|trivial|area:ops|type:task|Provide RFC template required before starting selected high tasks.|Template includes motivation design risks and rollout plan.|
+Add stale label auto-suggestion script|trivial|area:ops|type:task|Create script to suggest stale labels based on inactivity and blockers.|Script outputs proposed labels without mutating issues by default.|
+Add backlog freshness review workflow|medium|area:ops|type:feature|Introduce recurring process to retire stale tasks and refine active scope.|Workflow defines cadence owner and stale criteria.|
+Add contributor SLA section with timers|medium|area:ops|type:feature|Set response and review timing commitments for wave sprint operations.|Playbook includes measurable SLA targets and escalation path.|
+Add quality gates checklist to PR flow|medium|area:ops|type:feature|Extend PR process with reproducibility and regression gate checklist.|Checklist is visible in template and referenced in contributing guide.|
+Add weekly triage cadence automation|medium|area:ops|type:feature|Automate recurring triage reminders and issue queue snapshots.|Automation posts summary with pending high-priority actions.|
+Define escalation policy for blocked PRs|medium|area:ops|type:feature|Set explicit escalation path when contributor PRs are blocked by dependencies.|Policy includes timing thresholds and communication template.|
+Document issue triage board queries|medium|area:ops|type:feature|Add saved search conventions for pending review stale and blocked issues.|Maintainers can follow documented queries without manual guesswork.|
+Implement issue audit script for duplicates|medium|area:ops|type:feature|Create script to detect near-duplicate issue titles and overlapping scope.|Audit report flags possible collisions before issue publishing.|
+Add failure artifact compression|trivial|area:runtime|type:task|Compress stored artifacts to reduce disk footprint of long campaigns.|Compression reduces storage while preserving artifact integrity.|
+Add run cancellation command|trivial|area:runtime|type:task|Allow maintainers to cancel active runs gracefully.|Cancelled runs end in terminal state with partial summary.|
+Add simulation timeout guardrails|trivial|area:runtime|type:task|Stop long running simulation attempts and mark as timeout class.|Timeout threshold is configurable and surfaced in run metadata.|
+Add stale run detector|trivial|area:runtime|type:task|Detect and mark runs that stop producing progress for too long.|Detector marks stale status and surfaces recovery hint.|
+Add environment fingerprinting to bundles|medium|area:runtime|type:feature|Record runtime environment details for replay consistency checks.|Replay warns when environment fingerprint differs materially.|implemented
+Add replay command for single seed|medium|area:runtime|type:feature|Create CLI command to replay one exact seed bundle end to end.|Replay returns same class and signature as original failure.|
+Add retention policy for run artifacts|medium|area:runtime|type:feature|Apply configurable retention windows for old run artifacts.|Policy can keep latest failures while pruning old non-critical data.|
+Add retry strategy for transient RPC failures|medium|area:runtime|type:feature|Retry idempotent simulation calls on transient network errors.|Retries are bounded and include backoff with jitter.|implemented
+Build failure classification taxonomy|medium|area:runtime|type:feature|Map raw failures to stable categories like auth budget state and xdr.|Classification logic is documented and covered by tests.|
+Capture RPC request response envelopes|medium|area:runtime|type:feature|Store sanitized request and response envelopes for reproducibility auditing.|Sensitive fields are redacted and replay still works.|
+Implement run health summary endpoint|medium|area:runtime|type:feature|Provide health summary with throughput failures and queue depth metrics.|Endpoint returns machine-readable summary for dashboard polling.|
+Implement run metadata schema versioning|medium|area:runtime|type:feature|Version run metadata format to support safe future migrations.|Older metadata can be read and upgraded without data loss.|
+Persist failing case bundle format|medium|area:runtime|type:feature|Store seed input context env and failure payload in a portable bundle.|Bundle can be saved loaded and versioned with schema field.|
+Implement run resume from checkpoint|high|area:runtime|type:feature|Resume interrupted campaigns from persisted checkpoints.|Resumed run continues from last checkpoint without reprocessing completed seeds.|
+Implement secret scanning guidance for contributors|trivial|area:security|type:task|Document pre-commit secret scanning expectations and remediation steps.|Guide includes recommended tools and response process.|
+Add conflict-of-interest maintainer policy|medium|area:security|type:feature|Define conflict-of-interest handling for issue assignment and review decisions.|Policy is published and linked from maintainer playbook.|
+Add dependency update safety policy|medium|area:security|type:feature|Define policy for dependency updates including review and rollback requirements.|Policy requires changelog review and post-update validation checklist.|
+Add security policy and disclosure path|medium|area:security|type:feature|Define coordinated vulnerability disclosure process and response expectations.|Security policy file exists and linked from README.|
+Document Security Hardening Assumptions|medium|area:security|type:task|Document the security hardening assumptions covering fuzz input handling and artifact storage.|Documentation exists in README.md, CONTRIBUTING.md, and MAINTAINER_WAVE_PLAYBOOK.md with clear trust boundaries and mitigation controls.|implemented
+Create threat model draft for artifact handling|high|area:security|type:feature|Build threat model for input ingestion artifact storage and report export.|Threat model lists abuse cases mitigations and open risks.|
+Add Accessible keyboard nav blueprint|trivial|area:web|type:task|Implement frontend Accessible keyboard nav blueprint for improved UX.|Accessible keyboard nav blueprint is visible and functional in the dashboard.|
+Add API error report page|trivial|area:web|type:task|Create page for visualizing recurring API errors. (Issue seed 57)|Shows counts and top occurrences.|
+Add Column customization|trivial|area:web|type:task|Implement frontend Column customization for improved UX.|Column customization is visible and functional in the dashboard.|
+Add Dark mode support|trivial|area:web|type:task|Implement frontend Dark mode support for improved UX.|Dark mode support is visible and functional in the dashboard.|
+Add empty-state onboarding cards|trivial|area:web|type:task|Show actionable onboarding cards when no runs or crashes exist.|Cards guide first campaign setup and docs entry points.|
+Add explicit loading and error states|trivial|area:web|type:task|Implement non-blocking loading and actionable error states across dashboard.|No blank screens when API request fails or is pending.|
+Add Export run CSV|trivial|area:web|type:task|Implement frontend Export run CSV for improved UX.|Export run CSV is visible and functional in the dashboard.|
+Add Export run JSON|trivial|area:web|type:task|Implement frontend Export run JSON for improved UX.|Export run JSON is visible and functional in the dashboard.|
+Add Keyboard navigation help|trivial|area:web|type:task|Implement frontend Keyboard navigation help for improved UX.|Keyboard navigation help is visible and functional in the dashboard.|
+Add keyboard navigation in dashboard|trivial|area:web|type:task|Enable keyboard shortcuts for table navigation and detail views.|Core flows are usable without mouse and documented in help panel.|
+Add Markdown preview for reports|trivial|area:web|type:task|Implement frontend Markdown preview for reports for improved UX.|Markdown preview for reports is visible and functional in the dashboard.|
+Add markdown rendering for issue-ready reports|trivial|area:web|type:task|Render issue report markdown preview before export or copy.|Preview matches exported markdown structure and formatting.|
+Add Responsive layout improvements|trivial|area:web|type:task|Implement frontend Responsive layout improvements for improved UX.|Responsive layout improvements is visible and functional in the dashboard.|
+Add run filtering by area and severity|trivial|area:web|type:task|Enable filtering runs by component and severity tag.|Filters are reflected in URL query params.|
+Add run issue link page|trivial|area:web|type:task|Show related issue links on run details page (Issue seed 53)|Each run lists associated issues with jump links.|
+Add Tagging and labels UI|trivial|area:web|type:feature|Implement frontend Tagging and labels UI for improved UX.|Tagging and labels UI is visible and functional in the dashboard.|
+Add Theme tokens and contrast|trivial|area:web|type:task|Implement frontend Theme tokens and contrast for improved UX.|Theme tokens and contrast is visible and functional in the dashboard.|
+Add theme tokens for accessibility contrast|trivial|area:web|type:task|Define color tokens with accessible contrast for key statuses.|Status chips pass WCAG AA contrast checks.|
+Build run history table UI|trivial|area:web|type:task|Implement dashboard table listing run id status duration and seed count.|Table supports basic pagination and links to run detail.|implemented
+Create reporting templates page|trivial|area:web|type:task|Add page for creating issue/PR report templates. (Issue seed 60)|Templates can be saved and selected.|
+Create run status timeline component|trivial|area:web|type:task|Visual timeline for run state changes from queued to complete. (Issue seed 52)|Timeline updates with real state histories.|
+Implement Onboarding checklist modal component|trivial|area:web|type:feature|Implement frontend Onboarding checklist modal for improved UX.|Onboarding checklist modal is visible and functional in the dashboard.|
+Implement Virtualized run table component|trivial|area:web|type:feature|Implement frontend Virtualized run table for improved UX.|Virtualized run table is visible and functional in the dashboard.|
+Add a fuzzy query builder page|medium|area:web|type:feature|Page for building query objects for run extraction. (Issue seed 51)|User can save and run queries from UI.|
+Add accessible keyboard nav blueprint page|medium|area:web|type:feature|Add page to enforce keyboard-first navigation tests. (Issue seed 59)|All controls accessible with tab flow.|
+Add Alert presets|medium|area:web|type:task|Implement frontend Alert presets for improved UX.|Alert presets is visible and functional in the dashboard.|
+Add API error report|medium|area:web|type:task|Implement frontend API error report for improved UX.|API error report is visible and functional in the dashboard.|
+Add Artifact explorer|medium|area:web|type:task|Implement frontend Artifact explorer for improved UX.|Artifact explorer is visible and functional in the dashboard.|
+Add Bulk actions for runs|medium|area:web|type:task|Implement frontend Bulk actions for runs for improved UX.|Bulk actions for runs is visible and functional in the dashboard.|
+Add downloadable run artifact bundle|medium|area:web|type:feature|Provide one-click download of run artifacts for offline analysis.|Download contains metadata traces and fixture exports.|
+Add Issue triage board UI|medium|area:web|type:feature|Implement frontend Issue triage board UI for improved UX.|Issue triage board UI is visible and functional in the dashboard.|
+Add log viewer page component|medium|area:web|type:feature|Display structured logs from runs with search. (Issue seed 56)|Logs are searchable and have timestamp anchors.|
+Add Notification center UI|medium|area:web|type:feature|Implement frontend Notification center UI for improved UX.|Notification center UI is visible and functional in the dashboard.|
+Add Report generator|medium|area:web|type:task|Implement frontend Report generator for improved UX.|Report generator is visible and functional in the dashboard.|
+Add Reporting templates manager|medium|area:web|type:task|Implement frontend Reporting templates manager for improved UX.|Reporting templates manager is visible and functional in the dashboard.|
+Add role-based maintainer view toggles|medium|area:web|type:feature|Support maintainer-focused view presets for triage and review cadence.|Toggle persists per user and changes default dashboard modules.|
+Add Run annotations|medium|area:web|type:task|Implement frontend Run annotations for improved UX.|Run annotations is visible and functional in the dashboard.|
+Add Run filtering by severity|medium|area:web|type:task|Implement frontend Run filtering by severity for improved UX.|Run filtering by severity is visible and functional in the dashboard.|
+Add Run QA checklist|medium|area:web|type:task|Implement frontend Run QA checklist for improved UX.|Run QA checklist is visible and functional in the dashboard.|
+Add run sanity check pipeline page|medium|area:web|type:feature|Add page to hold pre-run sanity checks, validations and gating options.|Sanity checks can be run and status persists.|
+Add shareable permalink for run report|medium|area:web|type:feature|Create stable URL for a specific run and applied filters.|Copy link action shares the same report view for other users.|
+Add signature trend charts|medium|area:web|type:feature|Visualize crash signature frequency trends across recent runs.|Charts support area and severity filters with readable legends.|
+Build campaign configuration form|medium|area:web|type:feature|Create UI form for run profile seed source and auth mode settings.|Submitted config persists and launches campaign with expected parameters.|
+Build crash detail drawer UI|medium|area:web|type:feature|Show failure category signature payload and replay action in side drawer.|Drawer opens from history row and preserves browser state.|
+Build replay from UI action|medium|area:web|type:feature|Trigger seed replay directly from crash detail panel.|Replay action shows status and links to resulting run.|
+Build resource fee insight panel|medium|area:web|type:feature|Display cpu mem and min resource fee with warning thresholds.|Panel flags expensive runs and links to related run details.|
+Create Advanced dashboard filters page|medium|area:web|type:feature|Implement frontend Advanced dashboard filters for improved UX.|Advanced dashboard filters is visible and functional in the dashboard.|
+Create Alerting settings page page|medium|area:web|type:feature|Implement frontend Alerting settings page for improved UX.|Alerting settings page is visible and functional in the dashboard.|
+Create cross-run board custom widgets|medium|area:web|type:feature|Add configurable widget components for cross-run dashboards.|Widgets can be saved, reloaded, and reordered.|
+Create Run issue link page page|medium|area:web|type:feature|Implement frontend Run issue link page for improved UX.|Run issue link page is visible and functional in the dashboard.|
+Create Sanity check pipeline page page|medium|area:web|type:feature|Implement frontend Sanity check pipeline page for improved UX.|Sanity check pipeline page is visible and functional in the dashboard.|
+Implement alerting settings page|medium|area:web|type:feature|Page to configure threshold alerts for crash rate spikes. (Issue seed 54)|Users can set conditions with enabled toggles.|
+Implement Artifact preview modal component|medium|area:web|type:feature|Implement frontend Artifact preview modal for improved UX.|Artifact preview modal is visible and functional in the dashboard.|
+Implement Crash detail drawer component|medium|area:web|type:feature|Implement frontend Crash detail drawer for improved UX.|Crash detail drawer is visible and functional in the dashboard.|
+Implement Cross-run board widgets component|medium|area:web|type:feature|Implement frontend Cross-run board widgets for improved UX.|Cross-run board widgets is visible and functional in the dashboard.|
+Implement Log viewer component|medium|area:web|type:feature|Implement frontend Log viewer for improved UX.|Log viewer is visible and functional in the dashboard.|
+Implement Resource fee insight panel component|medium|area:web|type:feature|Implement frontend Resource fee insight panel for improved UX.|Resource fee insight panel is visible and functional in the dashboard.|
+Implement Run detail modal component|medium|area:web|type:feature|Implement frontend Run detail modal for improved UX.|Run detail modal is visible and functional in the dashboard.|
+Implement Run history table component|medium|area:web|type:feature|Implement frontend Run history table for improved UX.|Run history table is visible and functional in the dashboard.|
+Implement Widget layout editor component|medium|area:web|type:feature|Implement frontend Widget layout editor for improved UX.|Widget layout editor is visible and functional in the dashboard.|
+Add Failure classification taxonomy|high|area:web|type:task|Implement frontend Failure classification taxonomy for improved UX.|Failure classification taxonomy is visible and functional in the dashboard.|
+Add Heatmap interactions|high|area:web|type:task|Implement frontend Heatmap interactions for improved UX.|Heatmap interactions is visible and functional in the dashboard.|
+Add live run progress timeline|high|area:web|type:feature|Render live timeline of campaign milestones and failure discovery events.|Timeline updates incrementally and supports pause resume markers.|
+Add Replay from UI action|high|area:web|type:feature|Implement frontend Replay from UI action for improved UX.|Replay from UI action is visible and functional in the dashboard.|
+Add Run cluster overview|high|area:web|type:task|Implement frontend Run cluster overview for improved UX.|Run cluster overview is visible and functional in the dashboard.|
+Add Run cluster visualization|high|area:web|type:task|Implement frontend Run cluster visualization for improved UX.|Run cluster visualization is visible and functional in the dashboard.|
+Add Run comparison|high|area:web|type:task|Implement frontend Run comparison for improved UX.|Run comparison is visible and functional in the dashboard.|
+Add Run comparison builder|high|area:web|type:feature|Implement frontend Run comparison builder for improved UX.|Run comparison builder is visible and functional in the dashboard.|
+Add Run comparison charts|high|area:web|type:task|Implement frontend Run comparison charts for improved UX.|Run comparison charts is visible and functional in the dashboard.|
+Add Run heatmap|high|area:web|type:task|Implement frontend Run heatmap for improved UX.|Run heatmap is visible and functional in the dashboard.|
+Add Run replay UI|high|area:web|type:feature|Implement frontend Run replay UI for improved UX.|Run replay UI is visible and functional in the dashboard.|
+Add Run status timeline|high|area:web|type:task|Implement frontend Run status timeline for improved UX.|Run status timeline is visible and functional in the dashboard.|
+Add Run timeline|high|area:web|type:task|Implement frontend Run timeline for improved UX.|Run timeline is visible and functional in the dashboard.|
+Add state change diff view|high|area:web|type:feature|Render readable before and after ledger entry changes from simulation output.|Diff highlights created updated deleted changes with type labels.|
+Create run heatmap page|high|area:web|type:feature|Show heatmap of runtime regressions across contracts. (Issue seed 55)|Heatmap is interactive and has legend semantics.|
+Implement failure cluster view|high|area:web|type:feature|Cluster related crashes by signature and context to reduce triage noise.|Cluster view links to representative sample and grouped count.|
+Implement run workflow board page|high|area:web|type:feature|Kanban-like board for run states (open/in-review/closed). (Issue seed 58)|Drag and drop moves state and persists.|
+Implement Timeline scrubber component component|high|area:web|type:feature|Implement frontend Timeline scrubber component for improved UX.|Timeline scrubber component is visible and functional in the dashboard.|

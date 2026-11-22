@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { MOCK_API_ERRORS } from '../fixtures/api-errors';
+import { absoluteShort } from './utils/datetime';
 
 /**
  * API Error Report Page
@@ -35,87 +37,6 @@ interface ApiErrorReportPageProps {
   error?: string;
 }
 
-// Mock data for demonstration
-const MOCK_API_ERRORS: ApiError[] = [
-  {
-    id: 'err-001',
-    endpoint: '/api/simulate-transaction',
-    method: 'POST',
-    statusCode: 503,
-    errorMessage: 'Service Unavailable: RPC node temporarily offline',
-    count: 47,
-    firstOccurrence: '2026-04-20T10:15:00Z',
-    lastOccurrence: '2026-04-23T09:30:00Z',
-    affectedRuns: ['run-1001', 'run-1005', 'run-1012', 'run-1018'],
-  },
-  {
-    id: 'err-002',
-    endpoint: '/api/get-ledger-entries',
-    method: 'GET',
-    statusCode: 429,
-    errorMessage: 'Rate Limit Exceeded: Too many requests',
-    count: 32,
-    firstOccurrence: '2026-04-21T14:22:00Z',
-    lastOccurrence: '2026-04-23T08:45:00Z',
-    affectedRuns: ['run-1003', 'run-1007', 'run-1015'],
-  },
-  {
-    id: 'err-003',
-    endpoint: '/api/send-transaction',
-    method: 'POST',
-    statusCode: 400,
-    errorMessage: 'Bad Request: Invalid transaction envelope',
-    count: 28,
-    firstOccurrence: '2026-04-19T16:30:00Z',
-    lastOccurrence: '2026-04-22T18:20:00Z',
-    affectedRuns: ['run-1002', 'run-1009', 'run-1014'],
-  },
-  {
-    id: 'err-004',
-    endpoint: '/api/get-account',
-    method: 'GET',
-    statusCode: 404,
-    errorMessage: 'Not Found: Account does not exist',
-    count: 19,
-    firstOccurrence: '2026-04-20T11:00:00Z',
-    lastOccurrence: '2026-04-23T07:15:00Z',
-    affectedRuns: ['run-1004', 'run-1011'],
-  },
-  {
-    id: 'err-005',
-    endpoint: '/api/simulate-transaction',
-    method: 'POST',
-    statusCode: 500,
-    errorMessage: 'Internal Server Error: Contract execution failed',
-    count: 15,
-    firstOccurrence: '2026-04-21T09:45:00Z',
-    lastOccurrence: '2026-04-23T06:30:00Z',
-    affectedRuns: ['run-1006', 'run-1013'],
-  },
-  {
-    id: 'err-006',
-    endpoint: '/api/get-events',
-    method: 'GET',
-    statusCode: 408,
-    errorMessage: 'Request Timeout: Query took too long',
-    count: 12,
-    firstOccurrence: '2026-04-22T12:00:00Z',
-    lastOccurrence: '2026-04-23T05:00:00Z',
-    affectedRuns: ['run-1008'],
-  },
-  {
-    id: 'err-007',
-    endpoint: '/api/get-transaction',
-    method: 'GET',
-    statusCode: 502,
-    errorMessage: 'Bad Gateway: Upstream server error',
-    count: 8,
-    firstOccurrence: '2026-04-22T15:30:00Z',
-    lastOccurrence: '2026-04-23T04:00:00Z',
-    affectedRuns: ['run-1010'],
-  },
-];
-
 const STATUS_CODE_COLORS: Record<number, string> = {
   400: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800',
   404: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-800',
@@ -130,15 +51,7 @@ const getStatusCodeColor = (code: number): string => {
   return STATUS_CODE_COLORS[code] || 'bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700';
 };
 
-const formatDate = (isoString: string): string => {
-  const date = new Date(isoString);
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+const formatDate = (isoString: string): string => absoluteShort(isoString);
 
 const getStatusCodeCategory = (code: number): string => {
   if (code >= 400 && code < 500) return 'Client Error';

@@ -1,121 +1,89 @@
-/**
- * API Route for Individual Artifact Operations
- *
- * GET /api/artifacts/[id] - Download an artifact
- * DELETE /api/artifacts/[id] - Delete an artifact
- */
-
 import { NextRequest, NextResponse } from 'next/server';
+import { selectArtifactRepository } from '@/lib/storage/artifact-repository';
+import { jsonError, withRouteErrorHandling } from '@/lib/route-handler';
+import { successResponse } from '@/lib/api-response-utils';
+import { recordAuditEvent } from '@/lib/audit/audit-sink';
+import { isRedisConfigured, getRedis } from '@/lib/redis';
 
-// Reference to the same in-memory store from parent route
-// In production, this would be a proper database or service
-const artifactStore: Map<string, {
-  id: string;
-  name: string;
-  createdAt: string;
-  sizeBytes: number;
-  buffer: Buffer;
-}> = new Map();
-
-/**
- * GET /api/artifacts/[id]
- * Downloads an artifact by ID
- */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
+export const GET = withRouteErrorHandling(
+  'GET /api/artifacts/[id]',
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { id } = await params;
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Artifact ID is required' },
-        { status: 400 }
-      );
+      return jsonError('Artifact ID is required', 400);
     }
 
-    // Validate ID format (path traversal prevention)
-    if (id.includes('..') || id.includes('/') || id.includes('\\')) {
-      return NextResponse.json(
-        { error: 'Invalid artifact ID' },
-        { status: 400 }
-      );
+    if (isRedisConfigured()) {
+      const redis = getRedis();
+      const raw = await redis.get(`artifact:${id}`);
+      if (!raw) return jsonError('Artifact not found', 404);
+
+      const record = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (record.utUrl) {
+        return NextResponse.redirect(record.utUrl);
+      }
+      return jsonError('Artifact has no download URL', 404);
     }
 
-    const artifact = artifactStore.get(id);
+    const result = await selectArtifactRepository().get(id);
 
-    if (!artifact) {
-      return NextResponse.json(
-        { error: 'Artifact not found' },
-        { status: 404 }
-      );
+    if (!result) {
+      return jsonError('Artifact not found', 404);
     }
 
-    // Return the artifact as a download
-    return new NextResponse(artifact.buffer as any, {
+    const { metadata, buffer } = result;
+
+    return new NextResponse(buffer as unknown as BodyInit, {
       status: 200,
       headers: {
         'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${artifact.name}"`,
-        'Content-Length': artifact.sizeBytes.toString(),
+        'Content-Disposition': `attachment; filename="${metadata.name}"`,
+        'Content-Length': metadata.sizeBytes.toString(),
+        'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });
-  } catch (error) {
-    console.error('Failed to download artifact:', error);
-    return NextResponse.json(
-      { error: 'Failed to download artifact' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  'Failed to download artifact',
+);
 
-/**
- * DELETE /api/artifacts/[id]
- * Deletes an artifact by ID
- */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
+export const DELETE = withRouteErrorHandling(
+  'DELETE /api/artifacts/[id]',
+  async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { id } = await params;
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Artifact ID is required' },
-        { status: 400 }
-      );
+      return jsonError('Artifact ID is required', 400);
     }
 
-    // Validate ID format (path traversal prevention)
-    if (id.includes('..') || id.includes('/') || id.includes('\\')) {
-      return NextResponse.json(
-        { error: 'Invalid artifact ID' },
-        { status: 400 }
-      );
+    if (isRedisConfigured()) {
+      const redis = getRedis();
+      const raw = await redis.get(`artifact:${id}`);
+      if (!raw) return jsonError('Artifact not found', 404);
+
+      const record = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (record.runId) {
+        await redis.srem(`artifact:run:${record.runId}`, id);
+      }
+      await redis.srem('artifact:index', id);
+      await redis.del(`artifact:${id}`);
+
+      recordAuditEvent({ action: 'artifact.delete', target: id });
+      return successResponse({ success: true, message: 'Artifact deleted successfully' });
     }
 
-    const existed = artifactStore.has(id);
+    const deleted = await selectArtifactRepository().delete(id);
 
-    if (!existed) {
-      return NextResponse.json(
-        { error: 'Artifact not found' },
-        { status: 404 }
-      );
+    if (!deleted) {
+      return jsonError('Artifact not found', 404);
     }
 
-    artifactStore.delete(id);
+    recordAuditEvent({ action: 'artifact.delete', target: id });
 
-    return NextResponse.json({
+    return successResponse({
       success: true,
       message: 'Artifact deleted successfully',
     });
-  } catch (error) {
-    console.error('Failed to delete artifact:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete artifact' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  'Failed to delete artifact',
+);

@@ -1,0 +1,493 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+
+import { createSentryAdapter } from "@/lib/integrations/sentry-adapter";
+import type { SentryConfig, CrashReport } from "./integrate-sentry-integration-for-crash-reporting-utils";
+import { absoluteShort } from "../../app/utils/datetime";
+
+/**
+ * Issue #248: Integrate Sentry integration for crash reporting
+ *
+ * This component provides a dashboard for configuring and monitoring
+ * Sentry integration to automatically report crashes and errors from
+ * fuzzing runs to Sentry for centralized error tracking.
+ */
+
+const DEFAULT_CONFIG: SentryConfig = {
+  dsn: "",
+  environment: "production",
+  enabled: false,
+  sampleRate: 1.0,
+  tracesSampleRate: 0.1,
+};
+
+export default function IntegrateSentryIntegrationForCrashReporting() {
+  const [config, setConfig] = useState<SentryConfig>(DEFAULT_CONFIG);
+  const [recentReports, setRecentReports] = useState<CrashReport[]>([]);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<"success" | "error" | null>(
+    null,
+  );
+  const [showDsnInput, setShowDsnInput] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [creatingIssueId, setCreatingIssueId] = useState<string | null>(null);
+  const [createdIssues, setCreatedIssues] = useState<Record<string, { key: string; url: string }>>({});
+  const [, setIssueCreationError] = useState<string | null>(null);
+
+  const sentryAdapter = useMemo(() => createSentryAdapter(), []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const savedConfig = await sentryAdapter.loadConfig();
+        if (!cancelled && savedConfig) {
+          setConfig(savedConfig);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Failed to load Sentry configuration.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sentryAdapter]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setError(null);
+      try {
+        const reports = await sentryAdapter.fetchRecentReports();
+        if (!cancelled) {
+          setRecentReports(reports);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Failed to load recent crash reports.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sentryAdapter]);
+
+  const handleSaveConfig = async () => {
+    setError(null);
+    setSaveSuccess(false);
+    try {
+      await sentryAdapter.saveConfig(config);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch {
+      setError("Failed to save Sentry configuration.");
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    setError(null);
+
+    try {
+      const result = await sentryAdapter.testConnection(config.dsn);
+      setTestResult(result.success ? "success" : "error");
+      if (!result.success && result.error) {
+        setError(result.error);
+      }
+    } catch {
+      setTestResult("error");
+      setError("Connection test failed.");
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const formatTimestamp = (iso: string) => absoluteShort(iso);
+
+  const handleCreateJiraIssue = async (report: CrashReport) => {
+    setCreatingIssueId(report.id);
+    setIssueCreationError(null);
+
+    try {
+      const response = await fetch('/api/integrations/jira', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          summary: `Crash report: ${report.signature}`,
+          description: `Crash report created from SorobanCrashLab for ${report.id}.\n\nSignature: ${report.signature}\nEvent ID: ${report.sentryEventId}\nTimestamp: ${report.timestamp}`,
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+
+      if (!response.ok || !(payload.data as { issue?: unknown } | undefined)?.issue) {
+        throw new Error((payload.error as string) || 'Could not create a Jira issue right now.');
+      }
+
+      const jiraIssue = (payload.data as { issue: { key: string; url: string } }).issue;
+      setCreatedIssues((prev) => ({
+        ...prev,
+        [report.id]: {
+          key: jiraIssue.key,
+          url: jiraIssue.url,
+        },
+      }));
+    } catch (error) {
+      setIssueCreationError(error instanceof Error ? error.message : 'Could not create a Jira issue right now.');
+    } finally {
+      setCreatingIssueId(null);
+    }
+  };
+
+  return (
+    <section className="w-full rounded-[2.5rem] border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-zinc-950">
+      <div className="flex flex-col xl:flex-row gap-12">
+        {/* Left Column - Configuration */}
+        <div className="xl:w-1/2">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-orange-600 dark:text-orange-400">
+            Error Tracking
+          </p>
+          <h2 className="text-3xl font-bold tracking-tight mb-4">
+            Sentry Integration
+          </h2>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
+            Automatically send crash reports and error traces from fuzzing runs
+            to Sentry for centralized monitoring, alerting, and debugging
+            workflows.
+          </p>
+
+          {error && (
+            <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-900/20 rounded-xl border border-rose-200 dark:border-rose-900/40">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-rose-700 dark:text-rose-300">{error}</p>
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-4 text-rose-500 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-200"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isLoading && (
+            <div className="mb-6 p-4 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading configuration...</p>
+            </div>
+          )}
+
+          <div className="space-y-6 bg-zinc-50 dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-200 dark:border-zinc-800">
+            {/* Enable Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300">
+                  Enable Sentry
+                </label>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Activate crash reporting to Sentry
+                </p>
+              </div>
+              <button
+                onClick={() =>
+                  setConfig((prev) => ({ ...prev, enabled: !prev.enabled }))
+                }
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  config.enabled
+                    ? "bg-orange-600"
+                    : "bg-zinc-300 dark:bg-zinc-700"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    config.enabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* DSN Configuration */}
+            <div>
+              <label className="block text-sm font-bold mb-2 text-zinc-700 dark:text-zinc-300">
+                Sentry DSN
+              </label>
+              {showDsnInput || config.dsn ? (
+                <input
+                  type="text"
+                  placeholder="https://[key]@[org].ingest.sentry.io/[project]"
+                  value={config.dsn}
+                  onChange={(e) =>
+                    setConfig((prev) => ({ ...prev, dsn: e.target.value }))
+                  }
+                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 focus:ring-2 focus:ring-orange-500 outline-none transition font-mono text-sm"
+                />
+              ) : (
+                <button
+                  onClick={() => setShowDsnInput(true)}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:border-orange-400 hover:text-orange-600 transition"
+                >
+                  Click to configure DSN
+                </button>
+              )}
+            </div>
+
+            {/* Environment */}
+            <div>
+              <label className="block text-sm font-bold mb-2 text-zinc-700 dark:text-zinc-300">
+                Environment
+              </label>
+              <select
+                value={config.environment}
+                onChange={(e) =>
+                  setConfig((prev) => ({
+                    ...prev,
+                    environment: e.target.value,
+                  }))
+                }
+                className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 focus:ring-2 focus:ring-orange-500 outline-none transition"
+              >
+                <option value="production">Production</option>
+                <option value="staging">Staging</option>
+                <option value="development">Development</option>
+              </select>
+            </div>
+
+            {/* Sample Rate */}
+            <div>
+              <label className="block text-sm font-bold mb-2 text-zinc-700 dark:text-zinc-300">
+                Error Sample Rate: {(config.sampleRate * 100).toFixed(0)}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={config.sampleRate}
+                onChange={(e) =>
+                  setConfig((prev) => ({
+                    ...prev,
+                    sampleRate: parseFloat(e.target.value),
+                  }))
+                }
+                className="w-full"
+              />
+              <p className="text-xs text-zinc-500 mt-1">
+                Percentage of errors to send to Sentry
+              </p>
+            </div>
+
+            {/* Traces Sample Rate */}
+            <div>
+              <label className="block text-sm font-bold mb-2 text-zinc-700 dark:text-zinc-300">
+                Traces Sample Rate: {(config.tracesSampleRate * 100).toFixed(0)}
+                %
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={config.tracesSampleRate}
+                onChange={(e) =>
+                  setConfig((prev) => ({
+                    ...prev,
+                    tracesSampleRate: parseFloat(e.target.value),
+                  }))
+                }
+                className="w-full"
+              />
+              <p className="text-xs text-zinc-500 mt-1">
+                Percentage of transactions to trace
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={handleTestConnection}
+                disabled={isTesting || !config.dsn}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition ${
+                  testResult === "success"
+                    ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                    : testResult === "error"
+                      ? "bg-rose-50 border border-rose-200 text-rose-700"
+                      : "bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                }`}
+              >
+                {isTesting
+                  ? "Testing..."
+                  : testResult === "success"
+                    ? "✓ Connected"
+                    : testResult === "error"
+                      ? "✗ Failed"
+                      : "Test Connection"}
+              </button>
+              <button
+                onClick={handleSaveConfig}
+                disabled={isLoading}
+                className={`flex-1 py-3 rounded-xl font-bold shadow-lg shadow-orange-500/20 transition ${
+                  saveSuccess
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                    : "bg-orange-600 text-white hover:bg-orange-700"
+                }`}
+              >
+                {saveSuccess ? "✓ Saved" : "Save Configuration"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Recent Reports */}
+        <div className="xl:w-1/2">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold">Recent Crash Reports</h3>
+            <div
+              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${
+                config.enabled
+                  ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+                  : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+              }`}
+            >
+              {config.enabled ? "Active" : "Inactive"}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {recentReports.length === 0 ? (
+              <div className="p-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-[2rem] text-center text-zinc-500">
+                No crash reports sent yet
+              </div>
+            ) : (
+              recentReports.map((report) => (
+                <div
+                  key={report.id}
+                  className="p-6 rounded-[2rem] border border-[var(--border-color)] bg-[var(--surface)] shadow-[var(--card-shadow)] transition hover:shadow-[var(--card-shadow-hover)] text-[var(--text-primary)]"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="font-mono text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                        {report.id}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">
+                        {formatTimestamp(report.timestamp)}
+                      </div>
+                    </div>
+                    <span
+                      className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                        report.status === "sent"
+                          ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+                          : report.status === "pending"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                            : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                      }`}
+                    >
+                      {report.status}
+                    </span>
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="text-xs text-zinc-500 mb-1">
+                      Crash Signature
+                    </div>
+                    <div className="font-mono text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg overflow-x-auto">
+                      {report.signature}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-xs text-[var(--text-secondary)]">
+                      Event ID:{" "}
+                      <span className="font-mono text-[var(--text-primary)]">
+                        {report.sentryEventId}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {createdIssues[report.id] ? (
+                        <a
+                          href={createdIssues[report.id].url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-semibold rounded-full border border-[var(--border-color)] px-3 py-1 transition text-[var(--text-primary)] bg-[var(--highlight-bg)]"
+                        >
+                          Jira • {createdIssues[report.id].key}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handleCreateJiraIssue(report)}
+                          disabled={creatingIssueId === report.id}
+                          className="rounded-full border border-[var(--border-color)] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 text-[var(--text-primary)] bg-[var(--surface)]"
+                        >
+                          {creatingIssueId === report.id ? 'Creating…' : 'Create Jira issue'}
+                        </button>
+                      )}
+                      <a
+                        href={`https://sentry.io/events/${report.sentryEventId}/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold transition text-[#0A66C2]"
+                      >
+                        View in Sentry →
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Info Box */}
+          <div className="mt-8 p-6 bg-orange-50 dark:bg-orange-900/20 rounded-[2rem] border border-orange-100 dark:border-orange-900/40">
+            <div className="flex gap-4">
+              <div className="h-10 w-10 shrink-0 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-600">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h4 className="font-bold text-orange-900 dark:text-orange-100 text-sm">
+                  Getting Started
+                </h4>
+                <p className="text-sm text-orange-800/80 dark:text-orange-300/80 mt-1 leading-relaxed">
+                  Create a new project in Sentry, copy the DSN from your project
+                  settings, and paste it above. All crashes from fuzzing runs
+                  will be automatically reported with full stack traces and
+                  context.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

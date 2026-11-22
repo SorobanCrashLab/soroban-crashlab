@@ -195,7 +195,7 @@ export default function CampaignMilestoneTimeline({
 
   if (dataState === "error") {
     return (
-      <section className="border border-red-200 dark:border-red-900/50 bg-red-50/60 dark:bg-red-950/20 rounded-xl p-6 shadow-sm w-full font-sans">
+      <section role="alert" className="border border-red-200 dark:border-red-900/50 bg-red-50/60 dark:bg-red-950/20 rounded-xl p-6 shadow-sm w-full font-sans">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-red-900 dark:text-red-100">

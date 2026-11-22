@@ -3,13 +3,13 @@
     "seed_id": 42,
     "input_payload": "010203",
     "mode": "invoker",
-    "failure_class": "runtime-failure"
+    "failure_class": "xdr"
   },
   {
     "seed_id": 7,
     "input_payload": "",
     "mode": "invoker",
-    "failure_class": "empty-input"
+    "failure_class": "auth"
   },
   {
     "seed_id": 11,

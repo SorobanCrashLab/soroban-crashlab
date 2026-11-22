@@ -19,6 +19,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
                 <button
                     onClick={() => onPageChange(currentPage - 1)}
                     disabled={currentPage === 1}
+                    aria-label="Previous page"
                     className="relative inline-flex items-center rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                     Previous
@@ -26,6 +27,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
                 <button
                     onClick={() => onPageChange(currentPage + 1)}
                     disabled={currentPage >= totalPages}
+                    aria-label="Next page"
                     className="relative ml-3 inline-flex items-center rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                     Next
@@ -43,6 +45,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
                         <button
                             onClick={() => onPageChange(currentPage - 1)}
                             disabled={currentPage === 1}
+                            aria-label="Previous page"
                             className="relative inline-flex items-center rounded-l-md px-3 py-2 text-zinc-400 ring-1 ring-inset ring-zinc-300 dark:ring-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             <span className="sr-only">Previous</span>
@@ -53,6 +56,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
                         <button
                             onClick={() => onPageChange(currentPage + 1)}
                             disabled={currentPage >= totalPages}
+                            aria-label="Next page"
                             className="relative inline-flex items-center rounded-r-md px-3 py-2 text-zinc-400 ring-1 ring-inset ring-zinc-300 dark:ring-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                             <span className="sr-only">Next</span>

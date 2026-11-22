@@ -93,7 +93,6 @@ const runDocumentationAssertions = () => {
   const contributing = readRepoFile(repoRoot, 'CONTRIBUTING.md');
   const playbook = readRepoFile(repoRoot, 'MAINTAINER_WAVE_PLAYBOOK.md');
   const security = readRepoFile(repoRoot, '.github/SECURITY.md');
-  const prDescription = readRepoFile(repoRoot, 'PR_DESCRIPTION.md');
 
   assert.match(security, /## Maintainer Conflicts of Interest/);
   assert.match(security, /unconflicted maintainer/i);
@@ -115,10 +114,6 @@ const runDocumentationAssertions = () => {
     `${readme}\n${contributing}\n${playbook}\n${security}`,
     /\bTODO\b|\bTBD\b/,
   );
-
-  assert.match(prDescription, /Closes #/);
-  assert.match(prDescription, /rg -n "TODO\|TBD"/);
-  assert.match(prDescription, /npm run test:policy/);
 };
 
 const runTimelineAlignmentAssertions = () => {

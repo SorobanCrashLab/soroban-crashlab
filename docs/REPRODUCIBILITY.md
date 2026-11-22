@@ -2,6 +2,8 @@
 
 This document describes the deterministic guarantees provided by CrashLab, known limitations across environments, and troubleshooting steps for mismatched replay outcomes.
 
+> The precise contract — what reproduces, over which engine versions and platforms, with cross-platform evidence — is [reproducibility-contract.md](reproducibility-contract.md). It also has the "why did my repro fail?" decision tree.
+
 ## Deterministic Guarantees
 
 CrashLab is designed to produce identical outputs given identical inputs. The following components are fully deterministic:
@@ -65,15 +67,15 @@ let mutator = scheduler.select_mutator(&mut rng);
 
 ### Parallel worker partitioning
 
-When splitting a campaign across workers, use `WorkerPartition` and `drive_run_partitioned` from `crashlab-core`: global seed index `i` is assigned to worker `i % num_workers`. Each worker runs only its indices, but the runner still walks the full `0..total_seeds` order for cancellation alignment.
+When splitting a campaign across workers, use `WorkerPartition` and `drive_run_partitioned` from `crashlab-core`. Seed indices are placed on a fixed hash ring (`RING_SIZE` slots) whose layout never depends on the worker count: `ring_slot(i)` is a pure function of the seed index. Worker `w` of `num_workers` owns a contiguous ring range, and for every worker count those ranges are pairwise disjoint and cover the whole ring. A resize therefore only moves range *boundaries* — it never moves a seed to a different slot. Each worker still walks the full `0..total_seeds` order for cancellation alignment.
 
 **Guarantee**: Per-seed outputs (classification, signatures, mutation) depend only on the seed index and payload, not on worker count. Merging worker results sorted by global seed index matches a single-worker `drive_run` over the same schedule.
 
 ### Checkpoint resume
 
-Persist `RunCheckpoint` as JSON and resume with `drive_run_from_checkpoint` (single worker) or `drive_run_partitioned_from_checkpoint` (per-worker resume). The checkpoint cursor always points at the next global seed index to inspect, and it advances only after the current seed index has been fully accounted for.
+Persist `RunCheckpoint` as JSON and resume with `drive_run_from_checkpoint` (single worker) or `drive_run_partitioned_from_checkpoint` (per-worker resume). Single-worker checkpoints advance `next_seed_index` only after the current seed index has been fully accounted for. Partitioned checkpoints record `ring_coverage`: the ring slots already swept. A resumed worker subtracts the covered ranges from its own ring range and executes only the remainder, and it marks a slot covered only once that slot's last global index has run, so an interrupted sweep is never recorded as complete.
 
-**Guarantee**: Restarting from the same checkpoint replays the same remaining seed order without reprocessing seed indices already covered by that checkpoint.
+**Guarantee**: Restarting from the same checkpoint replays the same remaining seed order without reprocessing covered seeds. Because coverage is recorded on the worker-count-independent ring, resuming or scaling to a different `num_workers` also avoids double execution and coverage holes. A v1 checkpoint (no `ring_coverage`) is read as empty coverage and re-swept conservatively.
 
 ## Known Limitations
 
@@ -179,7 +181,7 @@ export_to_ci(stable_pack);
 
 ### Grouped regression suites
 
-`crashlab_core::export_rust_regression_suite` places each fixture into a submodule named from **domain risk** (`FailureClass` from `classify_failure` on the bundle seed) and **expected failure mode** (`bundle.signature.category`). That lets you run slices of the suite independently:
+`crashlab_core::export_rust_regression_suite` places each fixture into a submodule named from **domain risk** (`FailureClass` from `classify_failure` on the stored replay payload) and **expected failure mode** (`bundle.signature.category`). The bundle signature category and regression fixture class are both derived from the exact payload stored for replay. Regression-suite evaluation prepares raw fixture seeds through the same deterministic, idempotent replay mutation used by bundle creation; an already-exported bundle payload therefore remains unchanged. This is a payload/classification semantics clarification, not a bundle schema change. That lets you run slices of the suite independently:
 
 ```bash
 # All regression tests under the generated root module
@@ -190,6 +192,20 @@ cargo test my_contract_regression::regression_auth_runtime_failure
 ```
 
 Use `crashlab_core::group_bundles_by_regression_group` or `regression_group_module_ident` if you need the same grouping in tooling without emitting Rust source.
+
+### Rust reproducer export (single bundle)
+
+To turn one failing bundle into a standalone cargo test:
+
+```bash
+cargo run --bin crashlab -- bundle export-rust failing_bundle.json -o tests/repro_failing.rs
+CRASHLAB_CONTRACT_WASM=path/to/contract.wasm cargo test --test repro_failing
+```
+
+- The generated test needs `crashlab-core` with the `host-runner` feature.
+- `-o` refuses to overwrite an existing file; pass `--force` to replace it.
+- A bundle does not record the contract wasm, function, arguments, or auth mode. The test replays the seed through `HostContractRunner`, which derives the call from the payload, and asserts the recorded category, digest and signature hash.
+- The generated text is covered by golden tests. Compiling and running it is not checked in CI.
 
 ## Troubleshooting Mismatched Replays
 

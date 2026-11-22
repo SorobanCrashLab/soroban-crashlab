@@ -1,0 +1,40 @@
+name: Source Roots
+
+# Fails a PR when tracked TypeScript sources appear outside the allowed source
+# roots (apps/, contracts/, ...).
+#
+# A root-level `src/` tree once held `integrations/datadog.ts` plus its spec,
+# importing `hot-shots` and `dotenv` — neither declared in any package.json.
+# It sat outside every tsconfig, so tsc, eslint and Vitest never loaded it: the
+# code could not fail CI, and its spec was never executed. Deleting that tree
+# (issue #1673) is not sufficient on its own, so this gate keeps the next stray
+# tree from landing just as silently.
+#
+# Runs without installing dependencies — the check is pure `git ls-files`, so
+# it stays fast and cannot be broken by a dependency or toolchain change.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: source-roots-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  source-roots:
+    name: Check for stray source trees
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Check tracked sources are inside a known source root
+        run: bash scripts/check-source-roots.sh

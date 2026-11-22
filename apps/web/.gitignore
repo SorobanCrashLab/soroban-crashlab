@@ -13,6 +13,17 @@
 # testing
 /coverage
 
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/e2e/.temp-test-files/
+
+# playwright visual gate (separate config/reporters)
+/test-results-visual/
+/playwright-report-visual/
+
 # next.js
 /.next/
 /out/
@@ -32,6 +43,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +51,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.auth/
+
+# lighthouse ci
+/.lighthouseci/
+
+# stryker mutation testing
+/reports/
+/.stryker-tmp/
+/.lighthouseci-desktop/
+/.lighthouseci-mobile/
+
+# webhook store runtime state (delivery queue, retry queue, DLQ)
+/.webhook-data/

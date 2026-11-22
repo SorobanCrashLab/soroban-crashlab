@@ -1,0 +1,40 @@
+name: compose-validate
+
+# Reference deployment (#1896): the compose file, Caddyfile and scripts must
+# stay valid. Booting the full stack is the local drill (deploy/compose/drill.sh).
+on:
+  pull_request:
+    paths:
+      - 'deploy/**'
+      - '.github/workflows/compose-validate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: deploy/compose
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: docker compose config
+        run: |
+          cp .env.example .env
+          ./generate-secrets.sh
+          docker compose config -q
+          docker compose --profile restore config -q
+      - name: Caddyfile parses in every TLS mode
+        run: |
+          for mode in auto internal files; do
+            docker run --rm -e CRASHLAB_DOMAIN=crashlab.example.com -e CRASHLAB_TLS_MODE=$mode \
+              -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+              caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d \
+              caddy adapt --config /etc/caddy/Caddyfile > /dev/null
+          done
+      - name: Shell scripts
+        working-directory: deploy
+        run: |
+          shellcheck -S warning compose/*.sh backup/compose-*.sh

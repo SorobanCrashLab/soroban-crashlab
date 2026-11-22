@@ -1,0 +1,207 @@
+name: Mutation Testing
+
+# Issue #1821.
+#
+# Line coverage says a line ran; mutation testing says a test would notice if it
+# were wrong. cargo-mutants flips comparisons, drops branches and disables auth
+# checks in the classification and security modules; StrykerJS does the same for
+# the critical TypeScript libs. Survivors (mutants no test killed) are compared
+# against a committed baseline.
+#
+# Phase: REPORT-ONLY. The gate reports new survivors but does not fail the build
+# until the baseline has had a week of nightly runs (see
+# docs/testing/mutation-testing.md). Flip it to enforcement by setting the
+# repository variable MUTATION_ENFORCE=true, or by passing `enforce` on a manual
+# run. A PR only runs the diff scope; the nightly run covers the full critical
+# module set.
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/crashlab-core/src/taxonomy.rs'
+      - 'contracts/crashlab-core/src/fixture_classifier.rs'
+      - 'contracts/crashlab-core/src/signature_hash.rs'
+      - 'contracts/crashlab-core/src/replay.rs'
+      - 'contracts/crashlab-core/mutation-baseline.json'
+      - 'apps/web/src/lib/api-key-auth.ts'
+      - 'apps/web/src/lib/storage/api-token-store.ts'
+      - 'apps/web/mutation-baseline.json'
+      - 'scripts/mutation/**'
+      - '.github/workflows/mutation.yml'
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      enforce:
+        description: 'Fail the gate on new survivors in critical modules'
+        type: boolean
+        default: false
+
+concurrency:
+  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+  MUTATION_ENFORCE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.enforce == 'true' || vars.MUTATION_ENFORCE == 'true' }}
+
+jobs:
+  baseline-contract:
+    name: Baseline comparison contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Unit-test the baseline comparison
+        run: node --test scripts/mutation/*.test.mjs
+      - name: Validate the committed baselines parse
+        run: |
+          node -e "
+            for (const f of ['contracts/crashlab-core/mutation-baseline.json', 'apps/web/mutation-baseline.json']) {
+              const b = require('./' + f);
+              if (!Array.isArray(b.survivors)) throw new Error(f + ': survivors must be an array');
+              if (!Array.isArray(b.criticalModules)) throw new Error(f + ': criticalModules must be an array');
+            }
+            console.log('baselines OK');
+          "
+
+  rust-mutants:
+    name: cargo-mutants
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # 1.97.1
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: contracts/crashlab-core
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+
+      - name: Decide mutant scope
+        id: scope
+        run: |
+          set -eu
+          CRITICAL="src/taxonomy.rs src/fixture_classifier.rs src/signature_hash.rs src/replay.rs"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            changed="$(git diff --name-only "$base"...HEAD -- contracts/crashlab-core/src | sed 's#^contracts/crashlab-core/##')"
+            files=""
+            for f in $changed; do
+              case " $CRITICAL " in *" $f "*) files="$files --file $f";; esac
+            done
+            files="$(echo "$files" | xargs)"
+            if [ -z "$files" ]; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "No critical Rust modules changed; skipping the mutation run."
+              exit 0
+            fi
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            printf 'files=%s\n' "$files" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "files=--file src/taxonomy.rs --file src/fixture_classifier.rs --file src/signature_hash.rs --file src/replay.rs" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run cargo-mutants
+        if: steps.scope.outputs.changed == 'true'
+        # Report-only: a surviving mutant must not fail the build during the
+        # bootstrap phase. The comparison step below decides, honouring
+        # MUTATION_ENFORCE.
+        continue-on-error: true
+        working-directory: contracts/crashlab-core
+        run: |
+          set +e
+          cargo mutants ${{ steps.scope.outputs.files }} --json > "$RUNNER_TEMP/mutants.json" 2> "$RUNNER_TEMP/mutants.err"
+          echo "cargo-mutants exit code: $?"
+          tail -20 "$RUNNER_TEMP/mutants.err" || true
+          exit 0
+
+      - name: Compare survivors against baseline
+        if: steps.scope.outputs.changed == 'true'
+        run: |
+          if [ ! -s "$RUNNER_TEMP/mutants.json" ]; then
+            echo "No cargo-mutants report produced (tool error or timeout); nothing to compare."
+            exit 0
+          fi
+          if [ "$MUTATION_ENFORCE" = "true" ]; then
+            node scripts/mutation/check-mutants-baseline.mjs \
+              --report "$RUNNER_TEMP/mutants.json" \
+              --baseline contracts/crashlab-core/mutation-baseline.json \
+              --format cargo-mutants --enforce
+          else
+            node scripts/mutation/check-mutants-baseline.mjs \
+              --report "$RUNNER_TEMP/mutants.json" \
+              --baseline contracts/crashlab-core/mutation-baseline.json \
+              --format cargo-mutants || true
+          fi
+
+      - name: Upload cargo-mutants report
+        if: always() && steps.scope.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cargo-mutants-report
+          path: |
+            ${{ runner.temp }}/mutants.json
+            ${{ runner.temp }}/mutants.err
+          if-no-files-found: ignore
+
+  web-mutants:
+    name: StrykerJS critical libs
+    # Not on PRs: StrykerJS is slower and the TS critical surface is small, so
+    # it rides the nightly/manual schedule rather than every PR.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Install StrykerJS
+        run: pnpm --dir apps/web add -D @stryker-mutator/core@latest @stryker-mutator/vitest-runner@latest
+      - name: Run StrykerJS
+        continue-on-error: true
+        working-directory: apps/web
+        run: pnpm exec stryker run
+      - name: Compare survivors against baseline
+        if: always()
+        run: |
+          if [ ! -f apps/web/reports/mutation/mutation.json ]; then
+            echo "No Stryker report produced; nothing to compare."
+            exit 0
+          fi
+          if [ "$MUTATION_ENFORCE" = "true" ]; then
+            node scripts/mutation/check-mutants-baseline.mjs \
+              --report apps/web/reports/mutation/mutation.json \
+              --baseline apps/web/mutation-baseline.json \
+              --format stryker --enforce
+          else
+            node scripts/mutation/check-mutants-baseline.mjs \
+              --report apps/web/reports/mutation/mutation.json \
+              --baseline apps/web/mutation-baseline.json \
+              --format stryker || true
+          fi
+      - name: Upload Stryker report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stryker-report
+          path: apps/web/reports/mutation/
+          if-no-files-found: ignore

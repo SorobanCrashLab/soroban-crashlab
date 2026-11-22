@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "stack": "web",
+  "tool": "vitest (istanbul v8)",
+  "generatedAt": "2026-10-17",
+  "bootstrap": true,
+  "tolerancePct": 1.0,
+  "changedLinesMinimum": 60,
+  "total": {
+    "lines": 0
+  },
+  "files": {},
+  "notes": [
+    "Bootstrap baseline: the committed numbers are intentionally empty until the first full coverage run on a healthy main.",
+    "Regenerate with: node scripts/coverage/write-baseline.mjs --format lcov --report apps/web/coverage/lcov.info --root \"$PWD\" --stack web --tool \"vitest (istanbul v8)\" --out apps/web/coverage-baseline.json",
+    "While `bootstrap` is true the coverage workflow is report-only and does not fail the build."
+  ]
+}

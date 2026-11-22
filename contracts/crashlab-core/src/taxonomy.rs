@@ -2,24 +2,34 @@ use crate::is_invalid_enum_tag_payload;
 use crate::{CaseSeed, CrashSignature};
 use std::collections::HashMap;
 
+/// Version of the shipped failure taxonomy.
+///
+/// Bump this whenever [`FailureClass`] variants, their stable labels, or the
+/// [`classify_failure`] rules change. Downstream consumers such as the
+/// normalization rules in [`crate::cluster`] record this version so results
+/// produced against different taxonomies are never silently conflated.
+pub const TAXONOMY_VERSION: u32 = 2;
+
 /// Stable failure categories for Soroban contract crashes.
 ///
 /// ## Category descriptions
 ///
-/// | Variant          | Failure domain                                              |
-/// |------------------|-------------------------------------------------------------|
-/// | `Auth`           | Missing or invalid authorization entry                      |
-/// | `Budget`         | CPU or memory execution budget exceeded                     |
-/// | `State`          | Ledger entry absent, wrong type, or version conflict        |
-/// | `Xdr`            | XDR encoding / decoding error — malformed or out-of-range  |
-/// | `InvalidEnumTag` | Enum-like payload carried an unsupported discriminant tag   |
-/// | `EmptyInput`     | Seed payload was empty; no execution was attempted          |
-/// | `OversizedInput` | Seed payload exceeded the maximum allowable size            |
-/// | `Unknown`        | Raw failure did not match any known category                |
+/// | Variant            | Failure domain                                              |
+/// |--------------------|-------------------------------------------------------------|
+/// | `Auth`             | Missing or invalid authorization entry                      |
+/// | `Budget`           | CPU or memory execution budget exceeded                     |
+/// | `State`            | Ledger entry absent, wrong type, or version conflict        |
+/// | `Xdr`              | XDR encoding / decoding error — malformed or out-of-range  |
+/// | `InvalidEnumTag`   | Enum-like payload carried an unsupported discriminant tag   |
+/// | `EmptyInput`       | Seed payload was empty; no execution was attempted          |
+/// | `OversizedInput`   | Seed payload exceeded the maximum allowable size            |
+/// | `Unknown`          | Raw failure did not match any known category                |
+/// | `Timeout`          | Simulation attempt exceeded the configured timeout          |
+/// | `InternalPanic`    | Internal simulation worker thread panicked                  |
 ///
 /// Classifications produced by [`classify_failure`] are deterministic:
 /// the same seed always maps to the same `FailureClass`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FailureClass {
     /// Authorization check failed: missing or invalid auth entry.
     Auth,
@@ -39,6 +49,21 @@ pub enum FailureClass {
     Unknown,
     /// Simulation attempt exceeded the configured timeout threshold.
     Timeout,
+    /// Internal simulation worker thread panicked.
+    /// This is distinct from timeout - the worker crashed internally.
+    InternalPanic,
+    /// RPC transport fault: connect/timeout/reset (never enters crash corpus).
+    RpcTransport,
+    /// RPC rate-limit fault: 429/503 with retry-after (never enters corpus).
+    RpcRateLimited,
+    /// RPC sequence fault: nonce gap requiring re-sync and single replay.
+    RpcSequence,
+    /// RPC resource fault: fee/budget refusal with detail for signatures.
+    RpcResource,
+    /// RPC contract fault: genuine trap, distinct from transport noise.
+    RpcContract,
+    /// RPC not-found fault: archived entry.
+    RpcNotFound,
 }
 
 impl FailureClass {
@@ -57,11 +82,18 @@ impl FailureClass {
             FailureClass::OversizedInput => "oversized-input",
             FailureClass::Unknown => "unknown",
             FailureClass::Timeout => "timeout",
+            FailureClass::InternalPanic => "internal-panic",
+            FailureClass::RpcTransport => "rpc-transport",
+            FailureClass::RpcRateLimited => "rpc-rate-limited",
+            FailureClass::RpcSequence => "rpc-sequence",
+            FailureClass::RpcResource => "rpc-resource",
+            FailureClass::RpcContract => "rpc-contract",
+            FailureClass::RpcNotFound => "rpc-not-found",
         }
     }
 
     /// All variants in declaration order, useful for iteration and reporting.
-    pub const ALL: [FailureClass; 9] = [
+    pub const ALL: [FailureClass; 16] = [
         FailureClass::Auth,
         FailureClass::Budget,
         FailureClass::State,
@@ -71,6 +103,13 @@ impl FailureClass {
         FailureClass::OversizedInput,
         FailureClass::Unknown,
         FailureClass::Timeout,
+        FailureClass::InternalPanic,
+        FailureClass::RpcTransport,
+        FailureClass::RpcRateLimited,
+        FailureClass::RpcSequence,
+        FailureClass::RpcResource,
+        FailureClass::RpcContract,
+        FailureClass::RpcNotFound,
     ];
 
     /// Parses a persisted category label into a stable failure class.
@@ -84,6 +123,14 @@ impl FailureClass {
             "empty-input" => Some(FailureClass::EmptyInput),
             "oversized-input" => Some(FailureClass::OversizedInput),
             "unknown" => Some(FailureClass::Unknown),
+            "timeout" => Some(FailureClass::Timeout),
+            "internal-panic" => Some(FailureClass::InternalPanic),
+            "rpc-transport" => Some(FailureClass::RpcTransport),
+            "rpc-rate-limited" => Some(FailureClass::RpcRateLimited),
+            "rpc-sequence" => Some(FailureClass::RpcSequence),
+            "rpc-resource" => Some(FailureClass::RpcResource),
+            "rpc-contract" => Some(FailureClass::RpcContract),
+            "rpc-not-found" => Some(FailureClass::RpcNotFound),
             _ => None,
         }
     }
@@ -92,6 +139,28 @@ impl FailureClass {
 impl std::fmt::Display for FailureClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+impl FailureClass {
+    /// True for RPC harness faults that must never enter the crash corpus.
+    pub fn is_harness_fault(self) -> bool {
+        matches!(
+            self,
+            FailureClass::RpcTransport
+                | FailureClass::RpcRateLimited
+                | FailureClass::RpcSequence
+                | FailureClass::RpcResource
+                | FailureClass::RpcNotFound
+        )
+    }
+
+    /// True when a bundle with this class must be excluded from `CrashIndex`.
+    pub fn excludes_from_corpus(self) -> bool {
+        matches!(
+            self,
+            FailureClass::RpcTransport | FailureClass::RpcRateLimited
+        )
     }
 }
 
@@ -189,6 +258,32 @@ pub fn stable_failure_class_for_bundle(
             FailureClass::Unknown
         }
     })
+}
+
+/// Build a `CrashSignature` from a seed using only the taxonomy mapping.
+///
+/// This central helper produces the stable `category` label, computes the
+/// deterministic `digest` and derives a `signature_hash` using the
+/// `signature_hash` helper. It is intended to be the single place that
+/// constructs `CrashSignature` values from raw seed bytes so callers (e.g.
+/// `to_bundle`) remain consistent with the taxonomy.
+pub fn crash_signature_from_seed(seed: &CaseSeed) -> CrashSignature {
+    let class = classify_failure(seed);
+    let category = class.as_str().to_string();
+
+    // Preserve the existing digest algorithm used by callers.
+    let digest = seed.payload.iter().fold(seed.id, |acc, b| {
+        acc.wrapping_mul(1099511628211).wrapping_add(*b as u64)
+    });
+
+    // Use the signature hashing helper so hashing logic is centralized.
+    let signature_hash = crate::signature_hash::hash_category_payload(category.as_str(), &seed.payload);
+
+    CrashSignature {
+        category,
+        digest,
+        signature_hash,
+    }
 }
 
 #[cfg(test)]
@@ -294,9 +389,11 @@ mod tests {
     }
 
     #[test]
-    fn all_contains_nine_variants() {
-        assert_eq!(FailureClass::ALL.len(), 9);
+    fn all_contains_ten_variants() {
+        assert_eq!(FailureClass::ALL.len(), 16);
         assert!(FailureClass::ALL.contains(&FailureClass::Unknown));
+        assert!(FailureClass::ALL.contains(&FailureClass::InternalPanic));
+        assert!(FailureClass::ALL.contains(&FailureClass::RpcTransport));
     }
 
     #[test]

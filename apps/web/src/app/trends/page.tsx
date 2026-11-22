@@ -1,33 +1,68 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { RunArea, RunSeverity, FuzzingRun } from '../types';
-import { FilterBar } from './FilterBar';
-import { CrashTrendChart } from './CrashTrendChart';
+import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { FuzzingRun, RunArea, RunSeverity } from "../types";
+import { FilterBar } from "./FilterBar";
+import { AnomalySensitivityToggle } from "./AnomalySensitivityToggle";
+import { TrendsChartSkeleton } from "../../components/LoadingSkeleton";
+import { PageHeader, StatCard } from "../../components";
+import { WidgetErrorBoundary } from "../../components/WidgetErrorBoundary";
+
+// Lazy-load the recharts bundle (~90 KB gzipped). Only analytics/trends routes
+// pay the chart cost; dashboard/runs/settings pages are excluded from this chunk.
+const CrashTrendChart = dynamic(
+  () => import("./CrashTrendChart").then((m) => ({ default: m.CrashTrendChart })),
+  { loading: () => <TrendsChartSkeleton />, ssr: false }
+);
+import { fetchRuns } from "../../lib/api-client";
 import {
   transformRunsToCrashEvents,
   bucketByDay,
   buildChartData,
   extractSignatureMetadata,
   isChartDataEmpty,
-} from '../utils/trendAggregation';
+} from "../utils/trendAggregation";
+import {
+  AnomalySensitivity,
+  buildDailyRateSeries,
+  detectAnomalies,
+} from "../utils/trendAnomaly";
 
 /**
  * Crash Signature Frequency Trend page.
  *
  * Visualizes crash signature frequency over time with interactive
  * filtering by area, severity, and specific signatures.
- *
- * TODO: Integrate with real API to fetch FuzzingRun data instead of using mock data.
  */
 export default function CrashTrendPage() {
-  // TODO: Replace with real data source (API call, context, etc.)
-  const runs = useMockFuzzingRuns();
+  const [runs, setRuns] = useState<FuzzingRun[]>([]);
+  const [_dataState, setDataState] = useState<"loading" | "success" | "error">(
+    "loading",
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRuns()
+      .then((data) => {
+        if (!cancelled) {
+          setRuns(data.runs ?? []);
+          setDataState("success");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setDataState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Filter state
   const [selectedAreas, setSelectedAreas] = useState<RunArea[]>([]);
-  const [selectedSeverities, setSelectedSeverities] = useState<RunSeverity[]>([]);
+  const [selectedSeverities, setSelectedSeverities] = useState<RunSeverity[]>(
+    [],
+  );
   const [selectedSignatures, setSelectedSignatures] = useState<string[]>([]);
 
   // Aggregate and filter data reactively
@@ -44,7 +79,7 @@ export default function CrashTrendPage() {
 
     // Step 4: Extract signatures from filtered data
     const sigMetadata = extractSignatureMetadata(
-      Array.from(buckets.values()).flat()
+      Array.from(buckets.values()).flat(),
     );
 
     // Step 5: Build chart data with signature filter
@@ -60,7 +95,7 @@ export default function CrashTrendPage() {
   // Determine which signatures are in the filtered data
   const availableSignaturesFiltered = useMemo(() => {
     return availableSignatures.filter((sig) =>
-      chartData.some((point) => point[sig.signature] !== undefined)
+      chartData.some((point) => point[sig.signature] !== undefined),
     );
   }, [availableSignatures, chartData]);
 
@@ -78,31 +113,33 @@ export default function CrashTrendPage() {
   const isEmpty = isChartDataEmpty(chartData);
   const hasNoRuns = runs.length === 0;
 
+  // Per-view anomaly sensitivity (maps to the detector's k multiplier).
+  const [sensitivity, setSensitivity] = useState<AnomalySensitivity>("medium");
+
+  // Statistical anomaly detection over the daily crash-rate series.
+  // Detection is deliberately run on the day TOTAL across the selected
+  // signatures: that is the "crash rate" a maintainer eyeballs for spikes.
+  const anomalyResult = useMemo(() => {
+    const series = buildDailyRateSeries(chartData, effectiveSelectedSignatures);
+    return detectAnomalies(series, { sensitivity });
+  }, [chartData, effectiveSelectedSignatures, sensitivity]);
+
+  const totalCrashes = useMemo(
+    () => calculateTotalCrashes(chartData),
+    [chartData],
+  );
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 mb-4 transition"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to Dashboard
-            </Link>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-            Crash Signature Trends
-          </h1>
-          <p className="text-zinc-600 dark:text-zinc-400">
-            Visualize crash signature frequency over time across fuzzing runs.
-            Filter by area, severity, and specific signatures to focus on
-            trends that matter.
-          </p>
-        </div>
-      </div>
+        <PageHeader
+          backLink={{ href: "/", label: "Back to Dashboard" }}
+          title="Crash Signature Trends"
+          description="Visualize crash signature frequency over time across fuzzing runs. Filter by area, severity, and specific signatures to focus on trends that matter."
+          titleClassName="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2"
+          descriptionClassName="text-zinc-600 dark:text-zinc-400"
+          className="mb-8"
+        />
 
         {/* No data state */}
         {hasNoRuns ? (
@@ -143,13 +180,32 @@ export default function CrashTrendPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <CrashTrendChart
-                  data={chartData}
-                  selectedSignatures={effectiveSelectedSignatures}
-                />
+                {/* Anomaly controls: sensitivity preset for this view */}
+                <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                  <AnomalySensitivityToggle
+                    value={sensitivity}
+                    onChange={setSensitivity}
+                    flagCount={anomalyResult.flags.length}
+                  />
+
+                  {/* Cold-start honesty: say what is missing, do not pretend. */}
+                  {anomalyResult.coldStart.active && (
+                    <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                      {anomalyResult.coldStart.message}
+                    </p>
+                  )}
+                </div>
+
+                <WidgetErrorBoundary title="Crash Trend Chart">
+                  <CrashTrendChart
+                    data={chartData}
+                    selectedSignatures={effectiveSelectedSignatures}
+                    anomalyFlags={anomalyResult.flags}
+                  />
+                </WidgetErrorBoundary>
 
                 {/* Summary stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
                   <StatCard
                     label="Total Days"
                     value={chartData.length.toString()}
@@ -164,7 +220,7 @@ export default function CrashTrendPage() {
                   />
                   <StatCard
                     label="Total Crashes"
-                    value={calculateTotalCrashes(chartData).toString()}
+                    value={totalCrashes.toString()}
                   />
                 </div>
               </div>
@@ -177,85 +233,18 @@ export default function CrashTrendPage() {
 }
 
 /**
- * Display helper: statistics card for summary metrics.
- */
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
-      <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-        {label}
-      </p>
-      <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-/**
  * Calculate total crashes across all chart data points.
  */
-function calculateTotalCrashes(chartData: Record<string, string | number>[]): number {
+function calculateTotalCrashes(
+  chartData: Record<string, string | number>[],
+): number {
   let total = 0;
   for (const point of chartData) {
     for (const [key, value] of Object.entries(point)) {
-      if (key !== 'date' && typeof value === 'number') {
+      if (key !== "date" && typeof value === "number") {
         total += value;
       }
     }
   }
   return total;
-}
-
-/**
- * Generate mock FuzzingRun data for demo/testing.
- * TODO: Replace with real API call after integration.
- */
-function useMockFuzzingRuns(): FuzzingRun[] {
-  // In a real implementation, this would fetch from an API or receive via props.
-  // For now, we generate realistic mock data for testing the visualization.
-
-  const areas: RunArea[] = ['auth', 'state', 'budget', 'xdr'];
-  const severities: RunSeverity[] = ['low', 'medium', 'high', 'critical'];
-  const baseDate = new Date('2026-03-20');
-
-  const runs: FuzzingRun[] = [];
-  let runId = 1;
-
-  // Generate 50 mock crashes across the past 10 days
-  for (let dayOffset = 0; dayOffset < 10; dayOffset++) {
-    const date = new Date(baseDate);
-    date.setDate(date.getDate() - dayOffset);
-
-    const crashCount = Math.floor(Math.random() * 8) + 1;
-
-    for (let i = 0; i < crashCount; i++) {
-      const area = areas[Math.floor(Math.random() * areas.length)];
-      const severity = severities[Math.floor(Math.random() * severities.length)];
-
-      // Generate stable signature hashes (in real data, these are FNV-1a hashes)
-      const signature = `0x${(Math.random() * 0xffffffff | 0).toString(16).padStart(8, '0')}`;
-
-      runs.push({
-        id: `run-${runId++}`,
-        status: 'failed',
-        area,
-        severity,
-        duration: Math.floor(Math.random() * 60000) + 1000,
-        seedCount: Math.floor(Math.random() * 1000) + 10,
-        cpuInstructions: Math.floor(Math.random() * 1000000),
-        memoryBytes: Math.floor(Math.random() * 10000000),
-        minResourceFee: Math.floor(Math.random() * 100000),
-        finishedAt: date.toISOString(),
-        crashDetail: {
-          failureCategory: area.toUpperCase(),
-          signature,
-          payload: `{"type":"${area}","test":true}`,
-          replayAction: `crashlab replay --signature ${signature}`,
-        },
-      });
-    }
-  }
-
-  return runs;
 }

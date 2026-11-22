@@ -2,6 +2,9 @@
 //!
 //! Apply retention windows to prune old non-critical data while preserving
 //! the latest failures and essential checkpoints.
+//!
+//! Supports per-artifact-class policies, pinned-never-delete protection, and
+//! two-phase (mark-expired → grace → delete) leased sweeps with dry-run plans.
 
 use crate::{CaseBundleDocument, RunCheckpoint};
 use chrono::{DateTime, Duration, Utc};
@@ -23,6 +26,201 @@ impl<T> RetentionRecord<T> {
     }
 }
 
+/// Artifact class used to select a per-class retention policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ArtifactClass {
+    /// Crash bundles (highest forensic value).
+    Bundle,
+    /// Execution traces.
+    Trace,
+    /// Raw seed inputs.
+    RawSeed,
+    /// Generic raw artifacts (legacy backends).
+    Raw,
+    /// Aggregated statistics.
+    AggregatedStats,
+    /// Audit logs.
+    Audit,
+}
+
+impl ArtifactClass {
+    /// Stable string identifier used in config and reports.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ArtifactClass::Bundle => "bundle",
+            ArtifactClass::Trace => "trace",
+            ArtifactClass::RawSeed => "raw_seed",
+            ArtifactClass::Raw => "raw",
+            ArtifactClass::AggregatedStats => "aggregated_stats",
+            ArtifactClass::Audit => "audit",
+        }
+    }
+
+    /// Classifies an artifact id into a class by prefix convention.
+    pub fn classify(id: &str) -> ArtifactClass {
+        let lower = id.to_lowercase();
+        if lower.starts_with("bundle") || lower.starts_with("crash") {
+            ArtifactClass::Bundle
+        } else if lower.starts_with("trace") {
+            ArtifactClass::Trace
+        } else if lower.starts_with("seed") {
+            ArtifactClass::RawSeed
+        } else if lower.starts_with("stat") {
+            ArtifactClass::AggregatedStats
+        } else if lower.starts_with("audit") || lower.starts_with("log") {
+            ArtifactClass::Audit
+        } else {
+            ArtifactClass::Raw
+        }
+    }
+}
+
+/// Per-artifact-class retention policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassPolicy {
+    /// Maximum age before an artifact becomes an expiry candidate.
+    pub ttl: Option<Duration>,
+    /// Always keep the newest N artifacts of this class regardless of age.
+    pub min_count: usize,
+}
+
+impl Default for ClassPolicy {
+    fn default() -> Self {
+        Self {
+            ttl: Some(Duration::days(30)),
+            min_count: 1,
+        }
+    }
+}
+
+/// Set of per-class policies with documented defaults.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassPolicies {
+    pub bundle: ClassPolicy,
+    pub trace: ClassPolicy,
+    pub raw_seed: ClassPolicy,
+    pub raw: ClassPolicy,
+    pub aggregated_stats: ClassPolicy,
+    pub audit: ClassPolicy,
+}
+
+impl Default for ClassPolicies {
+    fn default() -> Self {
+        Self {
+            bundle: ClassPolicy {
+                ttl: Some(Duration::days(30)),
+                min_count: 10,
+            },
+            trace: ClassPolicy {
+                ttl: Some(Duration::days(14)),
+                min_count: 5,
+            },
+            raw_seed: ClassPolicy {
+                ttl: Some(Duration::days(7)),
+                min_count: 3,
+            },
+            raw: ClassPolicy {
+                ttl: Some(Duration::days(7)),
+                min_count: 1,
+            },
+            aggregated_stats: ClassPolicy {
+                ttl: Some(Duration::days(90)),
+                min_count: 1,
+            },
+            audit: ClassPolicy {
+                ttl: Some(Duration::days(365)),
+                min_count: 1,
+            },
+        }
+    }
+}
+
+impl ClassPolicies {
+    /// Returns the policy for a given artifact class.
+    pub fn for_class(&self, class: ArtifactClass) -> &ClassPolicy {
+        match class {
+            ArtifactClass::Bundle => &self.bundle,
+            ArtifactClass::Trace => &self.trace,
+            ArtifactClass::RawSeed => &self.raw_seed,
+            ArtifactClass::Raw => &self.raw,
+            ArtifactClass::AggregatedStats => &self.aggregated_stats,
+            ArtifactClass::Audit => &self.audit,
+        }
+    }
+}
+
+/// A pinned artifact that must never be deleted (open issue refs, baselines).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pin {
+    /// Artifact class the pin applies to.
+    pub class: ArtifactClass,
+    /// Stable identifier of the pinned artifact.
+    pub id: String,
+    /// Human-readable reason (e.g. "open issue #123", "regression baseline").
+    pub reason: String,
+}
+
+/// A single artifact considered by the sweep planner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SweepCandidate {
+    pub class: ArtifactClass,
+    pub id: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Action the planner decided for a candidate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SweepAction {
+    /// Keep the artifact.
+    Keep,
+    /// Mark as expired; deletion happens after the grace window.
+    MarkExpired,
+}
+
+/// A planned action for a single candidate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SweepPlanEntry {
+    pub class: ArtifactClass,
+    pub id: String,
+    pub action: SweepAction,
+    pub reason: String,
+}
+
+/// Full sweep plan produced by the planner (used by `--dry-run`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SweepPlan {
+    pub entries: Vec<SweepPlanEntry>,
+}
+
+impl SweepPlan {
+    /// Number of artifacts that would be marked expired.
+    pub fn expired_count(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.action == SweepAction::MarkExpired)
+            .count()
+    }
+
+    /// Renders a human-readable plan for `--dry-run` output.
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        for entry in &self.entries {
+            let action = match entry.action {
+                SweepAction::Keep => "keep",
+                SweepAction::MarkExpired => "mark-expired",
+            };
+            out.push_str(&format!(
+                "{} {} {} ({})\n",
+                action,
+                entry.class.as_str(),
+                entry.id,
+                entry.reason
+            ));
+        }
+        out
+    }
+}
+
 /// Configuration for artifact retention policies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RetentionPolicy {
@@ -36,6 +234,14 @@ pub struct RetentionPolicy {
     pub checkpoint_retention_window: Option<Duration>,
     /// Number of newest failures to pin even when outside the retention window.
     pub keep_latest_failures: usize,
+    /// Maximum age for run heartbeats before considering a run directory abandoned (default: 60s).
+    pub heartbeat_ttl: Option<Duration>,
+    /// Grace period between marking a candidate and actual deletion in two-phase sweep.
+    pub sweep_grace_period: Duration,
+    /// Per-artifact-class policies.
+    pub class_policies: ClassPolicies,
+    /// Pinned artifacts that must never be deleted.
+    pub pins: Vec<Pin>,
 }
 
 impl Default for RetentionPolicy {
@@ -46,6 +252,10 @@ impl Default for RetentionPolicy {
             failure_retention_window: Some(Duration::days(30)),
             checkpoint_retention_window: Some(Duration::days(14)),
             keep_latest_failures: 10,
+            heartbeat_ttl: Some(Duration::seconds(60)),
+            sweep_grace_period: Duration::zero(),
+            class_policies: ClassPolicies::default(),
+            pins: Vec::new(),
         }
     }
 }
@@ -181,6 +391,80 @@ impl RetentionPolicy {
 
         keep
     }
+
+    /// Returns true if the given artifact is pinned and must never be deleted.
+    pub fn is_pinned(&self, class: ArtifactClass, id: &str) -> Option<&Pin> {
+        self.pins
+            .iter()
+            .find(|pin| pin.class == class && pin.id == id)
+    }
+
+    /// Builds a sweep plan for the given candidates without performing any writes.
+    ///
+    /// Applies per-class TTL and min-count floors, then excludes pinned
+    /// artifacts. This is the single source of truth used by both `--dry-run`
+    /// and the real sweep so the plan and execution cannot diverge.
+    pub fn plan_sweep(&self, candidates: &[SweepCandidate], now: DateTime<Utc>) -> SweepPlan {
+        let mut entries = Vec::with_capacity(candidates.len());
+
+        // Group indices by class so min-count floors are computed per class.
+        let mut by_class: HashMap<ArtifactClass, Vec<usize>> = HashMap::new();
+        for (i, candidate) in candidates.iter().enumerate() {
+            by_class.entry(candidate.class).or_default().push(i);
+        }
+
+        let mut decisions: Vec<Option<SweepPlanEntry>> = vec![None; candidates.len()];
+
+        for (class, mut indices) in by_class {
+            let policy = self.class_policies.for_class(class);
+            indices.sort_by(|&a, &b| {
+                candidates[b]
+                    .created_at
+                    .cmp(&candidates[a].created_at)
+                    .then_with(|| candidates[b].id.cmp(&candidates[a].id))
+            });
+
+            for (rank, &i) in indices.iter().enumerate() {
+                let candidate = &candidates[i];
+                let entry = if let Some(pin) = self.is_pinned(class, &candidate.id) {
+                    SweepPlanEntry {
+                        class,
+                        id: candidate.id.clone(),
+                        action: SweepAction::Keep,
+                        reason: format!("pinned: {}", pin.reason),
+                    }
+                } else if rank < policy.min_count {
+                    SweepPlanEntry {
+                        class,
+                        id: candidate.id.clone(),
+                        action: SweepAction::Keep,
+                        reason: format!("min-count floor ({})", policy.min_count),
+                    }
+                } else if within_window(candidate.created_at, now, policy.ttl) {
+                    SweepPlanEntry {
+                        class,
+                        id: candidate.id.clone(),
+                        action: SweepAction::Keep,
+                        reason: "within ttl".to_string(),
+                    }
+                } else {
+                    SweepPlanEntry {
+                        class,
+                        id: candidate.id.clone(),
+                        action: SweepAction::MarkExpired,
+                        reason: "past ttl".to_string(),
+                    }
+                };
+                decisions[i] = Some(entry);
+            }
+        }
+
+        for decision in decisions.into_iter().flatten() {
+            entries.push(decision);
+        }
+
+        SweepPlan { entries }
+    }
 }
 
 fn within_window(created_at: DateTime<Utc>, now: DateTime<Utc>, window: Option<Duration>) -> bool {
@@ -228,16 +512,18 @@ mod tests {
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+            provenance: None,
+            original_seed: None,
+            shrink_lineage: None,
+            engine_version: String::new(),
         }
     }
 
     fn checkpoint(campaign_id: &str, next_seed_index: usize) -> RunCheckpoint {
-        RunCheckpoint {
-            schema: 1,
-            campaign_id: campaign_id.to_string(),
-            next_seed_index,
-            total_seeds: 100,
-        }
+        let mut checkpoint = RunCheckpoint::new_run(campaign_id, &[]);
+        checkpoint.next_seed_index = next_seed_index;
+        checkpoint.total_seeds = 100;
+        checkpoint
     }
 
     #[test]
@@ -248,6 +534,10 @@ mod tests {
             failure_retention_window: None,
             checkpoint_retention_window: None,
             keep_latest_failures: 0,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
+            class_policies: ClassPolicies::default(),
+            pins: Vec::new(),
         };
 
         let bundles = vec![
@@ -268,6 +558,10 @@ mod tests {
             failure_retention_window: None,
             checkpoint_retention_window: None,
             keep_latest_failures: 0,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
+            class_policies: ClassPolicies::default(),
+            pins: Vec::new(),
         };
 
         let checkpoints = vec![
@@ -289,6 +583,10 @@ mod tests {
             failure_retention_window: Some(Duration::days(7)),
             checkpoint_retention_window: Some(Duration::days(7)),
             keep_latest_failures: 2,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
+            class_policies: ClassPolicies::default(),
+            pins: Vec::new(),
         };
 
         let bundles = vec![
@@ -310,6 +608,10 @@ mod tests {
             failure_retention_window: Some(Duration::days(90)),
             checkpoint_retention_window: Some(Duration::days(7)),
             keep_latest_failures: 1,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
+            class_policies: ClassPolicies::default(),
+            pins: Vec::new(),
         };
 
         let bundles = vec![
@@ -331,6 +633,10 @@ mod tests {
             failure_retention_window: Some(Duration::days(30)),
             checkpoint_retention_window: Some(Duration::days(2)),
             keep_latest_failures: 1,
+            heartbeat_ttl: None,
+            sweep_grace_period: Duration::zero(),
+            class_policies: ClassPolicies::default(),
+            pins: Vec::new(),
         };
 
         let checkpoints = vec![
@@ -350,5 +656,113 @@ mod tests {
         assert_eq!(policy.failure_retention_window, Some(Duration::days(30)));
         assert_eq!(policy.checkpoint_retention_window, Some(Duration::days(14)));
         assert_eq!(policy.keep_latest_failures, 10);
+        assert_eq!(policy.heartbeat_ttl, Some(Duration::seconds(60)));
+        assert_eq!(policy.sweep_grace_period, Duration::zero());
+    }
+
+    fn candidate(class: ArtifactClass, id: &str, created_at: DateTime<Utc>) -> SweepCandidate {
+        SweepCandidate {
+            class,
+            id: id.to_string(),
+            created_at,
+        }
+    }
+
+    #[test]
+    fn plan_sweep_applies_per_class_ttl() {
+        let now = Utc::now();
+        let mut policy = RetentionPolicy::default();
+        policy.class_policies.bundle.ttl = Some(Duration::days(30));
+        policy.class_policies.bundle.min_count = 0;
+        policy.class_policies.trace.ttl = Some(Duration::days(7));
+        policy.class_policies.trace.min_count = 0;
+
+        let candidates = vec![
+            candidate(ArtifactClass::Bundle, "b-old", now - Duration::days(40)),
+            candidate(ArtifactClass::Bundle, "b-new", now - Duration::days(1)),
+            candidate(ArtifactClass::Trace, "t-old", now - Duration::days(10)),
+            candidate(ArtifactClass::Trace, "t-new", now - Duration::days(1)),
+        ];
+
+        let plan = policy.plan_sweep(&candidates, now);
+        let expired: Vec<&str> = plan
+            .entries
+            .iter()
+            .filter(|e| e.action == SweepAction::MarkExpired)
+            .map(|e| e.id.as_str())
+            .collect();
+        assert_eq!(expired, vec!["b-old", "t-old"]);
+    }
+
+    #[test]
+    fn plan_sweep_respects_min_count_floor() {
+        let now = Utc::now();
+        let mut policy = RetentionPolicy::default();
+        policy.class_policies.raw_seed.ttl = Some(Duration::days(1));
+        policy.class_policies.raw_seed.min_count = 2;
+
+        let candidates = vec![
+            candidate(ArtifactClass::RawSeed, "s1", now - Duration::days(10)),
+            candidate(ArtifactClass::RawSeed, "s2", now - Duration::days(9)),
+            candidate(ArtifactClass::RawSeed, "s3", now - Duration::days(8)),
+        ];
+
+        let plan = policy.plan_sweep(&candidates, now);
+        let kept: Vec<&str> = plan
+            .entries
+            .iter()
+            .filter(|e| e.action == SweepAction::Keep)
+            .map(|e| e.id.as_str())
+            .collect();
+        assert_eq!(kept, vec!["s3", "s2"]);
+        assert_eq!(plan.expired_count(), 1);
+    }
+
+    #[test]
+    fn plan_sweep_protects_pinned_artifacts() {
+        let now = Utc::now();
+        let mut policy = RetentionPolicy::default();
+        policy.class_policies.bundle.ttl = Some(Duration::days(1));
+        policy.class_policies.bundle.min_count = 0;
+        policy.pins.push(Pin {
+            class: ArtifactClass::Bundle,
+            id: "b-pinned".to_string(),
+            reason: "open issue #42".to_string(),
+        });
+
+        let candidates = vec![
+            candidate(ArtifactClass::Bundle, "b-pinned", now - Duration::days(100)),
+            candidate(ArtifactClass::Bundle, "b-other", now - Duration::days(100)),
+        ];
+
+        let plan = policy.plan_sweep(&candidates, now);
+        let pinned = plan
+            .entries
+            .iter()
+            .find(|e| e.id == "b-pinned")
+            .expect("pinned entry present");
+        assert_eq!(pinned.action, SweepAction::Keep);
+        assert!(pinned.reason.contains("pinned"));
+        assert_eq!(plan.expired_count(), 1);
+    }
+
+    #[test]
+    fn dry_run_plan_renders_without_mutation() {
+        let now = Utc::now();
+        let mut policy = RetentionPolicy::default();
+        policy.class_policies.audit.ttl = Some(Duration::days(1));
+        policy.class_policies.audit.min_count = 0;
+
+        let candidates = vec![candidate(
+            ArtifactClass::Audit,
+            "a-old",
+            now - Duration::days(10),
+        )];
+        let snapshot = candidates.clone();
+
+        let plan = policy.plan_sweep(&candidates, now);
+        assert_eq!(candidates, snapshot, "planning must not mutate input");
+        let rendered = plan.render();
+        assert!(rendered.contains("mark-expired audit a-old"));
     }
 }

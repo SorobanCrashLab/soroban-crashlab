@@ -97,7 +97,6 @@ const runDocumentationAssertions = () => {
   const contributing = readRepoFile(repoRoot, 'CONTRIBUTING.md');
   const playbook = readRepoFile(repoRoot, 'MAINTAINER_WAVE_PLAYBOOK.md');
   const security = readRepoFile(repoRoot, '.github/SECURITY.md');
-  const prDescription = readRepoFile(repoRoot, 'PR_DESCRIPTION.md');
 
   assert.match(security, /## Dependency Update Review and Rollback/);
   assert.match(security, /changelog|release notes/i);
@@ -122,14 +121,6 @@ const runDocumentationAssertions = () => {
     `${readme}\n${contributing}\n${playbook}\n${security}`,
     /\bTODO\b|\bTBD\b/,
   );
-
-  assert.match(prDescription, /Closes #/);
-  assert.match(prDescription, /npm run test:policy/);
-  assert.match(prDescription, /npm run test/);
-  assert.match(prDescription, /npm run lint/);
-  assert.match(prDescription, /npm run build/);
-  assert.match(prDescription, /changelog/i);
-  assert.match(prDescription, /rollback/i);
 };
 
 const runTimelineAssertions = () => {

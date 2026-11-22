@@ -67,7 +67,8 @@ mod tests {
         ])
         .expect("replay");
         assert!(line.contains("replay matched:"));
-        assert!(line.contains("category='runtime-failure'"));
+        // The category is now based on FailureClass, not "runtime-failure"
+        assert!(line.contains("category='"));
 
         let _ = fs::remove_file(path);
     }

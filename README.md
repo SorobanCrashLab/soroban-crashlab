@@ -1,249 +1,334 @@
 # Soroban CrashLab
 
-Soroban CrashLab is an open-source quality engineering toolkit for Soroban smart contracts. It helps maintainers find failure modes early by generating adversarial inputs, replaying failing cases, and exporting deterministic tests for CI.
+**Advanced fuzzing and mutation testing framework for Soroban smart contracts on the Stellar network.**
 
-## Why this project exists
+CrashLab automatically discovers edge cases and vulnerabilities in your Soroban contracts by generating millions of adversarial inputs, detecting crashes, and converting them into reproducible regression tests. Think of it as a crash test dummy for your blockchain code.
 
-Most contract failures happen in edge cases that are not covered by manual tests. CrashLab gives maintainers a repeatable path to:
+[![Build Status](https://github.com/SorobanCrashLab/soroban-crashlab/actions/workflows/ci.yml/badge.svg)](https://github.com/SorobanCrashLab/soroban-crashlab/actions)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Stellar](https://img.shields.io/badge/Stellar-Soroban-0A66C2)](https://stellar.org)
 
-- stress contract entry points with structured fuzz cases
-- preserve exact failing seeds and replay traces
-- convert failures into deterministic regression tests
-- review risk and state-impact signals in a frontend dashboard
+---
 
-## Security
+## Why CrashLab?
 
-To report a vulnerability, see our [Security Policy](.github/SECURITY.md). Do not open a public issue for security concerns. Maintainer conflict-of-interest handling for security triage, assignment, review, and disclosure decisions is defined in the same policy.
+Smart contracts on blockchain handle real assets. A single bug can lead to loss of funds or unauthorized token minting. Traditional testing misses edge cases that attackers exploit. CrashLab solves this by:
 
-## Repository structure
+- **Automated adversarial input generation** — Mutates seeds, boundary cases, enum flips, and decimal extremes
+- **Cross auth mode testing** — Catches authorization bugs across all three Soroban auth modes
+- **Flaky detection** — Separates reproducible crashes from random noise
+- **Deterministic replay** — Same seed always produces the same result
+- **CI export** — Converts failures into regression tests automatically
+- **Web dashboard** — Visual triage, trends, and campaign management
 
-- `apps/web`: Next.js frontend dashboard for runs, failures, and replay output
-- `contracts/crashlab-core`: Rust crate for core fuzzing and reproducible case generation (`WorkerPartition` / `drive_run_partitioned` split seed indices across workers deterministically; see `docs/REPRODUCIBILITY.md`)
-- `docs/`: project documentation
-  - [`ARCHITECTURE.md`](docs/ARCHITECTURE.md): system architecture and data flow
-  - [`REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md): deterministic guarantees and troubleshooting
-  - [`RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md): maintainer checklist for tagging releases, updating the changelog, and reviewing backward compatibility
-- `.github/ISSUE_TEMPLATE`: structured issue intake for maintainers and contributors
-- `ops/wave3-issues.tsv`: curated backlog for Wave 3 with 32 non-overlapping issues
-- `scripts/create-wave3-issues.sh`: script to publish backlog issues to GitHub
+---
 
-## Quick start
-
-If this is your first time setting up the repo locally, start with the
-[contributor setup checklist](CONTRIBUTING.md#local-setup-checklist).
-It walks through installing Git, Node.js, npm, Rust, and optional GitHub
-tooling before you run the project checks below.
-If setup, build, test, or replay commands fail locally, jump to the
-[contributor debugging playbook](CONTRIBUTING.md#contributor-debugging-playbook).
+## Quick Start
 
 ### Prerequisites
 
+- Node.js 22+ and npm 10+
+- Rust stable (1.80+) and Cargo
 - Git
-- Node.js 22+
-- npm 10+ (the npm version bundled with Node.js 22 is fine)
-- Rust stable + Cargo
-- Optional: GitHub CLI (`gh`) authenticated for Wave maintenance scripts
 
-### Verify your toolchain
+### Local development with Docker Compose
 
 ```bash
-git --version
-node -v
-npm -v
-rustc -V
-cargo -V
-gh --version # optional
+docker compose up web
 ```
 
-### Install web dependencies and run web checks
+The dashboard is available at [http://localhost:3000](http://localhost:3000). Source is bind-mounted with a persistent `node_modules` volume for fast iteration.
+
+For a production-like image:
+
+```bash
+docker compose --profile prod up web-prod
+```
+
+To build and test the Rust core in a container:
+
+```bash
+docker compose --profile core build core
+```
+
+### Frontend Dashboard
 
 ```bash
 cd apps/web
 npm ci
-npm run test
-npm run lint
-npm run build
 npm run dev
 ```
 
-### Build and test core crate
+Open [http://localhost:3000](http://localhost:3000) to view the dashboard.
+
+### Backend Fuzzing Engine
 
 ```bash
 cd contracts/crashlab-core
 cargo test --all-targets
 ```
 
-### Run checkpoints (resume without redoing work)
-
-Persist a [`RunCheckpoint`](contracts/crashlab-core/src/checkpoint.rs) (JSON) with `next_seed_index` and reload it after an interruption. Use `drive_run_from_checkpoint` to resume a single-worker campaign from the first unfinished seed without replaying completed work.
-
-For multi-worker runs, keep a separate checkpoint file per worker and resume with `drive_run_partitioned_from_checkpoint`. Each worker checkpoint stores the next global seed index that worker should inspect, so unowned indices are skipped once and not rescanned after restart.
-
-### Artifact retention policy
-
-Apply configurable retention windows for old run artifacts with [`RetentionPolicy`](contracts/crashlab-core/src/retention.rs). Count-based helpers remain available through `retain_failure_bundles` and `retain_checkpoints`, while time-aware pruning uses `RetentionRecord<T>` plus:
-
-- `retain_failure_bundle_records`: keeps the newest failures pinned via `keep_latest_failures`, then prunes older failures outside `failure_retention_window`.
-- `retain_checkpoint_records`: keeps each campaign's most advanced checkpoints and any checkpoints still inside `checkpoint_retention_window`.
-
-This lets maintainers preserve the latest failure evidence while pruning old non-critical artifacts deterministically.
-
-### Corpus export (portable seed archive)
-
-Export a deterministic, sorted corpus JSON (schema `CORPUS_ARCHIVE_SCHEMA_VERSION`) via `export_corpus_json` / `import_corpus_json`, or the CLI:
+### Smart Contract Example
 
 ```bash
+cd contracts/soroban-example
+cargo build --release --target wasm32-unknown-unknown
+```
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   User Browser                       │
+│           (Next.js Dashboard - Vercel)               │
+├─────────────────────────────────────────────────────┤
+│                    API Layer                         │
+│         (Next.js API Routes / Backend Proxy)         │
+├─────────────────────────────────────────────────────┤
+│               Rust Fuzzing Engine                    │
+│    (Seed Generation → Mutation → Classification)     │
+├─────────────────────────────────────────────────────┤
+│            Stellar Soroban Contract                  │
+│           (WASM compiled contract target)            │
+└─────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Web Dashboard | `apps/web/` | Next.js frontend with run history, analytics, triage, and settings |
+| Fuzzing Engine | `contracts/crashlab-core/` | Rust library for seed mutation, crash detection, and replay |
+| Example Contract | `contracts/soroban-example/` | Target ERC-20-like contract for fuzzing demonstrations |
+| Documentation | `docs/` | Architecture, reproducibility, and release guides |
+
+---
+
+## Features
+
+### Smart Contract Fuzzing
+- **Seed generation** with structured random inputs (ID + payload bytes)
+- **Deterministic mutation** using XOR-based bit-flipping
+- **Nine failure categories** — auth, budget, state, xdr, invalid enum tag, empty input, oversized input, unknown, timeout
+- **Auth matrix testing** — Runs every seed under all three Soroban authorization modes
+- **Flaky detection** — Separates truly reproducible crashes from non-deterministic failures
+- **Checkpoint resume** — Long campaigns can be paused and resumed without data loss
+- **Parallel worker support** — Deterministic partitioning across multiple machines
+
+### Web Dashboard
+- **Dark terminal or Navy Professional theme** — Choose your preferred visual style
+- **Run management** — View, filter, sort, and manage fuzzing campaigns
+- **Analytics** — Failure clusters, performance heatmaps, flaky test detection, crash trends
+- **Failure triage** — Group failures by signature, review crash details, take action
+- **Integrations hub** — Sentry, Prometheus, webhooks, issue trackers, and more
+- **Settings** — Alerting presets, reporting templates, accessibility options
+- **Maintainer tools** — SLA tracking, conflict of interest policy, system monitoring
+
+### Security Hardening
+- **Adversarial input handling** — All fuzz input treated as fully adversarial
+- **Seed validation** — Configurable payload length and ID bounds
+- **Safe artifact naming** — FNV-1a signature hashes for collision-safe file paths
+- **Environment fingerprinting** — Records OS, CPU architecture, and tool version for replay validation
+- **Secret redaction** — Sanitizes failure payloads before public sharing
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Architecture Guide](docs/ARCHITECTURE.md) | System architecture, data flow, and design decisions |
+| [Contributor Architecture Guide](docs/contributors/architecture.md) | Component map, data-flow diagrams with file anchors, and what you can change without cross-stack fallout |
+| [Where to Start](docs/contributors/where-to-start.md) | Issue batch themes, prerequisite chains, labels legend, and the PR workflow |
+| [ADR Index](docs/adr/README.md) | Architecture decisions, one line each, and when to write a new one |
+| [API Reference](docs/API.md) | HTTP API for the dashboard's Next.js routes (runs, artifacts, settings, and more) |
+| [Reproducibility Guide](docs/REPRODUCIBILITY.md) | Deterministic guarantees and troubleshooting |
+| [Reproducibility Contract](docs/reproducibility-contract.md) | Exactly what reproduces, across which platforms and engine versions, with live evidence |
+| [Roadmap](docs/ROADMAP.md) | Milestone overview and issue tracking |
+| [Environment Variables](docs/ENV.md) | Web app, API route, and deployment configuration reference (secrecy classification) |
+| [Deployment Guide](docs/DEPLOYMENT.md) | Vercel + Docker Compose paths and deploy gating |
+| [Reference Deployment](docs/self-hosting/reference-deployment.md) | Hardened self-hosted compose stack: TLS, secrets, backups, restore drill, upgrades |
+| [Incident Response](docs/ops/incident-response.md) | Severity matrix, escalation, playbooks and postmortem process for running CrashLab |
+| [Release Process](docs/RELEASE_PROCESS.md) | Maintainer checklist for releases |
+| [Release Policy](docs/releases/policy.md) | Semver by surface, deprecation window, signed tags, upgrade notes |
+| [Backup and Restore](docs/ops/backup-restore.md) | RPO/RTO targets, restore runbook, verification and drill record |
+| [Product Vision](docs/VISION.md) | 90% done criteria and roadmap alignment |
+| [Maintainer Onboarding Checklist](docs/MAINTAINER_ONBOARDING.md) | Step-by-step guide for onboarding new maintainers |
+| [Contributing Guide](CONTRIBUTING.md) | How to contribute to CrashLab |
+| [Security Policy](SECURITY.md) | How to report a vulnerability privately, supported versions, response times (mirrored to [.github/SECURITY.md](.github/SECURITY.md)) |
+| [Disclosure Runbook](docs/security/disclosure.md) | Maintainer intake → severity → fix → advisory → release → credit, and the repository-settings checklist |
+| [Security Guide](docs/SECURITY.md) | Severity classification, contributor security model, and safe artifact handling |
+| [Threat Model v2](docs/security/threat-model-v2.md) | Trust boundaries, attacker profiles, abuse cases mapped to tests and issues |
+
+---
+
+## Smart Contract Deployment
+
+### Deploy to Stellar Testnet
+
+```bash
+# Install the soroban CLI
+cargo install --locked soroban-cli
+
+# Navigate to the example contract
+cd contracts/soroban-example
+
+# Run the deployment script
+chmod +x deploy-testnet.sh
+./deploy-testnet.sh
+```
+
+The script will:
+1. Configure the Stellar testnet network
+2. Generate a testnet identity with free test XLM
+3. Build the contract to WASM
+4. Deploy the contract and output the contract ID
+5. Save the contract ID to your `.env.local` file
+
+### Deploy to Mainnet
+
+For production deployments, update the network configuration:
+```bash
+soroban network add --global mainnet \
+    --rpc-url https://soroban-rpc.mainnet.stellar.org \
+    --network-passphrase "Public Global Stellar Network ; September 2015"
+```
+
+You will need real XLM for mainnet deployment fees.
+
+---
+
+## Frontend Deployment
+
+See the canonical guide: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) (Vercel via `vercel.json`, Docker Compose via both Dockerfiles, and CI deploy gating).
+
+Quick Vercel path:
+
+1. Push your code to GitHub
+2. Import the repository at [vercel.com](https://vercel.com)
+3. Confirm settings from root `vercel.json`
+4. Set env vars from [`docs/ENV.md`](docs/ENV.md) (start with `NEXT_PUBLIC_ENABLE_MOCK_DATA=true`)
+5. Deploy
+
+### Environment Variables
+
+For the complete reference, including secrecy classification (public / server-only / secret), see
+[`docs/ENV.md`](docs/ENV.md).
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `NEXT_PUBLIC_API_URL` | Backend API URL (leave empty for mock data) | empty |
+| `NEXT_PUBLIC_ENABLE_MOCK_DATA` | Use mock data when backend is unavailable | `true` |
+| `NEXT_PUBLIC_APP_URL` | Application URL for server-side fetches | auto-detected |
+
+---
+
+## Development
+
+### Run Tests
+
+```bash
+# Frontend tests
+cd apps/web
+npm test
+
+# Rust tests
 cd contracts/crashlab-core
-cargo run --bin export-corpus -- seeds.json > corpus-archive.json
+cargo test --all-targets
+
+# End-to-end tests
+cd apps/web
+npx playwright test
 ```
 
-Input may be a bare JSON array of seeds or a full archive document; output is always canonical sorted order for stable sharing and re-import.
-
-### Simulation timeout guardrails
-
-`run_simulation_with_timeout` wraps a host/contract simulation and returns `timeout_crash_signature` when wall time exceeds `SimulationTimeoutConfig::timeout_ms`. Surface the active limit in dashboards or logs with `RunMetadata::from_timeout_config`.
-
-Run metadata JSON is versioned (`schema` / `RUN_METADATA_SCHEMA_VERSION`). Persist with `save_run_metadata_json` and reload with `load_run_metadata_json` so documents without a `schema` field (older writes) are accepted and normalized to the current format without losing `simulation_timeout_ms`.
-
-### Vec / map container stress mutator
-
-[`ContainerStressMutator`](contracts/crashlab-core/src/container_stress.rs) encodes bounded vec vs map growth and sparse key stride into a 32-byte payload (configurable min/max per dimension). Register it with [`WeightedScheduler`](contracts/crashlab-core/src/scheduler.rs) alongside other mutators.
-
-### Failing-case bundles and replay environment
-
-`CaseBundle` can store an optional `EnvironmentFingerprint` (OS, CPU architecture, platform family, and `crashlab-core` version at capture time). Build bundles with `to_bundle_with_environment` when you want replay checks. At replay, call `EnvironmentFingerprint::capture()` and pass it to `check_bundle_replay_environment` or `CaseBundle::replay_environment_report`. If the recorded OS, architecture, or family differs from the current host, `ReplayEnvironmentReport::material_mismatch` is true and `warnings` lists explanatory messages (tool version differences alone are not treated as material).
-
-### Replay one seed bundle
-
-Use either replay CLI to rerun one persisted bundle end to end:
+### Build
 
 ```bash
-cd contracts/crashlab-core
-cargo run --bin replay-single-seed -- ./bundle.json
-cargo run --bin crashlab -- replay seed ./bundle.json
+cd apps/web
+npm run build
 ```
 
-Replay reports both the stable taxonomy class (`auth`, `budget`, `state`, `xdr`, etc.) and the persisted signature fields (`category`, `digest`, `signature_hash`). The command exits `0` only when both the class and signature match the recorded bundle; it exits non-zero with a mismatch report otherwise.
+### Project Structure
 
-Legacy bundles that still store `signature.category = "runtime-failure"` remain replayable: the stable class is derived from the bundle seed so results stay reproducible across reruns.
-
-### Failure classification taxonomy
-
-CrashLab separates the stable failure class from the persisted crash signature:
-
-- `classify_failure(&seed)` maps bundle seeds into stable classes such as `auth`, `budget`, `state`, and `xdr`.
-- `stable_failure_class_for_bundle(&seed, &signature)` preserves backward compatibility by deriving a stable class from legacy `"runtime-failure"` signatures during replay.
-- `signature.category` remains unchanged in stored bundles, so older artifacts continue to round-trip through bundle persistence and replay.
-
-This keeps classification deterministic for dashboards and triage without breaking existing artifacts.
-
-### Stale run detection
-
-[`StaleRunDetector`](contracts/crashlab-core/src/stale_detector.rs) marks a run as stale when progress has not advanced within `StaleDetectorConfig::stale_threshold_ms`. Use `check()` during live runs or `check_with_elapsed()` in deterministic tests and health checks. `StaleStatus::Stale` includes both the elapsed stale duration and a recovery hint for operators.
-
-### Transient RPC Retry Strategy
-
-`crashlab-core` implements a bounded retry strategy with exponential backoff and jitter for simulation and reproduction calls that fail due to transient network or RPC errors.
-
-#### Error Classification
-
-Simulation and reproduction calls (via `run_matrix`, `FlakyDetector::check`, or `filter_ci_pack`) must return a `Result<CrashSignature, SimulationError>`.
-
-*   **`SimulationError::Transient`**: Safe to retry (e.g., HTTP 429 Rate Limit, HTTP 503 Service Unavailable, connection timeouts).
-*   **`SimulationError::NonTransient`**: Immediate failure (e.g., HTTP 400 Bad Request, contract traps, logical invariants).
-
-#### Configuration
-
-The default retry configuration is:
-
-*   **Max Attempts**: 5 (initial call + 4 retries)
-*   **Initial Backoff**: 100ms
-*   **Max Backoff**: 10 seconds
-*   **Backoff Algorithm**: Exponential (`2^(attempt-1)`) with randomized jitter (0.5x to 1.5x of base backoff).
-
-#### Determinism in Tests
-
-The implementation integrates with `SeededPrng` to ensure jitter is deterministic and reproducible during tests when a seed is provided.
-
-Expected bundle JSON shape:
-
-```json
-{
-  "seed": { "id": 42, "payload": [1, 2, 3] },
-  "signature": {
-    "category": "runtime-failure",
-    "digest": 123,
-    "signature_hash": 456
-  },
-  "environment": null
-}
+```
+soroban-crashlab/
+├── apps/
+│   └── web/                    # Next.js frontend dashboard
+│       ├── src/
+│       │   ├── app/            # Pages and API routes
+│       │   │   ├── api/        # REST API endpoints
+│       │   │   ├── runs/       # Run detail pages
+│       │   │   ├── analytics/  # Analytics hub
+│       │   │   ├── triage/     # Failure triage
+│       │   │   ├── settings/   # System settings
+│       │   │   └── ...         # Additional pages
+│       │   ├── components/     # Shared UI components
+│       │   └── lib/            # Utilities and API client
+│       └── deployment-guide.md # Step-by-step deployment guide
+├── contracts/
+│   ├── crashlab-core/          # Rust fuzzing engine
+│   └── soroban-example/        # Example Soroban contract
+├── docs/                       # Project documentation
+├── scripts/                    # Build and automation scripts
+└── ops/                        # Operations and backlog
 ```
 
-### Persist failing case bundles (JSON, versioned)
+---
 
-`crashlab-core` can serialize a [`CaseBundle`](contracts/crashlab-core/src/lib.rs) to portable UTF-8 JSON with a top-level **`schema`** field (`CASE_BUNDLE_SCHEMA_VERSION`, currently `2`). The document includes the **seed**, **crash signature**, optional **environment** fingerprint, optional **`failure_payload`** bytes (e.g. stderr / diagnostics), and optional **`rpc_envelope`** capture for replay auditing.
+## Technology Stack
 
-```rust
-use crashlab_core::{load_case_bundle_json, save_case_bundle_json, to_bundle, CaseSeed};
+| Layer | Technology |
+|-------|-----------|
+| **Fuzzing Engine** | Rust, Soroban SDK 22.x |
+| **Frontend** | Next.js 16, React 19, TypeScript 5 |
+| **Styling** | Tailwind CSS 4, Source Sans 3, JetBrains Mono |
+| **Charts** | Recharts 3 |
+| **Testing** | Playwright, Rust test harness |
+| **CI/CD** | GitHub Actions |
+| **Deployment** | Vercel (frontend), Docker (backend) |
+| **Blockchain** | Stellar Soroban |
 
-let bundle = to_bundle(CaseSeed { id: 1, payload: vec![1, 2, 3] });
-let bytes = save_case_bundle_json(&bundle).expect("serialize");
-let roundtrip = load_case_bundle_json(&bytes).expect("deserialize");
-assert_eq!(roundtrip.seed, bundle.seed);
-```
+---
 
-See [`contracts/crashlab-core/src/bundle_persist.rs`](contracts/crashlab-core/src/bundle_persist.rs) for `read_case_bundle_json` / `write_case_bundle_json` and error types.
+## Contributing
 
-### Publish curated Wave 3 issues
+We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for:
 
-```bash
-chmod +x scripts/create-wave3-issues.sh
-./scripts/create-wave3-issues.sh
-```
+- Local setup checklist
+- Development workflow
+- Pull request guidelines
+- Code review expectations
 
-## Maintainer workflow for Drips Wave
+### Good First Issues
 
-1. Keep issue acceptance criteria explicit and testable.
-2. Assign contributor quickly during active wave windows.
-3. Review PRs with reproducibility and safety as first checks.
-4. Mark issues resolved before wave cutoff when quality is acceptable.
-5. Leave post-resolution review feedback to strengthen contributor trust.
+Look for issues labeled `good-first-issue` or `help-wanted` in our [issue tracker](https://github.com/SorobanCrashLab/soroban-crashlab/issues).
 
-For release tagging, changelog upkeep, and compatibility review, follow the
-[release process guide](docs/RELEASE_PROCESS.md).
+---
 
-## Security Hardening Assumptions
-### Fuzz Input Handling
-- **Trust Model**: All fuzz input is considered fully adversarial. The library does not trust any external data.
-- **Trust Boundaries**: The primary entry point for fuzz input is the `CaseSeed` struct (defined in `lib.rs`). Any code that constructs a `CaseSeed` from external sources (e.g., file, network, generator) is responsible for validating it before use.
-- **Mitigation Controls**:
-  - The `SeedSchema` (in `seed_validator.rs`) provides configurable validation for payload length (default 1–64 bytes) and seed ID bounds. Integrators should call `validate` before using a seed.
-  - Validation errors are returned as a list of `SeedValidationError`, allowing the integrator to reject malformed seeds without panicking.
-- **Known Gaps**:
-  - **Null-byte handling**: The validator does not check for null bytes (`0x00`) in the payload. Contracts that interpret payloads as C-style strings may be vulnerable to truncation or injection. This is a known gap; integrators may need to add additional checks if their contract expects non-null bytes.
-  - **Automatic enforcement**: The library does not automatically reject invalid seeds; it's the integrator's responsibility to validate. If validation is skipped, subsequent operations may panic (e.g., oversized payloads could cause allocation failures).
-- **Failure Mode**: When validation fails, the `validate` method returns `Err`. Integrators should treat this as a non-execution case and log/record the error. The library itself does not panic on validation errors.
+## Community
 
-### Artifact Storage
-- **Trust Model**: Artifact storage (writing crash inputs, corpus entries, coverage data) is outside the library's scope. However, the library provides utilities that can be used safely. Filenames and paths derived from fuzz input must be considered untrusted and sanitized to prevent path traversal or injection.
-- **Trust Boundaries**: The integrator's artifact storage implementation is the trust boundary. If filenames are constructed from raw seed payloads, IDs, or other attacker-controlled data, they could contain path separators or special characters.
-- **Mitigation Controls**:
-  - The `compute_signature_hash` function (in `lib.rs`) produces a deterministic 64-bit FNV-1a hash from a category string and payload. This hash can be used as a safe filename because it contains only hexadecimal digits (or raw bytes) and no path separators.
-  - The `FailureClass::as_str` method returns static, filesystem-safe strings (e.g., `"auth"`, `"budget"`) that can be used as directory names without additional sanitization.
-- **Known Gaps**:
-  - **No built-in path traversal protection**: The library does not provide a function to sanitize arbitrary strings for use as filenames. Integrators must implement their own sanitization if they use any untrusted data in paths.
-  - **No file permission management**: The library does not set permissions on written artifacts. Integrators are responsible for setting appropriate permissions (e.g., `0o644` for files, `0o755` for directories) based on their security and reproducibility requirements.
-  - **Storage exhaustion**: The library does not handle disk full or quota errors; these must be caught by the integrator's I/O layer.
-- **Recommendations**: Use the signature hash as the primary artifact identifier. Store artifacts in a dedicated directory with restrictive permissions (e.g., `0o700`) to prevent unauthorized access. Validate available disk space before large writes.
+- [GitHub Issues](https://github.com/SorobanCrashLab/soroban-crashlab/issues) — Bug reports and feature requests
+- [GitHub Discussions](https://github.com/SorobanCrashLab/soroban-crashlab/discussions) — Questions and community support
+- [Stellar Ecosystem](https://stellar.org) — Learn more about Stellar and Soroban
 
+---
 
+## Security
 
-## Resolved Maintenance Notes
-- All previously tracked security placeholders have been addressed in source files.
-- Current security-process validation is covered by the maintainer policy checks in `apps/web`.
+Found a vulnerability? **Do not open a public issue for a security problem** —
+report it privately through [GitHub private vulnerability reporting](https://github.com/SorobanCrashLab/soroban-crashlab/security/advisories/new).
+[SECURITY.md](SECURITY.md) (also in [.github/SECURITY.md](.github/SECURITY.md))
+covers supported versions, response times, scope, credit and the
+conflict-of-interest rules maintainers follow when handling reports.
 
-Documentation updated in:
-- README.md: Added Security Hardening Assumptions section
-- CONTRIBUTING.md: Added security guidance for contributors
-- MAINTAINER_WAVE_PLAYBOOK.md: Updated operational security assumptions
-- ops/wave3-issues.tsv: Marked #79 as implemented
+---
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+Built for the Stellar Soroban ecosystem. Smart contracts deserve robust testing.

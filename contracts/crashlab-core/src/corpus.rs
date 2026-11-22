@@ -1,19 +1,43 @@
-//! Portable corpus (seed list) export and import with stable ordering.
+//! Portable corpus (seed list) export and import with stable ordering and content addressing.
 //!
 //! Seeds are sorted deterministically by `(id, payload)` before serialization so
-//! archives round-trip and merge predictably.
+//! archives round-trip and merge predictably. Content addressing via SHA-256 hash
+//! enables corruption detection and repair (#1802).
 
 use crate::CaseSeed;
 use serde::{Deserialize, Serialize};
+use sha2::{Sha256, Digest};
 
 /// Schema version for [`CorpusArchive`] JSON.
-pub const CORPUS_ARCHIVE_SCHEMA_VERSION: u32 = 1;
+pub const CORPUS_ARCHIVE_SCHEMA_VERSION: u32 = 2;
+/// Maximum corpus JSON input size accepted by importers.
+pub const MAX_CORPUS_JSON_BYTES: usize = crate::bundle_persist::MAX_BUNDLE_JSON_BYTES;
+
+/// Seed with content-addressed integrity metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AddressedSeed {
+    pub id: u64,
+    pub payload: Vec<u8>,
+    pub size: usize,
+    pub hash: String,
+}
 
 /// Versioned corpus document for sharing seed sets between hosts and CI.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CorpusArchive {
     pub schema: u32,
     pub seeds: Vec<CaseSeed>,
+    #[serde(default)]
+    pub addressed: Option<Vec<AddressedSeed>>,
+}
+
+/// Corpus verification result.
+#[derive(Debug, Clone)]
+pub enum CorpusVerifyStatus {
+    Valid,
+    Corrupt { seed_id: u64, reason: String },
+    Missing { seed_id: u64 },
+    Orphaned { seed_id: u64 },
 }
 
 /// Errors from loading a corpus archive.
@@ -21,6 +45,8 @@ pub struct CorpusArchive {
 pub enum CorpusError {
     Json(serde_json::Error),
     UnsupportedSchema { found: u32 },
+    Integrity(String),
+    SizeLimit { limit: usize },
 }
 
 impl std::fmt::Display for CorpusError {
@@ -29,6 +55,10 @@ impl std::fmt::Display for CorpusError {
             CorpusError::Json(e) => write!(f, "corpus JSON error: {e}"),
             CorpusError::UnsupportedSchema { found } => {
                 write!(f, "unsupported corpus schema version {found}")
+            }
+            CorpusError::Integrity(msg) => write!(f, "corpus integrity error: {msg}"),
+            CorpusError::SizeLimit { limit } => {
+                write!(f, "corpus exceeds the configured {limit}-byte size limit")
             }
         }
     }
@@ -39,6 +69,8 @@ impl std::error::Error for CorpusError {
         match self {
             CorpusError::Json(e) => Some(e),
             CorpusError::UnsupportedSchema { .. } => None,
+            CorpusError::Integrity(_) => None,
+            CorpusError::SizeLimit { .. } => None,
         }
     }
 }
@@ -49,32 +81,97 @@ impl From<serde_json::Error> for CorpusError {
     }
 }
 
+/// Compute SHA-256 hash of seed payload.
+pub fn hash_seed_payload(payload: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(payload);
+    format!("{:x}", hasher.finalize())
+}
+
+/// Verify seed integrity: hash matches payload.
+pub fn verify_seed_integrity(seed: &AddressedSeed) -> Result<(), CorpusError> {
+    let computed = hash_seed_payload(&seed.payload);
+    if computed != seed.hash {
+        return Err(CorpusError::Integrity(
+            format!("seed {} hash mismatch: expected {}, got {}", seed.id, seed.hash, computed),
+        ));
+    }
+    if seed.payload.len() != seed.size {
+        return Err(CorpusError::Integrity(
+            format!("seed {} size mismatch: expected {}, got {}", seed.id, seed.size, seed.payload.len()),
+        ));
+    }
+    Ok(())
+}
+
 fn sort_seeds_deterministic(seeds: &mut [CaseSeed]) {
+    seeds.sort_by(|a, b| a.id.cmp(&b.id).then_with(|| a.payload.cmp(&b.payload)));
+}
+
+fn sort_addressed_deterministic(seeds: &mut [AddressedSeed]) {
     seeds.sort_by(|a, b| a.id.cmp(&b.id).then_with(|| a.payload.cmp(&b.payload)));
 }
 
 /// Builds an archive from arbitrary seed order; output order is deterministic.
 pub fn corpus_archive_from_seeds(mut seeds: Vec<CaseSeed>) -> CorpusArchive {
     sort_seeds_deterministic(&mut seeds);
+    let addressed = seeds.iter().map(|s| AddressedSeed {
+        id: s.id,
+        size: s.payload.len(),
+        hash: hash_seed_payload(&s.payload),
+        payload: s.payload.clone(),
+    }).collect();
     CorpusArchive {
         schema: CORPUS_ARCHIVE_SCHEMA_VERSION,
         seeds,
+        addressed: Some(addressed),
     }
 }
 
-/// Serializes a corpus to pretty JSON bytes.
+/// Serializes a corpus to pretty JSON bytes with content addressing.
 pub fn export_corpus_json(seeds: &[CaseSeed]) -> Result<Vec<u8>, serde_json::Error> {
     let arch = corpus_archive_from_seeds(seeds.to_vec());
     serde_json::to_vec_pretty(&arch)
 }
 
-/// Parses JSON into a corpus and validates `schema`.
+/// Parses JSON into a corpus, validates schema, and verifies integrity.
 pub fn import_corpus_json(bytes: &[u8]) -> Result<Vec<CaseSeed>, CorpusError> {
+    if bytes.len() > MAX_CORPUS_JSON_BYTES {
+        return Err(CorpusError::SizeLimit {
+            limit: MAX_CORPUS_JSON_BYTES,
+        });
+    }
     let arch: CorpusArchive = serde_json::from_slice(bytes)?;
-    if arch.schema != CORPUS_ARCHIVE_SCHEMA_VERSION {
+    if arch.schema > CORPUS_ARCHIVE_SCHEMA_VERSION {
         return Err(CorpusError::UnsupportedSchema { found: arch.schema });
     }
+
+    // Verify addressed seeds if present (v2+)
+    if let Some(addressed) = &arch.addressed {
+        for seed in addressed {
+            verify_seed_integrity(seed)?;
+        }
+    }
+
     Ok(arch.seeds)
+}
+
+/// Verify corpus integrity: scan all seeds and report issues.
+pub fn verify_corpus_integrity(archive: &CorpusArchive) -> Vec<CorpusVerifyStatus> {
+    let mut issues = Vec::new();
+
+    if let Some(addressed) = &archive.addressed {
+        for seed in addressed {
+            if let Err(e) = verify_seed_integrity(seed) {
+                issues.push(CorpusVerifyStatus::Corrupt {
+                    seed_id: seed.id,
+                    reason: e.to_string(),
+                });
+            }
+        }
+    }
+
+    issues
 }
 
 #[cfg(test)]

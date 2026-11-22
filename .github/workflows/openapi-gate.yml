@@ -1,0 +1,167 @@
+name: OpenAPI Gate
+
+# Generated-contract gate (#1831). The committed
+# apps/web/src/lib/openapi/openapi.json must be exactly what the route
+# catalog (src/lib/openapi/registry.ts) generates — no manual drift — and
+# every contract change is classified:
+#
+#   additive  (new route/field/response, widened enum)  → gate passes
+#   breaking  (removed route/field/status, narrowed type,
+#              removed enum value, field became required) → gate fails until
+#              a maintainer comments `openapi-breaking-approved` on the PR
+#
+# The generated spec is uploaded as a CI artifact (openapi-spec). Regenerate
+# locally with `pnpm --dir apps/web openapi:update`.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: openapi-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  openapi-gate:
+    name: Generated OpenAPI gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Base-branch history is needed to diff the published contract.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build spec generator
+        working-directory: apps/web
+        run: |
+          pnpm exec tsc scripts/generate-openapi.ts \
+            --module commonjs --target es2022 --rootDir . --outDir build/openapi \
+            --esModuleInterop --skipLibCheck --types node
+
+      - name: Check committed spec matches the route catalog
+        working-directory: apps/web
+        run: |
+          set +e
+          node build/openapi/scripts/generate-openapi.js --check > "$RUNNER_TEMP/openapi-drift.txt" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            cat "$RUNNER_TEMP/openapi-drift.txt"
+            echo "Commit the route catalog, not a hand-edited openapi.json: the spec is generated." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::error::openapi.json has drifted from the route catalog. Run 'pnpm --dir apps/web openapi:update' and commit the regenerated file."
+          {
+            echo "## OpenAPI spec drift"
+            echo ""
+            echo '```diff'
+            cat "$RUNNER_TEMP/openapi-drift.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/openapi-drift.txt"
+          exit 1
+
+      - name: Publish generated spec artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: openapi-spec
+          path: apps/web/src/lib/openapi/openapi.json
+          retention-days: 30
+
+      - name: Classify contract changes against the base branch
+        id: classify
+        if: github.event_name == 'pull_request'
+        working-directory: apps/web
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base_spec="$RUNNER_TEMP/openapi.base.json"
+          if git show "$BASE_SHA:apps/web/src/lib/openapi/openapi.json" > "$base_spec" 2>/dev/null; then
+            echo "Comparing against $BASE_SHA."
+          else
+            echo "No base spec at $BASE_SHA; nothing to compare. Skipping classification."
+            echo "breaking=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+          node build/openapi/scripts/generate-openapi.js \
+            --base "$base_spec" \
+            --summary "$RUNNER_TEMP/openapi-diff.md"
+          status=$?
+          set -e
+
+          if [ -f "$RUNNER_TEMP/openapi-diff.md" ]; then
+            cat "$RUNNER_TEMP/openapi-diff.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "$status" -eq 2 ]; then
+            echo "breaking=true" >> "$GITHUB_OUTPUT"
+          elif [ "$status" -eq 0 ]; then
+            echo "breaking=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::OpenAPI change classification failed (exit $status)."
+            exit "$status"
+          fi
+
+      - name: Require maintainer approval for breaking changes
+        if: github.event_name == 'pull_request' && steps.classify.outputs.breaking == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const marker = 'openapi-breaking-approved';
+            const pr = context.payload.pull_request;
+            if ((pr.labels ?? []).some((label) => label.name === marker)) {
+              core.info(`Breaking OpenAPI change approved via the "${marker}" label.`);
+              return;
+            }
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            const approval = comments.find((comment) =>
+              typeof comment.body === 'string' &&
+              comment.body.includes(marker) &&
+              ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(comment.author_association),
+            );
+            if (approval) {
+              core.info(`Breaking OpenAPI change approved by ${approval.user.login} (${approval.author_association}).`);
+              return;
+            }
+            core.setFailed(
+              'BREAKING OpenAPI change detected and not yet approved. A maintainer must comment ' +
+              `"${marker}" on this PR (or apply the "${marker}" label) after confirming downstream consumers ` +
+              '(SDK/CLI/Action) are updated. ' +
+              'The job summary lists every removed route/field/status, narrowed type and newly required field.',
+            );
+
+      - name: Confirm additive-only changes pass
+        if: github.event_name == 'pull_request' && steps.classify.outputs.breaking != 'true'
+        run: echo "OpenAPI contract changes are additive (or absent); gate passes."

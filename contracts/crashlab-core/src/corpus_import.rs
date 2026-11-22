@@ -3,7 +3,7 @@
 //! This module provides high-level functions for importing external seed files
 //! into the local mutation corpus with comprehensive validation and error handling.
 
-use crate::{CaseSeed, SeedSchema, Validate};
+use crate::{CaseSeed, SeedSchema};
 use serde_json;
 use std::fmt;
 
@@ -25,6 +25,8 @@ pub enum CorpusImportError {
     },
     /// No valid seeds found
     NoValidSeeds,
+    /// Input exceeded the configured import limit.
+    SizeLimit { limit: usize },
 }
 
 impl fmt::Display for CorpusImportError {
@@ -46,6 +48,9 @@ impl fmt::Display for CorpusImportError {
                 )
             }
             CorpusImportError::NoValidSeeds => write!(f, "no valid seeds found in input"),
+            CorpusImportError::SizeLimit { limit } => {
+                write!(f, "seed input exceeds the configured {limit}-byte size limit")
+            }
         }
     }
 }
@@ -79,6 +84,11 @@ pub fn import_seeds_with_schema(
 ) -> CorpusImportResult<Vec<CaseSeed>> {
     if bytes.is_empty() {
         return Err(CorpusImportError::EmptyInput);
+    }
+    if bytes.len() > crate::corpus::MAX_CORPUS_JSON_BYTES {
+        return Err(CorpusImportError::SizeLimit {
+            limit: crate::corpus::MAX_CORPUS_JSON_BYTES,
+        });
     }
 
     let seeds = parse_seeds_json(bytes)?;
@@ -118,21 +128,18 @@ fn validate_seeds_list(
     seeds: &[CaseSeed],
     schema: &SeedSchema,
 ) -> CorpusImportResult<()> {
-    for (idx, seed) in seeds.iter().enumerate() {
-        if let Err(errors) = seed.validate(schema) {
-            let details = errors
-                .into_iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-                .join("; ");
-            return Err(CorpusImportError::InvalidSeed {
-                index: idx,
-                seed_id: seed.id,
-                details,
-            });
+    crate::seed_validator::validate_seeds(seeds, schema).map_err(|(idx, id, errors)| {
+        let details = errors
+            .into_iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("; ");
+        CorpusImportError::InvalidSeed {
+            index: idx,
+            seed_id: id,
+            details,
         }
-    }
-    Ok(())
+    })
 }
 
 #[cfg(test)]
@@ -170,9 +177,17 @@ mod tests {
     }
 
     #[test]
-    fn import_rejects_invalid_seed_payload_too_short() {
+    fn import_accepts_empty_payload_with_default_schema() {
         let json = br#"[{"id":1,"payload":[]}]"#;
-        let err = import_seeds(json).expect_err("empty payload should fail");
+        let seeds = import_seeds(json).expect("empty payload is valid under default schema");
+        assert_eq!(seeds.len(), 1);
+        assert_eq!(seeds[0].payload, Vec::<u8>::new());
+    }
+
+    #[test]
+    fn import_rejects_invalid_seed_payload_too_short_with_strict_schema() {
+        let json = br#"[{"id":1,"payload":[]}]"#;
+        let err = import_seeds_with_schema(json, &SeedSchema::strict()).expect_err("empty payload should fail strict");
         match err {
             CorpusImportError::InvalidSeed { index, details, .. } => {
                 assert_eq!(index, 0);
@@ -197,7 +212,7 @@ mod tests {
 
     #[test]
     fn import_rejects_first_invalid_seed_in_batch() {
-        let json = br#"[{"id":1,"payload":[1,2,3]},{"id":2,"payload":[]},{"id":3,"payload":[1]}]"#;
+        let json = br#"[{"id":1,"payload":[1,2,3]},{"id":2,"payload":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},{"id":3,"payload":[1]}]"#;
         let err = import_seeds(json).expect_err("second seed is invalid");
         match err {
             CorpusImportError::InvalidSeed {
@@ -207,7 +222,7 @@ mod tests {
             } => {
                 assert_eq!(index, 1);
                 assert_eq!(seed_id, 2);
-                assert!(details.contains("payload too short"));
+                assert!(details.contains("payload too long"));
             }
             _ => panic!("expected InvalidSeed"),
         }

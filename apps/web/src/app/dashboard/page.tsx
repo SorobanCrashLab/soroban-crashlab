@@ -1,0 +1,468 @@
+"use client";
+
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import dynamic from 'next/dynamic';
+import { LoadingSpinner } from "../../components/LoadingSkeleton";
+import { PageHeader, PageSection, StatCard } from "../../components";
+import { useRuns } from "../../hooks/useRuns";
+import { usePullToRefresh } from "../../hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "../../components/PullToRefreshIndicator";
+import DashboardSectionLayoutEditor from "../dashboard-section-layout-editor";
+import { WidgetErrorBoundary } from "../../components/WidgetErrorBoundary";
+import { useToast } from "../../components/Toast";
+import {
+  DASHBOARD_LAYOUT_STORAGE_KEY,
+  DEFAULT_DASHBOARD_LAYOUT,
+  getVisibleDashboardSections,
+  parseDashboardLayout,
+  type DashboardSectionConfig,
+  type DashboardSectionId,
+} from "../dashboard-layout-utils";
+import { ResourceFeeInsightPanel } from "../../features/misc/implement-resource-fee-insight-panel-component";
+import RunHealthScoreWidget from "../../features/runs/implement-run-health-score-widget";
+import Pagination from "../Pagination";
+import { getPageSlice, computeTotalPages, clampPage } from "../pagination-utils";
+
+const AddTaggingAndLabelsUi = dynamic(
+  () => import("../../features/misc/add-tagging-and-labels-ui"),
+  { ssr: false }
+);
+import { runMatchesTagFilter } from "../run-tags-utils";
+import { CoverflowCarousel } from "../../components/scroll-effects/CoverflowCarousel";
+import { StickyStack } from "../../components/scroll-effects/StickyStack";
+import { ScaleFade } from "../../components/scroll-effects/ScaleFade";
+import { TextReveal } from "../../components/scroll-effects/TextReveal";
+import { FuzzingRun } from "../types";
+import { useDataTableKeyboardNav } from "../use-data-table-keyboard-nav";
+import { sanitizeSearchParams } from "../../lib/sanitize";
+import { safeStorage } from "@/lib/local-storage";
+
+const makeSuggestedLabels = (run: FuzzingRun): string[] => [
+  run.area,
+  run.severity,
+  run.status === "failed" ? "has-crash-details" : "stable-pass",
+  run.minResourceFee >= 3_000 ? "high-fee" : "fee-ok",
+];
+
+const PAGE_SIZE = 10;
+
+function DashboardContent() {
+  const { runs, dataState, refetch } = useRuns({
+    revalidateOnFocus: true,
+    revalidateOnVisibility: true,
+  });
+  const { notifyError } = useToast();
+  const [layout, setLayout] = useState<DashboardSectionConfig[]>(DEFAULT_DASHBOARD_LAYOUT);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const sanitizedParams = sanitizeSearchParams(searchParams);
+  const activeTag = sanitizedParams.get("filter_tag") ?? "all";
+  const rawPage = parseInt(sanitizedParams.get("page") ?? "1", 10);
+  const currentPage = isNaN(rawPage) ? 1 : rawPage;
+
+
+  useEffect(() => {
+    const loadLayout = () => {
+      try {
+        setLayout(parseDashboardLayout(safeStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY)));
+      } catch {
+        setLayout(DEFAULT_DASHBOARD_LAYOUT);
+      }
+    };
+    loadLayout();
+    window.addEventListener("dashboard-layout-updated", loadLayout);
+    return () => window.removeEventListener("dashboard-layout-updated", loadLayout);
+  }, []);
+
+  const setActiveTag = useCallback(
+    (tag: string) => {
+      const next = new URLSearchParams(searchParams.toString());
+      if (!tag || tag === "all") {
+        next.delete("filter_tag");
+      } else {
+        next.set("filter_tag", tag);
+      }
+      next.delete("page");
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      const next = new URLSearchParams(searchParams.toString());
+      if (page <= 1) {
+        next.delete("page");
+      } else {
+        next.set("page", String(page));
+      }
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const filteredRuns = useMemo(() => {
+    if (activeTag === "all") return runs;
+    return runs.filter((run) =>
+      runMatchesTagFilter(run.tags ?? [], makeSuggestedLabels(run), activeTag),
+    );
+  }, [activeTag, runs]);
+
+  const totalPages = computeTotalPages(filteredRuns.length, PAGE_SIZE);
+  const clampedPage = clampPage(currentPage, totalPages);
+  const recentRuns = getPageSlice(filteredRuns, clampedPage, PAGE_SIZE);
+
+  const { getRowProps } = useDataTableKeyboardNav({
+    rowCount: recentRuns.length,
+    onActivate: (index) => {
+      const run = recentRuns[index];
+      if (run) {
+        router.push(`/runs/${run.id}`);
+      }
+    },
+  });
+
+  const handleRefresh = useCallback(async () => {
+    await refetch();
+    await new Promise<void>((resolve) => setTimeout(resolve, 600));
+  }, [refetch]);
+
+  const { isPulling, isRefreshing, pullDistance } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    disabled: dataState === 'loading',
+  });
+
+  return (
+    <div className="container-full page-padding fade-in">
+      <PullToRefreshIndicator isPulling={isPulling} isRefreshing={isRefreshing} pullDistance={pullDistance} />
+      <TextReveal as="div">
+        <PageHeader
+          title="Dashboard"
+          description="Fuzzing campaign overview"
+          actions={
+            <>
+              <Link href="/start" prefetch className="btn-primary text-xs sm:text-sm px-3 sm:px-6 h-9 sm:h-10">
+                Start a run
+              </Link>
+              <Link href="/runs" prefetch className="btn-outline text-xs sm:text-sm px-3 sm:px-6 h-9 sm:h-10">
+                View All Runs
+              </Link>
+            </>
+          }
+        />
+      </TextReveal>
+
+      <div className="mt-4">
+        <CoverflowCarousel>
+          <Link href="/runs" prefetch className="card card-padding min-w-[220px] card-interactive block">
+            <h4 className="font-semibold text-sm">Runs</h4>
+            <p className="text-meta text-xs mt-1">Browse all fuzzing runs</p>
+          </Link>
+          <Link href="/analytics" prefetch className="card card-padding min-w-[220px] card-interactive block">
+            <h4 className="font-semibold text-sm">Analytics</h4>
+            <p className="text-meta text-xs mt-1">Clusters, heatmaps, trends</p>
+          </Link>
+          <Link href="/triage" prefetch className="card card-padding min-w-[220px] card-interactive block">
+            <h4 className="font-semibold text-sm">Triage</h4>
+            <p className="text-meta text-xs mt-1">Kanban board for crashes</p>
+          </Link>
+          <Link href="/logs" prefetch className="card card-padding min-w-[220px] card-interactive block">
+            <h4 className="font-semibold text-sm">Logs</h4>
+            <p className="text-meta text-xs mt-1">Stream and filter logs</p>
+          </Link>
+        </CoverflowCarousel>
+      </div>
+
+      {dataState === "success" && runs.length === 0 && (
+        <PageSection className="mb-6">
+          <div className="card card-padding">
+            <h2 className="heading-section">How CrashLab works</h2>
+            <p className="text-meta mt-1 mb-4">Three steps from contract to triaged crash.</p>
+            <ol className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <li>
+                <Link href="/start" prefetch className="card card-padding card-interactive block h-full">
+                  <p className="code-text mb-1">01</p>
+                  <h3 className="text-sm-medium">Upload your contract</h3>
+                  <p className="text-meta text-xs mt-1">Drop in a .wasm file. No config needed.</p>
+                </Link>
+              </li>
+              <li>
+                <Link href="/start" prefetch className="card card-padding card-interactive block h-full">
+                  <p className="code-text mb-1">02</p>
+                  <h3 className="text-sm-medium">Launch the fuzzer</h3>
+                  <p className="text-meta text-xs mt-1">Pick targets, set workers, hit launch.</p>
+                </Link>
+              </li>
+              <li>
+                <Link href="/triage" prefetch className="card card-padding card-interactive block h-full">
+                  <p className="code-text mb-1">03</p>
+                  <h3 className="text-sm-medium">Triage the crashes</h3>
+                  <p className="text-meta text-xs mt-1">Identical failures group by signature.</p>
+                </Link>
+              </li>
+            </ol>
+          </div>
+        </PageSection>
+      )}
+
+      {dataState === "success" && (
+        <PageSection className="mb-6">
+          <Link href="/analytics/clusters" className="card card-padding card-interactive block">
+            <h2 className="heading-section">Failure Signature Clusters</h2>
+            <p className="text-meta mt-1">Group repeated crashes by signature and open representative samples for triage.</p>
+          </Link>
+        </PageSection>
+      )}
+
+      {dataState === "loading" && <div className="card card-padding text-meta">Loading...</div>}
+
+      {dataState === "success" && (
+        <div className="card table-responsive">
+          <table className="data-table" aria-label="Recent fuzzing runs overview">
+            <thead>
+              <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Status</th>
+                <th scope="col">Area</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentRuns.map((run, index) => (
+                <tr key={run.id} {...getRowProps(index)} aria-label={`Fuzzing run ${run.id}, status ${run.status}`} onClick={() => router.push(`/runs/${run.id}`)} className="cursor-pointer">
+                  <td className="code-text text-meta">{run.id}</td>
+                  <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
+                  <td>{run.area}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {dataState === "error" && (
+        <div role="alert" className="card card-padding mb-4 sm:mb-6" style={{ borderLeft: "4px solid #CC1016" }}>
+          <div className="flex-between">
+            <div>
+              <p className="font-semibold" style={{ color: "#CC1016" }}>Connection Error</p>
+              <p className="text-meta">Could not reach the backend API.</p>
+            </div>
+            <button
+              onClick={() => refetch()}
+              aria-label="Retry loading dashboard data"
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow transition"
+              style={{ backgroundColor: "#CC1016" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#a50d12")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#CC1016")}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582M20 20v-5h-.581M5.635 15A9 9 0 1118.365 9" />
+              </svg>
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {dataState === "loading" && (
+        <div role="status" aria-live="polite" className="card card-padding py-8 sm:py-12">
+          <LoadingSpinner label="Loading dashboard..." />
+        </div>
+      )}
+
+      {dataState === "success" && (
+        <>
+          <StickyStack offsetStep={14}>
+          {getVisibleDashboardSections(layout).map((section) => {
+            const sectionContent: Record<DashboardSectionId, ReactNode> = {
+              stats: (
+                <PageSection>
+                  <WidgetErrorBoundary title="Run Stats" onError={notifyError}>
+                  <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: "Total", value: filteredRuns.length },
+                      { label: "Failed", value: filteredRuns.filter((r) => r.status === "failed").length },
+                      { label: "Running", value: filteredRuns.filter((r) => r.status === "running").length },
+                      { label: "Critical", value: filteredRuns.filter((r) => r.severity === "critical").length },
+                    ].map((stat) => (
+                      <ScaleFade key={stat.label}>
+                        <StatCard label={stat.label} value={stat.value} />
+                      </ScaleFade>
+                    ))}
+                  </div>
+                  </WidgetErrorBoundary>
+                </PageSection>
+              ),
+              "widget-editor": (
+                <PageSection>
+                  <DashboardSectionLayoutEditor />
+                </PageSection>
+              ),
+              "recent-runs": (
+                <>
+                  <PageSection>
+                    <AddTaggingAndLabelsUi
+                      runs={filteredRuns}
+                      activeTag={activeTag}
+                      onActiveTagChange={setActiveTag}
+                    />
+                  </PageSection>
+                  <PageSection
+                    title="Recent Runs"
+                    actions={<Link href="/runs" prefetch className="link text-xs sm:text-sm">View all</Link>}
+                  >
+                    <div className="card table-responsive">
+                      <table className="data-table" aria-label="Recent fuzzing runs">
+                        <thead>
+                          <tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Area</th>
+                            <th scope="col">Tags</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentRuns.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-16 text-center">
+                                <div className="flex flex-col items-center gap-3">
+                                  <div className="p-4 surface-soft rounded-full text-zinc-300">
+                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                  </div>
+                                  <span className="text-sm-medium text-muted">No matching fuzzing runs</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            recentRuns.map((run, index) => (
+                              <tr key={run.id} {...getRowProps(index)} className="cursor-pointer" onClick={() => router.push(`/runs/${run.id}`)} aria-label={`Fuzzing run ${run.id}, status ${run.status}`}>
+                                <td className="code-text text-meta">{run.id}</td>
+                                <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
+                                <td>{run.area}</td>
+                                <td className="text-meta">{(run.tags ?? []).join(", ") || "—"}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {totalPages > 1 && (
+                      <Pagination
+                        currentPage={clampedPage}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                      />
+                    )}
+                  </PageSection>
+                </>
+              ),
+              "quick-actions": (
+                <PageSection className="card card-padding">
+                  <h3 className="font-semibold text-sm mb-3">Quick Actions</h3>
+                  <div className="flex flex-col gap-2">
+                    <Link href="/runs" prefetch className="link">Browse all runs</Link>
+                    <Link href="/analytics" prefetch className="link">Open analytics</Link>
+                  </div>
+                </PageSection>
+              ),
+            };
+            return <div key={section.id}>{sectionContent[section.id]}</div>;
+          })}
+          </StickyStack>
+          <ScaleFade>
+            <PageSection>
+              <WidgetErrorBoundary title="Run Health Score" onError={notifyError}>
+                <RunHealthScoreWidget runs={filteredRuns} dataState={dataState} />
+              </WidgetErrorBoundary>
+            </PageSection>
+
+            <PageSection>
+              <WidgetErrorBoundary title="Resource Fee Insights" onError={notifyError}>
+                <ResourceFeeInsightPanel runs={filteredRuns} dataState={dataState} />
+              </WidgetErrorBoundary>
+            </PageSection>
+
+            <PageSection>
+              <AddTaggingAndLabelsUi
+                runs={filteredRuns}
+                activeTag={activeTag}
+                onActiveTagChange={setActiveTag}
+              />
+            </PageSection>
+
+          <PageSection
+            title="Recent Runs"
+            actions={<Link href="/runs" prefetch className="link text-xs sm:text-sm">View all</Link>}
+          >
+            <div className="card table-responsive">
+                <table
+                  className="data-table"
+                  aria-label="Recent fuzzing runs"
+                >
+                  <thead>
+                    <tr>
+                      <th scope="col">ID</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Area</th>
+                      <th scope="col">Tags</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentRuns.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-16 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="p-4 surface-soft rounded-full text-zinc-300">
+                              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <span className="text-sm-medium text-muted">No matching fuzzing runs</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      recentRuns.map((run, index) => (
+                        <tr
+                          key={run.id}
+                          {...getRowProps(index)}
+                          className="cursor-pointer"
+                          onClick={() => router.push(`/runs/${run.id}`)}
+                          aria-label={`Fuzzing run ${run.id}, status ${run.status}`}
+                        >
+                          <td className="code-text text-meta">{run.id}</td>
+                          <td><span className={`badge badge-${run.status}`}>{run.status}</span></td>
+                          <td>{run.area}</td>
+                          <td className="text-meta">{(run.tags ?? []).join(", ") || "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+          </PageSection>
+          </ScaleFade>
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {dataState === "success" ? `${filteredRuns.length} runs filtered, ${recentRuns.length} shown on page ${clampedPage} of ${totalPages}` : dataState === "loading" ? "Loading dashboard" : dataState === "error" ? "Failed to load dashboard" : ""}
+          </div>
+        </>
+      )}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {dataState === "success" && `${filteredRuns.length} fuzzing runs available`}
+      </div>
+    </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="container-full page-padding text-meta">Loading...</div>}>
+      <DashboardContent />
+    </Suspense>
+  );
+}

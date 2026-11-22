@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "tool": "stryker",
+  "generatedAt": "2026-10-17",
+  "criticalModules": [
+    "apps/web/src/lib/api-key-auth.ts",
+    "apps/web/src/lib/rbac.ts",
+    "apps/web/src/lib/storage/api-token-store.ts"
+  ],
+  "survivors": [],
+  "notes": [
+    "Bootstrap baseline: populate from the first `pnpm --dir apps/web run mutation` run.",
+    "StrykerJS mutates only the security-critical libs listed above.",
+    "See docs/testing/mutation-testing.md for the survivor-justification policy."
+  ]
+}

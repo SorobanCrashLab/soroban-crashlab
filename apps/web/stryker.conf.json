@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "pnpm",
+  "testRunner": "vitest",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "mutate": [
+    "src/lib/api-key-auth.ts",
+    "src/lib/rbac.ts",
+    "src/lib/storage/api-token-store.ts"
+  ],
+  "reporters": ["clear-text", "json"],
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
+  "thresholds": {
+    "high": 90,
+    "low": 70,
+    "break": null
+  },
+  "tempDirName": ".stryker-tmp",
+  "concurrency": 2
+}

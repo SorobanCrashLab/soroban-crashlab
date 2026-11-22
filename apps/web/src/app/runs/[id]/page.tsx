@@ -1,45 +1,32 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import type { LedgerStateChange } from '../../types';
+import BreadcrumbNav from '@/components/BreadcrumbNav';
+import RunDetailAutoRefresh from './RunDetailAutoRefresh';
 import { buildMockRuns } from '../../mockRuns';
-import RunIssueLinkPage53 from '../../add-run-issue-link-page-53';
-import RunStatusTimeline from '../../create-run-status-timeline-component-52';
+import { buildLedgerChangesForRun } from '../../mock-ledger-changes';
+import { buildCallSequenceForRun } from '../../mock-call-sequence';
+import RunIssueLinkPage53 from '../../../features/runs/add-run-issue-link-page-53';
+import RunStatusTimeline from '../../RunStatusTimeline';
 import DownloadArtifactsButton from './DownloadArtifactsButton';
+import ContractStateDiffView from '../../components/ContractStateDiffView';
+import { summarizeStateChanges } from '../../components/state-diff-utils';
+import RunSequenceDiagram from './RunSequenceDiagram';
+import { summarizeCallSequence } from './run-sequence-diagram-utils';
+import AddRunReplayHistoryWithTimestamps from '../../../features/runs/add-run-replay-history-with-timestamps';
+import RunMetadataEditorWrapper from './RunMetadataEditorWrapper';
+import RunAnnotationThreads from './annotation-threads/RunAnnotationThreads';
+import SwipeNavigationWrapper from '../swipe/SwipeNavigationWrapper';
+
+import { absoluteShort } from '../../utils/datetime';
+
+export const dynamic = 'force-dynamic';
 
 interface RunDetailPageProps {
     params: Promise<{ id: string }>;
 }
 
-const ledgerChanges: LedgerStateChange[] = [
-    {
-        id: 'entry-1',
-        entryType: 'ContractData',
-        changeType: 'created',
-        after: '{"key":"allowance:alice:bob","value":"1000"}',
-    },
-    {
-        id: 'entry-2',
-        entryType: 'Account',
-        changeType: 'updated',
-        before: '{"balance":"10000000","seq":"184"}',
-        after: '{"balance":"9800000","seq":"185"}',
-    },
-    {
-        id: 'entry-3',
-        entryType: 'TrustLine',
-        changeType: 'deleted',
-        before: '{"asset":"USDC","limit":"500","balance":"0"}',
-    },
-];
-
-const changeBadge = {
-    created: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-900/60',
-    updated: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-900/60',
-    deleted: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-900/60',
-};
-
 const formatBytes = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-const formatDate = (value?: string): string => (value ? new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) : 'Pending');
+const formatDate = (value?: string): string => (value ? absoluteShort(value, 'UTC') : 'Pending');
 
 export default async function RunDetailPage({ params }: RunDetailPageProps) {
     const { id } = await params;
@@ -53,8 +40,22 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
     const memoryWarn = run.memoryBytes >= 7_000_000;
     const feeWarn = run.minResourceFee >= 3_000;
 
+    const ledgerChanges = buildLedgerChangesForRun(run);
+    const ledgerSummary = summarizeStateChanges(ledgerChanges);
+
+    const callSequence = buildCallSequenceForRun(run);
+    const callSequenceSummary = summarizeCallSequence(callSequence);
+
     return (
+        <SwipeNavigationWrapper currentRunId={id}>
         <div className="px-6 md:px-8 max-w-5xl mx-auto w-full py-14">
+            <BreadcrumbNav
+                segments={[
+                    { label: 'Runs', href: '/runs' },
+                    { label: id },
+                ]}
+            />
+
             <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-6 md:p-8">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
                     <div>
@@ -63,8 +64,18 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                             ID: {run.id}
                         </p>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <RunDetailAutoRefresh runId={run.id} initialStatus={run.status} />
+                        <Link href="/" className="btn-outline text-sm">Dashboard</Link>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                         <DownloadArtifactsButton run={run} ledgerChanges={ledgerChanges} />
+                        <Link
+                            href={`/runs/${run.id}/sequence`}
+                            className="inline-flex items-center justify-center h-10 px-4 rounded-full border border-zinc-300 dark:border-zinc-700 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition"
+                        >
+                            Sequence diagram
+                        </Link>
                         <Link
                             href="/"
                             className="inline-flex items-center justify-center h-10 px-4 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition"
@@ -82,6 +93,8 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                         finishedAt={formatDate(run.finishedAt)}
                     />
                 </div>
+
+                <RunMetadataEditorWrapper run={run} />
 
                 <RunIssueLinkPage53 issues={run.associatedIssues ?? []} />
 
@@ -111,50 +124,68 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                             </svg>
                             Run Annotations
                         </h2>
-                        <ul className="space-y-3">
-                            {run.annotations.map((note, index) => (
-                                <li key={index} className="text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-950/60 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm leading-relaxed">
-                                    {note}
-                                </li>
-                            ))}
-                        </ul>
+                        {run.annotations && run.annotations.length > 0 ? (
+                            <ul className="space-y-3">
+                                {run.annotations.map((note, index) => (
+                                    <li key={index} className="text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-950/60 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm leading-relaxed">
+                                        {note}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <div className="flex flex-col items-center gap-3 py-8 text-center">
+                                <div className="p-3 bg-indigo-100/60 dark:bg-indigo-900/30 rounded-full text-indigo-400 dark:text-indigo-500">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                    </svg>
+                                </div>
+                                <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">No annotations yet</p>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500">Run results will appear here once notes are added</p>
+                            </div>
+                        )}
                     </section>
                 )}
 
                 <section>
-                    <h2 className="text-lg font-semibold mb-3">Ledger State Change Diff</h2>
-                    <div className="space-y-3">
-                        {ledgerChanges.map((change) => (
-                            <article key={change.id} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
-                                <div className="flex flex-wrap items-center gap-2 mb-3">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${changeBadge[change.changeType]}`}>
-                                        {change.changeType.toUpperCase()}
-                                    </span>
-                                    <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 rounded px-2 py-0.5">
-                                        {change.entryType}
-                                    </span>
-                                    <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">{change.id}</span>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div>
-                                        <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">Before</div>
-                                        <pre className="text-xs rounded-lg bg-zinc-100 dark:bg-zinc-950 p-3 overflow-x-auto whitespace-pre-wrap break-all">
-                                            {change.before ?? 'N/A (created)'}
-                                        </pre>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">After</div>
-                                        <pre className="text-xs rounded-lg bg-zinc-100 dark:bg-zinc-950 p-3 overflow-x-auto whitespace-pre-wrap break-all">
-                                            {change.after ?? 'N/A (deleted)'}
-                                        </pre>
-                                    </div>
-                                </div>
-                            </article>
-                        ))}
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                        <h2 className="text-lg font-semibold">Ledger State Change Diff</h2>
+                        <p className="text-meta">
+                            {ledgerSummary.total} {ledgerSummary.total === 1 ? 'entry' : 'entries'}
+                            {ledgerSummary.total > 0 && (
+                                <>
+                                    {' · '}
+                                    {ledgerSummary.created} created, {ledgerSummary.updated} updated,{' '}
+                                    {ledgerSummary.deleted} deleted
+                                </>
+                            )}
+                        </p>
                     </div>
+                    <ContractStateDiffView changes={ledgerChanges} />
                 </section>
+
+                <section className="mt-8">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                        <h2 className="text-lg font-semibold">Call Sequence Diagram</h2>
+                        <p className="text-meta">
+                            {callSequenceSummary.total} {callSequenceSummary.total === 1 ? 'call' : 'calls'}
+                            {callSequenceSummary.total > 0 && (
+                                <>
+                                    {' · '}
+                                    {callSequenceSummary.success} success, {callSequenceSummary.failed} failed
+                                </>
+                            )}
+                        </p>
+                    </div>
+                    <RunSequenceDiagram steps={callSequence} />
+                </section>
+
+                <div className="mt-6">
+                    <AddRunReplayHistoryWithTimestamps sourceRunId={run.id} />
+                </div>
+
+                <RunAnnotationThreads runId={run.id} />
             </div>
         </div>
+        </SwipeNavigationWrapper>
     );
 }

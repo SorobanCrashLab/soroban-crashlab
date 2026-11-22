@@ -1,0 +1,44 @@
+name: Roadmap task
+description: Contributor task from the CrashLab 140-issue roadmap (use only if not already filed)
+title: "[area] "
+labels: []
+body:
+  - type: markdown
+    value: |
+      Prefer picking an open issue from the roadmap milestones. Each roadmap issue already includes Description, Requirements, Files, Checklist, and PR guide.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What and why (link roadmap issue number if applicable)
+    validations:
+      required: true
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Requirements
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Possible affected files
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Checklist
+    validations:
+      required: true
+  - type: textarea
+    id: pr_guide
+    attributes:
+      label: PR guide
+      value: |
+        - Branch: `issue/<number>-<short-slug>`
+        - One issue per PR against `main`
+        - Do **not** edit `pnpm-lock.yaml` or `package-lock.json`
+        - `package.json` changes need explicit maintainer approval in the PR description
+    validations:
+      required: true

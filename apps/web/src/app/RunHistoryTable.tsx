@@ -1,7 +1,14 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { FuzzingRun, RunStatus } from './types';
-import AddReplayFromUiAction from './add-replay-from-ui-action';
+import { STATUS_META } from '../lib/run-status';
+import AddReplayFromUiAction from '../features/misc/add-replay-from-ui-action';
+import { useDataTableKeyboardNav } from './use-data-table-keyboard-nav';
+import TruncatedCell from '@/components/TruncatedCell';
+import { useResponsiveRunColumns } from './use-responsive-run-columns';
+import { SortableColumnHeader } from '../components/SortableColumnHeader';
+import { getNextSortState, type SortState } from './run-history-sort-utils';
 
 interface RunHistoryTableProps {
     /** Array of fuzzing runs to display */
@@ -14,41 +21,36 @@ interface RunHistoryTableProps {
     onReplayRun?: (newRunData: { id: string; status: 'running' }) => void;
     /** List of visible columns */
     visibleColumns?: string[];
+    /** Active sort state (controlled) */
+    sortState?: SortState<string> | null;
+    /** Callback invoked when a sortable column header is activated */
+    onSort?: (field: string) => void;
 }
 
-/**
- * Formats milliseconds into a human-readable duration string (e.g., "5m 23s").
- */
-const formatDuration = (ms: number): string => {
-    if (ms < 1000) return `${ms}ms`;
-    const seconds = Math.floor((ms / 1000) % 60);
-    const minutes = Math.floor((ms / (1000 * 60)) % 60);
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-
-    const parts = [];
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
-
-    return parts.join(' ');
-};
+import { formatDuration } from './utils/format';
 
 /**
  * Renders a color-coded status badge for a run.
  * Colors are driven by CSS custom properties defined in globals.css,
  * which are chosen to meet WCAG AA contrast (≥4.5:1) in both light and dark modes.
+ * Running state gets a subtle pulse animation (disabled for prefers-reduced-motion).
  */
 const StatusBadge = ({ status }: { status: RunStatus }) => {
+    const isRunning = status === 'running';
     return (
         <span
-            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
-            style={{
-                backgroundColor: `var(--status-${status}-bg)`,
-                color: `var(--status-${status}-fg)`,
-                borderColor: `var(--status-${status}-border)`,
-            }}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border status-badge ${STATUS_META[status].badgeClass}`}
         >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+            {isRunning && (
+                <span
+                    className="relative inline-flex h-1.5 w-1.5 shrink-0"
+                    aria-hidden="true"
+                >
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-60" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-current" />
+                </span>
+            )}
+            {STATUS_META[status].label}
         </span>
     );
 };
@@ -61,9 +63,57 @@ export default function RunHistoryTable({
     onSelectRun, 
     onViewReport, 
     onReplayRun,
-    visibleColumns = ['id', 'status', 'duration', 'seedCount', 'report'] 
+    visibleColumns = ['id', 'status', 'duration', 'seedCount', 'report'],
+    sortState,
+    onSort,
 }: RunHistoryTableProps) {
-    if (runs.length === 0) {
+    const [internalSortState, setInternalSortState] = useState<SortState<string>>({ field: 'id', order: 'desc' });
+    const activeSort = sortState !== undefined ? sortState : internalSortState;
+
+    const handleSort = (field: string) => {
+        if (onSort) {
+            onSort(field);
+        } else {
+            setInternalSortState((prev) => getNextSortState(prev, field));
+        }
+    };
+
+    const sortedRuns = useMemo(() => {
+        if (!activeSort || !activeSort.field || activeSort.order === 'none') {
+            return runs;
+        }
+        const mult = activeSort.order === 'asc' ? 1 : -1;
+        return runs.slice().sort((a, b) => {
+            if (activeSort.field === 'id') {
+                return a.id.localeCompare(b.id) * mult;
+            }
+            if (activeSort.field === 'status') {
+                return a.status.localeCompare(b.status) * mult;
+            }
+            if (activeSort.field === 'duration') {
+                return (a.duration - b.duration) * mult;
+            }
+            if (activeSort.field === 'seedCount') {
+                return (a.seedCount - b.seedCount) * mult;
+            }
+            return 0;
+        });
+    }, [runs, activeSort]);
+
+    /** Responsive column set — adapts to phone and portrait-tablet viewports. */
+    const effectiveColumns = useResponsiveRunColumns(visibleColumns);
+
+    const { getRowProps } = useDataTableKeyboardNav({
+        rowCount: sortedRuns.length,
+        onActivate: (index) => {
+            const run = sortedRuns[index];
+            if (run) {
+                onSelectRun(run.id);
+            }
+        },
+    });
+
+    if (sortedRuns.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center p-12 border border-dashed rounded-xl bg-zinc-50 dark:bg-zinc-900/20 border-zinc-200 dark:border-zinc-800">
                 <p className="text-zinc-500 dark:text-zinc-400 font-medium">No fuzzing runs found.</p>
@@ -75,56 +125,85 @@ export default function RunHistoryTable({
     return (
         <div className="w-full overflow-hidden border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm bg-white dark:bg-zinc-950">
             <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[700px]">
+                <table className="w-full text-left border-collapse" aria-label="Fuzzing run history">
                     <thead>
                         <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
-                            {visibleColumns.includes('id') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Run ID</th>}
-                            {visibleColumns.includes('status') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Status</th>}
-                            {visibleColumns.includes('duration') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Duration</th>}
-                            {visibleColumns.includes('seedCount') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Seed Count</th>}
-                            {onReplayRun && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Actions</th>}
-                            {visibleColumns.includes('report') && <th className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Report</th>}
+                            {effectiveColumns.includes('id') && (
+                                <SortableColumnHeader
+                                    field="id"
+                                    label="Run ID"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+                                />
+                            )}
+                            {effectiveColumns.includes('status') && (
+                                <SortableColumnHeader
+                                    field="status"
+                                    label="Status"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+                                />
+                            )}
+                            {effectiveColumns.includes('duration') && (
+                                <SortableColumnHeader
+                                    field="duration"
+                                    label="Duration"
+                                    align="right"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right"
+                                />
+                            )}
+                            {effectiveColumns.includes('seedCount') && (
+                                <SortableColumnHeader
+                                    field="seedCount"
+                                    label="Seed Count"
+                                    align="right"
+                                    sortState={activeSort}
+                                    onSort={handleSort}
+                                    className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right"
+                                />
+                            )}
+                            {onReplayRun && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Actions</th>}
+                            {effectiveColumns.includes('report') && <th scope="col" className="px-6 py-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100 text-right">Report</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                        {runs.map((run) => (
+                        {sortedRuns.map((run, index) => (
                             <tr
                                 key={run.id}
-                                tabIndex={0}
+                                {...getRowProps(index)}
                                 className="group hover:bg-zinc-50 dark:hover:bg-zinc-900/30 transition-colors cursor-pointer"
                                 onClick={() => onSelectRun(run.id)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        onSelectRun(run.id);
-                                    }
-                                }}
+                                aria-label={`Fuzzing run ${run.id}, status ${run.status}`}
                             >
-                                {visibleColumns.includes('id') && (
-                                    <td className="px-6 py-4">
+                                {effectiveColumns.includes('id') && (
+                                    <td className="px-6 py-4 max-w-[200px]">
                                         <button
                                             type="button"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 onSelectRun(run.id);
                                             }}
-                                            className="text-sm font-mono text-blue-600 dark:text-blue-400 hover:underline decoration-blue-500/30 underline-offset-4 text-left"
+                                            className="text-sm font-mono text-blue-600 dark:text-blue-400 hover:underline decoration-blue-500/30 underline-offset-4 text-left w-full min-w-0"
                                         >
-                                            {run.id}
+                                            <TruncatedCell>{run.id}</TruncatedCell>
                                         </button>
                                     </td>
                                 )}
-                                {visibleColumns.includes('status') && (
+                                {effectiveColumns.includes('status') && (
                                     <td className="px-6 py-4">
                                         <StatusBadge status={run.status} />
                                     </td>
                                 )}
-                                {visibleColumns.includes('duration') && (
+                                {effectiveColumns.includes('duration') && (
                                     <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400 text-right tabular-nums">
                                         {formatDuration(run.duration)}
                                     </td>
                                 )}
-                                {visibleColumns.includes('seedCount') && (
+                                {effectiveColumns.includes('seedCount') && (
                                     <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400 text-right tabular-nums">
                                         {run.seedCount.toLocaleString()}
                                     </td>
@@ -137,7 +216,7 @@ export default function RunHistoryTable({
                                         />
                                     </td>
                                 )}
-                                {visibleColumns.includes('report') && (
+                                {effectiveColumns.includes('report') && (
                                     <td className="px-6 py-4 text-right">
                                         <button
                                             type="button"

@@ -8,7 +8,10 @@
 use crate::{CaseBundle, BundlePersistError};
 use std::path::{Path, PathBuf};
 use std::fs;
-use std::io;
+use std::io::{self, Read};
+
+/// Maximum size of an uncompressed artifact JSON document.
+pub const MAX_ARTIFACT_JSON_BYTES: usize = crate::bundle_persist::MAX_BUNDLE_JSON_BYTES;
 
 /// Configuration for artifact storage backends.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,6 +118,20 @@ pub trait ArtifactStore: Send + Sync {
 
     /// Checks if an artifact exists in storage.
     fn artifact_exists(&self, artifact_id: &str) -> bool;
+
+    /// Returns the artifact class for retention policy purposes.
+    ///
+    /// Defaults to `ArtifactClass::Raw` for backends that do not track classes.
+    fn artifact_class(&self, _artifact_id: &str) -> crate::retention::ArtifactClass {
+        crate::retention::ArtifactClass::Raw
+    }
+
+    /// Returns the last-modified timestamp (epoch seconds) for an artifact.
+    ///
+    /// Used by lease-based retention sweeps to compute artifact age.
+    fn artifact_modified_epoch(&self, _artifact_id: &str) -> Option<i64> {
+        None
+    }
 }
 
 /// Local filesystem-based artifact storage.
@@ -132,7 +149,13 @@ impl LocalArtifactStore {
 
     /// Validates artifact ID to prevent directory traversal attacks.
     fn validate_artifact_id(id: &str) -> Result<(), StorageError> {
-        if id.is_empty() || id.contains("..") || id.contains("/") || id.contains("\\") {
+        if id.is_empty()
+            || id == "."
+            || id == ".."
+            || !id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
             return Err(StorageError::InvalidId {
                 artifact_id: id.to_string(),
             });
@@ -173,7 +196,12 @@ impl ArtifactStore for LocalArtifactStore {
         Self::validate_artifact_id(artifact_id)?;
 
         let path = self.artifact_path(artifact_id);
-        let json_bytes = crate::save_case_bundle_json(bundle)?;
+        let json_bytes = crate::save_sanitized_case_bundle_json(bundle)?;
+        if json_bytes.len() > MAX_ARTIFACT_JSON_BYTES {
+            return Err(StorageError::Persistence(BundlePersistError::SizeLimit {
+                limit: MAX_ARTIFACT_JSON_BYTES,
+            }));
+        }
         fs::write(&path, json_bytes)?;
 
         Self::metadata_from_file(artifact_id, &path)
@@ -189,7 +217,15 @@ impl ArtifactStore for LocalArtifactStore {
             });
         }
 
-        let bytes = fs::read(&path)?;
+        let mut bytes = Vec::new();
+        fs::File::open(&path)?
+            .take(MAX_ARTIFACT_JSON_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > MAX_ARTIFACT_JSON_BYTES {
+            return Err(StorageError::Persistence(BundlePersistError::SizeLimit {
+                limit: MAX_ARTIFACT_JSON_BYTES,
+            }));
+        }
         Ok(crate::load_case_bundle_json(&bytes)?)
     }
 
@@ -243,6 +279,23 @@ impl ArtifactStore for LocalArtifactStore {
     fn artifact_exists(&self, artifact_id: &str) -> bool {
         Self::validate_artifact_id(artifact_id).is_ok()
             && self.artifact_path(artifact_id).exists()
+    }
+
+    fn artifact_class(&self, artifact_id: &str) -> crate::retention::ArtifactClass {
+        crate::retention::ArtifactClass::classify(artifact_id)
+    }
+
+    fn artifact_modified_epoch(&self, artifact_id: &str) -> Option<i64> {
+        if Self::validate_artifact_id(artifact_id).is_err() {
+            return None;
+        }
+        let path = self.artifact_path(artifact_id);
+        let metadata = fs::metadata(&path).ok()?;
+        let modified = metadata.modified().ok()?;
+        let duration = modified
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        Some(duration.as_secs() as i64)
     }
 }
 
@@ -366,6 +419,30 @@ mod tests {
                 "should reject invalid ID: {}",
                 invalid_id
             );
+        }
+
+        let _ = fs::remove_dir_all(&tmpdir);
+    }
+
+    #[test]
+    fn accept_ids_with_consecutive_dots() {
+        let tmpdir = unique_tmp();
+        let store = LocalArtifactStore::new(&tmpdir).expect("create store");
+        let bundle = to_bundle(CaseSeed {
+            id: 1,
+            payload: vec![1],
+        });
+
+        let valid_ids = vec!["run-v2..1", "artifact..name", "test..file", "..foo", "bar.."];
+
+        for valid_id in valid_ids {
+            let result = store.store_artifact(valid_id, &bundle);
+            assert!(
+                result.is_ok(),
+                "should accept ID with consecutive dots: {}",
+                valid_id
+            );
+            let _ = store.delete_artifact(valid_id);
         }
 
         let _ = fs::remove_dir_all(&tmpdir);

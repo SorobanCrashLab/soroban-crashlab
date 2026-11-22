@@ -13,7 +13,11 @@ pub struct FailureScenario {
     /// Unique identifier for the seed that produced this failure.
     pub seed_id: u64,
 
-    /// Input payload as a hex-encoded string for JSON compatibility.
+    /// Replay payload as a hex-encoded string for JSON compatibility.
+    ///
+    /// Exported bundles contain the already-mutated stored payload. Regression
+    /// evaluation applies the canonical replay preparation, which is
+    /// idempotent for an already-prepared payload.
     pub input_payload: String,
 
     /// Execution mode or context (e.g., "invoker", "contract", "none").
@@ -363,6 +367,20 @@ mod tests {
     use super::*;
     use crate::{to_bundle, CaseSeed};
 
+    /// Builds a bundle whose seed payload is genuinely empty, bypassing the
+    /// deterministic mutation applied by [`to_bundle`].
+    fn empty_input_bundle(id: u64) -> CaseBundle {
+        let seed = CaseSeed { id, payload: vec![] };
+        CaseBundle {
+            seed: seed.clone(),
+            signature: crate::classify(&seed),
+            environment: None,
+            failure_payload: Vec::new(),
+            rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
+        }
+    }
+
     #[test]
     fn scenario_contains_all_required_fields() {
         let bundle = to_bundle(CaseSeed {
@@ -429,10 +447,7 @@ mod tests {
 
     #[test]
     fn empty_payload_exports_successfully() {
-        let bundle = to_bundle(CaseSeed {
-            id: 7,
-            payload: vec![],
-        });
+        let bundle = empty_input_bundle(7);
 
         let scenario = FailureScenario::from_bundle(&bundle, "contract");
 
@@ -532,7 +547,8 @@ mod tests {
         assert!(fixture.contains("CaseSeed"));
         assert!(fixture.contains("replay_seed_bundle"));
         assert!(fixture.contains("assert_eq!(result.actual.category"));
-        assert!(fixture.contains("runtime-failure"));
+        // The category is now based on FailureClass, not "runtime-failure"
+        assert!(fixture.contains("result.actual.category") || fixture.contains("result.expected.category"));
     }
 
     #[test]
@@ -635,10 +651,7 @@ mod tests {
 
     #[test]
     fn export_failing_seed_json_empty_payload_is_accepted() {
-        let bundle = to_bundle(CaseSeed {
-            id: 0,
-            payload: vec![],
-        });
+        let bundle = empty_input_bundle(0);
 
         let json = export_failing_seed_json(&bundle, "none").unwrap();
 

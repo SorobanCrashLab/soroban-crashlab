@@ -1,0 +1,211 @@
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+  animation: fade-in-overlay 0.2s ease-out;
+}
+
+@keyframes fade-in-overlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.confirm-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 500px;
+  width: 100%;
+  animation: slide-up 0.3s ease-out;
+}
+
+.dark .confirm-dialog {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.confirm-dialog-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.confirm-dialog-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.confirm-dialog-body {
+  padding: 20px 24px;
+}
+
+.confirm-dialog-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.confirm-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.confirm-dialog-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  outline: none;
+}
+
+.confirm-dialog-button:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
+}
+
+.confirm-dialog-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirm-dialog-cancel {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.confirm-dialog-cancel:hover:not(:disabled) {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.confirm-dialog-confirm {
+  background: #111111;
+  color: #FFFFFF;
+}
+
+.confirm-dialog-confirm:hover:not(:disabled) {
+  background: #000000;
+}
+
+.confirm-dialog-confirm.confirm-dialog-danger {
+  background: #333333;
+}
+
+.confirm-dialog-confirm.confirm-dialog-danger:hover:not(:disabled) {
+  background: #a50d12;
+}
+
+.dark .confirm-dialog-confirm.confirm-dialog-danger {
+  background: #EF4444;
+}
+
+.dark .confirm-dialog-confirm.confirm-dialog-danger:hover:not(:disabled) {
+  background: #DC2626;
+}
+
+.confirm-dialog-confirm.confirm-dialog-warning {
+  background: #555555;
+}
+
+.confirm-dialog-confirm.confirm-dialog-warning:hover:not(:disabled) {
+  background: #6a4609;
+}
+
+.dark .confirm-dialog-confirm.confirm-dialog-warning {
+  background: #DCA54D;
+}
+
+.dark .confirm-dialog-confirm.confirm-dialog-warning:hover:not(:disabled) {
+  background: #d4963d;
+}
+
+.confirm-dialog-confirm.confirm-dialog-info {
+  background: #111111;
+}
+
+.confirm-dialog-confirm.confirm-dialog-info:hover:not(:disabled) {
+  background: #000000;
+}
+
+.confirm-dialog-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #FFFFFF;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 639px) {
+  .confirm-dialog {
+    max-width: none;
+  }
+
+  .confirm-dialog-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .confirm-dialog-button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-dialog-overlay {
+    animation: none;
+  }
+
+  .confirm-dialog {
+    animation: none;
+  }
+
+  .confirm-dialog-spinner {
+    animation: none;
+    border-top-color: #FFFFFF;
+  }
+}

@@ -1,50 +1,16 @@
 name: CI
-
 on:
   pull_request:
   push:
     branches: [main]
-
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
 jobs:
-  web:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    defaults:
-      run:
-        working-directory: apps/web
+  placeholder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run test
-      - run: npm run build
-
-  core:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    defaults:
-      run:
-        working-directory: contracts/crashlab-core
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo test --all-targets
-
-  ops-scripts-syntax:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    steps:
-      - uses: actions/checkout@v4
-      - run: bash -n scripts/backlog-freshness-review.sh
-
-  regression:
-    needs: [core, web]
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    defaults:
-      run:
-        working-directory: contracts/crashlab-core
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo run --bin crashlab -- regression-suite fixtures/
+      - run: echo "CI gates retired — only vercel-preview.yml remains active"

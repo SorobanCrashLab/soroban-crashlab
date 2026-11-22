@@ -5,6 +5,11 @@
 //! - Contract IDs (C-addresses): 56-character base32 encoded contract hashes
 //! - Muxed accounts (M-addresses): 69-character base32 with 64-bit memo ID
 //!
+//! Additionally, this module exposes helpers used by the type-directed ScVal mutator
+//! to swap address types (muxed ↔ ed25519 ↔ contract) while preserving the underlying
+//! 32-byte key material, and to synthesize address-shaped payloads for grammar-aware
+//! regeneration.
+//!
 //! The mutator supports toggling between valid and invalid address generation
 //! to test both parsing success and error handling paths.
 
@@ -45,6 +50,20 @@ impl AddressType {
             AddressType::Account => 56,
             AddressType::Contract => 56,
             AddressType::Muxed => 69,
+        }
+    }
+
+    /// Returns the number of base32 characters encoding the raw payload (excluding prefix).
+    pub fn payload_len(&self) -> usize {
+        self.valid_length() - 1
+    }
+
+    /// Returns the number of raw bytes encoded by this address type (excluding CRC).
+    pub fn raw_byte_len(&self) -> usize {
+        match self {
+            AddressType::Account => 32,
+            AddressType::Contract => 32,
+            AddressType::Muxed => 40,
         }
     }
 }
@@ -337,6 +356,122 @@ fn generate_empty_address() -> String {
     String::new()
 }
 
+/// Extract the raw 32-byte key material from an address, if the address is
+/// structurally valid (correct prefix, length, and base32 charset).
+///
+/// For muxed addresses, only the first 32 bytes (the ed25519 key) are returned;
+/// the memo ID is dropped. This is the primitive used by the ScVal mutator to
+/// swap address types while preserving key material.
+pub fn extract_key_bytes(addr: &str) -> Option<[u8; 32]> {
+    let bytes = addr.as_bytes();
+    if bytes.is_empty() {
+        return None;
+    }
+    let addr_type = match bytes[0] {
+        b'G' => AddressType::Account,
+        b'C' => AddressType::Contract,
+        b'M' => AddressType::Muxed,
+        _ => return None,
+    };
+    if bytes.len() != addr_type.valid_length() {
+        return None;
+    }
+    // Decode the first 32 bytes worth of base32 characters (52 chars).
+    let mut out = [0u8; 32];
+    let mut acc: u32 = 0;
+    let mut bits: u32 = 0;
+    let mut written = 0usize;
+    for &b in &bytes[1..] {
+        let v = base32_value(b)?;
+        acc = (acc << 5) | v as u32;
+        bits += 5;
+        if bits >= 8 {
+            bits -= 8;
+            out[written] = ((acc >> bits) & 0xFF) as u8;
+            written += 1;
+            if written == 32 {
+                break;
+            }
+        }
+    }
+    if written == 32 {
+        Some(out)
+    } else {
+        None
+    }
+}
+
+/// Re-encode 32 bytes of key material into an address of the requested type.
+///
+/// The trailing CRC characters are filled deterministically from the key bytes
+/// (they are not a real CRC, but they are stable and base32-valid). This is
+/// sufficient for fuzzing purposes: the resulting string is structurally valid
+/// and will exercise the address-type branch in the contract.
+pub fn encode_key_bytes(key: &[u8; 32], addr_type: AddressType) -> String {
+    let mut result = String::with_capacity(addr_type.valid_length());
+    result.push(addr_type.prefix());
+    let mut acc: u32 = 0;
+    let mut bits: u32 = 0;
+    for &byte in key.iter() {
+        acc = (acc << 8) | byte as u32;
+        bits += 8;
+        while bits >= 5 {
+            bits -= 5;
+            let idx = ((acc >> bits) & 0x1F) as usize;
+            result.push(b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"[idx] as char);
+        }
+    }
+    // Pad remaining bits (if any) and fill the rest of the payload with a
+    // deterministic CRC-ish tail derived from the key.
+    if bits > 0 {
+        let idx = ((acc << (5 - bits)) & 0x1F) as usize;
+        result.push(b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"[idx] as char);
+    }
+    let mut crc: u32 = 0xFFFF_FFFF;
+    for &byte in key.iter() {
+        crc ^= byte as u32;
+        for _ in 0..8 {
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xEDB8_8320
+            } else {
+                crc >> 1
+            };
+        }
+    }
+    let crc_bytes = crc.to_le_bytes();
+    for &byte in crc_bytes.iter() {
+        acc = (acc << 8) | byte as u32;
+        bits += 8;
+        while bits >= 5 {
+            bits -= 5;
+            let idx = ((acc >> bits) & 0x1F) as usize;
+            result.push(b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"[idx] as char);
+        }
+    }
+    while result.len() < addr_type.valid_length() {
+        result.push('A');
+    }
+    result.truncate(addr_type.valid_length());
+    result
+}
+
+/// Swap the address type of `addr` to `target`, preserving key material when possible.
+///
+/// Returns `None` if the source address is not structurally valid.
+pub fn swap_address_type(addr: &str, target: AddressType) -> Option<String> {
+    let key = extract_key_bytes(addr)?;
+    Some(encode_key_bytes(&key, target))
+}
+
+/// Decode a single base32 character to its 5-bit value.
+fn base32_value(b: u8) -> Option<u8> {
+    match b {
+        b'A'..=b'Z' => Some(b - b'A'),
+        b'2'..=b'7' => Some(b - b'2' + 26),
+        _ => None,
+    }
+}
+
 /// Convert a byte to a base32 character (RFC 4648 alphabet).
 fn base32_char(byte: u8) -> char {
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -371,9 +506,22 @@ pub fn generate_address_vectors(base_id: u64, config: &AddressMutatorConfig) -> 
         );
         seeds.push(CaseSeed {
             id,
-            payload: valid_addr.into_bytes(),
+            payload: valid_addr.clone().into_bytes(),
         });
         id += 1;
+
+        // Seed deterministic key-boundary and cross-type neighbors beside each
+        // valid base address so corpus generation can exercise the local
+        // neighborhood without waiting for byte-level havoc to find it.
+        if let Some(neighbors) = crate::address_neighbors::generate_address_neighbors(&valid_addr) {
+            for neighbor in neighbors {
+                seeds.push(CaseSeed {
+                    id,
+                    payload: neighbor.address.into_bytes(),
+                });
+                id += 1;
+            }
+        }
 
         // Invalid addresses (if config allows)
         if config.include_invalid && !config.valid_only {
@@ -573,6 +721,47 @@ mod tests {
                 ch
             );
         }
+    }
+
+    #[test]
+    fn extract_key_bytes_roundtrips_account() {
+        let addr = generate_valid_account_address(
+            &CaseSeed {
+                id: 7,
+                payload: vec![],
+            },
+            &mut 1234u64,
+        );
+        let key = extract_key_bytes(&addr).expect("valid account should decode");
+        let reencoded = encode_key_bytes(&key, AddressType::Account);
+        assert_eq!(reencoded.len(), 56);
+        assert!(reencoded.starts_with('G'));
+        assert_eq!(extract_key_bytes(&reencoded).unwrap(), key);
+    }
+
+    #[test]
+    fn swap_address_type_preserves_key() {
+        let addr = generate_valid_account_address(
+            &CaseSeed {
+                id: 3,
+                payload: vec![],
+            },
+            &mut 42u64,
+        );
+        let key = extract_key_bytes(&addr).unwrap();
+        for target in AddressType::ALL {
+            let swapped = swap_address_type(&addr, target).expect("swap should succeed");
+            assert_eq!(swapped.len(), target.valid_length());
+            assert_eq!(swapped.chars().next().unwrap(), target.prefix());
+            assert_eq!(extract_key_bytes(&swapped).unwrap(), key);
+        }
+    }
+
+    #[test]
+    fn extract_key_bytes_rejects_invalid() {
+        assert!(extract_key_bytes("").is_none());
+        assert!(extract_key_bytes("XABC").is_none());
+        assert!(extract_key_bytes("G0000000000000000000000000000000000000000000000000000").is_none());
     }
 
     /// Helper to check if an address appears valid (basic checks).

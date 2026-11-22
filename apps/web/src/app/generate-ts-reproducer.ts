@@ -2,6 +2,14 @@
 // Exports failing case as a TypeScript reproducer helper for web tests.
 // Outputs are stable and deterministic given the same input.
 
+import {
+  buildReproducerModel,
+  type CaseBundleExport,
+  type ReproducerModel,
+} from './reproducer-model';
+
+export type { CaseBundleExport, ReproducerModel } from './reproducer-model';
+
 export interface ReproducerInput<TInput = unknown, TExpected = unknown, TActual = unknown> {
   testName: string;
   input: TInput;
@@ -17,14 +25,6 @@ export interface ReproducerOptions {
   timeoutMs?: number;
   /** Emit a `test.skip` wrapper instead of a normal test. */
   skipIf?: boolean;
-}
-
-export interface CaseBundleExport {
-  seedId: number;
-  inputPayloadHex: string;
-  failureClass: string;
-  signatureHash: string;
-  mode: string;
 }
 
 /** Escapes a string for safe embedding inside a template literal or single-quoted string. */
@@ -91,6 +91,9 @@ export function generateTSReproducer<TInput = unknown, TExpected = unknown, TAct
  * Generates a TypeScript reproducer snippet from a `CaseBundleExport` — the
  * JSON-serializable form produced by the Rust generator.
  *
+ * The bundle is normalized through the shared `ReproducerModel` (see
+ * `./reproducer-model`) so every emitter consumes the same intermediate shape.
+ *
  * The snippet documents the hex payload, failure class, and signature hash so a
  * maintainer can locate the bundle without manual guesswork.
  */
@@ -98,17 +101,31 @@ export function generateTSReproducerFromBundle(
   bundle: CaseBundleExport,
   options: ReproducerOptions = {},
 ): string {
-  const testName = `seed-${bundle.seedId}-${bundle.failureClass}`;
+  return generateTSReproducerFromModel(buildReproducerModel(bundle), options);
+}
+
+/**
+ * Generates a TypeScript reproducer snippet from the shared intermediate model.
+ *
+ * Emitters for other languages (`generate-rust-reproducer`,
+ * `generate-python-reproducer`) consume the same `ReproducerModel`, so the
+ * models, not the bundle shape, are the single point of truth across languages.
+ */
+export function generateTSReproducerFromModel(
+  model: ReproducerModel,
+  options: ReproducerOptions = {},
+): string {
+  const testName = `seed-${model.seedId}-${model.failureClass}`;
 
   const input = {
-    seedId: bundle.seedId,
-    payloadHex: bundle.inputPayloadHex,
-    mode: bundle.mode,
+    seedId: model.seedId,
+    payloadHex: model.payloadHex,
+    mode: model.mode,
   };
 
   const expected = {
-    failureClass: bundle.failureClass,
-    signatureHash: bundle.signatureHash,
+    failureClass: model.failureClass,
+    signatureHash: model.signatureHash,
   };
 
   const actual = {

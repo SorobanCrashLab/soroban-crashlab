@@ -1,78 +1,144 @@
 # Security Policy
 
+Soroban CrashLab handles API tokens, sessions, webhook secrets, multi-tenant
+data and adversarial fuzz inputs. If you find a way to break any of that,
+please tell us privately first — this page explains how, and what we commit to
+in return.
+
+> This file is mirrored at `.github/SECURITY.md` (the repository's Security
+> tab). Keep the two identical — `scripts/check-doc-links.mjs` fails CI when
+> they drift — and use absolute links so both copies resolve.
+
 ## Supported Versions
 
-Only the latest commit on `main` is actively maintained. There are no versioned releases at this time.
+Per the [release policy](https://github.com/SorobanCrashLab/soroban-crashlab/blob/main/docs/releases/policy.md),
+security fixes land on `main` and in a patch release of the latest minor line.
+The previous minor line receives fixes for **90 days** after its successor
+ships (the N-1 window).
 
-| Branch | Supported |
-|--------|-----------|
-| `main` | ✅ Yes    |
-| older  | ❌ No     |
+| Version | Supported |
+| --- | --- |
+| `main` | ✅ |
+| `v0.2.x` (latest release) | ✅ |
+| `< v0.2.0` | ❌ |
 
 ## Reporting a Vulnerability
 
-**Do not open a public GitHub issue for security vulnerabilities.**
+**Do not open a public issue, pull request or discussion for a vulnerability.**
 
-To report a vulnerability, please use one of the following private channels:
-
-- **GitHub private vulnerability reporting**: Use the [Security tab → "Report a vulnerability"](../../security/advisories/new) button in this repository. This is the preferred path.
-- **Email**: If GitHub private reporting is unavailable, email the maintainers directly. Contact details are listed in [`FUNDING.json`](../FUNDING.json) or the repository profile.
+1. **Preferred — GitHub private vulnerability reporting:**
+   [Security → Report a vulnerability](https://github.com/SorobanCrashLab/soroban-crashlab/security/advisories/new).
+   The report is visible only to you and the maintainers, and becomes the
+   advisory we publish later.
+2. **Fallback — if you cannot use GitHub's form:** open a public issue titled
+   only `Security contact request` with **no details**. A maintainer will reply
+   with a private channel (email) within the acknowledgement time below.
 
 ### What to include
 
-A useful report includes:
-
-- A clear description of the vulnerability and its potential impact
-- Steps to reproduce or a minimal proof-of-concept
-- Affected component(s) (e.g., `crashlab-core`, `apps/web`, CI scripts)
-- Any suggested mitigations or patches, if available
+- **Affected component** — e.g. `contracts/crashlab-core` (engine, CLI,
+  bundle/corpus parsing), `apps/web` (API route, auth/session, RBAC, tenancy,
+  webhooks, artifact upload), CI workflows, scripts, Docker images.
+- **Version or commit** you tested.
+- **Impact class** — which trust boundary is crossed: authentication bypass,
+  privilege escalation (RBAC), cross-tenant access, secret disclosure, code
+  execution from a fuzz input/bundle/artifact, integrity of results
+  (forged/hidden crashes, tampered audit log), supply chain. The
+  [threat model](https://github.com/SorobanCrashLab/soroban-crashlab/blob/main/docs/THREAT_MODEL_ARTIFACT_HANDLING.md)
+  lists the boundaries we defend.
+- **Reproduction** — minimal steps, request/response pairs or a proof of
+  concept, and what you observed vs expected.
+- Whether you want to be **credited**, and under what name.
 
 ### Response expectations
 
-| Step | Target timeline |
-|------|----------------|
-| Acknowledgement of report | 48 hours |
-| Initial triage and severity assessment | 5 business days |
-| Fix or mitigation plan communicated to reporter | 14 days |
-| Public disclosure (coordinated with reporter) | 90 days from report, or sooner if fix is ready |
+| Step | Target |
+| --- | --- |
+| Acknowledgement of your report | **48 hours** (never more than 3 business days) |
+| Initial triage and severity assessment | **5 business days** |
+| Status updates until resolved | at least every **10 business days** |
+| Fix or mitigation plan communicated to you | **14 days** |
+| Fix released — critical / high | 14 / 30 days from triage |
+| Fix released — medium / low | 60 days / next scheduled release |
+| Public disclosure (coordinated with you) | when the fix ships, and no later than **90 days** from your report |
 
-We follow a **coordinated disclosure** model. We ask reporters to keep details private until a fix is available or the 90-day window closes, whichever comes first. We will credit reporters in the advisory unless they prefer to remain anonymous.
+We will tell you if we cannot meet a target and why. If a vulnerability is
+being actively exploited we may publish an advisory with mitigations before a
+fix is ready, and we will tell you first.
 
-## Maintainer Conflicts of Interest
+### Coordinated disclosure
 
-Security trust depends on assignment, triage, review, merge, severity, and disclosure decisions being made by maintainers who can act independently.
+We follow a **coordinated disclosure** model:
 
-A maintainer has a conflict of interest when they are the reporter, author, assignee, PR author, employer, client, sponsor, close collaborator, direct financial beneficiary, direct competitor, or prior private implementer for the issue or PR under decision.
+- Please keep details private until the advisory is published or 90 days
+  have passed, whichever comes first.
+- We publish a GitHub Security Advisory for every confirmed vulnerability in a
+  supported version, request a CVE where warranted, and ship the fix in a
+  release whose notes link the advisory.
+- We will not pursue good-faith research that follows this policy: no privacy
+  violations, no destruction or exfiltration of other people's data, no
+  service degradation, and only accounts and deployments you own.
 
-### Required control path
+### Credit
 
-1. The conflicted maintainer discloses the conflict before taking an assignment, review, merge, severity, fix-readiness, bounty, point-award, or disclosure decision.
-2. For public issues or PRs, disclose with a short public comment and avoid sensitive details. For private vulnerability reports, disclose only in the GitHub private vulnerability report or maintainer channel.
-3. An unconflicted maintainer takes ownership before the decision continues.
-4. The conflicted maintainer may provide factual context when requested, but must not approve, merge, assign, close, set severity, decide disclosure timing, or award resolution credit for the conflicted item.
-
-### Timelines
-
-- Issue assignment and PR review conflicts use the Wave maintainer timelines: replacement owner within **24 hours**, escalation to any available unconflicted maintainer at **36 hours**.
-- Security report conflicts keep the disclosure timelines in this policy: acknowledgement within **48 hours**, initial triage and severity assessment within **5 business days**, and fix or mitigation plan within **14 days**.
-
-### Known risks and mitigation boundaries
-
-- A small maintainer pool can delay replacement ownership. Mitigation: the Wave lead or any available unconflicted maintainer may take over at the escalation timer.
-- Private vulnerability reports can reveal sensitive details while a conflict is being handled. Mitigation: recusal records for private reports stay in private channels until coordinated disclosure.
-- This policy does not automatically detect personal, employment, financial, or sponsor relationships. Mitigation: maintainers must self-disclose, contributors should flag known conflicts, and reviewers can request reassignment when independence is unclear.
+Credit is **opt-in**. With your permission we name you (or your handle /
+organisation) in the advisory and the release notes. There is no paid bounty.
 
 ## Scope
 
-This policy covers:
+In scope:
 
-- `contracts/crashlab-core` — Rust fuzzing and reproducibility crate
-- `apps/web` — Next.js frontend dashboard
-- CI/CD configuration under `.github/workflows`
-- Scripts under `scripts/`
+- `contracts/crashlab-core` — Rust fuzzing engine, CLI and persisted formats
+- `apps/web` — Next.js dashboard and API routes
+- CI/CD configuration under `.github/workflows`, scripts under `scripts/` and
+  `deploy/`, and published Docker images
+- Vulnerabilities in dependencies that are **reachable** from CrashLab, and the
+  review/rollback of dependency updates proposed here
 
-Out of scope: vulnerabilities in third-party dependencies themselves (report those upstream), and issues that require physical access to infrastructure. In scope for this repository: review, rollback, and validation requirements for dependency updates proposed here.
+Out of scope:
+
+- Social engineering, phishing or physical attacks against maintainers or
+  infrastructure
+- Denial of service by volume (floods, resource exhaustion) without a
+  security impact beyond availability
+- Reports from automated scanners without a demonstrated impact
+- Missing headers or best-practice suggestions with no exploit path (open a
+  normal issue instead)
+- Unreachable vulnerabilities in third-party dependencies (report upstream)
+- Findings that require a compromised maintainer account, a malicious
+  deployment operator, or physical access
+- Testnet-only behaviour with no path to user impact
+- Crashes **in contracts under test** that CrashLab finds — that is the
+  product working; report them to the contract's authors
+
+## Maintainer Conflicts of Interest
+
+Assignment, triage, review, merge, severity and disclosure decisions must be
+made by a maintainer who can act independently. A maintainer has a conflict
+of interest when they are the reporter, author, assignee, PR author, employer,
+client, sponsor, close collaborator, direct financial beneficiary, direct
+competitor, or prior private implementer for the item under decision.
+
+1. The conflicted maintainer discloses the conflict before taking any
+   assignment, review, merge, severity, fix-readiness, bounty, point-award or
+   disclosure decision — publicly for public items (no sensitive detail), and
+   only inside the private advisory or maintainer channel for private reports.
+2. An unconflicted maintainer takes ownership before the decision continues.
+3. The conflicted maintainer may supply facts on request but must not approve,
+   merge, assign, close, set severity, decide disclosure timing or award credit.
+
+Timelines: replacement owner within **24 hours**, escalation to any available
+unconflicted maintainer at **36 hours**. Security reports keep the timers
+above: acknowledgement within **48 hours**, initial triage within **5 business
+days**, fix or mitigation plan within **14 days**.
 
 ## Known Gaps and Accepted Risks
 
-See the [Operational Security Assumptions](../MAINTAINER_WAVE_PLAYBOOK.md#operational-security-assumptions) section of the Maintainer Wave Playbook for a documented list of known gaps and accepted residual risks.
+See the Operational Security Assumptions section of
+[`MAINTAINER_WAVE_PLAYBOOK.md`](https://github.com/SorobanCrashLab/soroban-crashlab/blob/main/MAINTAINER_WAVE_PLAYBOOK.md#operational-security-assumptions).
+
+## For maintainers
+
+Intake, severity mapping, advisory and release steps, and the
+repository-settings checklist are in
+[`docs/security/disclosure.md`](https://github.com/SorobanCrashLab/soroban-crashlab/blob/main/docs/security/disclosure.md).

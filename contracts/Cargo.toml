@@ -1,0 +1,37 @@
+[workspace]
+resolver = "2"
+members = [
+    "crashlab-core",
+    "soroban-example",
+    "crashlab-core/tests/regression_harness",
+]
+# The cargo-fuzz crate is intentionally kept out of the workspace: `cargo fuzz`
+# manages its own lockfile and target directory.
+exclude = ["crashlab-core/fuzz"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+soroban-sdk = "22.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+flate2 = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"
+sha2 = "0.10"
+env_logger = "0.10.0"
+reqwest = { version = "0.12", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+num_cpus = "1.16"
+filetime = "0.2"
+mockito = "1.6"
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+lto = true
+codegen-units = 1
+panic = "abort"

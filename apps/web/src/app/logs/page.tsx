@@ -1,120 +1,81 @@
-'use client';
+"use client";
 
 /**
  * Log Viewer page – /logs
  * Issue seed #56: Display structured logs from runs with search.
+ * Issue #1352: Smart autoscroll with scroll intent tracking.
  *
  * Features: searchable logs, timestamp anchors, loading/error states,
- * keyboard accessibility, responsive layout.
+ * keyboard accessibility, responsive layout, smart autoscroll.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   filterLogEntries,
   type LogEntry,
-  type LogLevel,
   type LogLevelFilter,
-} from '../log-viewer-utils';
+} from "../log-viewer-utils";
 import {
   logEntryAnchorId,
   logEntryAnchorHref,
   type PageDataState,
-} from './log-viewer-page-utils';
-
-// ---------------------------------------------------------------------------
-// Mock data loader (replace with real API call when backend is wired)
-// ---------------------------------------------------------------------------
-const MOCK_ENTRIES: LogEntry[] = [
-  { id: '1', timestamp: Date.now() - 300_000, level: 'info',  source: 'fuzz-worker', message: 'Campaign drive_run started (partition 0/4)' },
-  { id: '2', timestamp: Date.now() - 270_000, level: 'debug', source: 'fuzz-worker', message: 'Mutation stream seeded from case id 0x7a3f' },
-  { id: '3', timestamp: Date.now() - 240_000, level: 'warn',  source: 'rpc',         message: 'RPC latency p95 820ms (threshold 750ms)' },
-  { id: '4', timestamp: Date.now() - 210_000, level: 'info',  source: 'scheduler',   message: 'Checkpoint advanced: next_seed_index=18432' },
-  { id: '5', timestamp: Date.now() - 180_000, level: 'error', source: 'fuzz-worker', message: 'InvariantViolation: balance_nonnegative (signature recorded)' },
-  { id: '6', timestamp: Date.now() - 150_000, level: 'info',  source: 'rpc',         message: 'Replay envelope submitted for run-1012' },
-  { id: '7', timestamp: Date.now() - 120_000, level: 'debug', source: 'scheduler',   message: 'PRNG state commit checkpoint=73728' },
-  { id: '8', timestamp: Date.now() -  90_000, level: 'warn',  source: 'fuzz-worker', message: 'Soft budget warning on contract token (91% instr)' },
-  { id: '9', timestamp: Date.now() -  60_000, level: 'error', source: 'rpc',         message: 'Transient RPC timeout (attempt 2/3)' },
-  { id: '10', timestamp: Date.now() - 30_000, level: 'info',  source: 'scheduler',   message: 'Partition 0/4 complete – 18432 seeds processed' },
-];
+} from "./log-viewer-page-utils";
+import { shouldFollow } from "./scroll-intent-utils";
+import { useDebounce } from "../../lib/useDebounce";
+import { MOCK_LOG_ENTRIES } from "../../fixtures/logs";
+import { useDataTableKeyboardNav } from "../use-data-table-keyboard-nav";
+import LogSeverityBadge from "../../components/LogSeverityBadge";
+import SortableColumnHeader from "../../components/SortableColumnHeader";
+import { getNextSortState, type SortState } from "../run-history-sort-utils";
+import { useRunStream } from "../runs/[id]/useRunStream";
 
 async function fetchLogs(): Promise<LogEntry[]> {
-  // Simulate network latency; swap for real fetch() when API is available.
   await new Promise((r) => setTimeout(r, 800));
-  return MOCK_ENTRIES;
+  return MOCK_LOG_ENTRIES;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 const LEVEL_OPTIONS: { value: LogLevelFilter; label: string }[] = [
-  { value: 'all',   label: 'All'   },
-  { value: 'info',  label: 'Info'  },
-  { value: 'warn',  label: 'Warn'  },
-  { value: 'error', label: 'Error' },
-  { value: 'debug', label: 'Debug' },
+  { value: "all", label: "All" },
+  { value: "info", label: "Info" },
+  { value: "warn", label: "Warn" },
+  { value: "error", label: "Error" },
+  { value: "debug", label: "Debug" },
 ];
 
-const LEVEL_BADGE: Record<LogLevel, string> = {
-  info:  'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800',
-  warn:  'bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-950/50 dark:text-amber-200 dark:border-amber-800',
-  error: 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800',
-  debug: 'bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700',
-};
-
 function formatTimestamp(ts: number): string {
-  return new Date(ts).toISOString().replace('T', ' ').slice(0, 23) + 'Z';
+  return new Date(ts).toISOString().replace("T", " ").slice(0, 23) + "Z";
 }
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-function LoadingSkeleton() {
-  return (
-    <div role="status" aria-label="Loading logs" className="space-y-2 animate-pulse">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="h-8 rounded bg-zinc-200 dark:bg-zinc-800" />
-      ))}
-      <span className="sr-only">Loading…</span>
-    </div>
-  );
-}
-
-function ErrorState({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-center gap-4 py-16 text-center">
-      <svg className="w-10 h-10 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-      </svg>
-      <p className="text-zinc-600 dark:text-zinc-400">Failed to load logs. Check your connection and try again.</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
-      >
-        Retry
-      </button>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <p className="text-center py-16 text-zinc-500 dark:text-zinc-400">
-      No log entries match the current filters.
-    </p>
-  );
-}
+import { ListState } from "../../components/ListState";
 
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 export default function LogViewerPage() {
-  const [dataState, setDataState] = useState<PageDataState>('loading');
-  const [entries, setEntries] = useState<LogEntry[]>([]);
-  const [levelFilter, setLevelFilter] = useState<LogLevelFilter>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [dataState, setDataState] = useState<PageDataState>("success");
+  const [entries, setEntries] = useState<LogEntry[]>(MOCK_LOG_ENTRIES);
+  const [levelFilter, setLevelFilter] = useState<LogLevelFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [fetchAttempt, setFetchAttempt] = useState(0);
+  const [autoscroll, setAutoscroll] = useState(true);
+  useRunStream("run-1001", (envelope) => {
+    if (envelope.event.type !== "LOG_APPEND") return;
+    const logEvent = envelope.event;
+    setEntries((current) => {
+      const known = new Set(current.map((entry) => entry.id));
+      return [...current, ...logEvent.entries.filter((entry) => !known.has(entry.id))];
+    });
+  });
+
+  // Refs for scroll intent tracking
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const distanceFromBottomRef = useRef(0);
+  const scrolledUpRef = useRef(false);
+  const isDraggingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,44 +83,169 @@ export default function LogViewerPage() {
       .then((data) => {
         if (!cancelled) {
           setEntries(data);
-          setDataState('success');
+          setDataState("success");
         }
       })
       .catch(() => {
-        if (!cancelled) setDataState('error');
+        if (!cancelled) setDataState("error");
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [fetchAttempt]);
 
   const handleRetry = () => {
-    setDataState('loading');
+    setDataState("loading");
     setFetchAttempt((n) => n + 1);
   };
 
-  const visible = useMemo(
-    () =>
-      filterLogEntries(entries, { level: levelFilter, query: searchQuery }).sort(
-        (a, b) => a.timestamp - b.timestamp,
-      ),
-    [entries, levelFilter, searchQuery],
-  );
+  const [sortState, setSortState] = useState<SortState<string>>({
+    field: "timestamp",
+    order: "asc",
+  });
+
+  const handleSort = (field: string) => {
+    setSortState((prev) => getNextSortState(prev, field));
+  };
+
+  const visible = useMemo(() => {
+    const filtered = filterLogEntries(entries, {
+      level: levelFilter,
+      query: debouncedSearchQuery,
+    });
+
+    if (!sortState.field || sortState.order === "none") {
+      return filtered.slice().sort((a, b) => a.timestamp - b.timestamp);
+    }
+
+    const mult = sortState.order === "asc" ? 1 : -1;
+    return filtered.slice().sort((a, b) => {
+      if (sortState.field === "timestamp") {
+        return (a.timestamp - b.timestamp) * mult;
+      }
+      if (sortState.field === "level") {
+        return a.level.localeCompare(b.level) * mult;
+      }
+      if (sortState.field === "source") {
+        return a.source.localeCompare(b.source) * mult;
+      }
+      if (sortState.field === "message") {
+        return a.message.localeCompare(b.message) * mult;
+      }
+      return 0;
+    });
+  }, [entries, levelFilter, debouncedSearchQuery, sortState]);
+
+  const { getRowProps } = useDataTableKeyboardNav({
+    rowCount: visible.length,
+    onActivate: (index) => {
+      const entry = visible[index];
+      if (!entry) {
+        return;
+      }
+      const row = document.getElementById(logEntryAnchorId(entry));
+      row?.scrollIntoView({ block: "nearest" });
+      row?.querySelector<HTMLElement>("a")?.focus();
+    },
+  });
+
+  // Track scroll position and intent
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let lastScrollTop = container.scrollTop;
+    let settleTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      distanceFromBottomRef.current = distanceFromBottom;
+
+      // Detect upward scroll
+      if (scrollTop < lastScrollTop) {
+        scrolledUpRef.current = true;
+        // Clear previous settle timeout
+        if (settleTimeout) clearTimeout(settleTimeout);
+        // Reset scrolledUp flag after 500ms of no scrolling
+        settleTimeout = setTimeout(() => {
+          if (distanceFromBottom <= 50) {
+            scrolledUpRef.current = false;
+          }
+        }, 500);
+      } else if (distanceFromBottom <= 50) {
+        // User scrolled down to near-bottom - resume following
+        scrolledUpRef.current = false;
+      }
+
+      lastScrollTop = scrollTop;
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement;
+      // Check if clicking on scrollbar area
+      if (target === container && e.offsetX > container.clientWidth - 20) {
+        isDraggingRef.current = true;
+      }
+    };
+
+    const handlePointerUp = () => {
+      isDraggingRef.current = false;
+    };
+
+    container.addEventListener("scroll", handleScroll);
+    container.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      container.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("pointerup", handlePointerUp);
+      if (settleTimeout) clearTimeout(settleTimeout);
+    };
+  }, []);
+
+  // Autoscroll effect - triggered when visible entries change
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || visible.length === 0) return;
+
+    // Decide whether to scroll based on current intent
+    const follow = shouldFollow({
+      distanceFromBottom: distanceFromBottomRef.current,
+      scrolledUp: scrolledUpRef.current || isDraggingRef.current,
+      autoscroll,
+    });
+
+    if (follow) {
+      // Smooth scroll to bottom
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [visible, autoscroll]);
 
   return (
-    <div className="max-w-5xl mx-auto w-full px-4 py-10">
+    <div className="container-full page-padding fade-in">
       {/* Page header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Log Viewer
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Structured run logs with search and timestamp anchors. Issue seed #56.
-        </p>
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <div>
+          <h1 className="heading-page">Log Viewer</h1>
+          <p className="text-meta mt-0.5 sm:mt-1">
+            Structured run logs with search and timestamp anchors
+          </p>
+        </div>
       </div>
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center mb-6">
         {/* Level filter */}
-        <div role="group" aria-label="Filter by log level" className="flex flex-wrap gap-2">
+        <div
+          role="group"
+          aria-label="Filter by log level"
+          className="flex flex-wrap gap-2"
+        >
           {LEVEL_OPTIONS.map((opt) => {
             const active = levelFilter === opt.value;
             return (
@@ -168,11 +254,7 @@ export default function LogViewerPage() {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setLevelFilter(opt.value)}
-                className={
-                  active
-                    ? 'px-3 py-1 rounded-lg text-xs font-semibold bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                    : 'px-3 py-1 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-                }
+                className={active ? "chip chip-active text-xs" : "chip text-xs"}
               >
                 {opt.label}
               </button>
@@ -188,87 +270,149 @@ export default function LogViewerPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search message or source…"
-            className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="input-field"
           />
         </label>
+
+        {/* Autoscroll toggle */}
+        <button
+          type="button"
+          onClick={() => setAutoscroll(!autoscroll)}
+          className={autoscroll ? "chip chip-active text-xs" : "chip text-xs"}
+          aria-pressed={autoscroll}
+          aria-label="Toggle autoscroll"
+        >
+          Autoscroll {autoscroll ? "ON" : "OFF"}
+        </button>
       </div>
 
       {/* Content area */}
       <section
         aria-labelledby="log-table-heading"
-        className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden"
+        className="card overflow-hidden"
       >
-        <h2 id="log-table-heading" className="sr-only">Log entries</h2>
+        <h2 id="log-table-heading" className="sr-only">
+          Log entries
+        </h2>
 
-        {dataState === 'loading' && (
-          <div className="p-6">
-            <LoadingSkeleton />
-          </div>
-        )}
-
-        {dataState === 'error' && (
-          <ErrorState onRetry={handleRetry} />
-        )}
-
-        {dataState === 'success' && visible.length === 0 && <EmptyState />}
-
-        {dataState === 'success' && visible.length > 0 && (
-          <>
-            {/* Status bar */}
-            <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400">
-              Showing {visible.length} of {entries.length} entries
-            </div>
-
-            {/* Log table */}
-            <div
-              role="log"
-              aria-label="Run log entries"
-              aria-live="polite"
-              className="overflow-x-auto"
-            >
-              <table className="w-full text-sm font-mono">
-                <thead className="bg-zinc-100 dark:bg-zinc-900 text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-                  <tr>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold w-52">Timestamp</th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold w-20">Level</th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold w-32">Source</th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">Message</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 bg-white dark:bg-zinc-950">
-                  {visible.map((entry) => (
-                    <tr
-                      key={entry.id}
-                      id={logEntryAnchorId(entry)}
-                      className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
-                    >
-                      <td className="px-4 py-2 text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
-                        <a
-                          href={logEntryAnchorHref(entry)}
-                          className="hover:text-indigo-600 dark:hover:text-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
-                          aria-label={`Anchor for log entry at ${formatTimestamp(entry.timestamp)}`}
+        <ListState
+          {...(dataState === "loading"
+            ? { state: "loading" }
+            : dataState === "error"
+              ? {
+                  state: "error",
+                  message:
+                    "Failed to load logs. Check your connection and try again.",
+                  onRetry: handleRetry,
+                }
+              : visible.length === 0
+                ? {
+                    state: "empty",
+                    type: "logs",
+                    message: "No log entries match the current filters.",
+                    description:
+                      levelFilter !== "all" || searchQuery
+                        ? "Try clearing search queries or adjusting severity filters to display logs."
+                        : "No log records have been generated yet for this session.",
+                    action:
+                      levelFilter !== "all" || searchQuery ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLevelFilter("all");
+                            setSearchQuery("");
+                          }}
+                          className="btn-outline text-xs sm:text-sm px-3 sm:px-4 py-1.5"
                         >
-                          {formatTimestamp(entry.timestamp)}
-                        </a>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${LEVEL_BADGE[entry.level]}`}>
-                          {entry.level}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-cyan-700 dark:text-cyan-400 whitespace-nowrap">
-                        {entry.source}
-                      </td>
-                      <td className="px-4 py-2 text-zinc-800 dark:text-zinc-200 break-all">
-                        {entry.message}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
+                          Clear Filters
+                        </button>
+                      ) : undefined,
+                  }
+                : { state: "success" })}
+        >
+          {/* Status bar */}
+          <div
+            className="px-4 py-2 bg-[var(--bg)] border-b border-[var(--border-color)]"
+          >
+            <span className="text-meta">
+              Showing {visible.length} of {entries.length} entries
+            </span>
+          </div>
+
+          {/* Log table */}
+          <div
+            ref={scrollContainerRef}
+            className="table-responsive max-h-[60vh] overflow-y-auto"
+          >
+            <table
+              className="data-table w-full text-xs sm:text-sm font-mono"
+              aria-label="Log entries"
+            >
+              <thead>
+                <tr>
+                  <SortableColumnHeader
+                    field="timestamp"
+                    label="Timestamp"
+                    sortState={sortState}
+                    onSort={handleSort}
+                    className="w-24 sm:w-52"
+                  />
+                  <SortableColumnHeader
+                    field="level"
+                    label="Level"
+                    sortState={sortState}
+                    onSort={handleSort}
+                    className="w-14 sm:w-20"
+                  />
+                  <SortableColumnHeader
+                    field="source"
+                    label="Source"
+                    sortState={sortState}
+                    onSort={handleSort}
+                    className="hidden sm:table-cell w-32"
+                  />
+                  <SortableColumnHeader
+                    field="message"
+                    label="Message"
+                    sortState={sortState}
+                    onSort={handleSort}
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((entry, index) => (
+                  <tr
+                    key={entry.id}
+                    id={logEntryAnchorId(entry)}
+                    {...getRowProps(index)}
+                    aria-label={`Log entry ${entry.level} from ${entry.source}`}
+                  >
+                    <td className="text-meta whitespace-nowrap text-[10px] sm:text-xs">
+                      <a
+                        href={logEntryAnchorHref(entry)}
+                        className="link text-[10px] sm:text-xs"
+                        aria-label={`Anchor for log entry at ${formatTimestamp(entry.timestamp)}`}
+                      >
+                        {formatTimestamp(entry.timestamp)}
+                      </a>
+                    </td>
+                    <td>
+                      <LogSeverityBadge level={entry.level} />
+                    </td>
+                    <td
+                      className="hidden sm:table-cell text-[#0A66C2]"
+                    >
+                      {entry.source}
+                    </td>
+                    <td className="break-all text-[11px] sm:text-sm">
+                      {entry.message}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ListState>
       </section>
     </div>
   );

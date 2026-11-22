@@ -99,9 +99,10 @@ export default function AlertPresets({ onSelectPreset }: AlertPresetsProps) {
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Alert Presets</h2>
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Alert Presets</h2>
         {error && (
-          <div className="text-xs font-medium text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-1 rounded-full border border-red-100 dark:border-red-800 animate-in fade-in slide-in-from-top-1">
+          <div className="text-xs font-medium px-3 py-1 rounded-full animate-in fade-in slide-in-from-top-1"
+               style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
             {error}
           </div>
         )}
@@ -117,24 +118,26 @@ export default function AlertPresets({ onSelectPreset }: AlertPresetsProps) {
               onClick={() => handleSelect(preset)}
               onKeyDown={(e) => handleKeyDown(e, index)}
               disabled={isLoading}
-              className={`flex flex-col text-left p-5 rounded-xl border transition-all duration-200 relative overflow-hidden group
-                ${isSelected 
-                  ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 shadow-md ring-1 ring-blue-500 ring-offset-1 dark:ring-offset-zinc-950' 
-                  : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm hover:-translate-y-0.5'
-                }
-                ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}
-              `}
+              className={`flex flex-col text-left p-5 rounded-xl border transition-all duration-200 relative overflow-hidden group ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              style={{
+                borderColor: isSelected ? '#3b82f6' : 'var(--border-color)',
+                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--surface)',
+                boxShadow: isSelected ? '0 0 0 1px #3b82f6, 0 4px 6px rgba(0,0,0,0.1)' : 'none',
+              }}
               aria-pressed={isSelected}
             >
-              <h3 className={`font-semibold text-base mb-2 ${isSelected ? 'text-blue-700 dark:text-blue-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+              <h3 className="font-semibold text-base mb-2"
+                  style={{ color: isSelected ? '#2563eb' : 'var(--text-primary)' }}>
                 {preset.title}
               </h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              <p className="text-sm leading-relaxed"
+                 style={{ color: 'var(--text-secondary)' }}>
                 {preset.description}
               </p>
               
               {isSelected && !isLoading && (
-                <div className="mt-3 inline-flex items-center text-xs font-medium text-blue-600 dark:text-blue-400">
+                <div className="mt-3 inline-flex items-center text-xs font-medium"
+                     style={{ color: '#2563eb' }}>
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
@@ -143,7 +146,8 @@ export default function AlertPresets({ onSelectPreset }: AlertPresetsProps) {
               )}
 
               {isSelected && isLoading && (
-                <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-[1px] flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center"
+                     style={{ background: 'rgba(59, 130, 246, 0.05)' }}>
                   <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
               )}
@@ -153,7 +157,8 @@ export default function AlertPresets({ onSelectPreset }: AlertPresetsProps) {
 
         {/* Floating Toast Notification */}
         {showToast && (
-          <div className="fixed bottom-6 right-6 z-50 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3">
+          <div className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold animate-in fade-in slide-in-from-bottom-4 flex items-center gap-3"
+               style={{ background: 'var(--text-primary)', color: 'var(--bg)' }}>
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
             Preset applied successfully
           </div>

@@ -528,35 +528,137 @@ mod tests {
 
     #[test]
     fn integration_fuzzer_bundle_replay() {
-        use crate::bundle_persist::{CASE_BUNDLE_SCHEMA_VERSION, save_case_bundle_json, load_case_bundle_json};
+        use crate::bundle_persist::{save_case_bundle_json, load_case_bundle_json};
         use crate::replay::replay_seed_bundle;
         use crate::CaseBundle;
+        use crate::classify;
 
         let s = seed(6);
         let reports = run_matrix_for_seeds(&[s.clone()], |s, _| {
-            Ok(CrashSignature {
-                category: crate::taxonomy::classify_failure(s).as_str().to_string(),
-                digest: 99,
-                signature_hash: 99,
-            })
+            // Use the actual classify() function to get realistic signature values
+            Ok(classify(s))
         });
         
         let report = reports.into_iter().next().unwrap().unwrap();
         assert!(report.is_consistent());
         
         let bundle = CaseBundle {
-            seed: report.seed,
+            seed: report.seed.clone(),
             signature: report.results[0].signature.clone(),
             environment: None,
             failure_payload: vec![],
             rpc_envelope: None,
+        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         };
 
         let bytes = save_case_bundle_json(&bundle).unwrap();
         let loaded_bundle = load_case_bundle_json(&bytes).unwrap();
         
         let replay_result = replay_seed_bundle(&loaded_bundle);
-        assert!(replay_result.matches);
+        assert!(replay_result.matches, 
+            "Replay mismatch: expected={:?}, actual={:?}", 
+            replay_result.expected, replay_result.actual);
         assert_eq!(replay_result.expected_class, FailureClass::Xdr); // Payload [1, 2, 3] begins with 1 -> Xdr
     }
+
+    // ── HostContractRunner integration ────────────────────────────────────────
+
+    #[test]
+    #[cfg(feature = "host-runner")]
+    fn host_runner_works_with_matrix() {
+        use crate::HostContractRunner;
+        use crate::runner::ContractRunner;
+
+        // Create a host runner with mock authorizations enabled
+        let mut host_runner = HostContractRunner::new();
+        let seed = seed(7);
+
+        // Adapt the host runner to work with the auth_matrix interface.
+        // The host runner doesn't natively support AuthMode switching, so for
+        // this test we run it once and verify the result works with the matrix.
+        let first_result = host_runner.run_seed(&seed).unwrap();
+
+        // Run the seed through the matrix using a mock runner that always
+        // returns the same signature (simulating consistent behavior across modes).
+        let report = run_matrix(&seed, |_, _| Ok(first_result.clone())).unwrap();
+
+        // Verify the matrix detected no mismatches when all modes produce the same signature
+        assert!(report.is_consistent());
+        assert_eq!(report.results.len(), 3);
+        
+        // Verify each mode got the expected result
+        for result in &report.results {
+            assert_eq!(result.signature, first_result);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "host-runner")]
+    fn host_runner_executes_multiple_seeds_with_matrix() {
+        use crate::HostContractRunner;
+        use crate::runner::ContractRunner;
+
+        let seeds = vec![seed(100), seed(101), seed(102)];
+        let mut host_runner = HostContractRunner::new();
+
+        // Execute each seed through the host runner and verify they all work with matrix
+        for test_seed in seeds {
+            let sig = host_runner.run_seed(&test_seed).unwrap();
+            
+            // Verify this signature works through the matrix
+            let report = run_matrix(&test_seed, |_, _| Ok(sig.clone())).unwrap();
+            assert!(report.is_consistent(), 
+                "Seed {} should produce consistent signature across modes", test_seed.id);
+            assert_eq!(report.seed.id, test_seed.id);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "host-runner")]
+    fn determinism_test_host_runner_produces_consistent_signatures() {
+        use crate::HostContractRunner;
+        use crate::runner::ContractRunner;
+
+        let seed = seed(200);
+        let mut runner1 = HostContractRunner::new();
+        let mut runner2 = HostContractRunner::new();
+
+        // Execute the same seed with two separate runner instances
+        let sig1 = runner1.run_seed(&seed).unwrap();
+        let sig2 = runner2.run_seed(&seed).unwrap();
+
+        // Both should produce identical signatures
+        assert_eq!(sig1.category, sig2.category);
+        assert_eq!(sig1.digest, sig2.digest);
+        assert_eq!(sig1.signature_hash, sig2.signature_hash);
+
+        // Verify they work correctly through the matrix
+        let sig1_clone = sig1.clone();
+        let report1 = run_matrix(&seed, |_, _| Ok(sig1_clone.clone())).unwrap();
+        
+        let sig2_clone = sig2.clone();
+        let report2 = run_matrix(&seed, |_, _| Ok(sig2_clone.clone())).unwrap();
+        
+        assert_eq!(report1.mismatches, report2.mismatches);
+    }
+
+    #[test]
+    #[cfg(feature = "host-runner")]
+    fn host_runner_with_mock_auths_disabled() {
+        use crate::HostContractRunner;
+        use crate::runner::ContractRunner;
+
+        // Create a runner with mock authorizations disabled
+        let mut runner_no_mock = HostContractRunner::with_mock_auths(false);
+        let seed = seed(201);
+
+        // Execute the seed and verify it produces a valid signature
+        let sig = runner_no_mock.run_seed(&seed).unwrap();
+        
+        // Verify the signature can be used with matrix without errors
+        let sig_clone = sig.clone();
+        let report = run_matrix(&seed, |_, _| Ok(sig_clone.clone())).unwrap();
+        assert!(report.is_consistent());
+    }
 }
+

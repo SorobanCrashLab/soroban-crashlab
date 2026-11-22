@@ -1,0 +1,80 @@
+services:
+  # Development server with hot module replacement
+  web:
+    container_name: crashlab-web
+    build:
+      context: ./apps/web
+      target: dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/app
+      - web_node_modules:/app/node_modules
+    env_file: .env
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+      - CRASHLAB_METRICS_SCRAPE_TOKEN=${CRASHLAB_METRICS_SCRAPE_TOKEN:-}
+    command: npm run dev
+    networks:
+      - crashlab-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const t=process.env.CRASHLAB_METRICS_SCRAPE_TOKEN; require('http').get({hostname:'localhost',port:3000,path:'/api/health/liveness',headers:t?{Authorization:'Bearer '+t}:{}},r=>process.exit(r.statusCode===200?0:1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Production-like build served via Next.js standalone server
+  web-prod:
+    container_name: crashlab-web-prod
+    build:
+      context: ./apps/web
+      target: runner
+    ports:
+      - "3001:3000"
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - CRASHLAB_METRICS_SCRAPE_TOKEN=${CRASHLAB_METRICS_SCRAPE_TOKEN:-}
+    restart: unless-stopped
+    profiles:
+      - prod
+    networks:
+      - crashlab-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const t=process.env.CRASHLAB_METRICS_SCRAPE_TOKEN; require('http').get({hostname:'localhost',port:3000,path:'/api/health/liveness',headers:t?{Authorization:'Bearer '+t}:{}},r=>process.exit(r.statusCode===200?0:1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Rust fuzzing engine (requires --profile core to start)
+  core:
+    container_name: crashlab-core
+    build:
+      context: ./contracts/crashlab-core
+    restart: unless-stopped
+    profiles:
+      - core
+    networks:
+      - crashlab-net
+
+networks:
+  crashlab-net:
+    driver: bridge
+
+volumes:
+  web_node_modules:

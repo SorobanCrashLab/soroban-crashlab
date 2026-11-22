@@ -1,0 +1,343 @@
+# Reference self-hosted deployment (#1896).
+# Guide: docs/self-hosting/reference-deployment.md
+#
+#   cd deploy/compose
+#   cp .env.example .env && chmod 600 .env       # then edit
+#   ./generate-secrets.sh                         # secrets/ (0700), never committed
+#   docker compose up -d
+#
+# Topology: Caddy (TLS) → web → kv-rest (Upstash REST protocol) → Redis,
+# web → objects (S3 API). Only Caddy publishes ports. Every long-running
+# service runs as a non-root user with all capabilities dropped, a read-only
+# root filesystem where the software allows it, a healthcheck, a restart
+# policy and resource limits.
+
+name: crashlab
+
+x-hardening: &hardening
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  # One-shot: give the non-root services ownership of their volumes (named
+  # volumes start out root-owned, and some images ship root-owned dirs inside
+  # them). Exits before anything else starts.
+  init-volumes:
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        chown -R 1000:1000 /v/caddy-data /v/caddy-config /v/objects &&
+        chown -R 1001:1001 /v/app &&
+        chown -R 65534:65534 /v/prometheus &&
+        chown -R 999:1000 /v/backups &&
+        chmod 0750 /v/backups
+    cap_drop: [ALL]
+    # DAC_READ_SEARCH: traverse 0700 dirs the services created on earlier runs.
+    cap_add: [CHOWN, FOWNER, DAC_READ_SEARCH]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    network_mode: none
+    volumes:
+      - caddy-data:/v/caddy-data
+      - caddy-config:/v/caddy-config
+      - objects-data:/v/objects
+      - app-data:/v/app
+      - prometheus-data:/v/prometheus
+      - backups:/v/backups
+
+  caddy:
+    <<: *hardening
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    user: "1000:1000"
+    # The binary carries cap_net_bind_service as a file capability, so a
+    # non-root Caddy can still bind :80/:443.
+    cap_add: [NET_BIND_SERVICE]
+    # no-new-privileges would stop exec from honouring that file capability.
+    security_opt: []
+    ports:
+      - "${CRASHLAB_HTTP_PORT:-80}:80"
+      - "${CRASHLAB_HTTPS_PORT:-443}:443"
+      - "${CRASHLAB_HTTPS_PORT:-443}:443/udp"
+    environment:
+      CRASHLAB_DOMAIN: ${CRASHLAB_DOMAIN:?set CRASHLAB_DOMAIN in .env}
+      CRASHLAB_TLS_MODE: ${CRASHLAB_TLS_MODE:-auto}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CRASHLAB_TLS_CERT_DIR:-./certs}:/certs:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    tmpfs: ["/tmp"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      init-volumes: { condition: service_completed_successfully }
+      web: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 256M }
+    networks: [edge]
+
+  web:
+    <<: *hardening
+    # Pin a released, signed image and verify it first (see the guide:
+    # "Verify the image"). `build` is the fallback for local evaluation.
+    image: ${CRASHLAB_WEB_IMAGE:-crashlab-web:local}
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      target: runner
+    user: "1001:1001"
+    entrypoint: ["/bin/sh", "/opt/crashlab/load-secrets.sh"]
+    command: ["node", "server.js"]
+    env_file:
+      - path: ${CRASHLAB_ENV_FILE:-.env}
+        required: true
+    environment:
+      NODE_ENV: production
+      KV_REST_API_URL: http://kv-rest:80
+      CRASHLAB_STORAGE_DRIVER: s3
+      CRASHLAB_S3_ENDPOINT: http://objects:8333
+      CRASHLAB_S3_REGION: us-east-1
+      CRASHLAB_S3_BUCKET: ${CRASHLAB_S3_BUCKET:-crashlab-artifacts}
+      CRASHLAB_ARTIFACT_DIR: /data/artifacts
+      SQLITE_PATH: /data/db/crashlab.db
+      PROMETHEUS_ENDPOINT: http://prometheus:9090
+    secrets:
+      - KV_REST_API_TOKEN
+      - CRASHLAB_S3_ACCESS_KEY_ID
+      - CRASHLAB_S3_SECRET_ACCESS_KEY
+      - CRASHLAB_METRICS_SCRAPE_TOKEN
+      - CRASHLAB_GITHUB_SESSION_SECRET
+      - CRASHLAB_WEBHOOK_API_KEY
+      - CRASHLAB_CRON_SECRET
+      - SECRETS_MASTER_KEY
+    volumes:
+      - ./load-secrets.sh:/opt/crashlab/load-secrets.sh:ro
+      - app-data:/data
+    tmpfs:
+      - /tmp
+      - /app/apps/web/.next/cache:uid=1001,gid=1001
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/api/health/liveness',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      init-volumes: { condition: service_completed_successfully }
+      kv-rest: { condition: service_healthy }
+      objects: { condition: service_healthy }
+      prometheus: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "1.00", memory: 1G }
+    networks: [edge, backend]
+
+  redis:
+    <<: *hardening
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    user: "999:1000"
+    # The password goes into a tmpfs include file, not onto the command line.
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        printf 'requirepass "%s"\n' "$$(cat /run/secrets/REDIS_PASSWORD)" > /run/redis/auth.conf &&
+        exec redis-server /usr/local/etc/redis/redis.conf
+    secrets: [REDIS_PASSWORD]
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis-data:/data
+    tmpfs: ["/run/redis:uid=999,gid=1000,mode=0700"]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/REDIS_PASSWORD)\" redis-cli ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 512M }
+    networks: [backend]
+
+  # Upstash REST protocol in front of Redis — the web app's KV client
+  # (@upstash/redis) speaks REST, not RESP.
+  kv-rest:
+    <<: *hardening
+    image: hiett/serverless-redis-http:latest@sha256:5b0bb9239fce53abf87b2018a7a0deb9ec7bd900c5360738fe5fbeeb426f9150
+    user: "65534:65534"
+    read_only: false # the Erlang release writes runtime files next to itself
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        export SRH_MODE=env SRH_TOKEN="$$(cat /run/secrets/KV_REST_API_TOKEN)"
+        SRH_CONNECTION_STRING="redis://:$$(cat /run/secrets/REDIS_PASSWORD)@redis:6379" &&
+        exec _build/prod/rel/prod/bin/prod start
+    secrets: [KV_REST_API_TOKEN, REDIS_PASSWORD]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - --header \"Authorization: Bearer $$(cat /run/secrets/KV_REST_API_TOKEN)\" --header 'Content-Type: application/json' --post-data '[\"PING\"]' http://127.0.0.1:80/ | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      redis: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 256M }
+    networks: [backend]
+
+  # S3-compatible object storage. SeaweedFS stands in for MinIO, whose
+  # community images are no longer published; any S3 endpoint works.
+  objects:
+    <<: *hardening
+    image: chrislusf/seaweedfs:3.85@sha256:49312939c00c01e5ee6afbd7d728b18027821d3764c35a797a72acd4fdf3296a
+    user: "1000:1000"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        printf '{"identities":[{"name":"crashlab","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}'
+        "$$(cat /run/secrets/CRASHLAB_S3_ACCESS_KEY_ID)" "$$(cat /run/secrets/CRASHLAB_S3_SECRET_ACCESS_KEY)" > /run/seaweed/s3.json &&
+        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/run/seaweed/s3.json -master.volumeSizeLimitMB=1024 -volume.max=0
+    secrets: [CRASHLAB_S3_ACCESS_KEY_ID, CRASHLAB_S3_SECRET_ACCESS_KEY]
+    volumes:
+      - objects-data:/data
+    tmpfs: ["/run/seaweed:uid=1000,gid=1000,mode=0700", "/tmp"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      init-volumes: { condition: service_completed_successfully }
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 512M }
+    networks: [backend]
+
+  # Monitoring hookup: the web app's /api/health checks Prometheus, and
+  # prometheus.yml is where scrape jobs for the app (W5-I02) are added.
+  # Internal network only; reach it with an SSH tunnel or your own proxy.
+  prometheus:
+    <<: *hardening
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      init-volumes: { condition: service_completed_successfully }
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 512M }
+    networks: [backend]
+
+  # Scheduled backup + verification (deploy/backup/compose-backup.sh).
+  backup:
+    <<: *hardening
+    build:
+      context: ../backup
+      dockerfile: Dockerfile.compose
+    image: crashlab-backup:local
+    user: "999:1000"
+    entrypoint: ["/bin/sh", "/opt/crashlab/load-secrets.sh"]
+    command: ["sh", "-c", "while :; do /opt/backup/compose-backup.sh || echo 'backup FAILED'; sleep \"$${BACKUP_INTERVAL_SECONDS}\"; done"]
+    environment:
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_TARGET: ${BACKUP_TARGET:-/backups/vault}
+      CRASHLAB_S3_BUCKET: ${CRASHLAB_S3_BUCKET:-crashlab-artifacts}
+    secrets:
+      - REDIS_PASSWORD
+      - CRASHLAB_S3_ACCESS_KEY_ID
+      - CRASHLAB_S3_SECRET_ACCESS_KEY
+      - BACKUP_ENCRYPTION_KEY
+    volumes:
+      - ./load-secrets.sh:/opt/crashlab/load-secrets.sh:ro
+      - ../backup:/opt/backup:ro
+      - app-data:/data/app:ro
+      - backups:/backups
+    tmpfs: ["/tmp:uid=999,gid=1000,mode=0700"]
+    healthcheck:
+      # Healthy while the last *verified* backup is younger than 1.5 intervals.
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(sed 's/.*\"finishedAt\":\\([0-9]*\\).*/\\1/' /backups/last-success.json) )) -lt $$(( BACKUP_INTERVAL_SECONDS * 3 / 2 ))"]
+      interval: 5m
+      timeout: 10s
+      retries: 1
+      start_period: 5m
+    depends_on:
+      redis: { condition: service_healthy }
+      objects: { condition: service_healthy }
+      init-volumes: { condition: service_completed_successfully }
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 256M }
+    networks: [backend]
+
+  # One-shot restore (profile `restore`); see deploy/backup/compose-restore.sh.
+  # Runs as root only to write files owned by the Redis and web users.
+  restore:
+    profiles: [restore]
+    image: crashlab-backup:local
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/opt/crashlab/load-secrets.sh", "/opt/backup/compose-restore.sh"]
+    environment:
+      BACKUP_TARGET: ${BACKUP_TARGET:-/backups/vault}
+      CRASHLAB_S3_BUCKET: ${CRASHLAB_S3_BUCKET:-crashlab-artifacts}
+    secrets: [CRASHLAB_S3_ACCESS_KEY_ID, CRASHLAB_S3_SECRET_ACCESS_KEY, BACKUP_ENCRYPTION_KEY]
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    security_opt: ["no-new-privileges:true"]
+    volumes:
+      - ./load-secrets.sh:/opt/crashlab/load-secrets.sh:ro
+      - ../backup:/opt/backup:ro
+      - redis-data:/restore/redis
+      - app-data:/restore/app
+      - backups:/backups:ro
+    tmpfs: ["/tmp"]
+    networks: [backend]
+
+networks:
+  edge: {}
+  backend:
+    internal: true
+
+volumes:
+  caddy-data: {}
+  caddy-config: {}
+  redis-data: {}
+  objects-data: {}
+  app-data: {}
+  prometheus-data: {}
+  backups: {}
+
+secrets:
+  KV_REST_API_TOKEN: { file: ./secrets/KV_REST_API_TOKEN }
+  REDIS_PASSWORD: { file: ./secrets/REDIS_PASSWORD }
+  CRASHLAB_S3_ACCESS_KEY_ID: { file: ./secrets/CRASHLAB_S3_ACCESS_KEY_ID }
+  CRASHLAB_S3_SECRET_ACCESS_KEY: { file: ./secrets/CRASHLAB_S3_SECRET_ACCESS_KEY }
+  CRASHLAB_METRICS_SCRAPE_TOKEN: { file: ./secrets/CRASHLAB_METRICS_SCRAPE_TOKEN }
+  CRASHLAB_GITHUB_SESSION_SECRET: { file: ./secrets/CRASHLAB_GITHUB_SESSION_SECRET }
+  CRASHLAB_WEBHOOK_API_KEY: { file: ./secrets/CRASHLAB_WEBHOOK_API_KEY }
+  CRASHLAB_CRON_SECRET: { file: ./secrets/CRASHLAB_CRON_SECRET }
+  SECRETS_MASTER_KEY: { file: ./secrets/SECRETS_MASTER_KEY }
+  BACKUP_ENCRYPTION_KEY: { file: ./secrets/BACKUP_ENCRYPTION_KEY }

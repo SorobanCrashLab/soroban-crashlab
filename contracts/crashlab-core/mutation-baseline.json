@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "tool": "cargo-mutants",
+  "generatedAt": "2026-10-17",
+  "criticalModules": [
+    "contracts/crashlab-core/src/taxonomy.rs",
+    "contracts/crashlab-core/src/fixture_classifier.rs",
+    "contracts/crashlab-core/src/signature_hash.rs",
+    "contracts/crashlab-core/src/replay.rs"
+  ],
+  "survivors": [],
+  "notes": [
+    "Bootstrap baseline: the first nightly cargo-mutants run populates `survivors`.",
+    "Until then the gate runs report-only and fails nothing (see docs/testing/mutation-testing.md).",
+    "A survivor is admitted here only with a one-line justification and a link to the tracking issue; prefer adding a test that kills it."
+  ]
+}

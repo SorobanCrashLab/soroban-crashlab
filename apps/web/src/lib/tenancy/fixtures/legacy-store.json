@@ -1,0 +1,9 @@
+{
+  "run:run-001": { "id": "run-001", "status": "completed" },
+  "run:run-002": { "id": "run-002", "status": "failed" },
+  "artifact:crash/seed-17.bin": { "id": "seed-17", "sizeBytes": 512 },
+  "settings:notifications": { "slack": true },
+  "rbac:role:github:octocat": { "role": "maintainer" },
+  "crashlab:audit-log:v1": [],
+  "org/org_default/project/prj_default/legacy/run%3Arun-000": { "id": "run-000", "status": "completed" }
+}

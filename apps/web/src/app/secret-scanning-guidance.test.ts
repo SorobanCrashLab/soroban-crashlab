@@ -29,7 +29,6 @@ const runAssertions = () => {
   const contributing = readRepoFile(repoRoot, 'CONTRIBUTING.md');
   const playbook = readRepoFile(repoRoot, 'MAINTAINER_WAVE_PLAYBOOK.md');
   const readme = readRepoFile(repoRoot, 'README.md');
-  const prDescription = readRepoFile(repoRoot, 'PR_DESCRIPTION.md');
 
   assert.match(security, /## Pre-Commit Secret Scanning Expectations/);
   assert.match(security, /gitleaks/i);
@@ -52,12 +51,6 @@ const runAssertions = () => {
 
   assert.match(readme, /\.github\/SECURITY\.md/);
   assert.match(readme, /secret scanning/i);
-
-  assert.match(prDescription, /Closes #/);
-  assert.match(prDescription, /rg -n "TODO\|TBD"/);
-  assert.match(prDescription, /npm run test:policy/);
-  assert.match(prDescription, /gitleaks|trufflehog/i);
-  assert.match(prDescription, /rotate|revoke/i);
 
   assert.doesNotMatch(
     `${readme}\n${security}\n${contributing}\n${playbook}`,

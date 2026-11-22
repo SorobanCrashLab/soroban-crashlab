@@ -361,7 +361,7 @@ function parseRule(rawRule: unknown): AlertRule | null {
     cooldown,
     tags,
     createdAt,
-    lastTriggered,
+    lastTriggered: lastTriggered as string | undefined,
   };
 }
 
@@ -401,7 +401,7 @@ function parseChannel(rawChannel: unknown): NotificationChannel | null {
     enabled,
     config: Object.fromEntries(
       entries.map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
-    ),
+    ) as Record<string, string | number | boolean | string[]>,
   };
 }
 
@@ -635,6 +635,57 @@ export function formatRelativeTime(
   }
 
   return "Recently";
+}
+
+export type DryRunStatus = 'idle' | 'running' | 'done';
+
+export interface DryRunEvaluation {
+  ruleId: string;
+  ruleName: string;
+  outcome: 'would-trigger' | 'no-match' | 'cooldown-blocked';
+  matchedCondition: AlertCondition;
+  matchedValue: number;
+  threshold: number;
+  unit: string;
+  channels: AlertChannel[];
+  detail: string;
+  severity: AlertSeverity;
+  category: AlertCategory;
+}
+
+export function classifyDryRunResults(
+  results: DryRunEvaluation[],
+): {
+  triggers: DryRunEvaluation[];
+  blocked: DryRunEvaluation[];
+  noMatch: DryRunEvaluation[];
+} {
+  const triggers: DryRunEvaluation[] = [];
+  const blocked: DryRunEvaluation[] = [];
+  const noMatch: DryRunEvaluation[] = [];
+
+  for (const result of results) {
+    if (result.outcome === 'would-trigger') triggers.push(result);
+    else if (result.outcome === 'cooldown-blocked') blocked.push(result);
+    else noMatch.push(result);
+  }
+
+  return { triggers, blocked, noMatch };
+}
+
+export function buildDryRunSummary(results: DryRunEvaluation[]): {
+  totalRules: number;
+  wouldTrigger: number;
+  blocked: number;
+  noMatch: number;
+} {
+  const { triggers, blocked, noMatch } = classifyDryRunResults(results);
+  return {
+    totalRules: results.length,
+    wouldTrigger: triggers.length,
+    blocked: blocked.length,
+    noMatch: noMatch.length,
+  };
 }
 
 export function getNextAlertingTab(

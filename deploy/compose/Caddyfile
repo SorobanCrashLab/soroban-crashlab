@@ -1,0 +1,48 @@
+# TLS edge for the reference deployment (#1896).
+#
+# CRASHLAB_TLS_MODE selects how certificates are obtained:
+#   auto     — public ACME (Let's Encrypt / ZeroSSL); needs a public DNS name
+#              pointing here and ports 80/443 reachable. Default.
+#   internal — Caddy's local CA; for LAN/evaluation (clients must trust it).
+#   files    — your own cert/key mounted at /certs/cert.pem and /certs/key.pem.
+{
+	admin 127.0.0.1:2019
+}
+
+(tls-auto) {
+}
+
+(tls-internal) {
+	tls internal
+}
+
+(tls-files) {
+	tls /certs/cert.pem /certs/key.pem
+}
+
+{$CRASHLAB_DOMAIN} {
+	import tls-{$CRASHLAB_TLS_MODE}
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Metrics are for the scraper on the internal network, not the internet.
+	@metrics path /api/health/metrics
+	respond @metrics 404
+
+	reverse_proxy web:3000 {
+		health_uri /api/health/liveness
+		health_interval 30s
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

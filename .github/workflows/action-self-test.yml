@@ -1,0 +1,83 @@
+name: Action Self-Test
+
+# Dogfoods the distributable regression action (#1863): the repository consumes
+# its own `action/` on a tiny fixture set, plus the dependency-free unit tests
+# for the classifier and the checksum verifier. No monorepo CI changes.
+on:
+  pull_request:
+    paths:
+      - 'action/**'
+      - 'contracts/crashlab-core/**'
+      - '.github/workflows/action-self-test.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'action/**'
+      - '.github/workflows/action-self-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  self-test:
+    name: Action self-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # 1.97.1
+        with:
+          toolchain: 1.97.1
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: contracts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Classifier unit tests
+        run: node --test action/tests/classify.test.mjs
+
+      - name: Checksum verifier self-test
+        run: bash action/tests/checksum.test.sh
+
+      # Green path: the only fixture is a known failure, so fail-on
+      # new-signatures must not block.
+      - name: Dogfood action (expected green)
+        id: green
+        uses: ./action
+        with:
+          build-from-source: 'true'
+          fixtures: action/tests/fixtures.suite.json
+          baseline: action/tests/baseline.json
+          fail-on: new-signatures
+
+      - name: Assert green gate
+        run: |
+          test "${{ steps.green.outputs.new-signatures }}" = "0"
+          test "${{ steps.green.outputs.blocking }}" = "0"
+
+      # Red path: a seed absent from the baseline must block, proving the
+      # action fails the build on a new signature.
+      - name: Dogfood action (expected new signature)
+        id: red
+        continue-on-error: true
+        uses: ./action
+        with:
+          build-from-source: 'true'
+          fixtures: action/tests/new-signature.suite.json
+          baseline: action/tests/baseline.json
+          fail-on: new-signatures
+
+      - name: Assert the new signature blocked
+        run: |
+          test "${{ steps.red.outcome }}" = "failure"
+          test "${{ steps.red.outputs.new-signatures }}" = "1"

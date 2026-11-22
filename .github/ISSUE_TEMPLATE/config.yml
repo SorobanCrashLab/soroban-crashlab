@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/SorobanCrashLab/soroban-crashlab/security/advisories/new
+    about: Report privately — never in a public issue. Policy and response times are in SECURITY.md.
   - name: Maintainer playbook
     url: https://github.com/SorobanCrashLab/soroban-crashlab/blob/main/MAINTAINER_WAVE_PLAYBOOK.md
     about: Read maintainership and review policy before filing advanced issues.

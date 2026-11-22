@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "knownFailures": [
+    {
+      "fixture": "seed-7-invoker",
+      "signature": "empty-input",
+      "reason": "fixtures/regression_suite.json expects `auth` for the empty payload but the classifier reports `empty-input`; failing on main before the regression summary existed."
+    }
+  ]
+}

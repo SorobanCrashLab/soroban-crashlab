@@ -19,19 +19,19 @@ git --version
 If the command is missing, install Git from your operating system package
 manager or from git-scm.com before continuing.
 
-### 2. Install Node.js and npm
+### 2. Install Node.js and pnpm
 
-The frontend in `apps/web` targets Node.js 22+ and npm 10+.
+The frontend in `apps/web` targets Node.js 22+ and pnpm 10+.
 
 Verify your versions:
 
 ```bash
 node -v
-npm -v
+pnpm -v
 ```
 
-If either command is missing, install Node.js 22 LTS. The bundled npm
-version that ships with Node.js 22 is supported.
+If either command is missing, install Node.js 22 LTS and enable pnpm with
+`corepack enable` before continuing.
 
 ### 3. Install Rust and Cargo
 
@@ -65,30 +65,29 @@ as described in [`MAINTAINER_WAVE_PLAYBOOK.md`](MAINTAINER_WAVE_PLAYBOOK.md).
 
 ### 5. Install frontend dependencies
 
+From the repo root, install the workspace once:
+
 ```bash
-cd apps/web
-npm ci
+pnpm install --frozen-lockfile
 ```
 
-Use `npm install` later only when you intentionally need to update
-dependencies or the lockfile.
+Use `pnpm add` or `pnpm install` later only when you intentionally need to
+update dependencies or the lockfile.
 
 ### 6. Run web verification
 
 Use the same checks referenced by the maintainer playbook:
 
 ```bash
-cd apps/web
-npm run test
-npm run lint
-npm run build
+pnpm --dir apps/web run test
+pnpm --dir apps/web run lint
+pnpm --dir apps/web run build
 ```
 
 To start the local dashboard after the checks pass:
 
 ```bash
-cd apps/web
-npm run dev
+pnpm --dir apps/web run dev
 ```
 
 ### 7. Run core tests
@@ -98,12 +97,54 @@ cd contracts/crashlab-core
 cargo test --all-targets
 ```
 
-### 8. Expected first-run result
+### 8. Docker-based setup (alternative)
+
+If you prefer a containerized environment (no local Node.js or Rust
+installed):
+
+```bash
+# 1. Copy the Docker environment template
+cp .env.docker.example .env
+
+# 2. Start the development server
+docker compose up web
+
+# 3. Open http://localhost:3000
+
+# To also run the fuzzing engine:
+docker compose --profile core up
+
+# To run the production-like build:
+docker compose --profile prod up web-prod
+
+# To stop:
+docker compose down
+```
+
+**Troubleshooting Docker:**
+
+- **Port conflict (3000 already in use):** Change the host port in
+  `docker-compose.yml` (e.g. `"3000:3000"` → `"3001:3000"`).
+
+- **Hot reload not working:** Ensure `WATCHPACK_POLLING=true` is set in
+  your `.env` file. This enables file polling inside the container.
+
+- **Permission errors on mounted volumes:** On Linux, ensure your user
+  has read/write access to `apps/web/`. On macOS and Windows this is
+  handled automatically by Docker Desktop.
+
+- **Node_modules conflicts:** If the container's `node_modules` differs
+  from your host's, rebuild with:
+  ```bash
+  docker compose down -v && docker compose up web
+  ```
+
+### 9. Expected first-run result
 
 On a clean machine, a successful setup looks like this:
 
-- `npm ci` completes without dependency errors
-- `npm run lint` and `npm run build` both pass in `apps/web`
+- `pnpm install --frozen-lockfile` completes without dependency errors
+- `pnpm --dir apps/web run lint` and `pnpm --dir apps/web run build` both pass
 - `cargo test --all-targets` passes in `contracts/crashlab-core`
 
 If one of those steps fails, include the failing command and its output in
@@ -130,10 +171,9 @@ which npm
 - Fix: switch your shell back to Node.js 22+, then reinstall and rerun the web checks:
 
 ```bash
-cd apps/web
-npm ci
-npm run lint
-npm run build
+pnpm install --frozen-lockfile
+pnpm --dir apps/web run lint
+pnpm --dir apps/web run build
 ```
 
 ### Web checks fail with `next: command not found` or `eslint: command not found`
@@ -142,11 +182,10 @@ npm run build
 - Run:
 
 ```bash
-cd apps/web
-rm -rf node_modules
-npm ci
-npm run lint
-npm run build
+rm -rf node_modules apps/web/node_modules
+pnpm install --frozen-lockfile
+pnpm --dir apps/web run lint
+pnpm --dir apps/web run build
 ```
 
 - Fix: if `npm ci` still fails, paste the full install error into your issue or PR instead of only the final `next` or `eslint` message.
@@ -241,16 +280,58 @@ cargo -V
 
 Also paste the exact failing command and the first relevant error block.
 
-## Branch and PR flow
+## Branch naming
 
-1. Create a branch from `main` named `feat/<short-name>` or `fix/<short-name>`.
-2. Keep PRs focused on one issue.
-3. Link the issue in the PR description using `Closes #<number>`.
-4. Include test evidence and reproduction notes for behavior changes.
-5. If your change alters a public API, persisted schema, CLI contract, or
-   documented maintainer workflow, call that out clearly in the PR so the next
-   release maintainer can update [`CHANGELOG.md`](CHANGELOG.md) and run the
-   compatibility review in [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
+Create branches from `main` using the convention `issue/<number>-<kebab-case-description>`.
+
+```bash
+git checkout -b issue/137-contributing-md
+```
+
+## Pull Request process
+
+1. **One issue per PR.** Keep scope limited to the files listed in the issue to avoid merge conflicts.
+2. **PR title format.** Use [Conventional Commits](https://www.conventionalcommits.org/):
+   ```
+   type(area): short summary (ROADMAP-NNN)
+   ```
+   Examples:
+   ```
+   docs(root): add CONTRIBUTING.md with PR policy (ROADMAP-137)
+   feat(web): add run cancellation button (ROADMAP-142)
+   fix(core): handle timeout edge case in replay (ROADMAP-138)
+   ```
+3. **Link the issue.** Include `Closes #<issue_number>` in the PR body.
+4. **Test evidence.** Include output from relevant verification commands and reproduction notes for behavior changes.
+5. **API / schema / CLI changes.** If your change alters a public API, persisted schema, CLI contract, or documented maintainer workflow, call that out clearly in the PR so the next release maintainer can update [`CHANGELOG.md`](CHANGELOG.md) and run the compatibility review in [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
+
+## Labels and triage lifecycle
+
+Maintainers apply a small, authoritative label set during triage; contributors
+do not need to apply labels themselves. The labels the automation depends on are
+`wave4`, exactly one `complexity:*` (`complexity:trivial` /
+`complexity:medium` / `complexity:high`), and at least one `area:*`. The
+reserved labels `pinned`, `security`, `backlog`, and `dependencies` must keep
+their exact names because the stale workflow exempts on them.
+
+See [`docs/LABEL_TAXONOMY.md`](docs/LABEL_TAXONOMY.md) for the full taxonomy
+(purpose + owner of each prefix), the deprecated labels being retired and their
+canonical replacements, and the end-to-end issue/PR lifecycle with SLA timers.
+
+## Lockfile policy
+
+Do not commit changes to `pnpm-lock.yaml` or `package-lock.json`. If your
+change requires a dependency update, open a separate PR that only touches the
+lockfile.
+
+## package.json changes
+
+If your PR modifies `package.json`, add a **Maintainer approval** section in the
+PR body describing why the change is needed. Examples of valid reasons:
+
+- Adding a new dependency required by the feature
+- Updating a dependency to fix a security vulnerability
+- Changing a script for the build or dev workflow
 
 ## Conflict of interest disclosures
 
@@ -266,6 +347,16 @@ If you know that an issue assignment, PR review, merge, security triage, or reso
 - no dead code or placeholder logic in merged PRs
 - tests cover the introduced behavior
 - docs are updated when user-facing behavior changes
+- **Architecture changes** (data mode, runners, storage drivers, campaign/replay flow, or system boundaries) update [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+
+### Review checklist (architecture)
+
+When a PR changes how systems fit together:
+
+- [ ] [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) diagram / decision tree / runner matrix / lifecycle section updated
+- [ ] Known gaps remain marked honestly (with issue links when available)
+- [ ] [`docs/ENV.md`](docs/ENV.md) updated if new env vars were introduced (`node scripts/audit-env.mjs` green)
+- [ ] [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) updated if deploy paths or gating changed
 
 ## Security Guidance for Contributors
 When adding new fuzz input handling:

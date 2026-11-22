@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "knownFailures": [
+    {
+      "fixture": "seed-7-invoker",
+      "signature": "empty-input",
+      "reason": "Tiny dogfood suite for the composite action self-test (#1863)."
+    }
+  ]
+}

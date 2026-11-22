@@ -1,1316 +1,524 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import RunHistoryTable from "./implement-run-history-table-component";
-import RunHistoryTableSkeleton from "./RunHistoryTableSkeleton";
-import Pagination from "./Pagination";
-import CrashDetailDrawer from "./CrashDetailDrawer";
-import { FuzzingRun, RunStatus, RunArea, RunSeverity } from "./types";
-import ReportModal from "./ReportModal";
-import { generateMarkdownReport } from "./report-utils";
-import CreateRunHeatmapPage55 from "./create-run-heatmap-page-55";
-import AddRunComparisonCharts from "./add-run-comparison-charts";
-import AddTaggingAndLabelsUi from "./add-tagging-and-labels-ui";
-import AlertingSettingsPage54 from "./implement-alerting-settings-page-54";
-import AlertingSettingsPage from "./create-alerting-settings-page-page";
-import CrossRunBoardWidgets from "./implement-cross-run-board-widgets-component";
-import CrossRunBoardCustomWidgets from "./create-cross-run-board-custom-widgets-63";
-import RunClusterVisualization from "./add-run-cluster-visualization";
-import RunClusterOverview from "./add-run-cluster-overview";
-import ImplementRunWorkflowBoardPage58 from "./implement-run-workflow-board-page-58";
-import FailureClusterView from "./FailureClusterView";
-import MaintainerToggle from "./MaintainerToggle";
-import { useMaintainerMode } from "./useMaintainerMode";
-import AlertPresets from "./AlertPresets";
-import CreateReportingTemplatesPage60 from "./create-reporting-templates-page-60";
-import TimelineScrubber from "./implement-timeline-scrubber-component-component";
-import ColumnCustomization, { ColumnId } from "./add-column-customization";
-import CampaignMilestoneTimeline from "./campaign-milestone-timeline-55";
-import VirtualizedRunTable from "./implement-virtualized-run-table-component";
-import ReportingTemplatesManager from "./add-reporting-templates-manager";
-import AutomatedRegressionDeployIntegration from "./integrate-automated-regression-deploy-integration";
-import IntegrationTestHarnessForUIFlows from "./integrate-integration-test-harness-for-ui-flows";
-import ReportGenerator from "./add-report-generator";
-import WidgetLayoutEditor from "./implement-widget-layout-editor-component";
-import AddRunStatusTimeline from "./add-run-status-timeline";
-import AddExportRunJson from "./add-export-run-json";
-import AddExportRunCsv from "./add-export-run-csv";
-import IntegrateWebhookManagerForRunEvents from "./integrate-webhook-manager-for-run-events";
-import MetricsExportToPrometheus from "./integrate-metrics-export-to-prometheus";
-import LogViewer from "./implement-log-viewer-component";
-import AddAccessibleKeyboardNavBlueprint from "./add-accessible-keyboard-nav-blueprint";
-import ArtifactExplorer from "./add-artifact-explorer";
-import RunSeverityFilter from "./add-run-filtering-by-severity";
-import AddRunTimeline from "./add-run-timeline";
-import OnboardingChecklistModal from "./implement-onboarding-checklist-modal-component";
-import FailureClassificationTaxonomy from "./add-failure-classification-taxonomy";
-import AddAFuzzyQueryBuilderPage51 from "./add-a-fuzzy-query-builder-page-51";
-import AddResponsiveLayoutImprovements from "./add-responsive-layout-improvements";
-import AddKeyboardNavigationHelp from "./add-keyboard-navigation-help";
-import AddRunAnnotations from "./add-run-annotations";
-import AddRunReplayUi from "./add-run-replay-ui";
-import NotificationCenter from "./add-notification-center-ui";
-import BulkActionsForRuns, { BulkAction } from "./add-bulk-actions-for-runs";
-import AddDownloadableRunArtifactBundle from "./add-downloadable-run-artifact-bundle";
-import CampaignConfigForm from "./CampaignConfigForm";
-import ContributorSLATargets from "./ContributorSLATargets";
-import { CampaignConfig } from "./types";
-import ResourceFeeInsightPanel from "./implement-resource-fee-insight-panel-component";
-import AdvancedDashboardFilters, { DashboardFilters } from "./create-advanced-dashboard-filters-page";
+import dynamic from "next/dynamic";
+import { LogoMark } from "../components/Logo";
+import { ScrollReveal } from "../components/scroll-effects/ScrollReveal";
+import { ScrollBeam, BeamChild } from "../components/scroll-effects/ScrollBeam";
 
-// Mock data for demonstration
-const MOCK_RUNS: FuzzingRun[] = Array.from({ length: 25 }, (_, i) => ({
-  id: `run-${1000 + i}`,
-  status: ["completed", "failed", "running", "cancelled"][i % 4] as RunStatus,
-  area: ["auth", "state", "budget", "xdr"][i % 4] as RunArea,
-  severity: ["low", "medium", "high", "critical"][i % 4] as RunSeverity,
-  duration: 120000 + Math.random() * 3600000, // 2m to 1h
-  seedCount: Math.floor(10000 + Math.random() * 90000),
-  cpuInstructions: Math.floor(400000 + Math.random() * 900000),
-  memoryBytes: Math.floor(1_500_000 + Math.random() * 8_000_000),
-  minResourceFee: Math.floor(500 + Math.random() * 5000),
-  crashDetail:
-    i % 4 === 1
-      ? {
-          failureCategory: i % 8 === 1 ? "Panic" : "InvariantViolation",
-          signature: `sig:${1000 + i}:contract::transfer:assert_balance_nonnegative`,
-          payload: JSON.stringify(
-            {
-              contract: "token",
-              method: "transfer",
-              args: {
-                from: "GABCD...1234",
-                to: "GXYZ...7890",
-                amount: 999999999,
-              },
-            },
-            null,
-            2,
-          ),
-          replayAction: `cargo run --bin crash-replay -- --run-id run-${1000 + i}`,
-        }
-      : null,
-})).reverse();
+const SandboxDemo = dynamic(() => import("../features/landing/SandboxDemo"), { ssr: false });
 
-const ITEMS_PER_PAGE = 10;
-const CPU_WARNING = 900_000;
-const MEMORY_WARNING = 7_000_000;
-const FEE_WARNING = 3_000;
-const STATUS_OPTIONS: Array<"all" | RunStatus> = [
-  "all",
-  "running",
-  "completed",
-  "failed",
-  "cancelled",
+const STEPS = [
+  {
+    number: "01",
+    title: "Point it at your contract",
+    body: "Drop in a WASM file or paste a Stellar contract ID. CrashLab reads the exported functions and figures out what to break. No config needed to get started.",
+    accent: "var(--text-primary)",
+  },
+  {
+    number: "02",
+    title: "Set up the fuzz campaign",
+    body: "Pick which functions to stress, set mutation depth, resource limits, and how long to run. Or just hit start and let it figure things out on its own.",
+    accent: "var(--text-primary)",
+  },
+  {
+    number: "03",
+    title: "It mutates, executes, watches",
+    body: "The fuzzer generates thousands of mutated inputs, sends them to your contract on a local or testnet Stellar node, and watches for panics, out of bounds reads, and resource overflows.",
+    accent: "var(--text-primary)",
+  },
+  {
+    number: "04",
+    title: "Triage what broke",
+    body: "Crashes cluster by signature. The board groups identical failures together, shows the exact call sequence that triggered each one, and links to the ledger changes.",
+    accent: "var(--text-secondary)",
+  },
+  {
+    number: "05",
+    title: "Ship the fix with proof",
+    body: "Export a reproduction snippet, open a GitHub issue straight from the dashboard, or feed the failure into CI. Every crash comes with a replayable proof.",
+    accent: "var(--text-secondary)",
+  },
 ];
-const ONBOARDING_SEEN_STORAGE_KEY = "crashlab:onboarding-checklist-seen:v1";
-const ONBOARDING_DISMISSED_STORAGE_KEY =
-  "crashlab:onboarding-checklist-dismissed:v1";
 
-const formatBytes = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
+const FEATURES = [
+  {
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 0 .659 1.591L19 14.5m-4.25-11.396c.251.023.501.05.75.082M12 21a8.966 8.966 0 0 0 5.982-2.275M12 21a8.966 8.966 0 0 1-5.982-2.275M12 21c1.351 0 2.639-.15 3.862-.425m-7.724 0A8.966 8.966 0 0 1 6.018 18.725M12 3c-1.351 0-2.639.15-3.862.425m7.724 0A8.966 8.966 0 0 0 17.982 5.275" />
+      </svg>
+    ),
+    title: "Mutation fuzzing",
+    body: "No manual test writing. The fuzzer generates thousands of broken inputs on its own and finds the edge cases you never thought to test.",
+  },
+  {
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" />
+      </svg>
+    ),
+    title: "Failure clustering",
+    body: "Identical crashes group by signature. Instead of staring at five hundred failures, you see twelve distinct bugs. Triage in minutes, not days.",
+  },
+  {
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+      </svg>
+    ),
+    title: "Replay and reproduce",
+    body: "Every crash ships with a deterministic call sequence. Replay it on your machine, feed it into CI, and prove the fix actually works.",
+  },
+  {
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+      </svg>
+    ),
+    title: "Analytics and heatmaps",
+    body: "Performance heatmaps, crash trend timelines, and anomaly detection give you the full picture at a glance. Spot patterns before they become incidents.",
+  },
+  {
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9.75 16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" />
+      </svg>
+    ),
+    title: "CI and CD integration",
+    body: "GitHub Actions, webhooks, and API tokens let you wire CrashLab into your deployment pipeline. Break the build before the bug ships to production.",
+  },
+  {
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+      </svg>
+    ),
+    title: "Built for Soroban",
+    body: "Not a generic fuzzer with Soroban bolted on. Built from the ground up for Stellar's Soroban VM. Understands resource fees, auth trees, and contract storage.",
+  },
+];
 
-const formatFee = (fee: number): string => `${fee.toLocaleString()} stroops`;
-
-const isExpensiveRun = (run: FuzzingRun): boolean =>
-  run.cpuInstructions >= CPU_WARNING ||
-  run.memoryBytes >= MEMORY_WARNING ||
-  run.minResourceFee >= FEE_WARNING;
-
-const toStableQueryString = (params: URLSearchParams): string => {
-  const sorted = Array.from(params.entries()).sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
-  return new URLSearchParams(sorted).toString();
-};
-
-function HomeContent() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [runs, setRuns] = useState<FuzzingRun[]>([]);
-  const [dataState, setDataState] = useState<"loading" | "error" | "success">(
-    "loading",
-  );
-  const [fetchAttempt, setFetchAttempt] = useState(0);
-  const [selectedCardIndex, setSelectedCardIndex] = useState(0);
-  const [showDetailView, setShowDetailView] = useState(false);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
-    "idle",
-  );
-  const [reportRun, setReportRun] = useState<FuzzingRun | null>(null);
-  const [showOnboardingChecklist, setShowOnboardingChecklist] = useState(false);
-  const cardsContainerRef = useRef<HTMLDivElement>(null);
-  const {
-    isMaintainer,
-    toggle: toggleMaintainerMode,
-    mounted: maintainerMounted,
-  } = useMaintainerMode();
-  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>([
-    "id",
-    "status",
-    "duration",
-    "seedCount",
-    "report",
-  ]);
-  const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(new Set());
-  const [showCampaignConfig, setShowCampaignConfig] = useState(false);
-  const [dashboardFilters, setDashboardFilters] = useState<DashboardFilters>({
-    status: [],
-    area: [],
-    severity: [],
-    dateRange: { start: '', end: '' },
-    durationRange: { min: 0, max: 0 },
-    resourceFeeRange: { min: 0, max: 0 },
-    hasCrash: null,
-    searchTerm: '',
-  });
-
-  const handleToggleRunSelection = useCallback((runId: string) => {
-    setSelectedRunIds(prev => {
-      const next = new Set(prev);
-      if (next.has(runId)) {
-        next.delete(runId);
-      } else {
-        next.add(runId);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleToggleAllRunsSelection = useCallback((runIds: string[]) => {
-    setSelectedRunIds(prev => {
-      if (prev.size === runIds.length && runIds.every(id => prev.has(id))) {
-        return new Set();
-      }
-      return new Set(runIds);
-    });
-  }, []);
-
-  const handleBulkAction = useCallback((action: BulkAction, runIds: string[], data?: Record<string, unknown>) => {
-    console.log("Applying bulk action:", action, "on runs:", runIds, data);
-    // Dummy action handling for now, would typically trigger API calls
-    if (action === "delete") {
-       setRuns(prev => prev.filter(r => !runIds.includes(r.id)));
-       setSelectedRunIds(new Set());
-    } else if (action === "cancel") {
-       setRuns(prev => prev.map(r => runIds.includes(r.id) ? { ...r, status: "cancelled" } : r));
-    } else if (action === "retry") {
-       setRuns(prev => prev.map(r => runIds.includes(r.id) ? { ...r, status: "running" } : r));
-    }
-    // Clear selection after action in most cases unless it's a non-mutating action
-    if (["export"].includes(action)) return;
-    setSelectedRunIds(new Set());
-  }, []);
-
-  const selectedRuns = useMemo(() => {
-    return runs.filter((run) => selectedRunIds.has(run.id));
-  }, [runs, selectedRunIds]);
-
-  const selectedRunId = searchParams.get("run");
-  const statusFilter = STATUS_OPTIONS.includes(
-    (searchParams.get("status") ?? "all") as "all" | RunStatus,
-  )
-    ? ((searchParams.get("status") ?? "all") as "all" | RunStatus)
-    : "all";
-  const severityFilter = ["all", "low", "medium", "high", "critical"].includes(
-    searchParams.get("severity") ?? "all",
-  )
-    ? ((searchParams.get("severity") ?? "all") as "all" | RunSeverity)
-    : "all";
-  const expensiveOnly = searchParams.get("expensive") === "1";
-  const reportRunId = searchParams.get("report");
-  const pageParam = Number.parseInt(searchParams.get("page") ?? "1", 10);
-  const currentPage =
-    Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
-
-  const setQueryState = useCallback(
-    (updates: Record<string, string | null>) => {
-      const nextParams = new URLSearchParams(searchParams.toString());
-
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value === null || value === "") {
-          nextParams.delete(key);
-          return;
-        }
-        nextParams.set(key, value);
-      });
-
-      const query = toStableQueryString(nextParams);
-      const nextUrl = query ? `${pathname}?${query}` : pathname;
-      const currentQuery = toStableQueryString(
-        new URLSearchParams(searchParams.toString()),
-      );
-      const currentUrl = currentQuery
-        ? `${pathname}?${currentQuery}`
-        : pathname;
-      if (nextUrl !== currentUrl) {
-        router.replace(nextUrl, { scroll: false });
-      }
-    },
-    [pathname, router, searchParams],
-  );
-
-  const filteredRuns = useMemo(() => {
-    return runs.filter((run) => {
-      if (statusFilter !== "all" && run.status !== statusFilter) {
-        return false;
-      }
-      if (severityFilter !== "all" && run.severity !== severityFilter) {
-        return false;
-      }
-      if (expensiveOnly && !isExpensiveRun(run)) {
-        return false;
-      }
-      return true;
-    });
-  }, [runs, statusFilter, severityFilter, expensiveOnly]);
-  const stableQueryString = useMemo(
-    () => toStableQueryString(new URLSearchParams(searchParams.toString())),
-    [searchParams],
-  );
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const hasSeenOnboarding =
-          localStorage.getItem(ONBOARDING_SEEN_STORAGE_KEY) === "true";
-        const hasDismissedOnboarding =
-          localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY) === "true";
-
-        if (!hasSeenOnboarding && !hasDismissedOnboarding) {
-          localStorage.setItem(ONBOARDING_SEEN_STORAGE_KEY, "true");
-          setShowOnboardingChecklist(true);
-        }
-      } catch {
-        setShowOnboardingChecklist(true);
-      }
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredRuns.length / ITEMS_PER_PAGE),
-  );
-  const clampedPage = Math.min(currentPage, totalPages);
-  const startIndex = (clampedPage - 1) * ITEMS_PER_PAGE;
-  const paginatedRuns = filteredRuns.slice(
-    startIndex,
-    startIndex + ITEMS_PER_PAGE,
-  );
-  const expensiveRuns = paginatedRuns.filter(isExpensiveRun);
-  const selectedRun = selectedRunId
-    ? (runs.find((run) => run.id === selectedRunId) ?? null)
-    : null;
-  // Simulate async data fetch with loading and error states.
-  // In production this would be a real API call (e.g. fetch('/api/runs')).
-  // startTransition is used to batch the loading reset so it's treated as a
-  // non-urgent update, which avoids the react-hooks/set-state-in-effect lint rule.
-  useEffect(() => {
-    let cancelled = false;
-    // Mark the loading reset as a low-priority transition so React batches it
-    // together with any concurrent work, avoiding a synchronous setState in effect.
-    const ctrl = new AbortController();
-    const resetAndFetch = async () => {
-      setDataState("loading");
-      setRuns([]);
-      try {
-        // Simulate a network round-trip (800ms)
-        await new Promise<void>((resolve, reject) => {
-          const t = window.setTimeout(() => {
-            if (ctrl.signal.aborted) return;
-            // ~10% chance of simulated failure to exercise the error path.
-            if (Math.random() < 0.1)
-              reject(new Error("Simulated network error"));
-            else resolve();
-          }, 800);
-          ctrl.signal.addEventListener("abort", () => window.clearTimeout(t));
-        });
-        if (!cancelled) {
-          setRuns(MOCK_RUNS);
-          setDataState("success");
-        }
-      } catch {
-        if (!cancelled) setDataState("error");
-      }
-    };
-    // Schedule on next tick so the setState calls go through React's batching.
-    const t = window.setTimeout(() => {
-      void resetAndFetch();
-    }, 0);
-    return () => {
-      cancelled = true;
-      ctrl.abort();
-      window.clearTimeout(t);
-    };
-  }, [fetchAttempt]);
-
-  useEffect(() => {
-    if (selectedRunId && !selectedRun) {
-      setQueryState({ run: null });
-    }
-  }, [selectedRun, selectedRunId, setQueryState]);
-
-  useEffect(() => {
-    if (currentPage !== clampedPage) {
-      setQueryState({ page: clampedPage === 1 ? null : String(clampedPage) });
-    }
-  }, [clampedPage, currentPage, setQueryState]);
-
-  useEffect(() => {
-    if (reportRunId && !reportRun) {
-      const run = runs.find(r => r.id === reportRunId);
-      if (run) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setReportRun(run);
-      } else if (dataState === "success") {
-        // Clear param if run not found after data loaded
-        setQueryState({ report: null });
-      }
-    }
-  }, [reportRun, reportRunId, runs, dataState, setQueryState]);
-
-  const handleOpenRunDrawer = useCallback(
-    (runId: string) => setQueryState({ run: runId, report: null }),
-    [setQueryState],
-  );
-
-  const handleCloseRunDrawer = useCallback(
-    () => setQueryState({ run: null }),
-    [setQueryState],
-  );
-
-  const handleOpenReport = useCallback(
-    (run: FuzzingRun) => {
-      setReportRun(run);
-      setQueryState({ report: run.id, run: null });
-    },
-    [setQueryState],
-  );
-
-  const handleCloseReport = useCallback(
-    () => {
-      setReportRun(null);
-      setQueryState({ report: null });
-    },
-    [setQueryState],
-  );
-
-  const handleReplayComplete = useCallback(
-    (data: FuzzingRun | { id: string; status: "running" }) => {
-      let newRun: FuzzingRun;
-      if ("area" in data) {
-        newRun = data;
-      } else {
-        newRun = {
-          id: data.id,
-          status: "running",
-          area: "state",
-          severity: "medium",
-          duration: 0,
-          seedCount: 0,
-          crashDetail: null,
-          cpuInstructions: 0,
-          memoryBytes: 0,
-          minResourceFee: 0,
-        };
-      }
-      setRuns((prev) => [newRun, ...prev]);
-    },
-    [],
-  );
-
-  const handlePageChange = useCallback(
-    (page: number) => {
-      setQueryState({ page: page <= 1 ? null : String(page) });
-      cardsContainerRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    },
-    [setQueryState],
-  );
-
-  const handleLaunchCampaign = useCallback((config: CampaignConfig) => {
-    console.log("Launching campaign with config:", config);
-    setShowCampaignConfig(false);
-    // Simulate campaign launch by adding a new running run
-    const newRun: FuzzingRun = {
-      id: `run-${Date.now().toString().slice(-4)}`,
-      status: "running",
-      area: "state",
-      severity: "medium",
-      duration: 0,
-      seedCount: 0,
-      crashDetail: null,
-      cpuInstructions: 0,
-      memoryBytes: 0,
-      minResourceFee: 0,
-    };
-    setRuns((prev) => [newRun, ...prev]);
-  }, []);
-
-  const handleCopyPermalink = useCallback(async () => {
-    try {
-      const stableQuery = toStableQueryString(
-        new URLSearchParams(searchParams.toString()),
-      );
-      const permalink = `${window.location.origin}${pathname}${stableQuery ? `?${stableQuery}` : ""}`;
-      await navigator.clipboard.writeText(permalink);
-      setCopyState("copied");
-    } catch {
-      setCopyState("failed");
-    }
-  }, [pathname, searchParams]);
-
-  const handleDashboardFiltersChange = useCallback((filters: DashboardFilters) => {
-    setDashboardFilters(filters);
-  }, []);
-
-  const handleDashboardFiltersReset = useCallback(() => {
-    setDashboardFilters({
-      status: [],
-      area: [],
-      severity: [],
-      dateRange: { start: '', end: '' },
-      durationRange: { min: 0, max: 0 },
-      resourceFeeRange: { min: 0, max: 0 },
-      hasCrash: null,
-      searchTerm: '',
-    });
-  }, []);
-
-  useEffect(() => {
-    if (copyState === "idle") return;
-    const timer = window.setTimeout(() => setCopyState("idle"), 1800);
-    return () => window.clearTimeout(timer);
-  }, [copyState]);
-
-  const cards = [
-    {
-      title: "Intelligent Mutation",
-      description:
-        "Automatically mutate transaction envelopes and inputs to explore complex state transitions specific to Soroban.",
-      icon: "M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z",
-      color: "blue",
-      details:
-        "Our intelligent mutation engine uses advanced algorithms to systematically explore the state space of your Soroban contracts. It generates meaningful test cases by mutating transaction parameters, account states, and contract inputs in ways that are likely to expose edge cases and vulnerabilities.",
-    },
-    {
-      title: "Invariant Testing",
-      description:
-        "Define robust invariants and property assertions. We run permutations to ensure they hold up under stress.",
-      icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-      color: "purple",
-      details:
-        "Property-based testing for Soroban contracts. Define invariants that should always hold true, and our fuzzer will attempt to break them through millions of randomized test cases. When an invariant is violated, we provide a minimal reproducible example.",
-    },
-    {
-      title: "Actionable Reports",
-      description:
-        "Get actionable, detailed execution traces when our fuzzer detects a crash, panic, or invariant breach.",
-      icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-      color: "green",
-      details:
-        "When issues are found, CrashLab generates comprehensive reports including full execution traces, contract state at the time of failure, and suggested fixes. Reports are formatted for easy integration into your CI/CD pipeline.",
-    },
-  ];
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const runDrawerOpen = Boolean(searchParams.get("run"));
-      if (runDrawerOpen && e.key === "Escape") {
-        e.preventDefault();
-        handleCloseRunDrawer();
-        return;
-      }
-      if (showDetailView && e.key !== "Escape") return;
-
-      switch (e.key) {
-        case "ArrowDown":
-        case "ArrowRight":
-          e.preventDefault();
-          setSelectedCardIndex((prev) => (prev + 1) % cards.length);
-          break;
-        case "ArrowUp":
-        case "ArrowLeft":
-          e.preventDefault();
-          setSelectedCardIndex(
-            (prev) => (prev - 1 + cards.length) % cards.length,
-          );
-          break;
-        case "Enter":
-          e.preventDefault();
-          setShowDetailView(true);
-          break;
-        case "Escape":
-          e.preventDefault();
-          if (showDetailView) {
-            setShowDetailView(false);
-          }
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showDetailView, cards.length, searchParams, handleCloseRunDrawer]);
-
-  const handleCardClick = (index: number) => {
-    setSelectedCardIndex(index);
-    setShowDetailView(true);
-  };
-
-  const handleOpenOnboardingChecklist = useCallback(() => {
-    setShowOnboardingChecklist(true);
-    try {
-      localStorage.setItem(ONBOARDING_SEEN_STORAGE_KEY, "true");
-      localStorage.setItem(ONBOARDING_DISMISSED_STORAGE_KEY, "false");
-    } catch {
-      // ignore storage write errors
-    }
-  }, []);
-
-  const handleCloseOnboardingChecklist = useCallback(() => {
-    setShowOnboardingChecklist(false);
-    try {
-      localStorage.setItem(ONBOARDING_DISMISSED_STORAGE_KEY, "true");
-    } catch {
-      // ignore storage write errors
-    }
-  }, []);
-
+function StepCard({ step, index }: { step: (typeof STEPS)[number]; index: number }) {
   return (
-    <div className="min-h-screen w-full">
-      <AddAccessibleKeyboardNavBlueprint />
-      <AddResponsiveLayoutImprovements />
-      <div
-        id="main-content"
-        className="flex flex-col items-center justify-center py-20 px-8 max-w-5xl mx-auto w-full responsive-container"
-      >
-        <AddKeyboardNavigationHelp />
-        <div
-          id="main-content"
-          className="flex flex-col items-center justify-center py-20 px-8 max-w-5xl mx-auto w-full"
-        >
-          {/* Role toggle */}
-          <div className="w-full flex flex-wrap justify-end gap-3 mb-6">
-            <NotificationCenter />
-            <button
-              type="button"
-              onClick={handleOpenOnboardingChecklist}
-              className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200 dark:hover:border-blue-800 dark:hover:bg-blue-950/60"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              Onboarding checklist
-            </button>
-            <MaintainerToggle
-              isMaintainer={isMaintainer}
-              onToggle={toggleMaintainerMode}
-              mounted={maintainerMounted}
-            />
-          </div>
-
-          {/* Run workflow board section */}
-          <div className="w-full mb-12">
-            <ImplementRunWorkflowBoardPage58 runs={runs} />
-          </div>
-
-          {/* Fuzzy query builder section */}
-          <div className="w-full mb-12">
-            <AddAFuzzyQueryBuilderPage51 runs={runs} />
-          </div>
-          {/* Cross-run board widgets section — maintainer only */}
-          {isMaintainer && (
-            <div className="w-full mb-12">
-              <CrossRunBoardWidgets 
-                runs={runs}
-                dataState={dataState}
-                onRetry={() => setFetchAttempt(prev => prev + 1)}
-                errorMessage="Failed to load cross-run statistics. Please try again."
-              />
-              <CrossRunBoardCustomWidgets runs={runs} />
-            </div>
-          )}
-
-          <div className="text-center max-w-3xl mb-16">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hero-title">
-              Bulletproof Your Soroban Smart Contracts
-            </h1>
-            <p className="text-xl leading-8 text-zinc-600 dark:text-zinc-400">
-              An advanced fuzzing and mutation testing framework designed to
-              discover elusive edge cases in Stellar&apos;s Soroban ecosystem.
-            </p>
-          </div>
-
-          <div
-            ref={cardsContainerRef}
-            className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mb-20"
-            role="list"
-            aria-label="Features"
-          >
-            {cards.map((card, index) => {
-              const isSelected = index === selectedCardIndex;
-              const colorClasses = {
-                blue: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-                purple:
-                  "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
-                green:
-                  "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
-              };
-
-              return (
-                <div
-                  key={index}
-                  role="listitem"
-                  tabIndex={0}
-                  onClick={() => handleCardClick(index)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleCardClick(index);
-                    }
-                  }}
-                  className={`border rounded-xl p-8 bg-white dark:bg-zinc-950 shadow-sm transition-all hover:shadow-md cursor-pointer ${
-                    isSelected
-                      ? "border-blue-500 dark:border-blue-400 ring-2 ring-blue-500 dark:ring-blue-400 ring-offset-2 dark:ring-offset-zinc-900"
-                      : "border-black/[.08] dark:border-white/[.145]"
-                  }`}
-                >
-                  <div
-                    className={`h-12 w-12 rounded-lg flex items-center justify-center mb-6 ${colorClasses[card.color as keyof typeof colorClasses]}`}
-                  >
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d={card.icon}
-                      />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold mb-3">{card.title}</h3>
-                  <p className="text-zinc-600 dark:text-zinc-400">
-                    {card.description}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          {dataState === "success" && (
-            <>
-              <TimelineScrubber runs={runs} onSelectRun={handleOpenRunDrawer} />
-              <AddRunTimeline runs={runs} onSelectRun={handleOpenRunDrawer} />
-              <div className="mt-12 w-full">
-                <AddRunStatusTimeline runs={runs} />
-              </div>
-              <div className="mt-12 w-full">
-                <LogViewer />
-              </div>
-            </>
-          )}
-
-          <RunClusterOverview
-            runs={runs}
-            dataState={dataState}
-            onRetry={() => setFetchAttempt((n) => n + 1)}
-            errorMessage="Run cluster diagnostics are temporarily unavailable."
-          />
-
-          <div className="w-full mb-12">
-            {showCampaignConfig ? (
-              <CampaignConfigForm
-                onSubmit={handleLaunchCampaign}
-                onCancel={() => setShowCampaignConfig(false)}
-              />
-            ) : (
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setShowCampaignConfig(true)}
-                  className="group relative flex items-center gap-3 px-8 py-4 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-xl active:scale-95"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Configure & Launch New Campaign
-                  <div className="absolute inset-0 rounded-2xl bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-              </div>
-            )}
-          </div>
-
-    <div className="w-full mb-20 border-t border-zinc-100 dark:border-zinc-800 pt-20">
-      <ContributorSLATargets />
-    </div>
-
-    <div id="recent-runs" className="w-full mb-8 scroll-mt-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Recent Fuzzing Runs</h2>
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/trends"
-                  className="px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition border border-blue-200 dark:border-blue-800"
-                >
-                  View Trends
-                </Link>
-                <ColumnCustomization
-                  visibleColumns={visibleColumns}
-                  onChange={setVisibleColumns}
-                />
-                <button
-                  type="button"
-                  onClick={handleCopyPermalink}
-                  className="px-3 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 text-xs font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 transition"
-                >
-                  Copy report link
-                </button>
-                <div className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg text-xs font-medium text-zinc-500">
-                  {filteredRuns.length} Matching Runs
-                </div>
-              </div>
-            </div>
-
-            <AdvancedDashboardFilters
-              filters={dashboardFilters}
-              onFiltersChange={handleDashboardFiltersChange}
-              onReset={handleDashboardFiltersReset}
-              isLoading={dataState === 'loading'}
-              error={dataState === 'error' ? 'Failed to load filters' : null}
-            />
-
-            <div className="mb-4 flex flex-col md:flex-row md:items-center gap-3">
-              <label className="flex items-center gap-2 text-sm">
-                <span className="text-zinc-600 dark:text-zinc-400">Status</span>
-                <select
-                  value={statusFilter}
-                  onChange={(e) =>
-                    setQueryState({
-                      status: e.target.value === "all" ? null : e.target.value,
-                      page: null,
-                    })
-                  }
-                  className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-sm"
-                >
-                  <option value="all">All</option>
-                  <option value="running">Running</option>
-                  <option value="completed">Completed</option>
-                  <option value="failed">Failed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </label>
-              <RunSeverityFilter
-                value={severityFilter}
-                onChange={(val) =>
-                  setQueryState({
-                    severity: val === "all" ? null : val,
-                    page: null,
-                  })
-                }
-              />
-              <label className="inline-flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300 group cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={expensiveOnly}
-                  onChange={(e) =>
-                    setQueryState({
-                      expensive: e.target.checked ? "1" : null,
-                      page: null,
-                    })
-                  }
-                  className="h-4 w-4 rounded border-zinc-300"
-                />
-                Only expensive runs
-              </label>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Shared links preserve page, selected run, and filters.
-              </p>
-            </div>
-
-            {copyState === "copied" && (
-              <p className="mb-3 text-sm text-green-700 dark:text-green-400">
-                Permalink copied to clipboard.
-              </p>
-            )}
-            {copyState === "failed" && (
-              <p className="mb-3 text-sm text-red-700 dark:text-red-400">
-                Could not copy link. Copy the URL from your browser address bar.
-              </p>
-            )}
-
-            {isMaintainer && (
-              <div className="mb-5 border border-amber-200 dark:border-amber-900/50 rounded-xl p-4 bg-amber-50/70 dark:bg-amber-950/20">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                    Resource Fee Insight
-                  </h3>
-                  <span className="text-xs text-amber-800 dark:text-amber-300">
-                    thresholds: cpu &ge; {CPU_WARNING.toLocaleString()}, mem
-                    &ge; {formatBytes(MEMORY_WARNING)}, fee &ge;{" "}
-                    {formatFee(FEE_WARNING)}
-                  </span>
-                </div>
-
-                {expensiveRuns.length === 0 ? (
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                    No expensive runs on this page.
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {expensiveRuns.map((run) => (
-                      <li
-                        key={run.id}
-                        className="text-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2 bg-white/60 dark:bg-zinc-900/40 rounded-lg px-3 py-2 border border-amber-100 dark:border-amber-900/40"
-                      >
-                        <div className="font-mono text-zinc-800 dark:text-zinc-200">
-                          {run.id}
-                        </div>
-                        <div className="text-zinc-700 dark:text-zinc-300">
-                          cpu {run.cpuInstructions.toLocaleString()} &middot;
-                          mem {formatBytes(run.memoryBytes)} &middot; min fee{" "}
-                          {formatFee(run.minResourceFee)}
-                        </div>
-                        <Link
-                          href={`/runs/${run.id}`}
-                          className="text-amber-700 dark:text-amber-300 hover:underline underline-offset-4 font-medium"
-                        >
-                          View run details
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-            {isMaintainer && (
-              <FailureClusterView
-                runs={runs}
-                pathname={pathname}
-                queryString={stableQueryString}
-              />
-            )}
-            <div className="mb-8 w-full">
-              <CampaignMilestoneTimeline
-                runs={runs}
-                dataState={dataState}
-                onRetry={() => setFetchAttempt((n) => n + 1)}
-                campaignId="campaign-001"
-                autoUpdateInterval={5000}
-                maxEventsDisplayed={10}
-              />
-            </div>
-            <div className="mb-4">
-               <BulkActionsForRuns 
-                 selectedRuns={selectedRuns}
-                 onAction={handleBulkAction}
-                 onClearSelection={() => setSelectedRunIds(new Set())}
-               />
-            </div>
-            <RunHistoryTable
-              runs={paginatedRuns}
-              onSelectRun={handleOpenRunDrawer}
-              onViewReport={handleOpenReport}
-              onReplayRun={handleReplayComplete}
-              visibleColumns={visibleColumns}
-              selectedRunIds={selectedRunIds}
-              onToggleRunSelection={handleToggleRunSelection}
-              onToggleAllRunsSelection={handleToggleAllRunsSelection}
-            />
-            {dataState === "loading" && (
-              <RunHistoryTableSkeleton rows={ITEMS_PER_PAGE} />
-            )}
-            {dataState === "error" && (
-              <div className="flex flex-col items-center gap-4 border border-red-200 dark:border-red-900/50 rounded-xl p-8 bg-red-50/60 dark:bg-red-950/20 text-center">
-                <div className="h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-red-600 dark:text-red-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-semibold text-red-900 dark:text-red-100">
-                    Failed to load fuzzing runs
-                  </p>
-                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                    Check your connection and try again.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFetchAttempt((n) => n + 1)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all shadow active:scale-95 text-sm"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582M20 20v-5h-.581M5.635 15A9 9 0 1118.365 9"
-                    />
-                  </svg>
-                  Retry
-                </button>
-              </div>
-            )}
-            <Pagination
-              currentPage={clampedPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-            />
-
-            <div className="mt-12 w-full">
-              <ArtifactExplorer />
-            </div>
-
-            {/* Virtualized run table — renders all filtered runs without pagination */}
-            {dataState === "success" && filteredRuns.length > 0 && (
-              <div className="mt-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold">Virtualized Run Table</h3>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      All {filteredRuns.length} runs rendered in a single
-                      scrollable viewport — only visible rows are in the DOM.
-                    </p>
-                  </div>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      />
-                    </svg>
-                    Virtualized
-                  </span>
-                </div>
-                <VirtualizedRunTable
-                  runs={filteredRuns}
-                  viewportHeight={480}
-                  onSelectRun={handleOpenRunDrawer}
-                  onViewReport={handleOpenReport}
-                  visibleColumns={visibleColumns}
-                />
-              </div>
-            )}
-
-            {/* Report Generator Section */}
-            {dataState === "success" && (
-              <div className="mt-12 w-full">
-                <ReportGenerator availableRuns={runs} />
-              </div>
-            )}
-
-            {/* Run Replay Section */}
-            {dataState === "success" && (
-              <div className="mt-12 w-full">
-                <AddRunReplayUi runs={runs} />
-              </div>
-            )}
-          </div>
-
-          <div className="mb-12 w-full grid grid-cols-1 md:grid-cols-2 gap-8">
-            <AddExportRunJson runs={filteredRuns} />
-            <AddExportRunCsv runs={filteredRuns} />
-          </div>
-
-          <div className="mb-12 w-full">
-            <AddDownloadableRunArtifactBundle runs={selectedRuns.length > 0 ? selectedRuns : filteredRuns} />
-          </div>
-
-          <div className="mb-12 w-full">
-            <AddRunComparisonCharts
-              runs={filteredRuns}
-              dataState={dataState}
-              onRetry={() => setFetchAttempt((n) => n + 1)}
-            />
-          </div>
-
-
-
-          <div className="mb-12 w-full">
-            <ResourceFeeInsightPanel runs={filteredRuns} />
-          </div>
-
-          <div className="mb-12 w-full">
-            <RunClusterVisualization
-              runs={filteredRuns}
-              dataState={dataState}
-              onRetry={() => setFetchAttempt((n) => n + 1)}
-              errorMessage="Cluster visualization diagnostics are temporarily unavailable."
-              onRunSelect={handleOpenRunDrawer}
-              showTimeline={true}
-              showMetrics={true}
-            />
-          </div>
-
-          <div className="mb-12 w-full">
-            <FailureClassificationTaxonomy runs={filteredRuns} />
-          </div>
-
-          <div className="mb-12 w-full">
-            <AddTaggingAndLabelsUi runs={filteredRuns} />
-          </div>
-
-          <div className="mb-12 w-full">
-            <AddRunAnnotations runs={runs} />
-          </div>
-
-          <div className="mb-12 w-full">
-            <AlertPresets
-              onSelectPreset={(config) =>
-                console.log("Applied Alert Preset:", config)
-              }
-            />
-          </div>
-
-          <div className="mb-12 w-full">
-            <CreateReportingTemplatesPage60 />
-          </div>
-
-          <div className="mb-12 w-full">
-            <ReportingTemplatesManager />
-          </div>
-
-          <div className="mb-12 w-full">
-            <AutomatedRegressionDeployIntegration />
-          </div>
-
-          <div className="mb-12 w-full">
-            <IntegrationTestHarnessForUIFlows />
-          </div>
-
-          {isMaintainer && (
-            <div className="mb-12 w-full">
-              <CreateRunHeatmapPage55 />
-            </div>
-          )}
-
-          {isMaintainer && (
-            <div className="mb-12 w-full">
-              <AlertingSettingsPage54 />
-            </div>
-          )}
-
-          {isMaintainer && (
-            <div className="mb-12 w-full">
-              <WidgetLayoutEditor />
-            </div>
-          )}
-
-          {isMaintainer && (
-            <div className="mb-12 w-full">
-              <AlertingSettingsPage />
-            </div>
-          )}
-
-          {showDetailView && (
+    <ScrollReveal delay={index * 80}>
+      <BeamChild className="rounded-xl px-5 sm:px-6 py-5 transition-all duration-500">
+        <div className="flex gap-4 sm:gap-6">
+          <div className="flex flex-col items-center shrink-0">
             <div
-              className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowDetailView(false)}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0"
+              style={{ fontFamily: 'var(--font-odometer)', backgroundColor: step.accent, color: 'var(--bg)' }}
             >
+              {step.number}
+            </div>
+            {index < STEPS.length - 1 && (
               <div
-                className="bg-white dark:bg-zinc-900 rounded-xl max-w-2xl w-full p-8 shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="detail-title"
-              >
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`h-12 w-12 rounded-lg flex items-center justify-center ${
-                        cards[selectedCardIndex].color === "blue"
-                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                          : cards[selectedCardIndex].color === "purple"
-                            ? "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
-                            : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                      }`}
-                    >
-                      <svg
-                        className="w-6 h-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d={cards[selectedCardIndex].icon}
-                        />
-                      </svg>
-                    </div>
-                    <h2 id="detail-title" className="text-2xl font-bold">
-                      {cards[selectedCardIndex].title}
-                    </h2>
-                  </div>
-                  <button
-                    onClick={() => setShowDetailView(false)}
-                    className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-                    aria-label="Close detail view"
-                  >
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed mb-4">
-                  {cards[selectedCardIndex].description}
-                </p>
-                <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
-                  <h3 className="font-semibold mb-2">More Details</h3>
-                  <p className="text-zinc-600 dark:text-zinc-400">
-                    {cards[selectedCardIndex].details}
-                  </p>
-                </div>
-                <div className="mt-6 flex justify-end">
-                  <button
-                    onClick={() => setShowDetailView(false)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    Close (Esc)
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {reportRun && (
-            <ReportModal
-              isOpen={true}
-              onClose={handleCloseReport}
-              markdown={generateMarkdownReport(reportRun)}
-              runId={reportRun.id}
-            />
-          )}
-
-          <OnboardingChecklistModal
-            isOpen={showOnboardingChecklist}
-            onClose={handleCloseOnboardingChecklist}
-          />
-
-          {selectedRun && (
-            <CrashDetailDrawer
-              key={selectedRun.id}
-              run={selectedRun}
-              onClose={handleCloseRunDrawer}
-              onReplayComplete={handleReplayComplete}
-            />
-          )}
-
-          <div className="mb-12 w-full">
-            <MetricsExportToPrometheus />
+                className="w-px flex-1 my-2"
+                style={{ backgroundColor: "var(--border-color)" }}
+              />
+            )}
           </div>
-
-          <div className="mt-12 mb-16 w-full">
-            <IntegrateWebhookManagerForRunEvents />
-          </div>
-
-          <div className="mt-16 text-center border-t border-black/[.08] dark:border-white/[.145] pt-12 w-full">
-            <h2 className="text-2xl font-bold mb-4">Stellar Wave 3 is Open!</h2>
-            <p className="text-zinc-600 dark:text-zinc-400 mb-8 max-w-2xl mx-auto">
-              We are actively looking for contributors. Check out our open
-              issues to build the future of Soroban dev tooling with us.
+          <div className="pb-6">
+            <h3
+              className="text-base sm:text-lg mb-1.5"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: "var(--text-primary)" }}
+            >
+              {step.title}
+            </h3>
+            <p
+              className="text-sm sm:text-[15px] leading-relaxed max-w-lg"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {step.body}
             </p>
-            <div className="flex justify-center gap-4">
-              <a
-                href="https://github.com/SorobanCrashLab/soroban-crashlab/issues?q=is%3Aissue+is%3Aopen+label%3Awave3"
-                className="flex items-center justify-center h-12 px-6 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Browse Wave 3 Issues
-              </a>
-              <a
-                href="https://github.com/SorobanCrashLab/soroban-crashlab"
-                className="flex items-center justify-center h-12 px-6 rounded-full border border-black/[.15] dark:border-white/[.15] font-medium hover:bg-black/[.04] dark:hover:bg-white/[.04] transition dark:hover:text-black dark:text-white"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Star the Repo
-              </a>
-            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </BeamChild>
+    </ScrollReveal>
   );
 }
 
-export default function Home() {
+function FeatureCard({ feature, index }: { feature: (typeof FEATURES)[number]; index: number }) {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-1 items-center justify-center min-h-[50vh] text-zinc-500 dark:text-zinc-400">
-          Loading…
+    <ScrollReveal delay={index * 60}>
+      <BeamChild className="rounded-xl h-full transition-all duration-500">
+        <div className="rounded-xl p-6 h-full" style={{ backgroundColor: "var(--surface)", border: "1px solid var(--border-color)" }}>
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
+            style={{ backgroundColor: "var(--highlight-bg)", color: "var(--text-primary)" }}
+          >
+            {feature.icon}
+          </div>
+          <h3
+            className="text-sm mb-2"
+            style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: "var(--text-primary)" }}
+          >
+            {feature.title}
+          </h3>
+          <p
+            className="text-[13px] leading-relaxed"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {feature.body}
+          </p>
         </div>
-      }
+      </BeamChild>
+    </ScrollReveal>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <div
+      style={{
+        background: "var(--bg)",
+        minHeight: "100vh",
+        marginTop: "-56px",
+        paddingTop: "56px",
+      }}
+      className="lg:mt-[-68px] lg:pt-[68px]"
     >
-      <HomeContent />
-    </Suspense>
+      <ScrollBeam />
+
+      {/* ── Hero ─────────────────────────────────────── */}
+      <section className="relative overflow-hidden">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(10,102,194,0.06) 0%, transparent 60%)",
+          }}
+        />
+
+        <div className="relative max-w-4xl mx-auto px-6 sm:px-8 pt-16 sm:pt-24 md:pt-28 pb-14 sm:pb-20 text-center">
+          <ScrollReveal delay={0}>
+            <div className="inline-flex items-center justify-center mb-8">
+              <LogoMark size={72} />
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay={100}>
+            <h1
+              className="text-[2rem] sm:text-4xl md:text-5xl lg:text-[56px] leading-[1.08] tracking-tight mb-5"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: "var(--text-primary)" }}
+            >
+              Break your Soroban contracts
+              <br className="hidden sm:block" />
+              <span className="sm:hidden"> </span>
+              before someone else does.
+            </h1>
+          </ScrollReveal>
+
+          <ScrollReveal delay={200}>
+            <p
+              className="text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              CrashLab throws thousands of mutated inputs at your Stellar smart contracts and watches
+              what breaks. Catches the panics, resource overflows, and auth bypasses that manual
+              testing misses.
+            </p>
+          </ScrollReveal>
+
+          <ScrollReveal delay={300}>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/dashboard"
+                prefetch
+                className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full text-sm font-bold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
+                style={{ backgroundColor: "var(--text-primary)", color: "var(--bg)" }}
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
+                  />
+                </svg>
+                Open App
+              </Link>
+              <a
+                href="https://github.com/SorobanCrashLab/soroban-crashlab"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-[1.02]"
+                style={{
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-color)",
+                  backgroundColor: "var(--surface)",
+                }}
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                </svg>
+                View Source
+              </a>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ── Technology Row ──────────────────────────────── */}
+      <section
+        className="border-y"
+        style={{ borderColor: "var(--border-color)", backgroundColor: "var(--surface)" }}
+      >
+        <div className="max-w-4xl mx-auto px-6 sm:px-8">
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 py-5 sm:py-6">
+            {["Stellar", "Soroban", "Rust", "WebAssembly", "TypeScript"].map((tech) => (
+              <span
+                key={tech}
+                className="text-xs font-semibold tracking-widest uppercase"
+                style={{ color: "var(--text-secondary)", opacity: 0.6 }}
+              >
+                {tech}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── How It Works ─────────────────────────────── */}
+      <section className="max-w-3xl mx-auto px-6 sm:px-8 py-20 sm:py-28">
+        <ScrollReveal>
+          <div className="text-center mb-14">
+            <p
+              className="text-xs font-bold tracking-widest uppercase mb-3"
+              style={{ color: "var(--text-primary)" }}
+            >
+              How it works
+            </p>
+            <h2
+              className="text-2xl sm:text-3xl md:text-4xl tracking-tight"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: "var(--text-primary)" }}
+            >
+              From WASM to triaged crash
+              <br className="hidden sm:block" />
+              in five steps.
+            </h2>
+          </div>
+        </ScrollReveal>
+
+        <div className="space-y-0">
+          {STEPS.map((step, i) => (
+            <StepCard key={step.number} step={step} index={i} />
+          ))}
+        </div>
+      </section>
+
+      {/* ── Sandbox Demo (below the fold, lazy-mounted) ── */}
+      <section className="max-w-3xl mx-auto px-6 sm:px-8 py-20 sm:py-28" aria-label="Sandbox demo">
+        <ScrollReveal>
+          <div className="text-center mb-10">
+            <p
+              className="text-xs font-bold tracking-widest uppercase mb-3"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Live sandbox
+            </p>
+            <h2
+              className="text-2xl sm:text-3xl md:text-4xl tracking-tight"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: "var(--text-primary)" }}
+            >
+              Watch a fuzzing run find a real crash.
+            </h2>
+          </div>
+        </ScrollReveal>
+        <ScrollReveal delay={100}>
+          <BeamChild>
+            <SandboxDemo />
+          </BeamChild>
+        </ScrollReveal>
+      </section>
+
+      {/* ── Features ─────────────────────────────────── */}
+      <section
+        className="py-20 sm:py-28"
+        style={{ backgroundColor: "var(--surface)" }}
+      >
+        <div className="max-w-5xl mx-auto px-6 sm:px-8">
+          <ScrollReveal>
+            <div className="text-center mb-14">
+              <p
+                className="text-xs font-bold tracking-widest uppercase mb-3"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Features
+              </p>
+              <h2
+                className="text-2xl sm:text-3xl md:text-4xl tracking-tight"
+                style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: "var(--text-primary)" }}
+              >
+                Everything you need to find
+                <br className="hidden sm:block" />
+                the bugs your tests miss.
+              </h2>
+            </div>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {FEATURES.map((feature, i) => (
+              <FeatureCard key={feature.title} feature={feature} index={i} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── The Problem Section ───────────────────────── */}
+      <section className="max-w-3xl mx-auto px-6 sm:px-8 py-20 sm:py-28">
+        <ScrollReveal>
+          <div className="text-center mb-10">
+            <p
+              className="text-xs font-bold tracking-widest uppercase mb-3"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Why this matters
+            </p>
+            <h2
+              className="text-2xl sm:text-3xl md:text-4xl tracking-tight mb-6"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: "var(--text-primary)" }}
+            >
+              Smart contracts hold real money.
+              <br className="hidden sm:block" />
+              One bug can drain everything.
+            </h2>
+          </div>
+        </ScrollReveal>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          {[
+            {
+              title: "Manual testing misses edge cases",
+              text: "Unit tests cover the paths you thought of. Fuzzing covers the ones you did not. That is where the exploits live.",
+            },
+            {
+              title: "Attacks are automated now",
+              text: "Bots scan new contracts within minutes of deployment. If your contract has a resource overflow or auth bypass, they will find it before you do.",
+            },
+            {
+              title: "The tools exist, use them",
+              text: "CrashLab is free and open source. There is no reason to ship a contract without running it through automated mutation testing first.",
+            },
+          ].map((item, i) => (
+            <ScrollReveal key={i} delay={i * 100}>
+              <BeamChild className="text-center sm:text-left">
+                <h3
+                  className="text-sm font-bold mb-2"
+                  style={{ fontFamily: 'var(--font-display)', fontWeight: 700, color: "var(--text-primary)" }}
+                >
+                  {item.title}
+                </h3>
+                <p
+                  className="text-sm leading-relaxed"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {item.text}
+                </p>
+              </BeamChild>
+            </ScrollReveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Bottom CTA ───────────────────────────────── */}
+      <section className="max-w-3xl mx-auto px-6 sm:px-8 py-20 sm:py-28 text-center">
+        <ScrollReveal>
+          <h2
+            className="text-2xl sm:text-3xl md:text-4xl tracking-tight mb-4"
+            style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: "var(--text-primary)" }}
+          >
+            Ready to break your contracts?
+          </h2>
+          <p
+            className="text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            CrashLab is free and open source. Point it at a contract
+            and see what the fuzzer finds. Takes about five minutes to get
+            your first results.
+          </p>
+          <Link
+            href="/dashboard"
+            prefetch
+            className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full text-sm font-bold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
+            style={{ backgroundColor: "var(--text-primary)", color: "var(--bg)" }}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
+              />
+            </svg>
+            Open App
+          </Link>
+        </ScrollReveal>
+      </section>
+
+      {/* ── Footer ────────────────────────────────────── */}
+      <footer
+        className="border-t py-10"
+        style={{ borderColor: "var(--border-color)", backgroundColor: "var(--surface)" }}
+      >
+        <div className="max-w-5xl mx-auto px-6 sm:px-8">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
+              <LogoMark size={24} />
+              <span
+                className="text-sm font-bold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                CrashLab
+              </span>
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                for Soroban
+              </span>
+            </div>
+            <div className="flex items-center gap-4 text-xs" style={{ color: "var(--text-secondary)" }}>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="w-2 h-2 rounded-full inline-block"
+                  style={{ backgroundColor: "var(--text-primary)" }}
+                />
+                Stellar Testnet
+              </span>
+              <span>·</span>
+              <span>Soroban Runtime</span>
+              <span>·</span>
+              <a
+                href="https://github.com/SorobanCrashLab/soroban-crashlab"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline"
+                style={{ color: "var(--text-primary)" }}
+              >
+                GitHub
+              </a>
+            </div>
+          </div>
+          <div
+            className="text-center text-[11px] mt-6"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Powered by Stellar, Soroban, Rust, and WebAssembly
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

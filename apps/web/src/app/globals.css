@@ -1,138 +1,1570 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Global focus-visible indicator for all interactive elements.
+ * Provides a consistent 2px blue ring so keyboard users always
+ * know which element is focused.  Uses :focus-visible so the
+ * ring only appears on keyboard navigation, not on clicks.
+ */
+:where(a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
+}
+
+.dark :where(a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline-color: #FFFFFF;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  z-index: 100;
+  padding: 8px 16px;
+  background: #0A66C2;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 0;
+  top: 0;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  outline: 2px solid #FFFFFF;
+  outline-offset: -2px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 @theme {
-  --background: #ffffff;
-  --foreground: #171717;
+  /*
+   * Typography tokens. `--font-display` / `--font-body` / `--font-sans` /
+   * `--font-mono` are emitted by `next/font` (see src/app/fonts.ts) on the
+   * <html> element. Space Grotesk headlines, Lora body, Inter UI, JetBrains
+   * Mono data — the Newsprint voice with the display face kept in grotesque.
+   */
+  --font-sans: var(--font-inter), "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-body: var(--font-lora), Georgia, "Times New Roman", serif;
+  --font-odometer: var(--font-jetbrains-mono), monospace;
 
-  --status-running-bg: #dbeafe;
-  --status-running-fg: #1d4ed8;
-  --header-border-color: rgba(0, 0, 0, 0.08);
-  --status-running-border: #bfdbfe;
-
-  --status-completed-bg: #dcfce7;
-  --status-completed-fg: #15803d;
-  --status-completed-border: #bbf7d0;
-
-  --status-failed-bg: #fee2e2;
-  --status-failed-fg: #b91c1c;
-  --status-failed-border: #fecaca;
-
-  --status-cancelled-bg: #f4f4f5;
-  --status-cancelled-fg: #3f3f46;
-  --status-cancelled-border: #e4e4e7;
+  --color-primary: #111111;
+  --color-primary-hover: #000000;
+  --color-secondary: #525252;
+  --color-neutral: #737373;
+  --color-background: #F9F9F7;
+  --color-surface: #FFFFFF;
+  --color-text-primary: #111111;
+  --color-text-secondary: #525252;
+  --color-border: #111111;
+  --color-success: #111111;
+  --color-warning: #737373;
+  --color-error: #111111;
 }
 
-@layer theme {
-  .dark {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --bg: #F9F9F7;
+  --surface: #FFFFFF;
+  --text-primary: #111111;
+  --text-secondary: #525252;
+  --border-color: #111111;
+  --nav-bg: #F9F9F7;
+  --card-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 0 rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 0 0 1px rgba(0, 0, 0, 0.08), 4px 4px 0px 0px rgba(0, 0, 0, 0.9);
+  --input-bg: #FFFFFF;
+  --input-border: #111111;
+  --skeleton-from: #E5E5E0;
+  --skeleton-to: #F9F9F7;
+  --chip-bg: #E5E5E0;
+  --hover-bg: #F5F5F5;
+  --highlight-bg: #F5F5F5;
 
-    --status-running-bg: #1e3a5f;
-    --status-running-fg: #93c5fd;
-    --header-border-color: rgba(255, 255, 255, 0.145);
-    --status-running-border: #1e40af;
-
-    --status-completed-bg: #14532d;
-    --status-completed-fg: #86efac;
-    --status-completed-border: #166534;
-
-    --status-failed-bg: #4c1d1d;
-    --status-failed-fg: #fca5a5;
-    --status-failed-border: #7f1d1d;
-
-    --status-cancelled-bg: #27272a;
-    --status-cancelled-fg: #d4d4d8;
-    --status-cancelled-border: #3f3f46;
-  }
-
-  @theme inline {
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
-    --font-sans: var(--font-geist-sans);
-    --font-mono: var(--font-geist-mono);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --background: #0a0a0a;
-      --foreground: #ededed;
-
-      --status-running-bg: #1e3a5f;
-      --status-running-fg: #93c5fd;
-      --status-running-border: #1e40af;
-
-      --status-completed-bg: #14532d;
-      --status-completed-fg: #86efac;
-      --status-completed-border: #166534;
-
-      --status-failed-bg: #4c1d1d;
-      --status-failed-fg: #fca5a5;
-      --status-failed-border: #7f1d1d;
-
-      --status-cancelled-bg: #27272a;
-      --status-cancelled-fg: #d4d4d8;
-      --status-cancelled-border: #3f3f46;
-    }
-  }
+  /* Status badge tokens — monochrome weights, no color */
+  --status-running-bg: #111111;
+  --status-running-fg: #F9F9F7;
+  --status-running-border: #111111;
+  --status-completed-bg: #FFFFFF;
+  --status-completed-fg: #111111;
+  --status-completed-border: #111111;
+  --status-failed-bg: #111111;
+  --status-failed-fg: #FFFFFF;
+  --status-failed-border: #111111;
+  --status-cancelled-bg: #E5E5E0;
+  --status-cancelled-fg: #525252;
+  --status-cancelled-border: #E5E5E0;
 }
 
-/* Pragmatic overrides: map common light utility classes to the
-   dark-mode CSS variables when `.dark` is present. This helps ensure
-   elements that were given explicit Tailwind light utilities (e.g.
-   `bg-white`, `bg-zinc-50`, `text-zinc-900`) will visually switch
-   when the `.dark` class is toggled. These selectors are intentionally
-   broad to cover many utility patterns; we can refine them later. */
-html.dark [class*="bg-white"],
-html.dark [class*="bg-zinc-50"],
-html.dark [class*="bg-zinc-100"],
-html.dark [class*="bg-zinc-200"] {
-  background-color: var(--background) !important;
+.dark {
+  --bg: #0c0c0c;
+  --surface: #111111;
+  --text-primary: #e6e6e6;
+  --text-secondary: #8a8a8a;
+  --border-color: #3a3a3a;
+  --nav-bg: #0c0c0c;
+  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 0 rgba(255, 255, 255, 0.04);
+  --card-shadow-hover: 0 0 0 1px rgba(255, 255, 255, 0.06), 4px 4px 0px 0px rgba(255, 255, 255, 0.85);
+  --input-bg: #0a0a0a;
+  --input-border: #606060;
+  --skeleton-from: #1a1a1a;
+  --skeleton-to: #111111;
+  --chip-bg: #1a1a1a;
+  --hover-bg: rgba(255, 255, 255, 0.04);
+  --highlight-bg: rgba(255, 255, 255, 0.05);
+
+  /* Status badge tokens — monochrome dark overrides */
+  --status-running-bg: #ffffff;
+  --status-running-fg: #111111;
+  --status-running-border: #ffffff;
+  --status-completed-bg: #111111;
+  --status-completed-fg: #e6e6e6;
+  --status-completed-border: #5a5a5a;
+  --status-failed-bg: #ffffff;
+  --status-failed-fg: #111111;
+  --status-failed-border: #ffffff;
+  --status-cancelled-bg: #1a1a1a;
+  --status-cancelled-fg: #8a8a8a;
+  --status-cancelled-border: #2a2a2a;
 }
 
-html.dark [class*="text-zinc-900"],
-html.dark [class*="text-black"],
-html.dark [class*="text-gray-900"] {
-  color: var(--foreground) !important;
-}
-
-/* Ensure border colors that reference black-ish tokens don't stay too
-   visible in dark mode. This is conservative — adjust values if you
-   want different border contrast in dark theme. */
-html.dark [class*="border-black"],
-html.dark [class*="border-gray-200"],
-html.dark [class*="border-zinc-200"] {
-  --tw-border-opacity: 0.18;
-  border-color: rgba(255, 255, 255, var(--tw-border-opacity)) !important;
-}
-
-/* Explicit class selectors for very common utilities that may not be
-   caught by substring-match selectors in some browsers/contexts. */
-html.dark .bg-white {
-  background-color: var(--background) !important;
-}
-html.dark .bg-zinc-50 {
-  background-color: var(--background) !important;
-}
-html.dark .text-zinc-900 {
-  color: var(--foreground) !important;
-}
-html.dark .text-black {
-  color: var(--foreground) !important;
-}
-
-/* Header border specific override (covers the `border-black/[.08]` utility) */
-/* Header-specific override to ensure header background and border
-   match the dark theme when toggled. */
-html.dark header {
-  background-color: var(--background) !important;
-  color: var(--foreground) !important;
-  --tw-border-opacity: 0.145;
-  border-color: rgba(255, 255, 255, var(--tw-border-opacity)) !important;
+html {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg);
+  color: var(--text-primary);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.4;
+  min-height: 100vh;
+}
+
+/* Enable theme transitions only after the inline script has applied the
+   correct theme class.  Without this gate the transition animates the
+   initial light→dark (or dark→light) swap, producing a visible flash. */
+html.theme-ready,
+html.theme-ready body {
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+::selection {
+  background: rgba(10, 102, 194, 0.15);
+  color: var(--text-primary);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg);
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg);
+}
+
+html {
+  scrollbar-color: var(--border-color) var(--bg);
+  color-scheme: light dark;
+}
+
+.heading-hero {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  color: var(--text-primary);
+}
+
+.heading-page {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.heading-section {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.heading-subtitle {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.body-text {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.625;
+  color: var(--text-primary);
+}
+
+.text-meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.text-caption {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.code-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.2s ease, background 0.3s ease, border-color 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+.card-padding {
+  padding: 16px 24px;
+}
+
+.card-interactive {
+  cursor: pointer;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  min-height: 44px;
+  padding: 0 24px;
+  background: #111111;
+  color: #F9F9F7;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-primary:hover {
+  background: #F9F9F7;
+  color: #111111;
+  border-color: #111111;
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  min-height: 44px;
+  padding: 0 24px;
+  background: transparent;
+  color: #111111;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid #111111;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-outline:hover {
+  background: #111111;
+  color: #F9F9F7;
+}
+
+.btn-outline:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 40px;
+  min-height: 44px;
+  background: transparent;
+  color: #111111;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.btn-ghost:hover {
+  background: #E5E5E0;
+}
+
+.btn-ghost:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
+}
+
+.input-field {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--input-border);
+  outline: none;
+  transition: background 0.15s ease;
+}
+
+.input-field:focus {
+  background: #F5F5F5;
+  border-bottom-color: #111111;
+}
+
+.dark .input-field:focus {
+  background: #1a1a1a;
+}
+
+.input-field::placeholder {
+  color: var(--text-secondary);
+}
+
+.input-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 0;
+  background: #111111;
+  color: #F9F9F7;
+  border: 1px solid #F9F9F7;
+}
+
+.badge-running {
+  background: #111111;
+  color: #F9F9F7;
+  animation: status-pill-pulse 2s ease-in-out infinite;
+}
+
+.badge-completed {
+  background: #F9F9F7;
+  color: #111111;
+}
+
+.badge-failed {
+  background: #111111;
+  color: #FFFFFF;
+}
+
+.badge-cancelled {
+  background: #E5E5E0;
+  color: #525252;
+}
+
+.badge-critical {
+  background: #111111;
+  color: #FFFFFF;
+}
+
+.dark .badge-completed {
+  background: #111111;
+  color: #E6E6E6;
+}
+
+.dark .badge-failed {
+  background: #FFFFFF;
+  color: #111111;
+}
+
+.link {
+  color: #111111;
+  text-decoration: none;
+  font-weight: 600;
+  transition: text-decoration 0.15s ease;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.top-nav-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: 52px;
+  padding: 0 16px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 400;
+  text-decoration: none;
+  transition: color 0.15s;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.top-nav-link:hover {
+  color: var(--text-primary);
+}
+
+.top-nav-link.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--text-primary);
+}
+
+.top-nav-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tablet navigation (768–1023px)
+ *
+ * The dashboard has eight primary destinations.  Keeping every text label,
+ * the search field, and global controls in the 52px header at tablet widths
+ * forces the navigation strip to scroll.  Use a consistent, touch-friendly
+ * icon rail in this range, then restore the full desktop navigation at 1024px.
+ * Labels remain available through each link's accessible name and title.
+ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tablet-header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .tablet-brand {
+    margin-right: 8px;
+  }
+
+  .tablet-brand-name,
+  .tablet-nav-label,
+  .tablet-search-label {
+    display: none;
+  }
+
+  .top-nav-link {
+    flex: 0 0 44px;
+    width: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .top-nav-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .tablet-actions {
+    gap: 8px;
+  }
+
+  .tablet-search {
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg);
+}
+
+.data-table td {
+  padding: 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.data-table tr:hover td {
+  background: var(--hover-bg);
+}
+
+.data-table tbody tr[tabindex="0"]:focus-visible td {
+  background: var(--hover-bg);
+  outline: 2px solid #0A66C2;
+  outline-offset: -2px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 9999px;
+  background: var(--chip-bg);
+  color: var(--text-primary);
+}
+
+.chip-active {
+  background: var(--highlight-bg);
+  color: #0A66C2;
+}
+
+.chip-add {
+  border: 1px dashed var(--input-border);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.chip-add:hover {
+  border-color: #0A66C2;
+  color: #0A66C2;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 16px 0;
+}
+
+.divider-light {
+  height: 1px;
+  background: var(--border-color);
+  margin: 8px 0;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--input-border);
+  border-radius: 2px;
+  appearance: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox:checked {
+  background: #0A66C2;
+  border-color: #0A66C2;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 18 18' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M14 6L7.5 13L4 9.5' stroke='white' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--skeleton-from) 25%, var(--skeleton-to) 50%, var(--skeleton-from) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* ===== CSS View Transitions — snappy, 60fps ===== */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root) {
+  animation: 80ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out;
+}
+
+::view-transition-new(root) {
+  animation: 120ms cubic-bezier(0, 0, 0.2, 1) both vt-fade-in;
+}
+
+@keyframes vt-fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-transition-container {
+  view-transition-name: page-content;
+  will-change: transform, opacity;
+  content-visibility: auto;
+}
+
+::view-transition-old(page-content) {
+  animation: 80ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out;
+}
+
+::view-transition-new(page-content) {
+  animation: 120ms cubic-bezier(0, 0, 0.2, 1) both vt-fade-in;
+}
+
+/* ===== Scroll-Driven Effects — shared base ===== */
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+
+/* Coverflow — horizontal scroll linked 3D */
+.coverflow-track { scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+.coverflow-track::-webkit-scrollbar { height: 4px; }
+.coverflow-track::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 9999px; }
+
+/* Sticky Stack — vertical piling */
+.sticky-stack-card { contain: layout style; }
+
+/* Parallax — background vs foreground depth */
+[data-parallax] { transform: translateZ(0); backface-visibility: hidden; }
+
+/* Scale & Fade — view-timeline where supported, JS fallback otherwise */
+@supports (animation-timeline: view()) {
+  .scale-fade-auto {
+    animation: scale-fade-view linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 50%;
+  }
+  @keyframes scale-fade-view {
+    from { opacity: 0; transform: scale(0.88) translateY(12px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+}
+
+/* Text Reveal — clip-path driven */
+.text-reveal { contain: layout paint; }
+.text-reveal-clip { clip-path: inset(0 0 0 0); }
+
+/* Navigation speed — instant feedback */
+a, button { -webkit-tap-highlight-color: transparent; }
+.top-nav-link, .drawer-item { transition: color 0.1s, background 0.1s, border-color 0.1s; }
+
+@keyframes parallax-drift {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+
+/**
+ * op-progress-indeterminate — sliding highlight for the indeterminate progress
+ * bar used by OperationProgressIndicator when no step count is available.
+ * Linear, 1.6 s loop — consistent with the shimmer skeleton timing convention.
+ */
+@keyframes op-progress-indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/**
+ * status-pill-pulse — subtle opacity/scale loop for live "running" state pills.
+ * Timing (2 s, ease-in-out) matches the parallax-drift convention in this file.
+ * Deliberately gentle: scale stays within ±2% so text remains legible.
+ */
+@keyframes status-pill-pulse {
+  0%, 100% { opacity: 1;    box-shadow: 0 0 0 0   rgba(10, 102, 194, 0);    }
+  50%       { opacity: 0.85; box-shadow: 0 0 0 3px rgba(10, 102, 194, 0.18); }
+}
+
+.parallax-slow {
+  animation: parallax-drift 6s ease-in-out infinite;
+}
+
+.parallax-medium {
+  animation: parallax-drift 4s ease-in-out infinite;
+}
+
+.parallax-fast {
+  animation: parallax-drift 2s ease-in-out infinite;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.container-feed {
+  max-width: 576px;
+  margin: 0 auto;
+}
+
+.container-full {
+  max-width: 1128px;
+  margin: 0 auto;
+}
+
+.list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.15s;
+}
+
+.list-item:hover {
+  background: var(--hover-bg);
+}
+
+.list-item-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.avatar-small {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 16px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.modal-content {
+  background: var(--surface);
+  border-radius: 8px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Lazy load fade-in */
+.lazy-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.lazy-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+
+/* Nav bar theme transition */
+nav, header, .nav-bar {
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* ===== Mobile Responsive Utilities ===== */
+
+/* Responsive table wrapper - add to any table to make it scroll horizontally on mobile */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.table-responsive table {
+  min-width: 100%;
+}
+
+/* Break tables into cards on very small screens (<640px) */
+@media (max-width: 639px) {
+  .table-card-mobile table,
+  .table-card-mobile thead,
+  .table-card-mobile tbody,
+  .table-card-mobile th,
+  .table-card-mobile td,
+  .table-card-mobile tr {
+    display: block;
+  }
+
+  .table-card-mobile thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .table-card-mobile tbody tr {
+    margin-bottom: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: var(--card-shadow);
+  }
+
+  .table-card-mobile tbody tr:hover td {
+    background: transparent;
+  }
+
+  .table-card-mobile td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+    text-align: right;
+    gap: 8px;
+  }
+
+  .table-card-mobile td:last-child {
+    border-bottom: none;
+  }
+
+  .table-card-mobile td::before {
+    content: attr(data-label);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  .table-card-mobile td:empty {
+    display: none;
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .container-full {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .card-padding {
+    padding: 12px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .heading-page {
+    font-size: 20px;
+  }
+
+  .heading-section {
+    font-size: 18px;
+  }
+
+  .heading-hero {
+    font-size: 24px;
+  }
+}
+
+/* Mobile drawer overlay */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.drawer-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 85%;
+  max-width: 320px;
+  background: var(--surface);
+  z-index: 70;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-left: 1px solid var(--border-color);
+}
+
+.drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.drawer-body {
+  flex: 1;
+  padding: 8px 0;
+}
+
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.drawer-item:hover {
+  background: var(--hover-bg);
+}
+
+.drawer-item.active {
+  background: var(--highlight-bg);
+  color: #0A66C2;
+}
+
+/* Mobile stat grid helper - 2 cols then auto on tablet+ */
+@media (min-width: 640px) {
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+/* ===== Touch-friendly hit targets (min 44px) ===== */
+
+/*
+ * Interactive elements get a comfortable minimum touch target on mobile and
+ * touch-only devices (Apple HIG / WCAG 2.5.5 recommend 44px). We bump the
+ * *minimum* size rather than the fixed size so compact utilities (e.g.
+ * Tailwind h-7/w-7 icon buttons) grow to 44px while larger controls keep
+ * their natural dimensions. Per the CSS box model min-height/min-width win
+ * over height/width, and these unlayered rules beat layered Tailwind
+ * utilities, so every call site is covered without touching each component.
+ *
+ * Inline text links are intentionally exempt: min-height/min-width have no
+ * effect on inline-level boxes, so links inside prose keep their natural tap
+ * area (explicitly allowed by WCAG 2.5.8).
+ */
+@media (max-width: 767px), (hover: none) {
+  button,
+  [role="button"],
+  a,
+  .chip,
+  .chip-add,
+  .nav-strip-item,
+  .breadcrumb-link,
+  .drawer-item,
+  .top-nav-link {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Remove the 300ms double-tap zoom delay on touch controls. */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* Slightly larger tap surface for custom checkboxes; checkbox rows rely on
+     the wrapping label for most of the hit area, so the visual stays compact. */
+  .checkbox {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* ===== Accessibility preferences (#1668) ===== */
+html[data-text-scale="112"] { font-size: 17.92px; }
+html[data-text-scale="125"] { font-size: 20px; }
+html[data-text-scale="150"] { font-size: 24px; }
+
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+.high-contrast {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #1a1a1a;
+  --border-color: #000000;
+  --highlight-bg: #ffff00;
+  --hover-bg: #f0f0f0;
+}
+
+.high-contrast.dark,
+.dark.high-contrast {
+  --bg: #000000;
+  --surface: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #e5e5e5;
+  --border-color: #ffffff;
+  --highlight-bg: #1a1a1a;
+  --hover-bg: #1a1a1a;
+}
+
+.high-contrast :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* ===== Reduced motion support ===== */
+@media (prefers-reduced-motion: reduce) {
+  html, body, * {
+    /* Disable animations and transitions for users who prefer reduced motion */
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    animation-play-state: paused !important;
+    animation-name: none !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+    transition-property: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Turn off specific animations used across the app */
+  .skeleton {
+    animation: none !important;
+    background-size: auto !important;
+  }
+
+  .fade-in,
+  .parallax-slow,
+  .parallax-medium,
+  .parallax-fast,
+  .lazy-enter,
+  .lazy-enter-active,
+  nav,
+  header,
+  .nav-bar,
+  .card {
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    box-shadow: none !important;
+  }
+
+  /* OperationProgressIndicator — keep the bar visible but static */
+  .op-progress-bar-indeterminate {
+    animation: none !important;
+    /* Show a 40 % filled static bar so the state is still perceptible */
+    transform: translateX(-60%) !important;
+  }
+
+  /* Status pill animations — disable the running-state pulse/glow */
+  .badge-running,
+  .status-badge-running {
+    animation: none !important;
+    box-shadow: none !important;
+  }
+
+  .drawer.open {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .stat-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* Stack nav items horizontally on mobile in a scrollable strip */
+.nav-strip {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 8px 0;
+}
+
+.nav-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-strip-item {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 9999px;
+  color: var(--text-secondary);
+  background: var(--chip-bg);
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.nav-strip-item:hover,
+.nav-strip-item.active {
+  background: var(--highlight-bg);
+  color: #0A66C2;
+}
+
+/* Safe area for fixed header on mobile */
+@media (max-width: 639px) {
+  .mobile-safe-top {
+    padding-top: 60px;
+  }
+}
+
+/* Page padding consistent across breakpoints */
+.page-padding {
+  padding: 24px;
+}
+
+@media (max-width: 639px) {
+  .page-padding {
+    padding: 12px;
+  }
+}
+
+@media (min-width: 768px) {
+  .page-padding {
+    padding: 24px 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-padding {
+    padding: 24px 48px;
+  }
+}
+
+/* ===== Breadcrumb Navigation ===== */
+
+.breadcrumb-nav {
+  padding: 8px 0 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.breadcrumb-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 3px 6px;
+  border-radius: 5px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.breadcrumb-link:hover {
+  color: #0A66C2;
+  background: var(--highlight-bg);
+}
+
+.breadcrumb-link:focus-visible {
+  outline: 2px solid #0A66C2;
+  outline-offset: 1px;
+}
+
+.breadcrumb-home {
+  color: var(--text-secondary);
+}
+
+.breadcrumb-home-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.breadcrumb-link:hover .breadcrumb-home-icon {
+  opacity: 1;
+}
+
+.breadcrumb-separator {
+  display: flex;
+  align-items: center;
+  color: var(--border-color);
+  flex-shrink: 0;
+}
+
+.breadcrumb-current {
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 3px 6px;
+  border-radius: 5px;
+}
+
+/* Responsive: tighten spacing on small screens */
+@media (max-width: 639px) {
+  .breadcrumb-nav {
+    padding: 6px 0 2px;
+  }
+
+  .breadcrumb-item {
+    font-size: 12px;
+  }
+
+  .breadcrumb-link,
+  .breadcrumb-current {
+    padding: 2px 4px;
+  }
+}
+
+/* ================================================================
+   Reusable layout / typography utilities
+
+   These collapse the most frequently repeated inline Tailwind class
+   combos into single semantic classes. Values mirror the Tailwind
+   defaults they replace so the rendered appearance is unchanged.
+   (See issue #1195.)
+   ================================================================ */
+
+.flex-center {
+  display: flex;
+  align-items: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Small text at medium/semibold weight (was `text-sm font-medium` / `text-sm font-semibold`) */
+.text-sm-medium {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.text-sm-semibold {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Muted secondary text (was `text-zinc-500 dark:text-zinc-400`)
+   Mirrors the Tailwind zinc palette: 500 = #71717a, 400 = #a1a1aa. */
+.text-muted {
+  color: #71717a;
+}
+
+.dark .text-muted {
+  color: #a1a1aa;
+}
+
+/* Soft neutral surface (was `bg-zinc-50 dark:bg-zinc-900`)
+   Mirrors the Tailwind zinc palette: 50 = #fafafa, 900 = #18181b. */
+.surface-soft {
+  background-color: #fafafa;
+}
+
+.dark .surface-soft {
+  background-color: #18181b;
+}
+
+.page-shell {
+  background: var(--bg);
+  padding-top: 52px;
+  min-height: 100vh;
+  transition: background 0.3s ease;
+}
+
+@layer utilities {
+  .bg-theme {
+    background: var(--background);
+  }
+
+  .text-theme {
+    color: var(--foreground);
+  }
+
+  .border-header {
+    border-color: var(--header-border-color);
+  }
+
+  .status-badge {
+    background-color: var(--status-badge-bg);
+    color: var(--status-badge-fg);
+    border-color: var(--status-badge-border);
+  }
+
+  .status-badge-running {
+    --status-badge-bg: var(--status-running-bg);
+    --status-badge-fg: var(--status-running-fg);
+    --status-badge-border: var(--status-running-border);
+    animation: status-pill-pulse 2s ease-in-out infinite;
+  }
+
+  .status-badge-completed {
+    --status-badge-bg: var(--status-completed-bg);
+    --status-badge-fg: var(--status-completed-fg);
+    --status-badge-border: var(--status-completed-border);
+  }
+
+  .status-badge-failed {
+    --status-badge-bg: var(--status-failed-bg);
+    --status-badge-fg: var(--status-failed-fg);
+    --status-badge-border: var(--status-failed-border);
+  }
+
+  .status-badge-cancelled {
+    --status-badge-bg: var(--status-cancelled-bg);
+    --status-badge-fg: var(--status-cancelled-fg);
+    --status-badge-border: var(--status-cancelled-border);
+  }
+
+  .text-token-primary {
+    color: var(--color-text);
+  }
+
+  .text-token-muted {
+    color: var(--color-muted);
+  }
+
+  .text-token-accent {
+    color: var(--color-accent);
+  }
+
+  .bg-token-bg {
+    background: var(--color-bg);
+  }
+
+  .bg-token-surface {
+    background: var(--color-surface);
+  }
+
+  .bg-token-elevated {
+    background: var(--color-elevated);
+  }
+
+  .border-token {
+    border-color: var(--color-border);
+  }
+
+  .text-token-border {
+    color: var(--color-border);
+  }
+}
+
+/*
+ * Landing page entrance animations.
+ * Fade + translate-up used by the hero on the marketing landing page.
+ */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animation-delay-100 {
+  animation-delay: 100ms;
+}
+
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animation-delay-300 {
+  animation-delay: 300ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
