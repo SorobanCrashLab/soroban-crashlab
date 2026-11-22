@@ -139,6 +139,7 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('POST', '/api/runs/[id]/replay', 'session', { role: 'maintainer', scopes: ['runs:write'] }, 'default'),
   r('GET', '/api/runs/[id]/replay-history', 'session', { scopes: ['runs:read'] }, 'default'),
   r('GET', '/api/runs/[id]/stream', 'session', { scopes: ['runs:read'] }, 'default'),
+  r('GET', '/api/runs/[id]/state', 'session', { scopes: ['runs:read'] }, 'default'),
   r('DELETE', '/api/runs/[id]/tags', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
   r('GET', '/api/runs/[id]/tags', 'session', { scopes: ['runs:read'] }, 'default'),
   r('POST', '/api/runs/[id]/tags', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
