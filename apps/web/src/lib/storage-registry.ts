@@ -46,3 +46,16 @@ export const columnSettingsStore = defineJsonStorage<string[]>(
 export const triageColumnOrderStore = defineJsonStorage<string[]>(
   'crashlab:triage-column-order:v1',
 );
+
+// ── Keyboard shortcuts customization (#2315) ─────────────────────────────────
+export interface StoredShortcutProfile {
+  profileName: string;
+  workspaceScope: string;
+  customBindings: Record<string, string>;
+  disabledIds: string[];
+  updatedAt: string;
+}
+
+export const shortcutCustomizationStore = defineJsonStorage<
+  Record<string, StoredShortcutProfile>
+>('crashlab:shortcut-customization:v1');
