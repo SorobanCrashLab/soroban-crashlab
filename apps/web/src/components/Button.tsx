@@ -34,9 +34,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       case 'ghost':
         return 'btn-ghost';
       case 'danger':
-        return 'inline-flex items-center justify-center font-semibold rounded-full bg-red-600 hover:bg-red-700 text-white transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-40 disabled:cursor-not-allowed';
+        return 'btn-primary btn-danger';
       case 'secondary':
-        return 'inline-flex items-center justify-center font-semibold rounded-full bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500 disabled:opacity-40 disabled:cursor-not-allowed';
+        return 'btn-primary btn-secondary';
       case 'primary':
       default:
         return 'btn-primary';
