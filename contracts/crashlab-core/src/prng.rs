@@ -67,6 +67,18 @@ impl SeededPrng {
     pub fn mutation_stream(&mut self, len: usize) -> Vec<u8> {
         (0..len).map(|_| self.next_byte()).collect()
     }
+
+    /// Returns a deterministic integer in `min..=max`.
+    ///
+    /// Used for sampling structure sizes such as the number of steps in a
+    /// multi-invocation sequence. An inverted or empty range collapses to `min`.
+    pub fn sequence_length(&mut self, min: usize, max: usize) -> usize {
+        if max <= min {
+            return min;
+        }
+        let span = (max - min + 1) as u64;
+        min + (self.next_u64() % span) as usize
+    }
 }
 
 /// [`Mutator`] adapter that drives mutations through [`SeededPrng`].

@@ -1,0 +1,58 @@
+{
+  "actions": {
+    "save": "[Sávé]",
+    "cancel": "[Çáñçél]",
+    "delete": "[Déléte]",
+    "edit": "[Édít]",
+    "close": "[Çlósé]",
+    "confirm": "[Çóñfírm]",
+    "back": "[Báçk]",
+    "next": "[Ñéxt]",
+    "finish": "[Fíñísh]",
+    "retry": "[Rétrý]",
+    "refresh": "[Réfrésh]",
+    "export": "[Éxpórt]",
+    "import": "[Ímpórt]",
+    "search": "[Séárçh]",
+    "filter": "[Fíltér]",
+    "clear": "[Çléár]",
+    "apply": "[Ápplý]",
+    "reset": "[Rését]",
+    "submit": "[Súbmít]",
+    "upload": "[Úplóád]",
+    "download": "[Dówñlóád]"
+  },
+  "status": {
+    "loading": "[Lóádíñg...]",
+    "saving": "[Sávíñg...]",
+    "success": "[Súççéss]",
+    "error": "[Érrór]",
+    "warning": "[Wárñíñg]",
+    "info": "[Íñfórmátíóñ]"
+  },
+  "time": {
+    "now": "[Ñów]",
+    "today": "[Tódáý]",
+    "yesterday": "[Ýéstérdáý]",
+    "tomorrow": "[Tómórrów]",
+    "thisWeek": "[Thís wéék]",
+    "lastWeek": "[Lást wéék]",
+    "thisMonth": "[Thís móñth]",
+    "lastMonth": "[Lást móñth]"
+  },
+  "validation": {
+    "required": "[Thís fíéld ís réqúíréd]",
+    "invalid": "[Íñválíd válúé]",
+    "tooShort": "[Tóó shórt]",
+    "tooLong": "[Tóó lóñg]",
+    "emailInvalid": "[Íñválíd émáíl áddrésş]",
+    "urlInvalid": "[Íñválíd ÚRL]"
+  },
+  "pagination": {
+    "previous": "[Prévíóús]",
+    "next": "[Ñéxt]",
+    "page": "[Págé]",
+    "of": "[óf]",
+    "showing": "[Shówíñg {start} tó {end} óf {total} ítéms]"
+  }
+}

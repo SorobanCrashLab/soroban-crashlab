@@ -29,7 +29,10 @@ pub struct RegressionGroup {
 impl RegressionGroup {
     /// Creates a new regression group from a domain area and signature hash.
     pub fn new(area: FailureClass, signature_hash: u64) -> Self {
-        Self { area, signature_hash }
+        Self {
+            area,
+            signature_hash,
+        }
     }
 
     /// Returns a stable string representation of this group in the format `area#hash`.
@@ -52,22 +55,13 @@ impl RegressionGroup {
         let area_str = parts[0];
         let hash_str = parts[1];
 
-        let area = match area_str {
-            "auth" => FailureClass::Auth,
-            "budget" => FailureClass::Budget,
-            "state" => FailureClass::State,
-            "xdr" => FailureClass::Xdr,
-            "invalid-enum-tag" => FailureClass::InvalidEnumTag,
-            "empty-input" => FailureClass::EmptyInput,
-            "oversized-input" => FailureClass::OversizedInput,
-            "unknown" => FailureClass::Unknown,
-            "timeout" => FailureClass::Timeout,
-            "internal-panic" => FailureClass::InternalPanic,
-            _ => return None,
-        };
+        let area = FailureClass::from_category_label(area_str)?;
 
         let signature_hash = u64::from_str_radix(hash_str, 16).ok()?;
-        Some(RegressionGroup { area, signature_hash })
+        Some(RegressionGroup {
+            area,
+            signature_hash,
+        })
     }
 }
 
@@ -132,13 +126,19 @@ mod tests {
     #[test]
     fn parse_stable_string_auth() {
         let parsed = RegressionGroup::from_stable_string("auth#1234567890abcdef");
-        assert_eq!(parsed, Some(RegressionGroup::new(FailureClass::Auth, 0x1234567890ABCDEF)));
+        assert_eq!(
+            parsed,
+            Some(RegressionGroup::new(FailureClass::Auth, 0x1234567890ABCDEF))
+        );
     }
 
     #[test]
     fn parse_stable_string_budget() {
         let parsed = RegressionGroup::from_stable_string("budget#deadbeef");
-        assert_eq!(parsed, Some(RegressionGroup::new(FailureClass::Budget, 0xDEADBEEF)));
+        assert_eq!(
+            parsed,
+            Some(RegressionGroup::new(FailureClass::Budget, 0xDEADBEEF))
+        );
     }
 
     #[test]

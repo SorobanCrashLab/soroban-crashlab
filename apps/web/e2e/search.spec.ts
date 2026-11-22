@@ -40,7 +40,7 @@ const mockRuns = [
 ];
 
 const fulfillRunsRequest = async (page: Page) => {
-  await page.route('**/api/runs', async (route) => {
+  await page.route('**/api/runs*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -140,7 +140,7 @@ test.describe('Search / Query Builder functionality', () => {
   });
 
   test('handles API failure during search query execution gracefully', async ({ page }) => {
-    await page.route('**/api/runs', async (route) => {
+    await page.route('**/api/runs*', async (route) => {
       await route.fulfill({
         status: 500,
         contentType: 'application/json',

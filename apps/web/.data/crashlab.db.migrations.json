@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "applied": [
+    {
+      "id": "000",
+      "name": "baseline-current-schemas",
+      "checksum": "b24de4bce58ddcc9",
+      "appliedAt": "2026-10-19T15:25:11.616Z"
+    },
+    {
+      "id": "001",
+      "name": "kv-runs-revision-v2",
+      "checksum": "a7dfb741a7282d92",
+      "appliedAt": "2026-10-19T15:25:11.700Z"
+    }
+  ],
+  "kvRevisions": {
+    "runs": "v2",
+    "notifications": "v1",
+    "api-tokens": "v1",
+    "idempotency": "v1"
+  }
+}

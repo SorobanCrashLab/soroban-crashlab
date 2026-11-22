@@ -38,7 +38,7 @@ function isObject(value: unknown): value is Json {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function typeOf(value: unknown): string {
+function _typeOf(value: unknown): string {
   if (Array.isArray(value)) return 'array';
   if (value === null) return 'null';
   return typeof value;

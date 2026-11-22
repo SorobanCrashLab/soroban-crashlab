@@ -297,6 +297,56 @@ describe('GET /api/runs', () => {
       expect(Array.isArray(data.runs)).toBe(true);
       expect(data.runs.length).toBeGreaterThan(0);
     });
+
+    it('rejects with 400 CURSOR_MISMATCH when the cursor was issued under a different filter', async () => {
+      delete process.env.NEXT_PUBLIC_API_URL;
+      process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA = 'true';
+
+      const page1 = await GET(new Request('http://localhost:3000/api/runs?limit=5&status=failed'));
+      const page1Json = await page1.json();
+      const nextCursor = (page1Json.data ?? page1Json).nextCursor as string;
+      expect(nextCursor).toBeTruthy();
+
+      // Replay the status=failed cursor against status=running mid-scroll.
+      const mismatched = await GET(
+        new Request(
+          `http://localhost:3000/api/runs?limit=5&status=running&cursor=${encodeURIComponent(nextCursor)}`,
+        ),
+      );
+
+      expect(mismatched.status).toBe(400);
+      const body = await mismatched.json();
+      expect(body.code).toBe('CURSOR_MISMATCH');
+    });
+
+    it('paginates with opaque versioned cursors and loses no rows across pages', async () => {
+      delete process.env.NEXT_PUBLIC_API_URL;
+      process.env.NEXT_PUBLIC_ENABLE_MOCK_DATA = 'true';
+
+      const seenIds: string[] = [];
+      let cursor: string | null = null;
+      for (let guard = 0; guard < 20; guard += 1) {
+        const url: string = cursor
+          ? `http://localhost:3000/api/runs?limit=7&cursor=${encodeURIComponent(cursor)}`
+          : 'http://localhost:3000/api/runs?limit=7';
+        const response = await GET(new Request(url));
+        expect(response.status).toBe(200);
+        const json = await response.json();
+        const data = json.data ?? json;
+        seenIds.push(...data.runs.map((r: { id: string }) => r.id));
+        if (!data.hasMore || !data.nextCursor) break;
+        cursor = data.nextCursor as string;
+        // The cursor must be opaque — raw run ids never appear verbatim.
+        expect(cursor).not.toContain('run-');
+      }
+
+      expect(new Set(seenIds).size).toBe(seenIds.length);
+      const all = await GET(new Request('http://localhost:3000/api/runs?limit=1000'));
+      const allJson = await all.json();
+      const allData = allJson.data ?? allJson;
+      // Every mock run is reachable through cursor pagination.
+      expect(seenIds.length).toBe(allData.runs.length);
+    });
   });
 
   describe('with mock data disabled', () => {

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FuzzingRun } from './types';
 
-const fetchRuns = vi.fn();
+const search = vi.fn();
 vi.mock('../lib/api-client', () => ({
-  fetchRuns: (...args: unknown[]) => fetchRuns(...args),
+  api: { runs: { search: (...args: unknown[]) => search(...args) } },
 }));
 
 import { createRunsProvider } from './command-palette-runs-provider';
@@ -24,16 +24,30 @@ function makeRun(overrides: Partial<FuzzingRun> = {}): FuzzingRun {
   } as unknown as FuzzingRun;
 }
 
+function result(run: FuzzingRun) {
+  return { run, score: 100, matchedFields: [] };
+}
+
 describe('createRunsProvider', () => {
-  it('maps matching runs to command entries and navigates on run()', async () => {
-    fetchRuns.mockResolvedValue({ runs: [makeRun({ id: 'run-42' }), makeRun({ id: 'other-99' })], total: 2 });
+  it('maps ranked server results to command entries and navigates on run()', async () => {
+    search.mockResolvedValue({
+      results: [result(makeRun({ id: 'run-42' })), result(makeRun({ id: 'other-99' }))],
+      total: 2,
+      truncated: false,
+      indexed: 2,
+      tookMs: 1,
+    });
     const navigate = vi.fn();
     const provider = createRunsProvider(navigate);
 
     const controller = new AbortController();
     const entries = await provider.suggest('run-42', controller.signal);
 
-    expect(entries).toHaveLength(1);
+    expect(search).toHaveBeenCalledWith('run-42', {
+      limit: 8,
+      signal: controller.signal,
+    });
+    expect(entries).toHaveLength(2);
     expect(entries[0].id).toBe('run:run-42');
 
     await entries[0].run();
@@ -41,9 +55,17 @@ describe('createRunsProvider', () => {
   });
 
   it('returns no results once the signal is aborted', async () => {
-    fetchRuns.mockImplementation(async (signal: AbortSignal) => {
+    search.mockImplementation(async (_query: string, options: { signal: AbortSignal }) => {
       return new Promise((resolve) => {
-        signal.addEventListener('abort', () => resolve({ runs: [makeRun()], total: 1 }));
+        options.signal.addEventListener('abort', () =>
+          resolve({
+            results: [result(makeRun())],
+            total: 1,
+            truncated: false,
+            indexed: 1,
+            tookMs: 1,
+          }),
+        );
       });
     });
     const provider = createRunsProvider(vi.fn());

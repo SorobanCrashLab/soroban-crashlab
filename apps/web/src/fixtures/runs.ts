@@ -206,17 +206,41 @@ export function buildMockRuns(): FuzzingRun[] {
     // pre-computed so dashboards can de-duplicate by hash without a backend call.
     const signatureHash = scenarioHashes[scenarioIndex];
 
+    const cpuInstructions = 450_000 + index * 28_500;
+    const memoryBytes = 1_800_000 + index * 230_000;
+    const minResourceFee = 600 + index * 170;
+    // Deterministic W5-A12-shaped envelope so the fee panel has known
+    // distributions and flags in the fixture campaign.
+    const feeWarnThreshold = 2_500;
+    const overFeeBudget = minResourceFee >= feeWarnThreshold;
+
     return {
       id: `run-${id}`,
+      campaignId: 'campaign-fixture',
+      fixtureName: `${failureScenario.contract}::${failureScenario.method}`,
       status,
       area,
       severity,
       duration,
       // seedCount approximates RunSummary.seeds_processed from the Rust backend
       seedCount: 10_000 + index * 1_250,
-      cpuInstructions: 450_000 + index * 28_500,
-      memoryBytes: 1_800_000 + index * 230_000,
-      minResourceFee: 600 + index * 170,
+      cpuInstructions,
+      memoryBytes,
+      minResourceFee,
+      resourceUsage: {
+        cpuInstructions,
+        memoryBytes,
+        minBuiltinEntries: 2 + (index % 5),
+      },
+      fee: {
+        minResourceFee,
+        inclusionFee: 100 + index * 5,
+        rentBumps: index % 4 === 0 ? 1 : 0,
+        feeWarnThreshold,
+        expensiveSuccess: status === 'completed' && overFeeBudget,
+        expensiveFailure: status === 'failed' && overFeeBudget,
+      },
+      feeWarnThreshold,
       queuedAt,
       startedAt,
       finishedAt,

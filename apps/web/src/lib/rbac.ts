@@ -158,7 +158,12 @@ export async function resolvePrincipal(request: NextRequest): Promise<RbacPrinci
     return ANONYMOUS_PRINCIPAL;
   }
 
-  const sessionLogin = await verifyGitHubSession(request.cookies.get(GITHUB_SESSION_COOKIE)?.value);
+  const userAgent = request.headers.get('user-agent') ?? '';
+  const sessionLogin = await verifyGitHubSession(
+    request.cookies.get(GITHUB_SESSION_COOKIE)?.value,
+    Date.now(),
+    userAgent,
+  );
   if (sessionLogin) {
     return {
       identityType: 'github',
@@ -170,7 +175,11 @@ export async function resolvePrincipal(request: NextRequest): Promise<RbacPrinci
 
   // OIDC sessions name an identity only; its role was written to the role
   // store by the claim-mapping policy at login (#1893).
-  const oidcIdentity = await verifyOidcSession(request.cookies.get(OIDC_SESSION_COOKIE)?.value);
+  const oidcIdentity = await verifyOidcSession(
+    request.cookies.get(OIDC_SESSION_COOKIE)?.value,
+    Date.now(),
+    userAgent,
+  );
   if (oidcIdentity) {
     return {
       identityType: 'oidc',

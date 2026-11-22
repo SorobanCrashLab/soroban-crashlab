@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { successResponse, errorResponse } from '@/lib/api-response-utils';
 import { getApiTokenSecretHash, rotateApiToken } from '../../../../../../lib/storage/api-token-store';
 import { registerTokenPrincipal } from '../../../../../../lib/storage/token-principal-store';
-import { AuditLog } from '../../../../../../lib/audit/audit-log';
+import { recordAuditEvent } from '../../../../../../lib/audit/audit-sink';
 
 export async function POST(
   _request: NextRequest,
@@ -25,7 +25,7 @@ export async function POST(
     await registerTokenPrincipal({ tokenId: result.token.id, sha256Hash: successorHash });
   }
 
-  AuditLog.append({ action: 'token.revoke', target: id, metadata: { rotated_to: result.token.id } });
+  recordAuditEvent({ action: 'token.revoke', target: id, metadata: { rotated_to: result.token.id } });
 
   return successResponse({
     message:

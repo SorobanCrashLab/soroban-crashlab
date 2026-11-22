@@ -1,4 +1,5 @@
 import React, { forwardRef, InputHTMLAttributes, ReactNode, useId } from 'react';
+import { getFieldA11yProps } from '../lib/a11y/form-errors';
 
 export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: ReactNode;
@@ -33,9 +34,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
 ) {
   const generatedId = useId();
   const id = customId || generatedId;
-  const errorId = error ? `${id}-error` : undefined;
-  const helperId = helperText ? `${id}-helper` : undefined;
-  const describedBy = [errorId, helperId].filter(Boolean).join(' ') || undefined;
+  const a11y = getFieldA11yProps({ id, error, helperText });
 
   return (
     <div className={`${fullWidth ? 'w-full' : 'inline-block'} ${wrapperClassName}`}>
@@ -43,14 +42,14 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
         <label htmlFor={id} className={`input-label flex-between ${labelClassName}`}>
           <span>
             {label}
-            {required && <span className="text-red-500 ml-1" aria-hidden="true">*</span>}
+            {required && <span className="field-required ml-1" aria-hidden="true">*</span>}
           </span>
         </label>
       )}
 
       <div className="relative mt-1">
         {leftIcon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-400">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ds-text-muted">
             {leftIcon}
           </div>
         )}
@@ -60,29 +59,28 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
           id={id}
           disabled={disabled}
           required={required}
-          aria-invalid={Boolean(error)}
-          aria-describedby={describedBy}
-          className={`input-field ${leftIcon ? 'pl-9' : ''} ${rightIcon ? 'pr-9' : ''} ${
-            error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-          } ${inputClassName} ${className}`}
+          aria-invalid={a11y.inputProps['aria-invalid']}
+          aria-describedby={a11y.inputProps['aria-describedby']}
+          aria-errormessage={a11y.inputProps['aria-errormessage']}
+          className={`input-field ${leftIcon ? 'pl-9' : ''} ${rightIcon ? 'pr-9' : ''} ${inputClassName} ${className}`}
           {...props}
         />
 
         {rightIcon && (
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-400">
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none ds-text-muted">
             {rightIcon}
           </div>
         )}
       </div>
 
       {error && (
-        <p id={errorId} role="alert" className="text-xs mt-1 text-red-600 dark:text-red-400 font-medium">
+        <p id={a11y.errorId ?? undefined} role="alert" className="field-error text-xs mt-1 font-medium">
           {error}
         </p>
       )}
 
       {!error && helperText && (
-        <p id={helperId} className="text-xs mt-1 text-meta">
+        <p id={a11y.helperId ?? undefined} className="text-xs mt-1 text-meta">
           {helperText}
         </p>
       )}

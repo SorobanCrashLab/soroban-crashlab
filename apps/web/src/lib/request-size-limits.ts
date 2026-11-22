@@ -12,11 +12,46 @@ const DEFAULT_CONFIG: Required<RequestSizeLimitConfig> = {
   maxFormDataSize: parseInt(process.env.MAX_FORM_DATA_SIZE || '1048576', 10), // 1MB
 };
 
-const UPLOAD_BODY_LIMIT = 20 * 1024 * 1024;
-const ROUTE_LIMIT_OVERRIDES: ReadonlyArray<{ path: string; config: RequestSizeLimitConfig }> = [
-  { path: '/api/artifacts', config: { maxBodySize: UPLOAD_BODY_LIMIT, maxFormDataSize: UPLOAD_BODY_LIMIT } },
-  { path: '/api/uploadthing', config: { maxBodySize: UPLOAD_BODY_LIMIT, maxFormDataSize: UPLOAD_BODY_LIMIT } },
-];
+const KIB = 1024;
+const MIB = 1024 * KIB;
+const UPLOAD_BODY_LIMIT = 20 * MIB;
+
+/**
+ * Route classes (#1572). Every API request body belongs to exactly one class,
+ * so limits are uniform within a class and explicit at the choke point instead
+ * of being rediscovered in individual handlers.
+ */
+export const REQUEST_SIZE_LIMIT_CLASSES = Object.freeze({
+  // Inbound third-party events: small, high-volume, untrusted.
+  webhook: Object.freeze({ maxBodySize: 1 * MIB, maxJsonSize: 256 * KIB, maxFormDataSize: 1 * MIB }),
+  // Artifact / bundle uploads: deliberately the largest class, bounded to 20 MiB.
+  artifact: Object.freeze({ maxBodySize: UPLOAD_BODY_LIMIT, maxJsonSize: 1 * MIB, maxFormDataSize: UPLOAD_BODY_LIMIT }),
+  // Maintainer settings writes: tiny payloads, low risk of legitimate bulk.
+  settings: Object.freeze({ maxBodySize: 256 * KIB, maxJsonSize: 128 * KIB, maxFormDataSize: 256 * KIB }),
+  // Everything else inherits the environment-tunable defaults.
+  default: Object.freeze({ ...DEFAULT_CONFIG }),
+} satisfies Record<string, Required<RequestSizeLimitConfig>>);
+
+export type RequestSizeRouteClass = keyof typeof REQUEST_SIZE_LIMIT_CLASSES;
+
+/** Maps an API pathname to its request-size class. */
+export function routeClassFor(pathname: string): RequestSizeRouteClass {
+  if (/^\/api\/(webhooks|integrations)(\/|$)/.test(pathname)) return 'webhook';
+  if (/^\/api\/(artifacts|uploadthing)(\/|$)/.test(pathname)) return 'artifact';
+  if (/^\/api\/settings(\/|$)/.test(pathname)) return 'settings';
+  return 'default';
+}
+
+/** Safe variant for request mocks that do not expose a URL. */
+export function routeClassForRequest(request: Request): RequestSizeRouteClass {
+  let pathname = '';
+  try {
+    if (request.url) pathname = new URL(request.url).pathname;
+  } catch {
+    pathname = '';
+  }
+  return routeClassFor(pathname);
+}
 
 const BODY_IDLE_TIMEOUT_MS = 10_000;
 const BODY_TOTAL_TIMEOUT_MS = 60_000;
@@ -52,11 +87,17 @@ export function effectiveRequestBodyLimit(request: Request, config: RequestSizeL
   return maxBody;
 }
 
-/** Route-specific overrides keep artifact upload caps explicit and bounded. */
-export function requestSizeConfigFor(request: Request): RequestSizeLimitConfig {
-  const path = request.url ? new URL(request.url).pathname : '';
-  const override = ROUTE_LIMIT_OVERRIDES.find((entry) => path === entry.path || path.startsWith(`${entry.path}/`));
-  return override ? { ...DEFAULT_CONFIG, ...override.config } : DEFAULT_CONFIG;
+/** Returns the byte caps for a route class, merged with environment defaults. */
+export function requestSizeConfigForClass(routeClass: RequestSizeRouteClass): Required<RequestSizeLimitConfig> {
+  return { ...DEFAULT_CONFIG, ...REQUEST_SIZE_LIMIT_CLASSES[routeClass] };
+}
+
+/** Resolves the class (and therefore the caps) for an incoming request. */
+export function requestSizeConfigFor(
+  request: Request,
+  routeClass: RequestSizeRouteClass = routeClassForRequest(request),
+): RequestSizeLimitConfig {
+  return requestSizeConfigForClass(routeClass);
 }
 
 /**

@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { FuzzingRun } from "../types";
 import { fetchRuns as fetchRunsFromApi } from "../../lib/api-client";
+import { RequireCapability } from "../../components/RequireCapability";
 
 const CrossRunBoardWidgets = dynamic(
   () => import("../../features/runs/implement-cross-run-board-widgets-component"),
@@ -46,13 +47,6 @@ export default function MaintainerPage() {
   );
   const [fetchAttempt, setFetchAttempt] = useState(0);
 
-  // Redirect if not maintainer (hard navigation so e2e URL assertions settle)
-  useEffect(() => {
-    if (mounted && !isMaintainer) {
-      window.location.replace("/");
-    }
-  }, [isMaintainer, mounted]);
-
   // Fetch runs data
   useEffect(() => {
     let cancelled = false;
@@ -82,24 +76,27 @@ export default function MaintainerPage() {
     };
   }, [fetchAttempt]);
 
-  // Show loading while checking auth
-  if (!mounted) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-zinc-600 dark:text-zinc-400">Loading...</p>
-        </div>
+  const loadingGate = (
+    <div className="min-h-screen w-full flex items-center justify-center">
+      <div className="text-center">
+        <div className="h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-zinc-600 dark:text-zinc-400">Loading...</p>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // Redirect in progress
-  if (!isMaintainer) {
-    return null;
-  }
-
+  // Capability-driven route guard (#1880): the server role decides, with the
+  // local maintainer-mode toggle as an explicit bypass for operators working
+  // against a server that has not granted their identity yet. Denied callers
+  // land on /403 with the missing capability spelled out.
   return (
+    <RequireCapability
+      capability="settings:write"
+      bypass={isMaintainer}
+      defer={!mounted}
+      hardRedirect
+      loading={loadingGate}
+    >
     <div className="min-h-screen w-full">
       <div className="flex flex-col items-center justify-center py-20 px-8 max-w-7xl mx-auto w-full">
         {/* Header */}
@@ -234,5 +231,6 @@ export default function MaintainerPage() {
         )}
       </div>
     </div>
+    </RequireCapability>
   );
 }

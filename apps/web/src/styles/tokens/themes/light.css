@@ -1,0 +1,52 @@
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --ds-color-background: #f9f9f7;
+  --ds-color-surface: #ffffff;
+  --ds-color-surface-raised: #ffffff;
+  --ds-color-text-primary: #111111;
+  --ds-color-text-secondary: #525252;
+  --ds-color-text-muted: #737373;
+  --ds-color-border: #111111;
+  --ds-color-focus: #111111;
+  --ds-color-action-primary-bg: #111111;
+  --ds-color-action-primary-text: #ffffff;
+  --ds-color-action-primary-hover: #000000;
+  --ds-color-action-danger-bg: #b91c1c;
+  --ds-color-action-danger-text: #ffffff;
+  --ds-color-action-danger-hover: #991b1b;
+  --ds-color-success-text: #166534;
+  --ds-color-success-bg: #dcfce7;
+  --ds-color-warning-text: #854d0e;
+  --ds-color-warning-bg: #fef3c7;
+  --ds-color-error-text: #b91c1c;
+  --ds-color-error-bg: #fee2e2;
+  --ds-color-info-text: #1e40af;
+  --ds-color-info-bg: #dbeafe;
+  --ds-color-table-row-selected-bg: #dbeafe;
+  --ds-color-neutral-text: #404040;
+  --ds-color-neutral-bg: #f5f5f5;
+
+  --card-shadow: 0 0 0 1px rgb(0 0 0 / 0.08), 0 1px 0 rgb(0 0 0 / 0.04);
+  --card-shadow-hover: 0 0 0 1px rgb(0 0 0 / 0.08), 4px 4px 0 rgb(0 0 0 / 0.9);
+  --input-bg: #ffffff;
+  --input-border: #111111;
+  --skeleton-from: #e5e5e0;
+  --skeleton-to: #f9f9f7;
+  --chip-bg: #e5e5e0;
+  --hover-bg: #f5f5f5;
+  --highlight-bg: #f5f5f5;
+
+  --status-running-bg: #111111;
+  --status-running-fg: #f9f9f7;
+  --status-running-border: #111111;
+  --status-completed-bg: #ffffff;
+  --status-completed-fg: #111111;
+  --status-completed-border: #111111;
+  --status-failed-bg: #111111;
+  --status-failed-fg: #ffffff;
+  --status-failed-border: #111111;
+  --status-cancelled-bg: #e5e5e0;
+  --status-cancelled-fg: #525252;
+  --status-cancelled-border: #e5e5e0;
+}

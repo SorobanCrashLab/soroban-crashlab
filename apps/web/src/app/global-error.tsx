@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { sentryAdapter } from '@/lib/integrations/sentry-client';
 
 export default function GlobalError({
   error,
@@ -12,10 +11,15 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    sentryAdapter.captureException(error, {
-      boundary: 'global-error',
-      digest: error?.digest ?? 'unknown',
-      source: 'app-root',
+    // Only load the Sentry SDK when the global boundary actually catches an
+    // error. Keeping it out of the entry graph avoids shipping the SDK on
+    // every successful page load (#1881).
+    void import('@/lib/integrations/sentry-client').then(({ sentryAdapter }) => {
+      sentryAdapter.captureException(error, {
+        boundary: 'global-error',
+        digest: error?.digest ?? 'unknown',
+        source: 'app-root',
+      });
     });
     console.error('[Global Error]', error);
   }, [error]);

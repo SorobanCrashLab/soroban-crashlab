@@ -1,0 +1,24 @@
+{
+  "title": "Integraciones",
+  "description": "Servicios conectados y webhooks",
+  "connect": "Conectar",
+  "disconnect": "Desconectar",
+  "configure": "Configurar",
+  "test": "Probar Conexión",
+  "status": {
+    "connected": "Conectado",
+    "disconnected": "Desconectado",
+    "error": "Error de Conexión"
+  },
+  "types": {
+    "github": "GitHub",
+    "slack": "Slack",
+    "jira": "Jira",
+    "sentry": "Sentry",
+    "webhook": "Webhook"
+  },
+  "empty": {
+    "title": "Sin integraciones",
+    "description": "Conecta servicios externos para mejorar tu flujo de trabajo"
+  }
+}

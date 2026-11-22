@@ -54,7 +54,7 @@ const mockRuns = [
 ];
 
 const fulfillRunsRequest = async (page: Page, body: unknown, status = 200) => {
-  await page.route('**/api/runs', async (route) => {
+  await page.route('**/api/runs*', async (route) => {
     const requestUrl = new URL(route.request().url());
     expect(requestUrl.pathname).toBe('/api/runs');
 
@@ -107,7 +107,7 @@ test.describe('Runs list', () => {
   test('shows an error state when the runs API fails and recovers after retry', async ({ page }) => {
     let requestCount = 0;
 
-    await page.route('**/api/runs', async (route) => {
+    await page.route('**/api/runs*', async (route) => {
       requestCount += 1;
 
       if (requestCount === 1) {

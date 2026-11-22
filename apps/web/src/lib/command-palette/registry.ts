@@ -13,12 +13,31 @@ export interface CommandEntry {
   id: string;
   title: string;
   subtitle?: string;
+  description?: string;
   category: CommandCategory;
   keywords?: string[];
+  shortcut?: string;
+  /** Context predicate for commands that only apply to a particular route. */
+  when?: (context: CommandContext) => boolean;
+  /** Optional child actions shown after opening this command. */
+  children?: CommandEntry[];
   /** Route path for navigation commands (e.g. `/runs`). Declarative so the
    *  keyboard-cheatsheet overlay can match key chords and execute by route. */
   route?: string;
-  run: () => void | Promise<void>;
+  run: (arguments_?: Record<string, string | string[]>) => void | Promise<void>;
+  arguments?: CommandArgument[];
+}
+
+export interface CommandArgument {
+  id: string;
+  label: string;
+  type: 'text' | 'select' | 'multi-select';
+  options?: string[];
+  required?: boolean;
+}
+
+export interface CommandContext {
+  pathname: string;
 }
 
 /**
@@ -28,6 +47,7 @@ export interface CommandEntry {
  */
 export interface CommandProvider {
   id: string;
+  when?: (context: CommandContext) => boolean;
   suggest(query: string, signal: AbortSignal): Promise<CommandEntry[]>;
 }
 
@@ -41,12 +61,30 @@ export interface SearchOptions {
   signal: AbortSignal;
   /** Most-recent-first list of previously executed command ids. */
   recentIds?: string[];
+  context?: CommandContext;
 }
 
 const RECENT_BOOST_STEP = 25;
 
-function entryHaystack(entry: CommandEntry): string {
-  return [entry.title, entry.subtitle, ...(entry.keywords ?? [])].filter(Boolean).join(' ');
+function entryScore(entry: CommandEntry, query: string): { score: number; indices: number[] } | null {
+  const titleMatch = fuzzyMatch(query, entry.title);
+  const descriptionMatch = fuzzyMatch(query, entry.description ?? entry.subtitle ?? '');
+  const keywordMatches = (entry.keywords ?? []).map((keyword) => fuzzyMatch(query, keyword));
+  const idMatch = fuzzyMatch(query, entry.id);
+
+  const weightedMatches = [
+    { match: titleMatch, weight: 4 },
+    { match: descriptionMatch, weight: 2 },
+    ...keywordMatches.map((match) => ({ match, weight: 1 })),
+    { match: idMatch, weight: 1 },
+  ].filter(({ match }) => match.matched);
+
+  if (weightedMatches.length === 0) return null;
+
+  return {
+    score: Math.max(...weightedMatches.map(({ match, weight }) => match.score * weight)),
+    indices: titleMatch.matched ? titleMatch.indices : [],
+  };
 }
 
 export function createCommandRegistry() {
@@ -59,14 +97,16 @@ export function createCommandRegistry() {
     }
     return () => {
       for (const entry of entries) {
-        staticEntries.delete(entry.id);
+        if (staticEntries.get(entry.id) === entry) staticEntries.delete(entry.id);
       }
     };
   }
 
   function registerProvider(provider: CommandProvider): () => void {
     providers.set(provider.id, provider);
-    return () => providers.delete(provider.id);
+    return () => {
+      if (providers.get(provider.id) === provider) providers.delete(provider.id);
+    };
   }
 
   function recentBoost(id: string, recentIds: string[] | undefined): number {
@@ -81,15 +121,19 @@ export function createCommandRegistry() {
     const results: ScoredEntry[] = [];
 
     for (const entry of staticEntries.values()) {
-      const match = trimmed === '' ? { matched: true, score: 0, indices: [] as number[] } : fuzzyMatch(trimmed, entryHaystack(entry));
-      if (!match.matched) continue;
+      if (options.context && entry.when && !entry.when(options.context)) continue;
+      const match = trimmed === '' ? { score: 0, indices: [] } : entryScore(entry, trimmed);
+      if (!match) continue;
       seen.add(entry.id);
       results.push({ entry, score: match.score + recentBoost(entry.id, options.recentIds), indices: match.indices });
     }
 
-    if (trimmed !== '' && providers.size > 0) {
+    const applicableProviders = Array.from(providers.values()).filter(
+      (provider) => !options.context || !provider.when || provider.when(options.context),
+    );
+    if (trimmed !== '' && applicableProviders.length > 0) {
       const providerLists = await Promise.all(
-        Array.from(providers.values()).map((provider) =>
+        applicableProviders.map((provider) =>
           provider.suggest(trimmed, options.signal).catch(() => [] as CommandEntry[]),
         ),
       );

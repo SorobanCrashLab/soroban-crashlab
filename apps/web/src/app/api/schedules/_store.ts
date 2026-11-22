@@ -90,6 +90,11 @@ export function getSchedulerState(): SchedulerState {
   return _state;
 }
 
+/** Execution ledger for one schedule; empty when it has never fired. */
+export function getSchedulerLedger(scheduleId: string): ExecutionLedgerEntry[] {
+  return getSchedulerState().ledger[scheduleId] ?? [];
+}
+
 export function setSchedulerState(next: SchedulerState): SchedulerState {
   _state = next;
   return _state;

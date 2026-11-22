@@ -1,0 +1,53 @@
+{
+  "preferences": {
+    "title": "Preferencias de Notificaciones",
+    "subtitle": "Configura qué notificaciones recibes y cómo se entregan.",
+    "savedMessage": "Preferencias guardadas exitosamente.",
+    "saveFailedMessage": "Error al guardar preferencias.",
+    "saveButton": "Guardar Preferencias",
+    "savingButton": "Guardando...",
+    "resetButton": "Restablecer Valores Predeterminados",
+    "enabledTypesCount": "{count, plural, one {# tipo de notificación habilitado} other {# tipos de notificación habilitados}}"
+  },
+  "types": {
+    "title": "Tipos de Notificación",
+    "subtitle": "Elige qué tipos de notificaciones mostrar en tu centro de notificaciones.",
+    "info": "Información",
+    "success": "Éxito",
+    "warning": "Advertencia",
+    "error": "Error"
+  },
+  "priority": {
+    "title": "Prioridad Mínima",
+    "subtitle": "Solo mostrar notificaciones en o por encima de este nivel de prioridad.",
+    "low": "Baja",
+    "medium": "Media",
+    "high": "Alta",
+    "critical": "Crítica"
+  },
+  "digest": {
+    "title": "Frecuencia de Resumen",
+    "subtitle": "¿Con qué frecuencia deseas recibir resúmenes de notificaciones?",
+    "realtime": "Tiempo real",
+    "hourly": "Resumen horario",
+    "daily": "Resumen diario",
+    "never": "Nunca"
+  },
+  "channels": {
+    "title": "Canales de Entrega",
+    "subtitle": "Elige cómo se entregan las notificaciones.",
+    "soundLabel": "Sonido",
+    "soundDescription": "Reproducir un sonido cuando llegan nuevas notificaciones",
+    "desktopLabel": "Notificaciones de Escritorio",
+    "desktopDescription": "Mostrar notificaciones del navegador para alertas importantes",
+    "emailLabel": "Notificaciones por Correo",
+    "emailDescription": "Recibir resúmenes por correo según tu configuración de frecuencia"
+  },
+  "quietHours": {
+    "title": "Horas de Silencio",
+    "subtitle": "Suprimir notificaciones durante horas específicas (solo sonido y escritorio).",
+    "enable": "Habilitar Horas de Silencio",
+    "start": "Hora de Inicio",
+    "end": "Hora de Fin"
+  }
+}

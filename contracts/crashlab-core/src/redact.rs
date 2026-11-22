@@ -42,15 +42,20 @@ fn bearer_regex() -> &'static regex::Regex {
 fn token_prefix_regex() -> &'static regex::Regex {
     static REGEX: OnceLock<regex::Regex> = OnceLock::new();
     REGEX.get_or_init(|| {
-        regex::Regex::new(r"\b(?:sk_(?:live|test)_|rk_(?:live|test)_|gh[pousr]_|xox[baprs]-)[A-Za-z0-9_-]{8,}\b")
-            .expect("valid token prefix expression")
+        regex::Regex::new(
+            r"\b(?:sk_(?:live|test)_|rk_(?:live|test)_|gh[pousr]_|xox[baprs]-)[A-Za-z0-9_-]{8,}\b",
+        )
+        .expect("valid token prefix expression")
     })
 }
 
 /// Redacts common key/value credentials and recognizable token formats.
 pub fn redact_text(value: &str) -> String {
     let keyed = inline_secret_regex().replace_all(value, |captures: &regex::Captures<'_>| {
-        format!("{}[REDACTED]", captures.get(1).map_or("", |prefix| prefix.as_str()))
+        format!(
+            "{}[REDACTED]",
+            captures.get(1).map_or("", |prefix| prefix.as_str())
+        )
     });
     let bearer = bearer_regex().replace_all(&keyed, "Bearer [REDACTED]");
     token_prefix_regex()
@@ -60,7 +65,9 @@ pub fn redact_text(value: &str) -> String {
 
 pub fn is_sensitive_field(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
-    SENSITIVE_FIELDS.iter().any(|pattern| lower.contains(pattern))
+    SENSITIVE_FIELDS
+        .iter()
+        .any(|pattern| lower.contains(pattern))
 }
 
 fn redact_value(value: &Value, path: &str, fields: &mut Vec<String>) -> Value {
@@ -73,14 +80,11 @@ fn redact_value(value: &Value, path: &str, fields: &mut Vec<String>) -> Value {
                 } else {
                     format!("{path}.{key}")
                 };
-                if is_sensitive_field(key) {
+                if is_sensitive_field(key) && value.is_string() {
                     fields.push(current_path);
                     result.insert(key.clone(), Value::String("[REDACTED]".to_string()));
                 } else {
-                    result.insert(
-                        key.clone(),
-                        redact_value(value, &current_path, fields),
-                    );
+                    result.insert(key.clone(), redact_value(value, &current_path, fields));
                 }
             }
             Value::Object(result)

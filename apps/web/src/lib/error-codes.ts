@@ -59,6 +59,11 @@ export const ERROR_CODES = Object.freeze({
     message: 'You do not have permission to perform this action.',
     httpStatus: 403,
   },
+  CURSOR_MISMATCH: {
+    code: 'CURSOR_MISMATCH',
+    message: 'Cursor does not match this query\'s sort/filter; restart pagination from page 1.',
+    httpStatus: 400,
+  },
 
   // -------------------------------------------------------------------------
   // Runs

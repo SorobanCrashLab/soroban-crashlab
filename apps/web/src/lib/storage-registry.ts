@@ -9,21 +9,22 @@
  */
 
 import { defineJsonStorage, defineStringStorage } from './local-storage';
+import type { AccessibilityPrefs as FullAccessibilityPrefs } from './accessibility-prefs';
 
 // ── Theme persistence (exemplar 1) ────────────────────────────────────────────
 // Key matches THEME_STORAGE_KEY in theme-provider-utils.ts
 export const themeStore = defineStringStorage('crashlab:theme');
 
-// ── Accessibility preferences (#1668) ────────────────────────────────────────
-export interface AccessibilityPrefs {
-  motion: 'system' | 'reduced' | 'full';
-  textScale: 100 | 112 | 125 | 150;
-  contrast: 'standard' | 'high';
-}
+// ── Accessibility preferences (#1668, #2317) ──────────────────────────────────
+export type AccessibilityPrefs = FullAccessibilityPrefs;
 
 export const accessibilityPrefsStore = defineJsonStorage<AccessibilityPrefs>(
   'crashlab:accessibility-prefs:v1',
 );
+
+export const workspaceAccessibilityPrefsStore = defineJsonStorage<
+  Record<string, AccessibilityPrefs>
+>('crashlab:accessibility-workspace-prefs:v1');
 
 // ── Triage swimlane layout (#1667) ───────────────────────────────────────────
 export interface TriageSwimlaneStored {
@@ -45,3 +46,16 @@ export const columnSettingsStore = defineJsonStorage<string[]>(
 export const triageColumnOrderStore = defineJsonStorage<string[]>(
   'crashlab:triage-column-order:v1',
 );
+
+// ── Keyboard shortcuts customization (#2315) ─────────────────────────────────
+export interface StoredShortcutProfile {
+  profileName: string;
+  workspaceScope: string;
+  customBindings: Record<string, string>;
+  disabledIds: string[];
+  updatedAt: string;
+}
+
+export const shortcutCustomizationStore = defineJsonStorage<
+  Record<string, StoredShortcutProfile>
+>('crashlab:shortcut-customization:v1');

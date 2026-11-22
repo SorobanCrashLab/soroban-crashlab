@@ -39,10 +39,10 @@ export type IdempotencyKeyParse =
 export function parseIdempotencyKey(raw: string | null): IdempotencyKeyParse {
   if (raw === null) return { ok: true, key: null };
   const key = raw.trim();
-  if (key.length === 0 || key.length > IDEMPOTENTY_KEY_MAX_LENGTH || !KEY_PATTERN.test(key)) {
+  if (key.length === 0 || key.length > IDEMPITENCY_KEY_MAX_LENGTH || !KEY_PATTERN.test(key)) {
     return {
       ok: false,
-      error: `${IDEMPOTENTY_KEY_HEADER} must be 1-${IDEMPOTENTY_KEY_MAX_LENGTH} visible ASCII characters.`,
+      error: `${IDEMPOTENCY_KEY_HEADER} must be 1-${IDEMPITENCY_KEY_MAX_LENGTH} visible ASCII characters.`,
     };
   }
   return { ok: true, key };
@@ -50,6 +50,16 @@ export function parseIdempotencyKey(raw: string | null): IdempotencyKeyParse {
 
 export function generateIdempotencyKey(): string {
   return crypto.randomUUID();
+}
+
+/**
+ * True when an error looks like a rejected/in-flight idempotent request, so
+ * the UI can suggest retrying instead of showing a generic failure.
+ */
+export function isIdempotencyError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const text = `${error.name} ${error.message}`.toLowerCase();
+  return text.includes('idempotency') || text.includes('idempotent');
 }
 
 /**

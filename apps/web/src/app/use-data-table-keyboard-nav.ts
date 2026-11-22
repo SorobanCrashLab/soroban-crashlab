@@ -24,6 +24,11 @@ interface UseDataTableKeyboardNavOptions {
   onActivate?: (index: number) => void;
   onFocusRow?: (index: number) => void;
   enabled?: boolean;
+  /**
+   * Rows traversed per PageUp/PageDown press (#1875). Defaults to 10; a
+   * virtualized grid should pass the number of rows its viewport shows.
+   */
+  pageSize?: number;
 }
 
 /**
@@ -35,6 +40,7 @@ export function useDataTableKeyboardNav({
   onActivate,
   onFocusRow,
   enabled = true,
+  pageSize,
 }: UseDataTableKeyboardNavOptions) {
   const rowRefs = useRef<Map<number, HTMLElement>>(new Map());
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
@@ -84,6 +90,7 @@ export function useDataTableKeyboardNav({
             event.key,
             index,
             rowCount,
+            pageSize,
           );
 
           if (action.type === "activate") {
@@ -99,7 +106,7 @@ export function useDataTableKeyboardNav({
         },
       };
     },
-    [enabled, focusRow, focusedIndex, onActivate, rowCount],
+    [enabled, focusRow, focusedIndex, onActivate, pageSize, rowCount],
   );
 
   return { getRowProps, focusedIndex, focusRow };

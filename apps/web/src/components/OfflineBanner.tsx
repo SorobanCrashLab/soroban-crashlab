@@ -24,6 +24,7 @@ export function OfflineBanner({ message, className = '' }: OfflineBannerProps) {
 
   useEffect(() => {
     // Read initial state after mount (browser-only).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     setOffline(!navigator.onLine);
 
     const handleOffline = () => setOffline(true);

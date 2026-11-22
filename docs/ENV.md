@@ -177,8 +177,9 @@ principal, never from the request. See
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `CRASHLAB_GITHUB_SESSION_SECRET` | No | *(unset)* | HMAC signing secret for the `crashlab_github_session` cookie issued by the GitHub OAuth callback. When set, a browser session resolves to a `github:<login>` principal whose role comes from the role store. When unset, no session is issued or trusted and browser callers resolve to the anonymous principal, which carries the lowest role. **Do not set this while the OAuth code exchange is still stubbed** — the session then names the stub identity, so anyone who completes the flow is that user. |
-| `CRASHLAB_GITHUB_SESSION_TTL_SECONDS` | No | `604800` | Lifetime of the GitHub session cookie, in seconds (7 days). |
+| `CRASHLAB_GITHUB_SESSION_SECRET` | No | *(unset)* | HMAC signing secret for the opaque GitHub session cookie. Issuing or verifying browser sessions also requires shared Upstash Redis (`KV_REST_API_URL` and `KV_REST_API_TOKEN`); the app fails closed if that durable store is unavailable. When configured, a session resolves to a `github:<login>` principal whose role comes from the role store. **Do not set this while the OAuth code exchange is still stubbed** — the session then names the stub identity. |
+| `CRASHLAB_GITHUB_SESSION_TTL_SECONDS` | No | `43200` | Browser cookie lifetime in seconds, capped at the 12-hour absolute session timeout. Sessions also expire after 30 minutes without activity; each successful verification refreshes the idle timer. |
+| `CRASHLAB_OIDC_SESSION_SECRET` | No | *(unset)* | HMAC signing secret for OIDC opaque session cookies. OIDC sessions use the same durable Redis store and 30-minute idle / 12-hour absolute timeouts as GitHub sessions. |
 | `CRASHLAB_RBAC_AUDIT_RETENTION_DAYS` | No | `90` | Age-based retention for the RBAC authorization audit log. Entries older than this are filtered out on read. |
 | `CRASHLAB_RBAC_AUDIT_MAX_ENTRIES` | No | `10000` | Hard cap on retained RBAC audit entries. The oldest are dropped once the cap is reached. |
 | `CRASHLAB_RBAC_ROLE_AUDIT_MAX_ENTRIES` | No | `1000` | Hard cap on retained role-assignment change entries. |
@@ -190,10 +191,21 @@ writes survive the invocation. When they are not, the in-memory driver is used,
 which is a single-instance store — adequate for local development, and not a
 durable audit trail for a multi-instance deployment.
 
+**Browser sessions**: GitHub and OIDC cookies contain only a random session ID
+and HMAC. The session identity and timestamps are stored in the record store;
+the record also holds an HMAC of the login-time User-Agent, never the raw
+User-Agent. Each verification compares it with the request's User-Agent and
+rejects a mismatch. Sessions are not bound to IP addresses.
+login rotates the ID and invalidates the prior record. `POST /api/auth/logout`
+revokes the presented record. Redis must be configured for session issuance
+and verification; there is no in-memory fallback. Production cookies use
+`__Host-` names, `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/`.
+
 **Identity sources**:
 - `Authorization: Bearer <secret>` matching `CRASHLAB_WEBHOOK_API_KEY` — principal `api-key:env:CRASHLAB_WEBHOOK_API_KEY`
 - `Authorization: Bearer <secret>` matching a token issued by `/api/settings/tokens` — principal `api-key:<token id>`
-- The signed `crashlab_github_session` cookie — principal `github:<login>`
+- The opaque GitHub session cookie (`crashlab_github_session` in development,
+  `__Host-crashlab_github_session` in production) — principal `github:<login>`
 
 A caller that presents no usable credential is the `anonymous` principal and
 resolves to the lowest role. A role asserted in a header, query parameter,

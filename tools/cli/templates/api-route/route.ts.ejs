@@ -1,0 +1,51 @@
+import { NextRequest } from 'next/server';
+import { withRouteErrorHandling } from '@/lib/route-handler';
+import { successResponse, createdResponse, jsonError } from '@/lib/api-response-utils';
+import { codedErrorResponse } from '@/lib/error-codes';
+import { z } from 'zod';
+
+const ${PascalCaseName}Schema = z.object({
+  // Define your schema here
+  // name: z.string().min(1, 'Name is required'),
+});
+
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const id = searchParams.get('id');
+
+  if (id) {
+    // Fetch single item
+    // const item = await fetch${PascalCaseName}(id);
+    // if (!item) return jsonError('${PascalCaseName} not found', 404);
+    // return successResponse({ item });
+  }
+
+  // Return list
+  // const items = await list${PascalCaseName}();
+  // return successResponse({ items });
+
+  return successResponse({ items: [] });
+}
+
+export const POST = withRouteErrorHandling(
+  'POST /api/${kebabCaseName}',
+  async (request: Request) => {
+    const body = await request.json();
+    const validated = ${PascalCaseName}Schema.safeParse(body);
+
+    if (!validated.success) {
+      return jsonError('Invalid input', 400);
+    }
+
+    // TODO: Implement create logic
+    // const newItem = await create${PascalCaseName}(validated.data);
+    // return createdResponse({ item: newItem });
+
+    return successResponse({}, { status: 201 });
+  },
+  'Failed to create ${kebabCaseName}',
+);
+
+// Add additional handlers as needed:
+// export const PUT = withRouteErrorHandling(...);
+// export const DELETE = withRouteErrorHandling(...);

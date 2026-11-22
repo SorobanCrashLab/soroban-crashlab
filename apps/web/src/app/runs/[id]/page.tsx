@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import nextDynamic from 'next/dynamic';
 import { notFound } from 'next/navigation';
 import BreadcrumbNav from '@/components/BreadcrumbNav';
 import RunDetailAutoRefresh from './RunDetailAutoRefresh';
@@ -8,14 +9,21 @@ import { buildCallSequenceForRun } from '../../mock-call-sequence';
 import RunIssueLinkPage53 from '../../../features/runs/add-run-issue-link-page-53';
 import RunStatusTimeline from '../../RunStatusTimeline';
 import DownloadArtifactsButton from './DownloadArtifactsButton';
-import ContractStateDiffView from '../../components/ContractStateDiffView';
 import { summarizeStateChanges } from '../../components/state-diff-utils';
-import RunSequenceDiagram from './RunSequenceDiagram';
 import { summarizeCallSequence } from './run-sequence-diagram-utils';
-import AddRunReplayHistoryWithTimestamps from '../../../features/runs/add-run-replay-history-with-timestamps';
 import RunMetadataEditorWrapper from './RunMetadataEditorWrapper';
-import RunAnnotationThreads from './annotation-threads/RunAnnotationThreads';
 import SwipeNavigationWrapper from '../swipe/SwipeNavigationWrapper';
+import { RunFeeSummaryChip } from './RunFeeSummaryChip';
+import { buildRunFeeSummary } from '../../resource-fee-insight-utils';
+
+// Below-the-fold interactive views: split their client chunks out of the run
+// detail first-load bundle. They stream in with the rest of the page (#1881).
+const ContractStateDiffView = nextDynamic(() => import('../../components/ContractStateDiffView'));
+const RunSequenceDiagram = nextDynamic(() => import('./RunSequenceDiagram'));
+const AddRunReplayHistoryWithTimestamps = nextDynamic(
+  () => import('../../../features/runs/add-run-replay-history-with-timestamps'),
+);
+const RunAnnotationThreads = nextDynamic(() => import('./annotation-threads/RunAnnotationThreads'));
 
 import { absoluteShort } from '../../utils/datetime';
 
@@ -36,9 +44,11 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
         notFound();
     }
 
-    const cpuWarn = run.cpuInstructions >= 900_000;
-    const memoryWarn = run.memoryBytes >= 7_000_000;
-    const feeWarn = run.minResourceFee >= 3_000;
+    const feeSummary = buildRunFeeSummary(run);
+    const cpuWarn = feeSummary.levels.cpu !== 'normal' && feeSummary.levels.cpu !== 'unknown';
+    const memoryWarn =
+      feeSummary.levels.memory !== 'normal' && feeSummary.levels.memory !== 'unknown';
+    const feeWarn = feeSummary.levels.fee !== 'normal' && feeSummary.levels.fee !== 'unknown';
 
     const ledgerChanges = buildLedgerChangesForRun(run);
     const ledgerSummary = summarizeStateChanges(ledgerChanges);
@@ -94,26 +104,46 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                     />
                 </div>
 
-                <RunMetadataEditorWrapper run={run} />
+                <RunMetadataEditorWrapper run={{ id: run.id, tags: run.tags ?? [] }} />
 
                 <RunIssueLinkPage53 issues={run.associatedIssues ?? []} />
 
                 <section className="mb-8 border border-amber-200 dark:border-amber-900/50 rounded-xl p-4 bg-amber-50/60 dark:bg-amber-950/20">
                     <h2 className="text-lg font-semibold mb-3">Resource Fee Insight</h2>
+                    <RunFeeSummaryChip run={run} />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                         <div className={`rounded-lg border p-3 ${cpuWarn ? 'border-amber-300 dark:border-amber-800 bg-amber-100/70 dark:bg-amber-900/20' : 'border-zinc-200 dark:border-zinc-700'}`}>
                             <div className="text-zinc-500 dark:text-zinc-400">CPU</div>
-                            <div className="font-semibold">{run.cpuInstructions.toLocaleString()}</div>
+                            <div className="font-semibold">
+                                {feeSummary.cpuInstructions === null
+                                    ? 'Not recorded'
+                                    : feeSummary.cpuInstructions.toLocaleString()}
+                            </div>
                         </div>
                         <div className={`rounded-lg border p-3 ${memoryWarn ? 'border-amber-300 dark:border-amber-800 bg-amber-100/70 dark:bg-amber-900/20' : 'border-zinc-200 dark:border-zinc-700'}`}>
                             <div className="text-zinc-500 dark:text-zinc-400">Memory</div>
-                            <div className="font-semibold">{formatBytes(run.memoryBytes)}</div>
+                            <div className="font-semibold">
+                                {feeSummary.memoryBytes === null
+                                    ? 'Not recorded'
+                                    : formatBytes(feeSummary.memoryBytes)}
+                            </div>
                         </div>
                         <div className={`rounded-lg border p-3 ${feeWarn ? 'border-amber-300 dark:border-amber-800 bg-amber-100/70 dark:bg-amber-900/20' : 'border-zinc-200 dark:border-zinc-700'}`}>
                             <div className="text-zinc-500 dark:text-zinc-400">Min Resource Fee</div>
-                            <div className="font-semibold">{run.minResourceFee.toLocaleString()} stroops</div>
+                            <div className="font-semibold">
+                                {feeSummary.minResourceFee === null
+                                    ? 'Not recorded'
+                                    : `${feeSummary.minResourceFee.toLocaleString()} stroops`}
+                            </div>
                         </div>
                     </div>
+                    {feeSummary.source === 'legacy' && (
+                        <p className="mt-3 text-xs text-amber-800 dark:text-amber-200">
+                            This run predates the W5-A12 fee envelope. Flat CPU, memory and
+                            minimum fee metrics are shown; per-seed budget simulation is
+                            unavailable.
+                        </p>
+                    )}
                 </section>
 
                 {run.annotations && run.annotations.length > 0 && (

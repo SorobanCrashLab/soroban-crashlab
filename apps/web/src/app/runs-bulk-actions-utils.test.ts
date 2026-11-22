@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict';
 import type { FuzzingRun } from './types';
 import {
   applyBulkActionToRuns,
+  bulkActionCapability,
   canPerformBulkAction,
   getBulkActionDescription,
   getSelectedRuns,
@@ -107,11 +108,21 @@ function testGetBulkActionDescription() {
   assert.match(getBulkActionDescription('export'), /Export/);
 }
 
+function testBulkActionCapability() {
+  assert.equal(bulkActionCapability('delete'), 'runs:delete');
+  assert.equal(bulkActionCapability('tag'), 'runs:annotate');
+  assert.equal(bulkActionCapability('cancel'), null);
+  assert.equal(bulkActionCapability('retry'), null);
+  assert.equal(bulkActionCapability('export'), null);
+  assert.equal(bulkActionCapability('assign'), null);
+}
+
 function runAllTests() {
   testToggleRunSelection();
   testToggleAllRunSelection();
   testGetSelectedRuns();
   testCanPerformBulkAction();
+  testBulkActionCapability();
   testApplyBulkActionToRuns();
   testShouldClearSelectionAfterAction();
   testGetBulkActionDescription();

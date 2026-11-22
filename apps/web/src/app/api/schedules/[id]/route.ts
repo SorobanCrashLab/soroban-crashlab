@@ -100,10 +100,11 @@ export const DELETE = withRouteErrorHandling(
     }
 
     setSchedulerState({
+      ...state,
       schedules: deleteSchedule(state.schedules, id),
       history: state.history.filter((run) => run.scheduleId !== id),
-      ledgers: Object.fromEntries(
-        Object.entries(state.ledgers ?? {}).filter(([scheduleId]) => scheduleId !== id),
+      ledger: Object.fromEntries(
+        Object.entries(state.ledger).filter(([scheduleId]) => scheduleId !== id),
       ),
     });
     return successResponse({ deleted: id });

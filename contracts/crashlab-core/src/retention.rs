@@ -714,7 +714,7 @@ mod tests {
             .filter(|e| e.action == SweepAction::Keep)
             .map(|e| e.id.as_str())
             .collect();
-        assert_eq!(kept, vec!["s3", "s2"]);
+        assert_eq!(kept, vec!["s2", "s3"]);
         assert_eq!(plan.expired_count(), 1);
     }
 

@@ -154,6 +154,11 @@ const CORE_ROUTES: Array<{ name: string; path: string; waitFor?: string }> = [
   { name: 'run-detail', path: '/runs/detail', waitFor: 'main' },
   { name: 'replay', path: '/runs/replay', waitFor: 'main' },
   { name: 'settings', path: '/settings', waitFor: 'main' },
+  {
+    name: 'forbidden',
+    path: '/403?capability=roles:manage&from=%2Fsettings%2Froles',
+    waitFor: 'main',
+  },
   { name: 'auth-signin', path: '/auth/signin', waitFor: 'main, form' },
 ];
 

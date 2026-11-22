@@ -26,6 +26,38 @@ describe('command registry search', () => {
     expect(results.map((r) => r.entry.id)).toEqual(['theme']);
   });
 
+  it('weights command titles above descriptions and keywords', async () => {
+    const registry = createCommandRegistry();
+    registry.registerEntries([
+      { ...entry('keyword-match', 'Open settings'), keywords: ['theme'] },
+      { ...entry('title-match', 'Toggle theme') },
+    ]);
+
+    const results = await registry.search('theme', { signal: new AbortController().signal });
+
+    expect(results[0].entry.id).toBe('title-match');
+  });
+
+  it('filters context-specific entries and providers', async () => {
+    const registry = createCommandRegistry();
+    registry.registerEntries([
+      { ...entry('run-action', 'Replay run'), when: ({ pathname }) => pathname.startsWith('/runs/') },
+      entry('global-action', 'Open settings'),
+    ]);
+    registry.registerProvider({
+      id: 'runs-only',
+      when: ({ pathname }) => pathname.startsWith('/runs/'),
+      suggest: async () => [entry('provider-run', 'Run result')],
+    });
+
+    const results = await registry.search('run', {
+      signal: new AbortController().signal,
+      context: { pathname: '/settings' },
+    });
+
+    expect(results.map(({ entry: result }) => result.id)).toEqual([]);
+  });
+
   it('boosts recent entries above higher raw-scoring matches', async () => {
     const registry = createCommandRegistry();
     registry.registerEntries([entry('run-x', 'Run X details'), entry('run-y', 'Run Y details')]);

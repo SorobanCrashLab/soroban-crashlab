@@ -27,6 +27,7 @@
 //! single-threaded [`crate::drive_run`].
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::fmt;
 
 /// Number of slots in the fixed partition ring.
@@ -110,6 +111,14 @@ pub struct RingCoverage {
     /// successful atomic swap so a stale coverage can be rejected on resume.
     #[serde(default)]
     generation: u64,
+    /// Completed global seed indices are recorded separately from ring slots:
+    /// a worker can die part-way through a slot, and those finished seeds must
+    /// not be repeated when the lease is reclaimed.
+    #[serde(default)]
+    completed_seed_indices: BTreeSet<u64>,
+    /// Fenced ownership records persisted alongside coverage.
+    #[serde(default)]
+    lease_ledger: LeaseLedger,
 }
 
 impl RingCoverage {
@@ -117,6 +126,13 @@ impl RingCoverage {
         Self {
             ranges: Vec::new(),
             generation: 0,
+            completed_seed_indices: BTreeSet::new(),
+            lease_ledger: LeaseLedger {
+                leases: Vec::new(),
+                next_generation: 0,
+                reclaimed_leases: 0,
+                zombie_writes: 0,
+            },
         }
     }
 
@@ -130,7 +146,7 @@ impl RingCoverage {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.ranges.is_empty()
+        self.ranges.is_empty() && self.completed_seed_indices.is_empty()
     }
 
     /// Normalized covered ranges, ordered by `start`.
@@ -148,11 +164,227 @@ impl RingCoverage {
         self.generation = generation;
     }
 
+    pub fn lease_ledger(&self) -> &LeaseLedger {
+        &self.lease_ledger
+    }
+
+    pub fn lease_ledger_mut(&mut self) -> &mut LeaseLedger {
+        &mut self.lease_ledger
+    }
+
+    pub fn is_seed_completed(&self, seed_index: u64) -> bool {
+        self.completed_seed_indices.contains(&seed_index)
+    }
+
+    /// Records successful work only if the lease token is current and unexpired.
+    pub fn record_seed_completed(
+        &mut self,
+        token: LeaseToken,
+        seed_index: u64,
+        now_ms: u64,
+    ) -> Result<bool, LeaseError> {
+        self.lease_ledger
+            .validate_write(token, ring_slot(seed_index), now_ms)?;
+        Ok(self.completed_seed_indices.insert(seed_index))
+    }
+
+    /// Records completed work for the legacy non-leased partition runner.
+    pub(crate) fn mark_seed_completed(&mut self, seed_index: u64) -> bool {
+        self.completed_seed_indices.insert(seed_index)
+    }
+
     /// Total number of covered ring slots.
     pub fn covered_slot_count(&self) -> u64 {
         self.ranges.iter().map(RingRange::len).sum()
     }
+}
 
+/// Fencing token issued when a worker claims a ring range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LeaseToken {
+    pub worker_id: u32,
+    pub generation: u64,
+    pub range: RingRange,
+}
+
+/// Persisted lease record. Expiration uses caller-supplied epoch milliseconds,
+/// making lease transitions deterministic and independent of wall-clock tests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PartitionLease {
+    pub worker_id: u32,
+    pub generation: u64,
+    pub range: RingRange,
+    pub expires_at_ms: u64,
+}
+
+/// Serializable ownership ledger; generation numbers are never reused.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LeaseLedger {
+    #[serde(default)]
+    leases: Vec<PartitionLease>,
+    #[serde(default)]
+    next_generation: u64,
+    #[serde(default)]
+    reclaimed_leases: u64,
+    #[serde(default)]
+    zombie_writes: u64,
+}
+
+/// Lease acquisition or fenced-write failure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LeaseError {
+    InvalidRange(RingRange),
+    AlreadyLeased { range: RingRange, worker_id: u32 },
+    GenerationExhausted,
+    Expired { generation: u64 },
+    Fenced { token_generation: u64 },
+    OutsideLease { slot: u64 },
+}
+
+impl fmt::Display for LeaseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidRange(range) => write!(f, "invalid ring lease range {range:?}"),
+            Self::AlreadyLeased { range, worker_id } => {
+                write!(
+                    f,
+                    "ring range {range:?} is already leased by worker {worker_id}"
+                )
+            }
+            Self::GenerationExhausted => write!(f, "partition lease generation exhausted"),
+            Self::Expired { generation } => {
+                write!(f, "partition lease generation {generation} expired")
+            }
+            Self::Fenced { token_generation } => {
+                write!(
+                    f,
+                    "partition lease generation {token_generation} was fenced"
+                )
+            }
+            Self::OutsideLease { slot } => write!(f, "ring slot {slot} is outside the lease"),
+        }
+    }
+}
+
+impl std::error::Error for LeaseError {}
+
+impl LeaseLedger {
+    /// Acquires `range`, reclaiming expired overlapping owners. Every new
+    /// acquisition receives a fresh generation; renewing requires the token.
+    pub fn claim(
+        &mut self,
+        range: RingRange,
+        worker_id: u32,
+        now_ms: u64,
+        ttl_ms: u64,
+    ) -> Result<LeaseToken, LeaseError> {
+        if range.is_empty() || range.end > RING_SIZE {
+            return Err(LeaseError::InvalidRange(range));
+        }
+
+        let mut reclaimed = 0;
+        self.leases.retain(|lease| {
+            if lease.range.intersection(&range).is_none() {
+                return true;
+            }
+            if now_ms < lease.expires_at_ms {
+                return true;
+            }
+            reclaimed += 1;
+            false
+        });
+        self.reclaimed_leases = self.reclaimed_leases.saturating_add(reclaimed);
+
+        if let Some(existing) = self
+            .leases
+            .iter()
+            .find(|lease| lease.range.intersection(&range).is_some())
+        {
+            return Err(LeaseError::AlreadyLeased {
+                range,
+                worker_id: existing.worker_id,
+            });
+        }
+
+        self.next_generation = self
+            .next_generation
+            .checked_add(1)
+            .ok_or(LeaseError::GenerationExhausted)?;
+        let lease = PartitionLease {
+            worker_id,
+            generation: self.next_generation,
+            range,
+            expires_at_ms: now_ms.saturating_add(ttl_ms),
+        };
+        self.leases.push(lease);
+        self.leases.sort_by_key(|lease| lease.range.start);
+        Ok(LeaseToken {
+            worker_id,
+            generation: lease.generation,
+            range,
+        })
+    }
+
+    /// Extends a current lease without changing its fencing generation.
+    pub fn renew(&mut self, token: LeaseToken, now_ms: u64, ttl_ms: u64) -> Result<(), LeaseError> {
+        self.validate_write(token, token.range.start, now_ms)?;
+        let lease = self
+            .leases
+            .iter_mut()
+            .find(|lease| {
+                lease.worker_id == token.worker_id
+                    && lease.generation == token.generation
+                    && lease.range == token.range
+            })
+            .expect("validate_write confirmed the lease exists");
+        lease.expires_at_ms = now_ms.saturating_add(ttl_ms);
+        Ok(())
+    }
+
+    /// Rejects zombie writes and counts them for health reporting.
+    pub fn validate_write(
+        &mut self,
+        token: LeaseToken,
+        slot: u64,
+        now_ms: u64,
+    ) -> Result<(), LeaseError> {
+        if !token.range.contains(slot) {
+            self.zombie_writes = self.zombie_writes.saturating_add(1);
+            return Err(LeaseError::OutsideLease { slot });
+        }
+        let Some(lease) = self.leases.iter().find(|lease| {
+            lease.worker_id == token.worker_id
+                && lease.generation == token.generation
+                && lease.range == token.range
+        }) else {
+            self.zombie_writes = self.zombie_writes.saturating_add(1);
+            return Err(LeaseError::Fenced {
+                token_generation: token.generation,
+            });
+        };
+        if now_ms >= lease.expires_at_ms {
+            self.zombie_writes = self.zombie_writes.saturating_add(1);
+            return Err(LeaseError::Expired {
+                generation: token.generation,
+            });
+        }
+        Ok(())
+    }
+
+    pub fn reclaimed_leases(&self) -> u64 {
+        self.reclaimed_leases
+    }
+
+    pub fn zombie_writes(&self) -> u64 {
+        self.zombie_writes
+    }
+
+    pub fn leases(&self) -> &[PartitionLease] {
+        &self.leases
+    }
+}
+
+impl RingCoverage {
     pub fn is_slot_covered(&self, slot: u64) -> bool {
         self.ranges.iter().any(|range| range.contains(slot))
     }
@@ -666,6 +898,48 @@ mod tests {
             coverage.uncovered_within(&RingRange::new(0, RING_SIZE)),
             vec![RingRange::new(0, RING_SIZE)]
         );
+    }
+
+    #[test]
+    fn expired_partition_lease_is_reclaimed_with_a_new_fencing_generation() {
+        let range = RingRange::new(0, 32);
+        let mut ledger = LeaseLedger::default();
+        let zombie = ledger.claim(range, 7, 100, 10).expect("initial lease");
+        assert!(matches!(
+            ledger.claim(range, 8, 109, 10),
+            Err(LeaseError::AlreadyLeased { .. })
+        ));
+        assert!(matches!(
+            ledger.claim(range, 7, 109, 10),
+            Err(LeaseError::AlreadyLeased { .. })
+        ));
+
+        let current = ledger
+            .claim(range, 8, 110, 10)
+            .expect("expired lease reclaimed");
+        assert!(current.generation > zombie.generation);
+        assert_eq!(ledger.reclaimed_leases(), 1);
+        assert!(matches!(
+            ledger.validate_write(zombie, 4, 111),
+            Err(LeaseError::Fenced { .. })
+        ));
+        assert_eq!(ledger.zombie_writes(), 1);
+        ledger
+            .validate_write(current, 4, 111)
+            .expect("current owner writes");
+    }
+
+    #[test]
+    fn expired_lease_rejects_write_even_before_another_worker_reclaims_it() {
+        let mut ledger = LeaseLedger::default();
+        let token = ledger
+            .claim(RingRange::new(10, 20), 3, 0, 5)
+            .expect("lease");
+        assert!(matches!(
+            ledger.validate_write(token, 12, 5),
+            Err(LeaseError::Expired { .. })
+        ));
+        assert_eq!(ledger.zombie_writes(), 1);
     }
 
     #[test]

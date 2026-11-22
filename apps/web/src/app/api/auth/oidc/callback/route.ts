@@ -3,7 +3,12 @@ import { errorResponse } from '@/lib/api-response-utils';
 import { logger } from '@/lib/logger';
 import { OIDC_STATE_COOKIE, OidcError } from '@/lib/auth/oidc';
 import { getOidcClient } from '@/lib/auth/oidc-runtime';
-import { issueOidcSession, OIDC_SESSION_COOKIE, OIDC_SESSION_MAX_AGE_SECONDS } from '@/lib/auth/oidc-session';
+import { DurableSessionStorageError } from '@/lib/auth/server-session';
+import {
+  issueOidcSession,
+  OIDC_SESSION_COOKIE,
+  OIDC_SESSION_MAX_AGE_SECONDS,
+} from '@/lib/auth/oidc-session';
 import { safeRedirectPath } from '@/lib/safe-redirect';
 
 /**
@@ -32,7 +37,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const login = await client.complete({ code: params.get('code'), state: params.get('state'), cookieState });
-    const session = await issueDidcSession(login.identity);
+    const session = await issueOidcSession(
+      login.identity,
+      Date.now(),
+      request.cookies.get(OIDC_SESSION_COOKIE)?.value,
+      request.headers.get('user-agent') ?? '',
+    );
     if (!session) return clearState(errorResponse('External sign-in sessions are not configured.', 503));
 
     // Resolve the post-auth redirect target from the 'next' query param,
@@ -51,6 +61,9 @@ export async function GET(request: NextRequest) {
     });
     return clearState(response);
   } catch (error) {
+    if (error instanceof DurableSessionStorageError) {
+      return clearState(errorResponse('External sign-in is temporarily unavailable.', 503));
+    }
     logger.warn('GET /api/auth/oidc/callback: login denied', {
       reason: error instanceof OidcError ? error.code : 'internal_error',
     });

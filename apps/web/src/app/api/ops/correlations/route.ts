@@ -1,0 +1,9 @@
+// WIP scaffold for issue #2271. Correlating alerts/deploys/failures/impacted runs not
+// implemented yet.
+import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  return NextResponse.json({ correlations: [], wip: true, issue: 2271 }, { status: 501 });
+}

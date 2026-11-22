@@ -116,6 +116,7 @@ pub fn repro_test_name(bundle: &CaseBundle) -> String {
 ///     environment: None,
 ///     failure_payload: Vec::new(),
 ///     rpc_envelope: None,
+///     engine_version: "0.1.0".into(),
 /// };
 /// let src = render_rust_test(&bundle).unwrap();
 /// assert!(src.contains("fn crashlab_repro_auth_0000000000000003()"));
@@ -198,7 +199,7 @@ mod tests {
             environment: None,
             failure_payload: Vec::new(),
             rpc_envelope: None,
-        engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
+            engine_version: crate::engine_version::ENGINE_VERSION.to_string(),
         }
     }
 
@@ -358,7 +359,7 @@ fn crashlab_repro_auth_0000000000000003() {
         // The category is emitted as a single escaped literal on one line.
         assert!(src.contains(r#"assert_eq!(actual.category, "auth\"); evil(); //");"#));
         // The test name stays a plain identifier.
-        assert!(src.contains("fn crashlab_repro_auth____evil______0000000000000006()"));
+        assert!(src.contains("fn crashlab_repro_auth____evil_______0000000000000006()"));
     }
 
     // ── naming ────────────────────────────────────────────────────────────────
@@ -368,7 +369,9 @@ fn crashlab_repro_auth_0000000000000003() {
         let b = bundle(7, vec![1], "Runtime Failure!", 0, 5);
         let name = repro_test_name(&b);
         assert_eq!(name, "crashlab_repro_runtime_failure__0000000000000005");
-        assert!(name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'));
+        assert!(name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'));
     }
 
     #[test]

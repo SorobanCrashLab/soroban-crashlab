@@ -1,28 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response-utils';
-import { sanitizeQueryParam, sanitizeSearchParams } from '@/lib/sanitize';
+import { sanitizeSearchParams, sanitizeQueryParam } from '@/lib/sanitize';
 import {
   GITHUB_SESSION_COOKIE,
   getGitHubSessionMaxAgeSeconds,
   issueGitHubSession,
 } from '@/lib/github-session';
+import {
+  constantTimeEqual,
+  NEXT_COOKIE_NAME,
+  STATE_COOKIE_NAME,
+  verifyState,
+} from '@/lib/github-oauth-state';
 import { safeRedirectPath } from '@/lib/safe-redirect';
+import { DurableSessionStorageError } from '@/lib/auth/server-session';
 
-const STATE_COOKIE_NAME = 'github_oauth_state';
+/**
+ * Strict allowlist of post-login redirect targets. Only same-origin relative
+ * paths under these prefixes are honored; anything else falls back to `/`.
+ * This prevents the callback from being used as an open redirect to an
+ * attacker-controlled URL via a crafted `next` parameter.
+ */
+const ALLOWED_CALLBACK_REDIRECT_PREFIXES = [
+  '/',
+  '/runs',
+  '/dashboard',
+  '/settings',
+  '/integrations',
+  '/alerts',
+];
 
 /**
  * GET /api/auth/github/callback
  * GitHub OAuth 2.0 callback route.
  *
  * Handles the redirect from GitHub after user authorization.
- * CSRF protection: the login route generates a cryptographically random
- * `state` (crypto.randomUUID), stores it in a short-lived httpOnly,
- * sameSite=lax cookie, and includes it in the redirect to GitHub.
- * This callback verifies the returned `state` query param against the
- * cookie value and rejects mismatched or missing state with 400 to
- * prevent CSRF / login-CSRF attacks. The cookie is cleared on every
- * outcome (success or failure) to enforce single-use semantics.
+ *
+ * Security properties (#1559):
+ *   (a) Cryptographic state binding: the login route mints an HMAC-signed
+ *       state token (`<nonce>.<hex-hmac>`) stored in an HttpOnly, Secure,
+ *       SameSite=Lax cookie with a 10-minute expiry. This callback verifies
+ *       the returned state's signature before accepting it, so a tampered or
+ *       forged state is rejected.
+ *   (b) Redirect control: the post-login `next` target is checked against a
+ *       strict allowlist of internal path prefixes; everything else falls
+ *       back to `/`. No open redirect to a caller-influenced external URL.
+ *   (c) Server-side token storage: the authorization code is never logged and
+ *       never serialized to the client; the issued session is an HttpOnly,
+ *       signed cookie with a short, configurable TTL.
+ *   (d) Replay / raced-callback handling: the state and next cookies are
+ *       cleared on every outcome (success or failure), enforcing single-use
+ *       semantics so a replayed callback is rejected with 400.
  */
 export async function GET(request: NextRequest) {
   const sanitizedParams = sanitizeSearchParams(new URL(request.url).searchParams);
@@ -30,45 +59,64 @@ export async function GET(request: NextRequest) {
   const rawState = sanitizedParams.get('state');
   const code = rawCode ? sanitizeQueryParam(rawCode) : null;
   const state = rawState ? sanitizeQueryParam(rawState) : null;
-  const storedState = request.cookies.get(STATE_COOKIE_NAME)?.value;
 
-  // Clear the state cookie regardless of outcome
-  const clearCookie = (response: NextResponse) => {
+  // Clear the state + next cookies regardless of outcome. Single-use state:
+  // once a callback has been processed the cookie is gone, so a replayed or
+  // raced callback finds no matching state and is rejected below.
+  const clearCookies = (response: NextResponse): NextResponse => {
     response.cookies.delete(STATE_COOKIE_NAME);
+    response.cookies.delete(NEXT_COOKIE_NAME);
     return response;
   };
 
   if (!code) {
-    return clearCookie(
+    logger.warn('GET /api/auth/github/callback: missing "code" parameter from GitHub callback');
+    return clearCookies(
       errorResponse('Missing "code" parameter from GitHub callback.', 400)
     );
   }
 
-  // Validate the CSRF state parameter
+  const storedState = request.cookies.get(STATE_COOKIE_NAME)?.value;
+
+  // (a) Cryptographic state binding: verify the cookie-issued state is intact
+  // (HMAC signature when a secret is configured), then require the returned
+  // state to match it exactly (constant-time comparison).
   if (!state || !storedState) {
     logger.warn('GET /api/auth/github/callback: missing state parameter (possible CSRF)');
-    return clearCookie(
+    return clearCookies(
       errorResponse('Missing OAuth state parameter. The login flow may have expired or been tampered with.', 400)
     );
   }
 
-  if (state !== storedState) {
+  const storedNonce = await verifyState(storedState);
+  if (!storedNonce) {
+    logger.warn('GET /api/auth/github/callback: state cookie failed cryptographic verification');
+    return clearCookies(
+      errorResponse('OAuth state is invalid. The login flow may have expired or been tampered with.', 400)
+    );
+  }
+
+  if (!constantTimeEqual(state, storedState)) {
     logger.warn('GET /api/auth/github/callback: state mismatch (possible CSRF attack)');
-    return clearCookie(
+    return clearCookies(
       errorResponse('OAuth state mismatch. The request may have been tampered with.', 400)
     );
   }
 
-  // Resolve the post-auth redirect target from the 'next' query param, validated
-  // against the shared safe-redirect allowlist. Invalid/unknown values fall
-  // back to '/' and are audit-logged by the validator.
+  // (b) Redirect control: strict allowlist for the post-login target.
   const nextParam = sanitizedParams.get('next');
-  const safeNext = safeRedirectPath(nextParam ?? null, {
-    context: 'api/auth/github/callback',
-  });
+  const cookieNext = request.cookies.get(NEXT_COOKIE_NAME)?.value;
+  const safeNext = safeRedirectPath(
+    nextParam ?? cookieNext ?? null,
+    {
+      allowedPrefixes: ALLOWED_CALLBACK_REDIRECT_PREFIXES,
+      fallback: '/',
+      context: 'api/auth/github/callback',
+    }
+  );
 
   try {
-    logger.info('GET /api/auth/github/callback: exchanging code for access token', { code });
+    logger.info('GET /api/auth/github/callback: exchanging code for access token');
 
     // Simulate API latency
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -86,16 +134,15 @@ export async function GET(request: NextRequest) {
       status: 302,
     });
 
-    // Bind the session to the authenticated GitHub login so RBAC can resolve a
-    // principal instead of guessing one. Requires a configured signing secret;
-    // without one the flow still completes and the caller stays anonymous,
-    // which resolves to the lowest role.
-    //
     // Note: the code exchange below is still a stub that yields a fixed user, so
-    // the resulting session names that stub identity. Treat this as wiring for
-    // the real exchange, not as a production identity provider — do not set a
-    // session secret until the exchange talks to GitHub.
-    const session = await issueGitHubSession(mockUser.login);
+    // the resulting session names that stub identity. Do not set a session
+    // secret until the exchange talks to GitHub.
+    const session = await issueGitHubSession(
+      mockUser.login,
+      request.cookies.get(GITHUB_SESSION_COOKIE)?.value,
+      Date.now(),
+      request.headers.get('user-agent') ?? '',
+    );
     if (session) {
       response.cookies.set(GITHUB_SESSION_COOKIE, session, {
         httpOnly: true,
@@ -110,11 +157,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return clearCookie(response);
+    return clearCookies(response);
   } catch (error) {
     logger.error('GET /api/auth/github/callback failed', { error });
-    return clearCookie(
-      errorResponse('An internal error occurred while processing the GitHub authentication.', 500)
+    return clearCookies(
+      error instanceof DurableSessionStorageError
+        ? errorResponse('Sign-in is temporarily unavailable.', 503)
+        : errorResponse('An internal error occurred while processing the GitHub authentication.', 500)
     );
   }
 }

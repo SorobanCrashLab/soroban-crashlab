@@ -47,16 +47,29 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('GET', '/api/health/metrics', 'bearer', 'Scrape endpoint metrics', ['ops'], ['UNAUTHORIZED'], {
     description: 'Bearer scrape token (CRASHLAB_METRICS_SCRAPE_TOKEN). Prometheus-compatible.',
   }),
-  r('GET', '/api/runs', 'bearer', 'List fuzzing runs (keyset paginated)', ['runs'], ['UNAUTHORIZED', 'VALIDATION_ERROR'], {
+  r('GET', '/api/runs', 'bearer', 'List fuzzing runs (keyset paginated)', ['runs'], ['UNAUTHORIZED', 'VALIDATION_ERROR', 'CURSOR_MISMATCH'], {
     paginated: true,
     scopes: ['read'],
-    description: 'Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20). Envelope: { data: { runs, total, nextCursor, hasMore }, total }.',
+    description:
+      'Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20). Envelope: { data: { runs, total, nextCursor, hasMore }, total }. Cursors are versioned and bound to the sort + filter set (e.g. status): replaying a cursor after changing filters returns 400 CURSOR_MISMATCH. Legacy offset cursors reset to page 1. Ordering is total — (queuedAt, id) with a mandatory id tiebreaker — so timestamp ties cannot reorder between pages.',
+  }),
+  r('GET', '/api/runs/search', 'bearer', 'Search fuzzing runs (ranked, bounded)', ['runs'], ['UNAUTHORIZED', 'VALIDATION_ERROR'], {
+    scopes: ['read'],
+    description: 'Ranked server-side search over run identifiers, signatures, contracts, and tags. ?q=<query>&limit=<1-200> (default 50). Results are capped at 200 with a truncation hint.',
   }),
   r('POST', '/api/runs', 'bearer-or-maintainer', 'Create a fuzzing run', ['runs'], ['VALIDATION_ERROR', 'UNAUTHORIZED', 'FORBIDDEN'], {
     scopes: ['write'],
   }),
+  r('GET', '/api/runs/compare', 'bearer', 'Compare two runs field by field', ['runs'], ['VALIDATION_ERROR', 'RUN_NOT_FOUND'], {
+    scopes: ['read'],
+    description: 'Side-by-side delta for ?base=<id>&candidate=<id>: metadata, coverage, crash signature and per-field verdicts.',
+  }),
   r('GET', '/api/runs/{id}', 'bearer', 'Get a single run', ['runs'], ['RUN_NOT_FOUND', 'RUN_ID_REQUIRED', 'UNAUTHORIZED'], {
     scopes: ['read'],
+  }),
+  r('GET', '/api/runs/{id}/fee-summary', 'bearer', 'Per-run resource fee summary', ['runs'], ['RUN_NOT_FOUND', 'RUN_ID_REQUIRED', 'UNAUTHORIZED'], {
+    scopes: ['read'],
+    description: 'Normalised W5-A12 fee envelope with a flat-metric fallback and an explicit fee-data-absent state for older runs.',
   }),
   r('DELETE', '/api/runs/{id}', 'bearer-or-maintainer', 'Delete a run (maintainer)', ['runs'], ['RUN_NOT_FOUND', 'FORBIDDEN'], {
     scopes: ['write'],
@@ -70,11 +83,26 @@ export const ROUTE_REGISTRY: RouteRegistryEntry[] = [
   r('POST', '/api/runs/{id}/replay', 'bearer-or-maintainer', 'Replay a crashed run (maintainer)', ['runs'], ['RUN_NOT_FOUND', 'FORBIDDEN'], { scopes: ['write'] }),
   r('GET', '/api/runs/{id}/replay-history', 'bearer', 'Replay history for a run', ['runs'], ['RUN_NOT_FOUND'], { scopes: ['read'] }),
   r('GET', '/api/runs/{id}/stream', 'bearer', 'Stream run progress (SSE)', ['runs'], ['RUN_NOT_FOUND'], { scopes: ['read'] }),
-  r('GET', '/api/artifacts', 'bearer', 'List artifacts', ['artifacts'], ['UNAUTHORIZED'], { paginated: true, scopes: ['read'] }),
+  r('GET', '/api/artifacts', 'bearer', 'List artifacts (keyset paginated)', ['artifacts'], ['UNAUTHORIZED', 'CURSOR_MISMATCH'], {
+    paginated: true,
+    scopes: ['read'],
+    description:
+      'Cursor pagination via ?cursor=<opaque>&limit=<n> (default 20, max 100). Envelope: { data: { artifacts, total, nextCursor, hasMore }, total }. Cursors are versioned and bound to the sort; a mismatched cursor returns 400 CURSOR_MISMATCH. Ordering is total — (updatedAt|createdAt, id) with a mandatory id tiebreaker.',
+  }),
   r('POST', '/api/artifacts', 'bearer', 'Upload an artifact bundle', ['artifacts'], ['ARTIFACT_MISSING_BUNDLE_FIELD', 'ARTIFACT_PAYLOAD_TOO_LARGE'], { scopes: ['write'] }),
   r('GET', '/api/artifacts/{id}', 'bearer', 'Get an artifact', ['artifacts'], ['NOT_FOUND'], { scopes: ['read'] }),
   r('POST', '/api/artifacts/validate', 'bearer', 'Validate an artifact bundle', ['artifacts'], ['ARTIFACT_INVALID_BUNDLE', 'ARTIFACT_INVALID_JSON'], { scopes: ['write'] }),
+  r('GET', '/api/audit', 'bearer', 'Query the org-scoped audit log (keyset paginated)', ['audit'], ['UNAUTHORIZED', 'VALIDATION_ERROR', 'CURSOR_MISMATCH'], {
+    paginated: true,
+    scopes: ['read'],
+    description:
+      'Filters: ?actor=&action=&target=&since=&until=. Cursor pagination via ?cursor=<opaque>&limit=<n> (default 50, max 200) on the append-only sequence, newest first. Envelope: { data: { orgId, items, total, nextCursor, hasMore, integrity } }. Cursors are versioned and bound to the org + filter set: replaying a cursor after changing filters or org returns 400 CURSOR_MISMATCH.',
+  }),
   r('GET', '/api/campaigns', 'bearer-or-maintainer', 'List fuzz campaigns', ['campaigns'], ['UNAUTHORIZED'], { paginated: true, scopes: ['read'] }),
+  r('GET', '/api/campaigns/{id}/fees', 'bearer', 'Campaign resource fee insight', ['campaigns'], ['UNAUTHORIZED', 'VALIDATION_ERROR'], {
+    scopes: ['read'],
+    description: 'Server-aggregated cpu/memory/fee histograms, threshold crossings, top expensive fixtures and a bounded trend series. ?top=<1-50>&buckets=<1-50>&trendPoints=<2-500>; legacy pre-W5-A12 runs are reported in coverage.',
+  }),
   r('POST', '/api/campaigns', 'bearer-or-maintainer', 'Create a fuzz campaign', ['campaigns'], ['VALIDATION_ERROR', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED', 'QUOTA_EXCEEDED', 'SCHEDULING_WINDOW_CLOSED', 'QUOTA_OVERRIDE_FORBIDDEN'], {
     scopes: ['write'],
     description: 'Admission checks the class scheduling window and capacity quotas (429 QUOTA_EXCEEDED / 403 SCHEDULING_WINDOW_CLOSED, both with Retry-After). Maintainers may bypass with X-CrashLab-Quota-Override: <reason>; the bypass is audited.',

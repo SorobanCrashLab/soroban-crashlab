@@ -1,0 +1,28 @@
+{
+  "title": "Settings",
+  "description": "Account and workspace settings",
+  "tabs": {
+    "general": "General",
+    "notifications": "Notifications",
+    "api": "API",
+    "team": "Team",
+    "billing": "Billing"
+  },
+  "general": {
+    "language": "Language",
+    "theme": "Theme",
+    "timezone": "Timezone"
+  },
+  "notifications": {
+    "emailNotifications": "Email Notifications",
+    "pushNotifications": "Push Notifications",
+    "weeklyDigest": "Weekly Digest"
+  },
+  "api": {
+    "apiKeys": "API Keys",
+    "createKey": "Create API Key",
+    "revokeKey": "Revoke Key"
+  },
+  "saveChanges": "Save Changes",
+  "changesSaved": "Changes saved successfully"
+}

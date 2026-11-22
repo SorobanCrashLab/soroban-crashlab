@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { LoadingSpinner } from '../../../components/LoadingSkeleton';
+import { Can } from '../../../components/Can';
+import { explainGate, useEffectiveAccess } from '../../../lib/permissions';
 
 type DigestFrequency = 'immediate' | 'daily' | 'weekly';
 type EventType = 'run_failure' | 'flaky_detection' | 'campaign_completion';
@@ -20,6 +23,10 @@ export default function NotificationSettingsRoute() {
   const [preference, setPreference] = useState<NotificationPreference | null>(null);
   const [digestFrequency, setDigestFrequency] = useState<DigestFrequency>('immediate');
   const [enabledEvents, setEnabledEvents] = useState<EventType[]>(['run_failure']);
+
+  // Saving notification preferences is a server write (settings:write, #1880).
+  const { status: accessStatus, role, can: holdsCapability } = useEffectiveAccess();
+  const canSavePreferences = holdsCapability('settings:write');
 
   useEffect(() => {
     async function fetchPreference() {
@@ -42,6 +49,7 @@ export default function NotificationSettingsRoute() {
   }, []);
 
   async function handleSavePreferences() {
+    if (!canSavePreferences) return;
     try {
       const res = await fetch('/api/settings/notifications', {
         method: 'POST',
@@ -77,9 +85,17 @@ export default function NotificationSettingsRoute() {
 
   return (
     <div className="px-6 md:px-8 max-w-5xl mx-auto w-full py-14 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold mb-2">Notification Settings</h1>
-        <p className="text-gray-600">Configure how you receive notifications</p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold mb-2">Notification Settings</h1>
+          <p className="text-gray-600">Configure how you receive notifications</p>
+        </div>
+        <Link
+          href="/settings/notifications/rules"
+          className="btn-outline text-xs sm:text-sm px-4 py-2"
+        >
+          Open Notification Rules &amp; Escalation Builder
+        </Link>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 space-y-6">
@@ -129,13 +145,32 @@ export default function NotificationSettingsRoute() {
           </div>
         </div>
 
+        {!canSavePreferences && (
+          <p id="notifications-gate-note" data-testid="gate-note-settings:write" className="text-xs text-amber-700">
+            {explainGate('settings:write', accessStatus, role)}
+          </p>
+        )}
         <div className="border-t pt-6 flex gap-3">
-          <button
-            onClick={handleSavePreferences}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+          <Can
+            capability="settings:write"
+            mode="disabled"
+            showNote={false}
+            describedBy="notifications-gate-note"
           >
-            Save Preferences
-          </button>
+            {(gate) => (
+              <button
+                onClick={handleSavePreferences}
+                disabled={gate.disabled}
+                className={`px-4 py-2 rounded-md font-medium ${
+                  gate.disabled
+                    ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Save Preferences
+              </button>
+            )}
+          </Can>
           <button
             onClick={() => {
               if (preference) {

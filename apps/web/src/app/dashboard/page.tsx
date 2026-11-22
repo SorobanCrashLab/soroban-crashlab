@@ -9,7 +9,6 @@ import { PageHeader, PageSection, StatCard } from "../../components";
 import { useRuns } from "../../hooks/useRuns";
 import { usePullToRefresh } from "../../hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "../../components/PullToRefreshIndicator";
-import DashboardSectionLayoutEditor from "../dashboard-section-layout-editor";
 import { WidgetErrorBoundary } from "../../components/WidgetErrorBoundary";
 import { useToast } from "../../components/Toast";
 import {
@@ -20,14 +19,30 @@ import {
   type DashboardSectionConfig,
   type DashboardSectionId,
 } from "../dashboard-layout-utils";
-import { ResourceFeeInsightPanel } from "../../features/misc/implement-resource-fee-insight-panel-component";
-import RunHealthScoreWidget from "../../features/runs/implement-run-health-score-widget";
 import Pagination from "../Pagination";
 import { getPageSlice, computeTotalPages, clampPage } from "../pagination-utils";
 
 const AddTaggingAndLabelsUi = dynamic(
   () => import("../../features/misc/add-tagging-and-labels-ui"),
   { ssr: false }
+);
+
+// Below-the-fold widgets are split out of the dashboard's first-load chunk.
+// They still render after hydration; nothing above the fold waits on them.
+const DashboardSectionLayoutEditor = dynamic(
+  () => import("../dashboard-section-layout-editor"),
+  { ssr: false }
+);
+const ResourceFeeInsightPanel = dynamic(
+  () =>
+    import("../../features/misc/implement-resource-fee-insight-panel-component").then(
+      (mod) => ({ default: mod.ResourceFeeInsightPanel }),
+    ),
+  { ssr: false },
+);
+const RunHealthScoreWidget = dynamic(
+  () => import("../../features/runs/implement-run-health-score-widget"),
+  { ssr: false },
 );
 import { runMatchesTagFilter } from "../run-tags-utils";
 import { CoverflowCarousel } from "../../components/scroll-effects/CoverflowCarousel";

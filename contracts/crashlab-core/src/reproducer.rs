@@ -63,14 +63,16 @@ pub struct ReproReport {
 /// # Example
 ///
 /// ```rust
-/// use crashlab_core::{to_bundle, CaseSeed};
+/// use crashlab_core::{to_bundle, CaseSeed, RetryConfig};
 /// use crashlab_core::reproducer::FlakyDetector;
 ///
 /// let bundle = to_bundle(CaseSeed { id: 1, payload: vec![1, 2, 3] });
 /// let detector = FlakyDetector::new(10, 0.1);
 ///
 /// // In a real integration this closure invokes the contract under test.
-/// let report = detector.check(&bundle, |_seed| Ok(bundle.signature.clone())).unwrap();
+/// let report = detector
+///     .check(&bundle, &RetryConfig::default(), |_seed| Ok(bundle.signature.clone()))
+///     .unwrap();
 /// assert!(report.is_stable);
 /// ```
 #[derive(Debug, Clone)]

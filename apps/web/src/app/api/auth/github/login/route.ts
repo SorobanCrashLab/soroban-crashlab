@@ -2,24 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response-utils';
 import { safeRedirectPath } from '@/lib/safe-redirect';
+import {
+  issueState,
+  STATE_COOKIE_NAME,
+  NEXT_COOKIE_NAME,
+  STATE_MAX_AGE_SECONDS,
+} from '@/lib/github-oauth-state';
 
 const GITHUB_AUTH_URL = 'https://github.com/login/oauth/authorize';
-const STATE_COOKIE_NAME = 'github_oauth_state';
-const STATE_MAX_AGE_SECONDS = 600;
-const NEXT_COOKIE_NAME = 'github_oauth_next';
 
 /**
  * GET /api/auth/github/login
  * Initiates the GitHub OAuth 2.0 flow.
  *
- * Generates a cryptographically random state parameter, stores it in a
- * short-lived httpOnly cookie, and redirects the user to GitHub's
- * authorization endpoint.
+ * Generates an HMAC-signed, cryptographically bound `state` parameter and
+ * stores it in a short-lived HttpOnly, Secure (production), SameSite=Lax
+ * cookie (10-minute expiry), then redirects the user to GitHub's
+ * authorization endpoint. The cookie is single-use: the callback clears it on
+ * every outcome, so a captured or replayed state can only be used once.
  *
  * An optional `?next=` parameter is validated through the shared
- * safe-redirect validator and stashed in a short-lived cookie so the
- * callback can resume the intended deep link. Invalid values fall back to
- * `/` with an audit log entry.
+ * safe-redirect validator and stashed in a short-lived cookie so the callback
+ * can resume the intended deep link. Invalid values fall back to `/` with an
+ * audit log entry.
  */
 export async function GET(request: NextRequest) {
   const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -29,7 +34,7 @@ export async function GET(request: NextRequest) {
     return errorResponse('GitHub OAuth is not configured.', 503);
   }
 
-  const state = crypto.randomUUID();
+  const state = await issueState();
 
   const rawNext = request.nextUrl.searchParams.get('next');
   const nextPath = safeRedirectPath(rawNext, {

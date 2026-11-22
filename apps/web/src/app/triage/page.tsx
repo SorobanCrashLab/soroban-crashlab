@@ -28,9 +28,17 @@ import {
   getRovingTabIndex,
   type KeyboardBoardState,
 } from "./triage-board-keyboard";
-import BulkActionsForRuns from "../../features/runs/add-bulk-actions-for-runs";
-import { getSelectedRuns } from "../runs-bulk-actions-utils";
 import { useTriageSelection } from "./use-triage-selection";
+import { getSelectedRuns } from "../runs-bulk-actions-utils";
+import dynamic from "next/dynamic";
+import { LoadingSpinner } from "../../components/LoadingSkeleton";
+
+// Bulk actions are only reachable after selecting cards. Splitting them keeps
+// the triage board's first-load chunk focused on the board itself (#1881).
+const BulkActionsForRuns = dynamic(
+  () => import("../../features/runs/add-bulk-actions-for-runs"),
+  { ssr: false, loading: () => <LoadingSpinner /> },
+);
 import {
   DEFAULT_SWIMLANE_CONFIG,
   parseSwimlaneConfig,

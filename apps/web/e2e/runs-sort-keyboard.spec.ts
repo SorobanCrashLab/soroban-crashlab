@@ -54,7 +54,7 @@ const mockRuns = [
 ];
 
 const fulfillRunsRequest = async (page: Page) => {
-  await page.route('**/api/runs', async (route) => {
+  await page.route('**/api/runs*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

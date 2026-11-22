@@ -1,17 +1,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from 'recharts';
 import { CorpusStatPoint } from '../types';
 import { downsampleCorpusStats } from '../../lib/utils/downsampler';
+import { TimeSeriesChart } from '../../components/charts';
 
 export interface CorpusStatsPanelProps {
   /** Optional time-series telemetry events from fuzzing engine coverage counters */
@@ -69,11 +61,6 @@ export function CorpusStatsPanel({
 
   const latest = series[series.length - 1];
 
-  const formattedChartData = downsampledData.map((pt) => ({
-    ...pt,
-    timeFormatted: new Date(pt.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-  }));
-
   return (
     <div className="card card-padding space-y-6" id="corpus-stats-panel">
       <div className="flex items-center justify-between">
@@ -117,70 +104,26 @@ export function CorpusStatsPanel({
         </div>
       </div>
 
-      {/* Coverage Line Chart */}
       <div className="pt-2">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-meta">
-            Coverage Momentum Over Time
-          </h3>
-          <span className="text-[10px] text-meta">
-            {downsampledData.length} downsampled chart points
-          </span>
-        </div>
-
-        <div className="h-64 w-full" id="corpus-coverage-chart">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={formattedChartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-              <defs>
-                <linearGradient id="coverageGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.6} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
-
-              <XAxis
-                dataKey="timeFormatted"
-                stroke="#94a3b8"
-                style={{ fontSize: '10px' }}
-                tickLine={false}
-              />
-
-              <YAxis
-                stroke="#94a3b8"
-                style={{ fontSize: '10px' }}
-                domain={[0, 100]}
-                unit="%"
-                tickLine={false}
-              />
-
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0f172a',
-                  borderColor: '#334155',
-                  borderRadius: '0.375rem',
-                  color: '#f8fafc',
-                  fontSize: '12px',
-                }}
-                formatter={(val: unknown) => {
-                  const num = typeof val === 'number' ? val : Number(val) || 0;
-                  return [`${num.toFixed(1)}%`, 'Coverage'];
-                }}
-                labelFormatter={(label) => `Time: ${label}`}
-              />
-
-              <Area
-                type="monotone"
-                dataKey="coveragePct"
-                stroke="#6366f1"
-                strokeWidth={2}
-                fill="url(#coverageGradient)"
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+        <p className="text-meta text-[10px] mb-2">
+          {downsampledData.length} downsampled chart points
+        </p>
+        <TimeSeriesChart
+          id="corpus-coverage-chart"
+          title="Coverage Momentum Over Time"
+          description="Engine coverage percentage across the selected telemetry stream."
+          area
+          height={256}
+          maxPoints={500}
+          yDomain={{ min: 0, max: 100 }}
+          formatValue={(value) => `${value.toFixed(1)}%`}
+          series={[{
+            id: 'coverage',
+            label: 'Coverage',
+            color: 'var(--ds-color-info-text, #1e40af)',
+            data: downsampledData.map((point) => ({ x: point.ts, y: point.coveragePct })),
+          }]}
+        />
       </div>
     </div>
   );

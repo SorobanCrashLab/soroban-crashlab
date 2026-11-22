@@ -1,0 +1,24 @@
+{
+  "title": "[Íñtégrátíóñs]",
+  "description": "[Çóññéçtéd sérvíçés áñd wébhóóks]",
+  "connect": "[Çóññéçt]",
+  "disconnect": "[Dísçóññéçt]",
+  "configure": "[Çóñfígúré]",
+  "test": "[Tést Çóññéçtíóñ]",
+  "status": {
+    "connected": "[Çóññéçtéd]",
+    "disconnected": "[Dísçóññéçtéd]",
+    "error": "[Çóññéçtíóñ Érrór]"
+  },
+  "types": {
+    "github": "[GítHúb]",
+    "slack": "[Sláçk]",
+    "jira": "[Jírá]",
+    "sentry": "[Séñtrý]",
+    "webhook": "[Wébhóók]"
+  },
+  "empty": {
+    "title": "[Ñó íñtégrátíóñs]",
+    "description": "[Çóññéçt éxtérñál sérvíçés tó éñháñçé ýóúr wórkflów]"
+  }
+}

@@ -14,8 +14,8 @@
  * a rotation story before this grows unbounded.
  */
 
-import { createHash } from 'node:crypto';
 import { redactMetadata } from './redaction';
+import { sha256Hex } from './sha256';
 
 export const GENESIS_HASH = '0'.repeat(64);
 
@@ -35,7 +35,12 @@ export type AuditAction =
   | 'auth.login'
   | 'auth.login.denied'
   | 'auth.role.grant'
-  | 'tenant.access.denied';
+  | 'tenant.access.denied'
+  | 'quota.override'
+  | 'triage.status'
+  | 'triage.assign'
+  | 'triage.priority'
+  | 'triage.bulk';
 
 /** Used when no principal could be resolved — availability over attribution. */
 export const SYSTEM_ACTOR = 'system';
@@ -130,7 +135,7 @@ export function entryPreimage(entry: Omit<AuditEntry, 'hash'>): string {
 }
 
 export function hashEntry(entry: Omit<AuditEntry, 'hash'>): string {
-  return createHash('sha256').update(entryPreimage(entry), 'utf8').digest('hex');
+  return sha256Hex(entryPreimage(entry));
 }
 
 export type ChainStatus = 'intact' | 'broken' | 'empty';

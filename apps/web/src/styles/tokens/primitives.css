@@ -1,0 +1,55 @@
+:root {
+  --primitive-color-neutral-0: #ffffff;
+  --primitive-color-neutral-50: #f9f9f7;
+  --primitive-color-neutral-100: #f5f5f5;
+  --primitive-color-neutral-200: #e5e5e0;
+  --primitive-color-neutral-400: #a3a3a3;
+  --primitive-color-neutral-600: #525252;
+  --primitive-color-neutral-700: #404040;
+  --primitive-color-neutral-900: #111111;
+  --primitive-color-neutral-950: #0c0c0c;
+  --primitive-color-green-800: #166534;
+  --primitive-color-amber-800: #854d0e;
+  --primitive-color-red-700: #b91c1c;
+  --primitive-color-blue-800: #1e40af;
+
+  --primitive-space-0: 0;
+  --primitive-space-1: 0.25rem;
+  --primitive-space-2: 0.5rem;
+  --primitive-space-3: 0.75rem;
+  --primitive-space-4: 1rem;
+  --primitive-space-5: 1.25rem;
+  --primitive-space-6: 1.5rem;
+  --primitive-space-8: 2rem;
+  --primitive-space-10: 2.5rem;
+  --primitive-space-12: 3rem;
+  --primitive-space-unit: 0.25rem;
+
+  --primitive-font-size-xs: 0.75rem;
+  --primitive-font-size-sm: 0.875rem;
+  --primitive-font-size-base: 0.875rem;
+  --primitive-font-size-lg: 1rem;
+  --primitive-font-size-xl: 1.25rem;
+  --primitive-font-size-2xl: 1.5rem;
+  --primitive-font-size-3xl: 2rem;
+  --primitive-line-height-tight: 1.2;
+  --primitive-line-height-normal: 1.4;
+  --primitive-line-height-relaxed: 1.625;
+
+  --primitive-radius-none: 0;
+  --primitive-radius-sm: 0.25rem;
+  --primitive-radius-md: 0.5rem;
+  --primitive-radius-lg: 0.75rem;
+  --primitive-radius-full: 9999px;
+
+  --primitive-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.08);
+  --primitive-shadow-md: 0 0 0 1px rgb(0 0 0 / 0.08), 0 1px 0 rgb(0 0 0 / 0.04);
+  --primitive-shadow-lg: 0 12px 24px rgb(0 0 0 / 0.16);
+
+  --primitive-z-index-base: 0;
+  --primitive-z-index-sticky: 20;
+  --primitive-z-index-dropdown: 40;
+  --primitive-z-index-overlay: 100;
+  --primitive-z-index-modal: 200;
+  --primitive-z-index-toast: 300;
+}

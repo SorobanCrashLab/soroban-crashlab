@@ -6,7 +6,8 @@ export type RunStreamEventType =
   | 'LOG_APPEND'
   | 'ARTIFACT_ADDED'
   | 'HEARTBEAT'
-  | 'STATIC';
+  | 'STATIC'
+  | 'LAGGING';
 
 export interface RunStatusEvent {
   type: 'RUN_STATUS';
@@ -36,12 +37,22 @@ export interface HeartbeatEvent {
   at: string;
 }
 
+/** Best-effort hint that the server dropped frames the client did not read. */
+export interface LaggingEvent {
+  type: 'LAGGING';
+  dropped: number;
+}
+
 export type RunStreamPayload =
   | RunStatusEvent
   | LogAppendEvent
   | ArtifactAddedEvent
   | HeartbeatEvent
-  | StaticRunEvent;
+  | StaticRunEvent
+  | LaggingEvent;
+
+/** Every event a run stream can carry. */
+export type RunStreamEvent = RunStreamPayload;
 
 export interface RunStreamEnvelope<T extends RunStreamPayload = RunStreamPayload> {
   seq: number;

@@ -34,6 +34,16 @@ The probe [`examples/repro_probe.rs`](../contracts/crashlab-core/examples/repro_
 exercises exactly this chain for a fixed seed set and folds every result into
 one digest. Equal digests on two platforms are the evidence below.
 
+The determinism suite [`tests/replay_equivalence.rs`](../contracts/crashlab-core/tests/replay_equivalence.rs)
+goes one step further: it compares every fixed seed's class and signature
+**byte for byte** with the committed golden file
+[`tests/golden/replay_equivalence.json`](../contracts/crashlab-core/tests/golden/replay_equivalence.json),
+and the `replay-equivalence` CI matrix
+(`.github/workflows/regression-suite.yml`) runs that comparison on Linux, macOS
+and Windows. A mismatch prints the first differing line and the regenerate
+command (`CRASHLAB_REPLAY_GOLDEN_MODE=update cargo test -p crashlab-core
+--test replay_equivalence`).
+
 ### Support matrix
 
 Platforms with a ✅ row in the evidence table are **supported**: replays
@@ -53,6 +63,7 @@ and checked on replay (W5-B08):
 | Soroban SDK / host version | **Yes** for host-mode replays | Host traps and metering change between releases |
 | Ledger state / RPC network | **Yes** for RPC-mode replays | Results depend on on-chain state |
 | OS (`os`), CPU architecture (`arch`), family | No, *within the support matrix* — flagged as "material" so a divergence is explained | Evidence shows these do not affect the guaranteed chain |
+| Endianness (`endian`), pointer width (`pointer_width`), path separator (`path_separator`) | No — replay names each differing axis so a divergence is explained | Integer-only chain; recorded so cross-platform drift is diagnosable (#1799). Fingerprints without these fields are read as "unspecified", never as a difference |
 | Toolchain (rustc), worker count, machine speed, locale, time zone | No | Not inputs to the guaranteed chain |
 
 ## 4. Version window

@@ -5,7 +5,7 @@ import { DEFAULT_SCHEDULE_CLASS, evaluateTick } from '@/lib/cron';
 import { readSchedulingWindows } from '@/lib/capacity/windows';
 import { scheduledCampaignIdempotencyKey } from '@/lib/idempotency-key';
 import { getSchedulerState, setSchedulerState } from '../_store';
-import { getCronLock, createInMemoryCronLock } from '@/lib/cron/lock';
+import { getCronLock } from '@/lib/cron/lock';
 import { applyMisfirePolicies, recordExecutionLedgerEntry } from '@/lib/cron/ledger';
 
 function verifyCronAuth(request: NextRequest): boolean {
@@ -93,10 +93,10 @@ export const POST = withRouteErrorHandling(
       });
 
       // 7. Record ledger entries for each created/deferred/skipped execution
-      let ledgerHistory = outcome.history;
+      const ledgerHistory = outcome.history;
+      let ledger = state.ledger;
       for (const created of outcome.created) {
-        ledgerHistory = recordExecutionLedgerEntry({
-          history: ledgerHistory,
+        ledger = recordExecutionLedgerEntry(ledger, {
           scheduleId: created.scheduleId,
           scheduleName: created.scheduleName,
           plannedFor: created.scheduledFor,
@@ -107,15 +107,15 @@ export const POST = withRouteErrorHandling(
         });
       }
       for (const deferred of outcome.deferred) {
-        ledgerHistory = recordExecutionLedgerEntry({
-          history: ledgerHistory,
+        const deferredAt = deferred.executedAt ?? now.toISOString();
+        ledger = recordExecutionLedgerEntry(ledger, {
           scheduleId: deferred.scheduleId,
-          scheduleName: deferred.scheduleName,
-          plannedFor: deferred.scheduledFor,
-          runId: deferred.id,
+          scheduleName: deferred.scheduleName ?? deferred.scheduleId,
+          plannedFor: deferred.scheduledFor ?? now.toISOString(),
+          runId: deferred.id ?? `deferred-${deferred.scheduleId}-${now.getTime()}`,
           outcome: 'skipped_overlap',
-          startedAt: deferred.executedAt,
-          finishedAt: deferred.executedAt,
+          startedAt: deferredAt,
+          finishedAt: deferredAt,
         });
       }
 
@@ -136,15 +136,17 @@ export const POST = withRouteErrorHandling(
       };
 
       setSchedulerState({
+        ...state,
         schedules: outcome.schedules,
         history: [...ledgerHistory, tickRecord],
+        ledger,
       });
 
       return successResponse({
         created: outcome.created,
         deferred: outcome.deferred,
         schedules: outcome.schedules,
-        history: ledgerHistory,
+        history: [...ledgerHistory, tickRecord],
         misfires: recovery.misfires,
         evaluatedAt: now.toISOString(),
       });
@@ -155,10 +157,3 @@ export const POST = withRouteErrorHandling(
   },
 );
 
-// Test helper to reset lock (for testing)
-export async function __resetCronLockForTesting(): Promise<void> {
-  const inMemoryLock = createInMemoryCronLock();
-  // Reset the global lock to in-memory for tests
-  const { setCronLock } = await import('@/lib/cron/lock');
-  setCronLock(inMemoryLock);
-}

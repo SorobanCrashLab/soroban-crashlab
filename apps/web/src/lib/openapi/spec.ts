@@ -87,13 +87,14 @@ export function buildOpenApiSpec() {
       title: 'Soroban CrashLab API',
       version: '1.0.0',
       description:
-        'Machine-readable contract for the CrashLab API. Global envelope: success is { data, total? }; errors are { error, code?, fieldErrors? }. Auth: `Authorization: Bearer <token>` with scopes `read`/`write` (tokens look like `scl_live_*`); maintainer-only routes additionally require role `maintainer`. Pagination is keyset-based via opaque `cursor` + `limit`.',
+        'Machine-readable contract for the CrashLab API. Global envelope: success is { data, total? }; errors are { error, code?, fieldErrors? }. Auth: `Authorization: Bearer <token>` with scopes `read`/`write` (tokens look like `scl_live_*`); maintainer-only routes additionally require role `maintainer`. Pagination is keyset-based via opaque `cursor` + `limit`; every paginated list route returns `nextCursor` + `hasMore` in its data payload. Cursors are versioned and bound to the route\'s sort/filter set — replaying a cursor against a changed query returns 400 CURSOR_MISMATCH, and legacy offset cursors reset to page 1.',
     },
     servers: [{ url: '/' }],
     security: [{ bearerAuth: [] }],
     tags: [
       { name: 'runs', description: 'Fuzzing runs, replay, tags, annotations, issues' },
       { name: 'artifacts', description: 'Artifact bundles and validation' },
+      { name: 'audit', description: 'Org-scoped audit log with integrity verification' },
       { name: 'campaigns', description: 'Fuzz campaigns' },
       { name: 'schedules', description: 'Scheduled campaigns' },
       { name: 'webhooks', description: 'Webhooks and delivery history' },

@@ -14,6 +14,22 @@ import type { CampaignClass } from '../capacity/quotas';
 /** Class a schedule fires as when it does not name one (#1904). */
 export const DEFAULT_SCHEDULE_CLASS: CampaignClass = 'nightly';
 
+/** What to do with cron slots missed while the scheduler was down. */
+export type MisfirePolicy = 'skip' | 'run-immediately';
+/** What to do when a slot comes due while the previous run is still active. */
+export type OverlapPolicy = 'skip' | 'allow' | 'queue';
+
+export interface CronPolicy {
+  misfire: MisfirePolicy;
+  /** Maximum number of missed slots collapsed into a catch-up run. */
+  catchUpCap: number;
+  overlap: OverlapPolicy;
+}
+
+export const DEFAULT_MISFIRE_POLICY: MisfirePolicy = 'run-immediately';
+export const DEFAULT_OVERLAP_POLICY: OverlapPolicy = 'skip';
+export const DEFAULT_CATCH_UP_CAP = 3;
+
 export interface Schedule {
   id: string;
   name: string;
@@ -33,6 +49,10 @@ export interface Schedule {
    * scheduling window and priority. Absent means {@link DEFAULT_SCHEDULE_CLASS}.
    */
   campaignClass?: CampaignClass;
+  /** Misfire/overlap behaviour for this schedule. */
+  policy?: CronPolicy;
+  /** Cached next fire time (ISO), when known. */
+  nextRun?: string | null;
 }
 
 /** Tag applied to every run the scheduler produces, surfaced in the runs list. */
@@ -67,6 +87,9 @@ export interface ScheduleInput {
   cron: string;
   enabled?: boolean;
   campaignClass?: CampaignClass;
+  misfirePolicy?: MisfirePolicy;
+  misfireCatchUpCap?: number;
+  overlapPolicy?: OverlapPolicy;
 }
 
 export const MAX_SCHEDULE_NAME_LENGTH = 80;
@@ -107,6 +130,11 @@ export function createSchedule(input: ScheduleInput, now: string, id: string): S
     createdAt: now,
     updatedAt: now,
     lastRunAt: null,
+    policy: {
+      misfire: input.misfirePolicy ?? DEFAULT_MISFIRE_POLICY,
+      catchUpCap: input.misfireCatchUpCap ?? DEFAULT_CATCH_UP_CAP,
+      overlap: input.overlapPolicy ?? DEFAULT_OVERLAP_POLICY,
+    },
     ...(input.campaignClass ? { campaignClass: input.campaignClass } : {}),
   };
 }
@@ -115,7 +143,13 @@ export function addSchedule(list: readonly Schedule[], schedule: Schedule): Sche
   return [...list, schedule];
 }
 
-export type SchedulePatch = Partial<Pick<Schedule, 'name' | 'cron' | 'enabled' | 'campaignClass'>>;
+export type SchedulePatch = Partial<
+  Pick<Schedule, 'name' | 'cron' | 'enabled' | 'campaignClass'>
+> & {
+  misfire?: MisfirePolicy;
+  overlap?: OverlapPolicy;
+  catchUpCap?: number;
+};
 
 export function updateSchedule(
   list: readonly Schedule[],
@@ -136,6 +170,17 @@ export function updateSchedule(
     }
     if (patch.enabled !== undefined) next.enabled = patch.enabled;
     if (patch.campaignClass !== undefined) next.campaignClass = patch.campaignClass;
+    if (
+      patch.misfire !== undefined ||
+      patch.overlap !== undefined ||
+      patch.catchUpCap !== undefined
+    ) {
+      next.policy = {
+        misfire: patch.misfire ?? next.policy?.misfire ?? DEFAULT_MISFIRE_POLICY,
+        catchUpCap: patch.catchUpCap ?? next.policy?.catchUpCap ?? DEFAULT_CATCH_UP_CAP,
+        overlap: patch.overlap ?? next.policy?.overlap ?? DEFAULT_OVERLAP_POLICY,
+      };
+    }
     next.updatedAt = now;
     return next;
   });
@@ -170,4 +215,58 @@ export function nextRunForSchedule(schedule: Schedule, after: Date): Date | null
   } catch {
     return null;
   }
+}
+
+export type MisfirePolicyNormalization =
+  | { policy: MisfirePolicy; catchUpCap: number }
+  | { error: string };
+
+/**
+ * Normalizes a request-supplied misfire setting. Accepts a policy string or an
+ * object carrying `policy`/`misfire` and `catchUpCap`; absent means the default.
+ */
+export function normalizeMisfirePolicy(raw: unknown): MisfirePolicyNormalization {
+  let policy: unknown = raw;
+  let catchUpCap: unknown = DEFAULT_CATCH_UP_CAP;
+
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    const record = raw as Record<string, unknown>;
+    policy = record.policy ?? record.misfire;
+    catchUpCap = record.catchUpCap ?? DEFAULT_CATCH_UP_CAP;
+  }
+
+  if (policy === undefined || policy === null) policy = DEFAULT_MISFIRE_POLICY;
+  if (policy !== 'skip' && policy !== 'run-immediately') {
+    return { error: 'misfirePolicy must be skip or run-immediately.' };
+  }
+  if (
+    typeof catchUpCap !== 'number' ||
+    !Number.isInteger(catchUpCap) ||
+    catchUpCap < 0 ||
+    catchUpCap > 100
+  ) {
+    return { error: 'misfireCatchUpCap must be an integer between 0 and 100.' };
+  }
+
+  return { policy, catchUpCap };
+}
+
+export type OverlapPolicyNormalization =
+  | { policy: OverlapPolicy }
+  | { error: string };
+
+/** Normalizes a request-supplied overlap policy; absent means the default. */
+export function normalizeOverlapPolicy(raw: unknown): OverlapPolicyNormalization {
+  let policy: unknown = raw;
+
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    policy = (raw as Record<string, unknown>).policy ?? (raw as Record<string, unknown>).overlap;
+  }
+
+  if (policy === undefined || policy === null) policy = DEFAULT_OVERLAP_POLICY;
+  if (policy !== 'skip' && policy !== 'allow' && policy !== 'queue') {
+    return { error: 'overlapPolicy must be skip, allow or queue.' };
+  }
+
+  return { policy };
 }

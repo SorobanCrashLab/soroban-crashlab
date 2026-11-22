@@ -4,7 +4,7 @@
 //! compatibility validation, and manifest-level checks at load time.
 
 use crate::provenance::{
-    verify_optional, ProvenanceError, ProvenanceOutcome, ProvenancePolicy, ProvenanceRecord,
+    verify_optional, ProvenanceOutcome, ProvenancePolicy, ProvenanceRecord,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

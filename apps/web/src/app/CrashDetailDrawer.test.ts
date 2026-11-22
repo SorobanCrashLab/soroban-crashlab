@@ -16,8 +16,8 @@ function testDrawerImplementation() {
             pattern: /status, setStatus.*ReplayButtonStatus/,
         },
         {
-            name: 'Checks for maintainer mode before triggering replay',
-            pattern: /if \(.*!isMaintainer.*\)\s*return/,
+            name: 'Checks replay capability before triggering replay',
+            pattern: /if \(.*!canTriggerReplay.*\)\s*return/,
         },
         {
             name: 'Displays "Running replay…" when loading',
@@ -36,8 +36,8 @@ function testDrawerImplementation() {
             pattern: /href=\{`\/\?run=\$\{replayedRunId\}`\}/,
         },
         {
-            name: 'Includes maintainer mode restriction help text',
-            pattern: /Enable maintainer mode to trigger replays/,
+            name: 'Shows capability-based restriction help text',
+            pattern: /explainGate\('runs:replay', accessStatus, role\)/,
         },
         {
             name: 'Uses accessible aria attributes',

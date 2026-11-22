@@ -28,7 +28,7 @@ export type AuthClass = 'public' | 'session' | 'token';
 export type RateLimitClass = 'default' | 'strict' | 'lenient' | 'none';
 
 export interface RouteCapability {
-  role: UserRole;
+  role?: UserRole;
   scopes?: ApiTokenScope[];
 }
 
@@ -78,6 +78,14 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('GET', '/api/health', 'public', null, 'none'),
   r('GET', '/api/health/liveness', 'public', null, 'none'),
   r('GET', '/api/health/metrics', 'token', null, 'none'),
+  r('GET', '/api/automation/executions', 'session', null, 'default'),
+  r('GET', '/api/automation/rules', 'session', null, 'default'),
+  r('POST', '/api/automation/rules', 'session', { role: 'maintainer' }, 'default'),
+  r('GET', '/api/automation/rules/[ruleId]', 'session', null, 'default'),
+  r('PATCH', '/api/automation/rules/[ruleId]', 'session', { role: 'maintainer' }, 'default'),
+  r('DELETE', '/api/automation/rules/[ruleId]', 'session', { role: 'maintainer' }, 'default'),
+  r('POST', '/api/automation/simulate', 'session', { role: 'analyst' }, 'default'),
+  r('GET', '/api/automation/triggers', 'session', null, 'default'),
   r('GET', '/api/integrations/ci/results', 'public', null, 'default'),
   r('POST', '/api/integrations/ci/results', 'token', { role: 'analyst', scopes: ['ci:write'] }, 'default'),
   r('GET', '/api/integrations/datadog/metrics', 'session', null, 'default'),
@@ -131,6 +139,7 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('POST', '/api/runs/[id]/replay', 'session', { role: 'maintainer', scopes: ['runs:write'] }, 'default'),
   r('GET', '/api/runs/[id]/replay-history', 'session', { scopes: ['runs:read'] }, 'default'),
   r('GET', '/api/runs/[id]/stream', 'session', { scopes: ['runs:read'] }, 'default'),
+  r('GET', '/api/runs/[id]/state', 'session', { scopes: ['runs:read'] }, 'default'),
   r('DELETE', '/api/runs/[id]/tags', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
   r('GET', '/api/runs/[id]/tags', 'session', { scopes: ['runs:read'] }, 'default'),
   r('POST', '/api/runs/[id]/tags', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
@@ -170,7 +179,15 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('POST', '/api/webhooks/retry', 'token', { role: 'maintainer', scopes: ['webhook:write'] }, 'default'),
   r('GET', '/api/webhooks/signing-secrets', 'token', { scopes: ['webhook:read'] }, 'default'),
   r('POST', '/api/webhooks/signing-secrets/[keyId]/revoke-grace', 'token', { role: 'maintainer', scopes: ['webhook:write'] }, 'default'),
-  r('POST', '/api/webhooks/signing-secrets/rotate', 'token', { role: 'maintainer', scopes: ['webhook:write'] }, 'default'),];
+  r('POST', '/api/webhooks/signing-secrets/rotate', 'token', { role: 'maintainer', scopes: ['webhook:write'] }, 'default'),
+
+  // Admin API routes
+  r('GET', '/api/admin/quotas', 'token', { role: 'maintainer', scopes: ['admin:read'] }, 'default'),
+  r('POST', '/api/admin/quotas', 'token', { role: 'maintainer', scopes: ['admin:write'] }, 'default'),
+  r('DELETE', '/api/admin/quotas', 'token', { role: 'maintainer', scopes: ['admin:write'] }, 'default'),
+  r('GET', '/api/admin/abuse', 'token', { role: 'maintainer', scopes: ['admin:read'] }, 'default'),
+  r('POST', '/api/admin/abuse', 'token', { role: 'maintainer', scopes: ['admin:write'] }, 'default'),
+  r('DELETE', '/api/admin/abuse', 'token', { role: 'maintainer', scopes: ['admin:write'] }, 'default'),];
 
 /**
  * True when `pathname` matches a catalog `path`, treating `[param]` segments as
