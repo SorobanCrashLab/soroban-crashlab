@@ -5,8 +5,8 @@
  * but heavier) > long-polling (always works, but least efficient).
  */
 
-import type { WebSocketTransport } from './WebSocketTransport';
-import type { LongPollTransport } from './LongPollTransport';
+import type { WebSocketTransport as _WebSocketTransport } from './WebSocketTransport';
+import type { LongPollTransport as _LongPollTransport } from './LongPollTransport';
 
 export type TransportType = 'sse' | 'websocket' | 'longpoll';
 

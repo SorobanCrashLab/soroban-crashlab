@@ -15,6 +15,7 @@ function ValueAutocompleteBase({ value, onChange, suggestions = [], disabled }: 
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     setSearch(String(value));
   }, [value]);
 

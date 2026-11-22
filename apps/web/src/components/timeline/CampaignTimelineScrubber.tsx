@@ -94,17 +94,20 @@ export default function CampaignTimelineScrubber({
 
   // Keep the focus inside an updated range (e.g. after a live poll extends it).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     setFocusMs((current) => clampToWindow(current, full));
   }, [full]);
 
   // Live mode follows the newest sample unless the operator is scrubbing.
   useEffect(() => {
     if (!liveActive || scrubbing) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     setFocusMs(full.endMs);
     setNarrowWindow(null);
   }, [liveActive, scrubbing, full.endMs]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     if (live) setLivePausedLocally(false);
   }, [live]);
 
@@ -114,6 +117,7 @@ export default function CampaignTimelineScrubber({
   }, [full, focusMs, narrowWindow, zoomLevel]);
 
   const viewWindowRef = useRef<TimelineWindow>(viewWindow);
+  // eslint-disable-next-line react-hooks/refs -- intentional state sync in this hook
   viewWindowRef.current = viewWindow;
 
   const visibleBuckets = useMemo(() => sliceBuckets(series, viewWindow), [series, viewWindow]);
@@ -214,6 +218,7 @@ export default function CampaignTimelineScrubber({
         return next;
       });
     },
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization -- intentional state sync in this hook
     [focusMs, full, fullSpan, pauseLive],
   );
 

@@ -5,7 +5,7 @@ import { DEFAULT_SCHEDULE_CLASS, evaluateTick } from '@/lib/cron';
 import { readSchedulingWindows } from '@/lib/capacity/windows';
 import { scheduledCampaignIdempotencyKey } from '@/lib/idempotency-key';
 import { getSchedulerState, setSchedulerState } from '../_store';
-import { getCronLock, createInMemoryCronLock } from '@/lib/cron/lock';
+import { getCronLock } from '@/lib/cron/lock';
 import { applyMisfirePolicies, recordExecutionLedgerEntry } from '@/lib/cron/ledger';
 
 function verifyCronAuth(request: NextRequest): boolean {
@@ -157,10 +157,3 @@ export const POST = withRouteErrorHandling(
   },
 );
 
-// Test helper to reset lock (for testing)
-export async function __resetCronLockForTesting(): Promise<void> {
-  const inMemoryLock = createInMemoryCronLock();
-  // Reset the global lock to in-memory for tests
-  const { setCronLock } = await import('@/lib/cron/lock');
-  setCronLock(inMemoryLock);
-}

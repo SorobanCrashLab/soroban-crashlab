@@ -4,7 +4,7 @@ import {
   buildReplayBundleDocument,
   buildReplayCliInvocation,
   serializeReplayBundleDocument,
-} from './route';
+} from './replay-bundle';
 
 const run: FuzzingRun = {
   id: 'run-1234',

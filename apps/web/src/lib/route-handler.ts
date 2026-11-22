@@ -197,6 +197,16 @@ export interface RouteConfig<BodySchema extends z.ZodTypeAny = z.ZodTypeAny> {
   fallbackMessage?: string;
 }
 
+/**
+ * The one-argument overload keeps direct unit-test calls terse; the required
+ * two-argument overload is last so Next.js generates the canonical
+ * `(request, context)` route signature (it infers from the last overload).
+ */
+export interface RouteHandler<Params = unknown> {
+  (request: Request): Promise<Response>;
+  (request: Request, context: { params: Promise<Params> }): Promise<Response>;
+}
+
 export function createRouteHandler<
   BodySchema extends z.ZodTypeAny = z.ZodNever,
   Params = unknown
@@ -209,10 +219,10 @@ export function createRouteHandler<
       body: z.infer<BodySchema>;
     }
   ) => Promise<Response>
-) {
-  return async (
+): RouteHandler<Params> {
+  const routeHandler = async (
     request: Request,
-    context: { params?: Promise<Params> | Params }
+    context?: { params?: Promise<Params> | Params }
   ): Promise<Response> => {
     const startTime = Date.now();
     let guarded: ReturnType<typeof limitRequestBody> | undefined;
@@ -289,4 +299,6 @@ export function createRouteHandler<
       return jsonError(config.fallbackMessage || 'An unexpected error occurred.', 500);
     }
   };
+
+  return routeHandler as RouteHandler<Params>;
 }

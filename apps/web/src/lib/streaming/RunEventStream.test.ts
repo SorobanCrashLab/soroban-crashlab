@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RunEventStream } from './RunEventStream';
-import { connectionManager } from './connectionManager';
+import { connectionManager as _connectionManager } from './connectionManager';
 
 // Mock EventSource
 class MockEventSource {

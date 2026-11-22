@@ -1,6 +1,5 @@
 import { successResponse } from '@/lib/api-response-utils';
-
-export const HEALTH_CHECK_VERSION = '1.0.0';
+import { HEALTH_CHECK_VERSION } from '../health-check';
 
 /**
  * GET /api/health/liveness

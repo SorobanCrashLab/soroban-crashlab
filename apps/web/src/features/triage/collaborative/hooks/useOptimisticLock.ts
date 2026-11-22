@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { safeStorage } from '@/lib/local-storage';
 
 const LOCK_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const LOCK_STORAGE_PREFIX = 'crashlab:triage-lock:';
@@ -30,14 +31,15 @@ export function useOptimisticLock(runId: string, canWrite: boolean = true): Lock
   useEffect(() => {
     const key = LOCK_STORAGE_PREFIX + runId;
     try {
-      const raw = localStorage.getItem(key);
+      const raw = safeStorage.getItem(key);
       if (raw) {
         const lock = JSON.parse(raw) as { holder: string; expiresAt: number };
         if (lock.expiresAt > Date.now()) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
           setLockHolder(lock.holder);
           setLockExpiresAt(lock.expiresAt);
         } else {
-          localStorage.removeItem(key);
+          safeStorage.removeItem(key);
         }
       }
     } catch {
@@ -51,7 +53,7 @@ export function useOptimisticLock(runId: string, canWrite: boolean = true): Lock
         setLockHolder(null);
         setLockExpiresAt(null);
         try {
-          localStorage.removeItem(key);
+          safeStorage.removeItem(key);
         } catch {
           // Ignore.
         }
@@ -68,7 +70,7 @@ export function useOptimisticLock(runId: string, canWrite: boolean = true): Lock
     const key = LOCK_STORAGE_PREFIX + runId;
     const expiresAt = Date.now() + LOCK_TTL_MS;
     try {
-      localStorage.setItem(key, JSON.stringify({ holder: 'You', expiresAt }));
+      safeStorage.setItem(key, JSON.stringify({ holder: 'You', expiresAt }));
     } catch {
       // Ignore.
     }
@@ -80,7 +82,7 @@ export function useOptimisticLock(runId: string, canWrite: boolean = true): Lock
   const releaseLock = useCallback(() => {
     const key = LOCK_STORAGE_PREFIX + runId;
     try {
-      localStorage.removeItem(key);
+      safeStorage.removeItem(key);
     } catch {
       // Ignore.
     }
@@ -95,7 +97,7 @@ export function useOptimisticLock(runId: string, canWrite: boolean = true): Lock
     setLockExpiresAt(expiresAt);
     const key = LOCK_STORAGE_PREFIX + runId;
     try {
-      localStorage.setItem(key, JSON.stringify({ holder: 'You', expiresAt }));
+      safeStorage.setItem(key, JSON.stringify({ holder: 'You', expiresAt }));
     } catch {
       // Ignore.
     }
