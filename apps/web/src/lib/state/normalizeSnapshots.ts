@@ -55,14 +55,6 @@ function safeValue(value: unknown, key = ''): unknown {
   return value;
 }
 
-function canonical(value: unknown): string {
-  if (value === undefined) return 'undefined';
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
-  return '{' + Object.keys(value as Record<string, unknown>).sort().map((key) =>
-    JSON.stringify(key) + ':' + canonical((value as Record<string, unknown>)[key])).join(',') + '}';
-}
-
 function categoryFor(key: string, namespace: string): StateCategory {
   const value = `${key} ${namespace}`.toLowerCase();
   if (/auth|signer|allowance|permit/.test(value)) return 'auth';
@@ -90,8 +82,8 @@ function normalizeMutation(raw: unknown, index: number, source: string): StateMu
     namespace,
     category: categoryFor(key, namespace),
     changeType,
-    ...(before !== undefined ? { before: safeValue(before) } : {}),
-    ...(after !== undefined ? { after: safeValue(after) } : {}),
+    ...(before !== undefined ? { before: safeValue(before, key) } : {}),
+    ...(after !== undefined ? { after: safeValue(after, key) } : {}),
     ...(typeof first(item.ledger, item.ledgerSequence, item.ledger_seq) === 'number'
       ? { ledger: Number(first(item.ledger, item.ledgerSequence, item.ledger_seq)) } : {}),
     ...(typeof item.timestamp === 'string' ? { timestamp: item.timestamp } : {}),
