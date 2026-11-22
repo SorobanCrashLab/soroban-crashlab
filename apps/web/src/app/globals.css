@@ -6,6 +6,7 @@
 @import "../styles/tokens/themes/high-contrast.css";
 @import "../styles/tokens/motion.css";
 @import "../styles/typography.css";
+@import "../components/charts/charts.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
