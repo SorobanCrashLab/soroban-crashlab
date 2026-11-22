@@ -40,6 +40,7 @@ describe('extracted pre-paint bootstrap', () => {
       "localStorage.getItem('crashlab:theme')",
       "'(prefers-color-scheme: dark)'",
       "document.documentElement.classList.toggle('dark', d)",
+      "document.documentElement.dataset.theme = d ? 'dark' : 'light'",
     ]) {
       expect(generateThemeBootstrapScript()).toContain(fragment);
       expect(script).toContain(fragment);
