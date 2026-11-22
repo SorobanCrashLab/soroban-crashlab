@@ -50,6 +50,7 @@ export default function SettingsPage() {
           { href: '/settings/alerting', title: 'Alerting', desc: 'Configure notification presets and alert thresholds', icon: '◉' },
           { href: '/settings/reporting', title: 'Reporting', desc: 'Report generation templates and export preferences', icon: '⊞' },
           { href: '/settings/accessibility', title: 'Accessibility', desc: 'Keyboard navigation, screen reader and contrast settings', icon: '◈' },
+          { href: '/settings/shortcuts', title: 'Keyboard Shortcuts', desc: 'Remap bindings, resolve conflicts, and browse contextual cheat sheet', icon: '⌘' },
           { href: '/settings/api', title: 'API Configuration', desc: 'Backend URL, rate limits and connection settings', icon: '⚙' },
           { href: '/settings/notifications', title: 'Notifications', desc: 'Configure notification types, delivery and quiet hours', icon: '◉' },
           { href: '/settings/network', title: 'Network', desc: 'Manage Stellar RPC and Horizon network endpoints', icon: '◎' },
