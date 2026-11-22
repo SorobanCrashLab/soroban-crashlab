@@ -12,6 +12,7 @@ try {
   var t = localStorage.getItem('crashlab:theme');
   var d = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.classList.toggle('dark', d);
+  document.documentElement.dataset.theme = d ? 'dark' : 'light';
   var a = null;
   try { a = JSON.parse(localStorage.getItem('crashlab:accessibility-prefs:v1') || 'null'); } catch {}
   var motion = a && a.motion;
