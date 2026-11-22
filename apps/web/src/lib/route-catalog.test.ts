@@ -119,4 +119,31 @@ describe('Route Catalog', () => {
     expect(roleFor('POST', '/api/integrations/pagerduty/trigger')).toBe('analyst');
     expect(roleFor('POST', '/api/artifacts/validate')).toBe('analyst');
   });
+
+  it('requires a maintainer to change rules and an analyst to simulate them', () => {
+    const roleFor = (method: string, pathname: string) =>
+      matchRouteCatalogEntry(method, pathname)?.requiredCapability?.role ?? null;
+
+    expect(roleFor('POST', '/api/automation/rules')).toBe('maintainer');
+    expect(roleFor('PATCH', '/api/automation/rules/rule-1')).toBe('maintainer');
+    expect(roleFor('DELETE', '/api/automation/rules/rule-1')).toBe('maintainer');
+    expect(roleFor('POST', '/api/automation/simulate')).toBe('analyst');
+  });
+
+  it('registers every automation API method with session authentication', () => {
+    const registrations = [
+      ['GET', '/api/automation/rules'],
+      ['POST', '/api/automation/rules'],
+      ['GET', '/api/automation/rules/rule-1'],
+      ['PATCH', '/api/automation/rules/rule-1'],
+      ['DELETE', '/api/automation/rules/rule-1'],
+      ['POST', '/api/automation/simulate'],
+      ['GET', '/api/automation/executions'],
+      ['GET', '/api/automation/triggers'],
+    ] as const;
+
+    for (const [method, pathname] of registrations) {
+      expect(matchRouteCatalogEntry(method, pathname)?.authClass).toBe('session');
+    }
+  });
 });

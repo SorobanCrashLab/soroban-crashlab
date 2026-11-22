@@ -50,7 +50,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         <label htmlFor={id} className={`input-label flex-between ${labelClassName}`}>
           <span>
             {label}
-            {required && <span className="text-red-500 ml-1" aria-hidden="true">*</span>}
+            {required && <span className="field-required ml-1" aria-hidden="true">*</span>}
           </span>
         </label>
       )}
@@ -64,9 +64,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           aria-invalid={a11y.inputProps['aria-invalid']}
           aria-describedby={a11y.inputProps['aria-describedby']}
           aria-errormessage={a11y.inputProps['aria-errormessage']}
-          className={`input-field pr-8 appearance-none cursor-pointer ${
-            error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-          } ${selectClassName} ${className}`}
+          className={`input-field pr-8 appearance-none cursor-pointer ${selectClassName} ${className}`}
           {...props}
         >
           {placeholder && (
@@ -83,7 +81,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
             : children}
         </select>
 
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-zinc-400">
+        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none ds-text-muted">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
@@ -91,7 +89,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
       </div>
 
       {error && (
-        <p id={a11y.errorId ?? undefined} role="alert" className="text-xs mt-1 text-red-600 dark:text-red-400 font-medium">
+        <p id={a11y.errorId ?? undefined} role="alert" className="field-error text-xs mt-1 font-medium">
           {error}
         </p>
       )}
