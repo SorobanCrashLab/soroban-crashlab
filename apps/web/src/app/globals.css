@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../components/charts/charts.css";
 @import "../styles/tokens/primitives.css";
 @import "../styles/tokens/semantic.css";
 @import "../styles/tokens/themes/light.css";
