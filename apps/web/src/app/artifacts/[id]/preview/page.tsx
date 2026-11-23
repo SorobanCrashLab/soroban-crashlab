@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { ArtifactPreviewSandbox } from '@/features/artifact-preview/ArtifactPreviewSandbox';
 import type { Artifact } from '@/features/artifact-preview/model';
 
@@ -32,6 +33,7 @@ export default async function ArtifactPreviewPage({ params }: PreviewPageProps) 
       <p className="text-meta mt-1 mb-6 max-w-3xl">
         Artifacts render inside an isolated sandbox with scripts disabled and deterministic redaction of secrets.
       </p>
+      <Link href={`/xdr-inspector?artifact=${encodeURIComponent(id)}`} className="mb-4 inline-block underline">Inspect an authorized XDR export</Link>
       <ArtifactPreviewSandbox artifact={sample} />
     </div>
   );

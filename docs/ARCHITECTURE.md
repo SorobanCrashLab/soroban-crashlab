@@ -311,3 +311,7 @@ infrastructure/           Deployment artifacts
 - [`API.md`](API.md) — HTTP surface of the dashboard
 - [`SECURITY.md`](SECURITY.md) — Security policy and artifact handling procedures
 - [`THREAT_MODEL_ARTIFACT_HANDLING.md`](THREAT_MODEL_ARTIFACT_HANDLING.md) — STRIDE threat model
+
+## Browser XDR inspector
+
+Run/artifact/trace/reproducer navigation opens the client-only [XDR/ScVal inspector](frontend/xdr-scval-inspector.md). A same-origin module worker owns the official codec, typed document and bounded index. React receives paged tree rows, a small byte window and selected editor subtrees; payload processing never falls back to the UI thread. Exact exports and leaf-redacted evidence are distinct. Context links carry identifiers and node paths without payloads; artifact permission flows remain authoritative. See proposed [ADR-0013](adr/0013-worker-xdr-inspection.md).
