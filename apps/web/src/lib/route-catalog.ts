@@ -72,6 +72,10 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('GET', '/api/auth/oidc/start', 'public', null, 'default'),
   r('POST', '/api/campaigns', 'session', { role: 'maintainer' }, 'default'),
   r('GET', '/api/capacity', 'public', null, 'default'),
+  // CI Checks & Quality Gates Dashboard (#2314): read-only, session-scoped.
+  // The handlers additionally project the payload by the principal's role.
+  r('GET', '/api/ci/runs', 'session', null, 'default'),
+  r('GET', '/api/ci/gates', 'session', null, 'default'),
   r('POST', '/api/capacity/usage', 'token', { role: 'analyst' }, 'default'),
   r('GET', '/api/database/migrations', 'session', null, 'default'),
   r('POST', '/api/database/migrations', 'session', { role: 'analyst' }, 'default'),
