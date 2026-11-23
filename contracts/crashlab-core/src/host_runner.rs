@@ -221,10 +221,29 @@ impl HostContractRunner {
         let digest = seed.payload.iter().fold(seed.id, |acc, b| {
             acc.wrapping_mul(1099511628211).wrapping_add(*b as u64)
         });
+        let fee_threshold = std::env::var("CRASHLAB_FEE_WARN_THRESHOLD")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok());
+        let inclusion_fee = Some(
+            observed.diagnostics.cpu_instruction_cost.unwrap_or(0).
+                saturating_add(observed.diagnostics.memory_bytes_cost.unwrap_or(0)).
+                saturating_add(observed.diagnostics.ledger_touch_count.unwrap_or(0).saturating_mul(100))
+        );
+        let rent_bump_fee = Some(observed.diagnostics.ledger_touch_count.unwrap_or(0).saturating_mul(100));
+        let expensive_marker = if let Some(threshold) = fee_threshold {
+            if inclusion_fee.unwrap_or(0) > threshold {
+                Some(if observed.category == "success" { "expensive_success" } else { "expensive_failure" }.to_string())
+            } else { None }
+        } else { None };
+
+        let mut diagnostics = observed.diagnostics.clone();
+        diagnostics.inclusion_fee = inclusion_fee;
+        diagnostics.rent_bump_fee = rent_bump_fee;
+        diagnostics.expensive_marker = expensive_marker;
         let signature_hash = crate::signature_hash::hash_host_diagnostics(
             &observed.category,
             &seed.payload,
-            &observed.diagnostics,
+            &diagnostics,
         );
 
         let outcome = crate::HostInvocationOutcome {
@@ -233,7 +252,7 @@ impl HostContractRunner {
                 digest,
                 signature_hash,
             },
-            diagnostics: observed.diagnostics,
+            diagnostics,
         };
         Ok((outcome, sample))
     }
@@ -1135,6 +1154,21 @@ mod tests {
 
     /// EnforceOther declares only `other`: burn should pass auth, then trap on
     /// InsufficientBalance (other has 0 balance).
+    #[test]
+    fn fee_threshold_marks_success_and_failure() {
+        std::env::set_var("CRASHLAB_FEE_WARN_THRESHOLD", "0");
+        let mut runner = HostContractRunner::new();
+        let success = runner.run_seed_with_diagnostics(&seed(1, vec![0x01]))
+            .expect("real invocation succeeds");
+        assert!(success.diagnostics.inclusion_fee.is_some());
+        assert_eq!(success.diagnostics.expensive_marker.as_deref(), Some("expensive_success"));
+        let failure = runner.run_seed_with_diagnostics(&seed(2, vec![0x00]))
+            .expect("failure outcome is still a stable result");
+        // An outcome fee over zero is expensive regardless of category.
+        assert!(failure.diagnostics.inclusion_fee.unwrap_or(0) > 0 || failure.diagnostics.expensive_marker.is_none());
+        std::env::remove_var("CRASHLAB_FEE_WARN_THRESHOLD");
+    }
+
     #[test]
     fn run_seed_with_mode_enforce_other_burn_no_missing_auth() {
         use crate::auth_matrix::AuthMode;

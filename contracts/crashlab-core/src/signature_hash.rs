@@ -204,6 +204,15 @@ pub fn hash_host_diagnostics(
     if let Some(count) = diagnostics.ledger_touch_count {
         hasher.add_field("host.ledger_touch_count", count.to_string());
     }
+    if let Some(fee) = diagnostics.inclusion_fee {
+        hasher.add_field("host.inclusion_fee", fee.to_string());
+    }
+    if let Some(fee) = diagnostics.rent_bump_fee {
+        hasher.add_field("host.rent_bump_fee", fee.to_string());
+    }
+    if let Some(marker) = &diagnostics.expensive_marker {
+        hasher.add_field("host.expensive_marker", marker);
+    }
     if let Some(exhaustion) = diagnostics.budget_exhaustion {
         hasher.add_field(
             "host.budget_exhaustion",
