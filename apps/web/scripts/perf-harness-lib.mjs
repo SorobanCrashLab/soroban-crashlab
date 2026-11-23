@@ -355,7 +355,93 @@ export function validateBudgetFile(data) {
 }
 
 /** Deterministic fixture used by the vitest p95 assertion and by examples. */
-export function fixtureRouteSamples() {
+export function mean(values) {
+  const clean = (values ?? []).filter((value) => typeof value === 'number' && Number.isFinite(value));
+  return clean.length ? clean.reduce((sum, value) => sum + value, 0) / clean.length : null;
+}
+
+export function standardDeviation(values) {
+  const clean = (values ?? []).filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (clean.length < 2) return 0;
+  const avg = mean(clean);
+  return Math.sqrt(clean.reduce((sum, value) => sum + (value - avg) ** 2, 0) / (clean.length - 1));
+}
+
+export function confidenceInterval(values, confidence = 0.95) {
+  const clean = (values ?? []).filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!clean.length) return null;
+  const avg = mean(clean);
+  if (clean.length === 1) return { mean: avg, low: avg, high: avg, confidence };
+  const margin = 1.96 * standardDeviation(clean) / Math.sqrt(clean.length);
+  return { mean: avg, low: avg - margin, high: avg + margin, confidence };
+}
+
+export function welchTTest(baseline, candidate) {
+  const a = (baseline ?? []).filter((value) => typeof value === 'number' && Number.isFinite(value));
+  const b = (candidate ?? []).filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (a.length < 2 || b.length < 2) return { test: 'welch-t', significant: false, pValue: 1, deltaPct: 0 };
+  const aMean = mean(a); const bMean = mean(b);
+  const aVar = standardDeviation(a) ** 2 / a.length;
+  const bVar = standardDeviation(b) ** 2 / b.length;
+  const standardError = Math.sqrt(aVar + bVar);
+  if (standardError === 0) return { test: 'welch-t', significant: false, pValue: aMean === bMean ? 1 : 0, deltaPct: aMean ? (bMean - aMean) / aMean * 100 : 0 };
+  const t = (bMean - aMean) / standardError;
+  const df = (aVar + bVar) ** 2 / ((aVar ** 2 / (a.length - 1)) + (bVar ** 2 / (b.length - 1)));
+  const pValue = 2 * (1 - normalCdf(Math.abs(t) / Math.sqrt(1 + 1 / df)));
+  const deltaPct = aMean ? (bMean - aMean) / aMean * 100 : 0;
+  return { test: 'welch-t', significant: pValue < 0.05, pValue: Math.max(0, Math.min(1, pValue)), deltaPct };
+}
+
+function normalCdf(value) {
+  const sign = value < 0 ? -1 : 1;
+  const x = Math.abs(value) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return 0.5 * (1 + sign * y);
+}
+
+export function mannWhitneyU(baseline, candidate) {
+  const a = (baseline ?? []).filter((value) => typeof value === 'number' && Number.isFinite(value));
+  const b = (candidate ?? []).filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!a.length || !b.length) return { test: 'mann-whitney', significant: false, pValue: 1, u: 0, deltaPct: 0 };
+  const combined = [...a.map((value) => ({ value, group: 'a' })), ...b.map((value) => ({ value, group: 'b' }))].sort((x, y) => x.value - y.value);
+  let rankSumA = 0;
+  for (let i = 0; i < combined.length;) {
+    let j = i + 1;
+    while (j < combined.length && combined[j].value === combined[i].value) j++;
+    const rank = ((i + 1) + j) / 2;
+    for (let k = i; k < j; k++) if (combined[k].group === 'a') rankSumA += rank;
+    i = j;
+  }
+  const u = rankSumA - a.length * (a.length + 1) / 2;
+  const meanU = a.length * b.length / 2;
+  const stdU = Math.sqrt(a.length * b.length * (a.length + b.length + 1) / 12);
+  const z = stdU ? (u - meanU) / stdU : 0;
+  const pValue = 2 * (1 - normalCdf(Math.abs(z)));
+  const aMean = mean(a); const bMean = mean(b);
+  return { test: 'mann-whitney', significant: pValue < 0.05, pValue: Math.max(0, Math.min(1, pValue)), u, deltaPct: aMean ? (bMean - aMean) / aMean * 100 : 0 };
+}
+
+export function compareBenchmarkSamples(baseline, candidate, options = {}) {
+  const test = options.method === 'mann-whitney' ? mannWhitneyU(baseline, candidate) : welchTTest(baseline, candidate);
+  const ci = confidenceInterval(candidate, options.confidence ?? 0.95);
+  const tolerancePct = options.tolerancePct ?? 20;
+  const isRegression = test.deltaPct > tolerancePct && test.significant;
+  return { ...test, confidenceInterval: ci, isRegression };
+}
+
+export function formatBenchmarkPrComment(results = []) {
+  const regressions = results.filter((result) => result.isRegression);
+  if (!regressions.length) return '## Benchmark comparison\n\nNo statistically significant performance regressions detected.';
+  const lines = regressions.map((result) => `- **${result.metric ?? result.route ?? 'benchmark'}**: ${result.deltaPct.toFixed(2)}% slower; p=${result.pValue.toFixed(4)}`);
+  return ['## Benchmark comparison', '', 'Performance regressions detected:', '', ...lines].join('\n');
+}
+
+export const BENCHMARK_METRICS = ['gas', 'executionTime', 'memory', 'cpu', 'storage'];
+
+export const compareBenchmarkSets = compareBenchmarkSamples;
+export const benchmarkConfidenceInterval = confidenceInterval;
+export const fixtureRouteSamples = function fixtureRouteSamples() {
   const sample = (start, step) => Array.from({ length: 20 }, (_, i) => start + step * i);
   return {
     route: '/runs',

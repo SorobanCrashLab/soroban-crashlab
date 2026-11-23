@@ -47,6 +47,90 @@ export const getHeatmapColor = (count: number, severity: string): string => {
   return colors[3];
 };
 
+export type HeatmapMetric = 'runs' | 'crashes' | 'gas' | 'duration';
+
+export interface HeatmapAnnotation {
+  id: string;
+  date: string;
+  kind: 'deployment' | 'incident' | 'config';
+  label: string;
+}
+
+export interface HeatmapCell extends HeatmapDataPoint {
+  runIds?: string[];
+  gas?: number;
+  durationMs?: number;
+  annotations?: HeatmapAnnotation[];
+}
+
+export const HEATMAP_METRICS: HeatmapMetric[] = ['runs', 'crashes', 'gas', 'duration'];
+
+export function getHeatmapMetricValue(point: HeatmapCell, metric: HeatmapMetric): number {
+  if (metric === 'crashes') return point.count;
+  if (metric === 'gas') return point.gas ?? 0;
+  if (metric === 'duration') return point.durationMs ?? 0;
+  return point.runs;
+}
+
+export function aggregateHeatmapData(points: HeatmapCell[], metric: HeatmapMetric = 'runs'): HeatmapCell[] {
+  const byDate = new Map<string, HeatmapCell>();
+  for (const point of points) {
+    if (!point.date) continue;
+    const existing = byDate.get(point.date);
+    if (!existing) {
+      byDate.set(point.date, { ...point, runIds: [...(point.runIds ?? [])], annotations: [...(point.annotations ?? [])] });
+      continue;
+    }
+    const count = existing.count + point.count;
+    const runs = existing.runs + point.runs;
+    const gas = (existing.gas ?? 0) + (point.gas ?? 0);
+    const durationMs = (existing.durationMs ?? 0) + (point.durationMs ?? 0);
+    byDate.set(point.date, {
+      ...existing,
+      count,
+      runs,
+      gas,
+      durationMs,
+      severity: count >= 20 ? 'critical' : count >= 10 ? 'high' : count >= 3 ? 'medium' : 'low',
+      runIds: [...new Set([...(existing.runIds ?? []), ...(point.runIds ?? [])])],
+      annotations: [...(existing.annotations ?? []), ...(point.annotations ?? [])],
+    });
+  }
+  const result = Array.from(byDate.values());
+  void metric;
+  return result;
+}
+
+export function filterHeatmapAnnotations(
+  annotations: HeatmapAnnotation[],
+  kinds: HeatmapAnnotation['kind'][] = ['deployment', 'incident', 'config'],
+): HeatmapAnnotation[] {
+  const allowed = new Set(kinds);
+  return annotations.filter((annotation) => allowed.has(annotation.kind));
+}
+
+export function heatmapToCsv(points: HeatmapCell[], metric: HeatmapMetric = 'runs'): string {
+  const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+  const rows = [['date', metric, 'severity', 'runIds', 'annotations']];
+  for (const point of points) {
+    rows.push([
+      point.date,
+      getHeatmapMetricValue(point, metric),
+      point.severity,
+      (point.runIds ?? []).join(';'),
+      (point.annotations ?? []).map((annotation) => annotation.label).join(';'),
+    ]);
+  }
+  return rows.map((row) => row.map(escape).join(',')).join('\n');
+}
+
+export function createHeatmapShareLink(baseUrl: string, date: string, metric: HeatmapMetric): string {
+  const url = new URL(baseUrl);
+  url.searchParams.set('date', date);
+  url.searchParams.set('metric', metric);
+  return url.toString();
+}
+
 export const getMonthWeeks = (year: number, month: number): Array<HeatmapDataPoint[]> => {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);

@@ -1,12 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { generateMockHeatmapData, getHeatmapColor, getMonthWeeks } from './heatmap-utils';
+import {
+  generateMockHeatmapData,
+  getHeatmapColor,
+  getHeatmapMetricValue,
+  getMonthWeeks,
+  heatmapToCsv,
+  HEATMAP_METRICS,
+  type HeatmapMetric,
+} from './heatmap-utils';
 
 export default function HeatmapCalendarPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedMetric, setSelectedMetric] = useState<HeatmapMetric>('runs');
 
   const data = generateMockHeatmapData();
   const weeks = getMonthWeeks(selectedYear, selectedMonth);
@@ -38,6 +47,16 @@ export default function HeatmapCalendarPage() {
     return data.find(d => d.date === dateStr);
   };
 
+  const exportCsv = () => {
+    const blob = new Blob([heatmapToCsv(data, selectedMetric)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `heatmap-${selectedMetric}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-8 px-4">
       <div className="max-w-6xl mx-auto">
@@ -57,7 +76,23 @@ export default function HeatmapCalendarPage() {
                 <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                   {monthName}
                 </h2>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    aria-label="Heatmap metric"
+                    value={selectedMetric}
+                    onChange={(event) => setSelectedMetric(event.target.value as HeatmapMetric)}
+                    className="px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg bg-transparent text-zinc-900 dark:text-zinc-100"
+                  >
+                    {HEATMAP_METRICS.map((metric) => (
+                      <option key={metric} value={metric}>{metric}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={exportCsv}
+                    className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium"
+                  >
+                    Export CSV
+                  </button>
                   <button
                     onClick={handlePrevMonth}
                     className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium transition-colors"
@@ -97,7 +132,7 @@ export default function HeatmapCalendarPage() {
                           style={{
                             backgroundColor: getHeatmapColor(day.count, day.severity),
                           }}
-                          title={day.date ? `${day.date}: ${day.runs} runs, ${day.count} crashes` : ''}
+                          title={day.date ? `${day.date}: ${getHeatmapMetricValue(day, selectedMetric)} ${selectedMetric}` : ''}
                         >
                           {day.date && day.date.split('-')[2]}
                         </button>

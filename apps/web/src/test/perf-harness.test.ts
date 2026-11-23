@@ -11,6 +11,11 @@ import {
   ratchetBudgets,
   roundBudgetValue,
   summarizeSamples,
+  compareBenchmarkSamples,
+  confidenceInterval,
+  mannWhitneyU,
+  welchTTest,
+  formatBenchmarkPrComment,
   validateBudgetFile,
 } from '../../scripts/perf-harness-lib.mjs';
 
