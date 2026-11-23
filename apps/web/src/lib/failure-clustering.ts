@@ -140,6 +140,32 @@ export interface ClusterMember {
   runId?: string;
 }
 
+export type Exploitability = 'benign' | 'potentially_exploitable' | 'exploitable';
+
+export interface CrashIntelligence {
+  rootCause: string;
+  exploitability: Exploitability;
+  novelty: 'known' | 'variation' | 'new';
+  triageGuidance: string;
+}
+
+export function classifyCrashIntelligence(rawSignature: string, clusterCount: number = 1): CrashIntelligence {
+  const lower = rawSignature.toLowerCase();
+  if (/(reentrancy|external_call.*before.*state|call.*before.*write)/i.test(lower)) {
+    return { rootCause: 'reentrancy/state update ordering', exploitability: 'exploitable', novelty: clusterCount <= 1 ? 'new' : 'variation', triageGuidance: 'Check external calls before state changes and add reentrancy guards.' };
+  }
+  if (/overflow|underflow|arithmetic/i.test(lower)) {
+    return { rootCause: 'arithmetic boundary violation', exploitability: 'exploitable', novelty: clusterCount <= 1 ? 'new' : 'variation', triageGuidance: 'Verify checked arithmetic and invariant boundaries.' };
+  }
+  if (/auth|authorization|signer/i.test(lower)) {
+    return { rootCause: 'authorization control', exploitability: 'exploitable', novelty: clusterCount <= 1 ? 'new' : 'variation', triageGuidance: 'Verify authorization ownership and require_auth call placement.' };
+  }
+  if (/panic|abort|trap/i.test(lower)) {
+    return { rootCause: 'runtime trap', exploitability: 'potentially_exploitable', novelty: clusterCount <= 1 ? 'new' : 'variation', triageGuidance: 'Minimize the seed and inspect the trap call sequence.' };
+  }
+  return { rootCause: 'unclassified crash behavior', exploitability: 'benign', novelty: clusterCount <= 1 ? 'new' : 'variation', triageGuidance: 'Capture a minimal reproducer and compare with known fixtures.' };
+}
+
 export interface FailureCluster {
   id: string;
   taxonomyClass: string;
@@ -154,6 +180,7 @@ export interface FailureCluster {
   firstSeen: number;
   lastSeen: number;
   members: ClusterMember[];
+  intelligence: CrashIntelligence;
 }
 
 function fnv1aHex(input: string): string {
@@ -209,6 +236,7 @@ export function clusterObservations(
         existing.exemplarRunId = obs.runId;
       }
       existing.members.push(member);
+      existing.intelligence = classifyCrashIntelligence(existing.normalizedSignature, existing.count);
       continue;
     }
 
@@ -225,6 +253,7 @@ export function clusterObservations(
       firstSeen: obs.observedAt,
       lastSeen: obs.observedAt,
       members: [member],
+      intelligence: classifyCrashIntelligence(normalized.text, 1),
     });
   }
 

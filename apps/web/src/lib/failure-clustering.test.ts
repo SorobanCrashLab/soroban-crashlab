@@ -8,6 +8,7 @@ import {
   findClusterForRun,
   normalizeSignaturePreimage,
   type FailureObservation,
+  classifyCrashIntelligence,
   type NormalizationRules,
 } from './failure-clustering';
 import type { FuzzingRun } from '@/app/types';
@@ -231,5 +232,21 @@ describe('buildHierarchicalClustersFromRuns', () => {
     expect(cluster).not.toBeNull();
     expect(cluster!.members.map((m) => m.runId).sort()).toEqual(['run-2000', 'run-2001']);
     expect(findClusterForRun(runs, 'run-2002')).toBeNull();
+  });
+});
+
+describe('crash intelligence', () => {
+  it('classifies reentrancy and supplies triage guidance', () => {
+    const result = classifyCrashIntelligence('reentrancy external_call before state_update', 1);
+    expect(result.rootCause).toBe('reentrancy/state update ordering');
+    expect(result.exploitability).toBe('exploitable');
+    expect(result.novelty).toBe('new');
+    expect(result.triageGuidance).toContain('reentrancy guards');
+  });
+
+  it('marks repeated crash variations as known variations', () => {
+    const result = classifyCrashIntelligence('overflow in checked arithmetic', 3);
+    expect(result.rootCause).toBe('arithmetic boundary violation');
+    expect(result.novelty).toBe('variation');
   });
 });

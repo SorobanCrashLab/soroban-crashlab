@@ -530,6 +530,15 @@ pub struct HostDiagnostics {
     pub memory_bytes_cost: Option<u64>,
     pub minimum_builtin_cost: Option<u64>,
     pub ledger_touch_count: Option<u64>,
+    /// Simulated or observed inclusion fee in stroops.
+    #[serde(default)]
+    pub inclusion_fee: Option<u64>,
+    /// Estimated rent/rent-bump charge in stroops.
+    #[serde(default)]
+    pub rent_bump_fee: Option<u64>,
+    /// Outcome marker used for cost anomalies; never changes the failure category.
+    #[serde(default)]
+    pub expensive_marker: Option<String>,
     /// Only set when the host provides an explicit CPU-versus-memory reason.
     pub budget_exhaustion: Option<BudgetExhaustion>,
 }
