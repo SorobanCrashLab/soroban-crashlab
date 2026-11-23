@@ -18,6 +18,11 @@ describe('safe Mermaid text', () => {
     expect(safeMermaidText('flowchart TD\r\n  A[Hi<script>x</script>]')).toBe('flowchart TD\n  A[Hix]');
   });
 
+  it('does not let malformed or comment-wrapped markup survive sanitization', () => {
+    expect(safeMermaidText('flowchart TD\n  A[<script onload=evil()')).not.toContain('<');
+    expect(validateMermaid('flowchart TD\n  <!--x--!> A --> B').valid).toBe(false);
+  });
+
   it('renders a structured text representation', () => {
     const lines = mermaidToAccessibleText('flowchart TD\n  A --> B');
     expect(lines[1]).toContain('leads to');

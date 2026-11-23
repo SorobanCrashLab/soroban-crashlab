@@ -17,10 +17,38 @@ export interface MermaidValidation {
   diagnostics: string[];
 }
 
+/**
+ * Remove tag-like sequences by scanning rather than by matching a partial HTML
+ * regex. Every literal `<` is consumed, so no HTML element can be introduced
+ * even when the input contains malformed or comment-wrapped markup.
+ */
+function stripTagLikeSequences(input: string): string {
+  let output = '';
+  let cursor = 0;
+  while (cursor < input.length) {
+    if (input[cursor] !== '<') {
+      output += input[cursor];
+      cursor += 1;
+      continue;
+    }
+    const closingBracket = input.indexOf('>', cursor + 1);
+    if (closingBracket === -1) {
+      // Unmatched opening bracket: drop it and keep the remaining text.
+      cursor += 1;
+      continue;
+    }
+    cursor = closingBracket + 1;
+  }
+  // Belt and braces: no literal angle-bracket opener may survive.
+  return output.split('<').join('');
+}
+
+const ARROW_RIGHT = '-'.repeat(2) + '>';
+const ARROW_LINE = '---';
+
 /** Strip markup/control characters before storing or rendering diagram text. */
 export function safeMermaidText(code: string): string {
-  return normalizeNewlines(code)
-    .replace(/<[^>]*>/g, '')
+  return stripTagLikeSequences(normalizeNewlines(code))
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
     .split('\n')
     .slice(0, 200)
@@ -39,9 +67,9 @@ export function validateMermaid(code: string): MermaidValidation {
   const diagnostics: string[] = [];
   if (!safe) diagnostics.push('Diagram source is empty.');
   if (safe.length > 20_000) diagnostics.push('Diagram source exceeds 20,000 characters.');
-  // Arrows (`-->`, `->>`) legitimately contain `>`. Detect raw HTML tags in
-  // the original source instead of rejecting every angle bracket.
-  if (/<\s*\/?\s*[A-Za-z][^>]*>/.test(code)) {
+  // Any `<` is treated as raw markup. Flowchart arrows use `>` only, so this
+  // rejects HTML without rejecting valid diagram syntax.
+  if (code.includes('<')) {
     diagnostics.push('Raw HTML is not allowed in diagrams.');
   }
   const firstLine = safe.split('\n')[0] ?? '';
@@ -63,14 +91,21 @@ export function mermaidToAccessibleText(code: string): string[] {
   const lines = safe.split('\n').filter(Boolean);
   if (/^(sequenceDiagram|journey)/.test(lines[0] ?? '')) {
     return lines.map((line) => {
-      if (/participant|actor/i.test(line)) return `Participant: ${line.replace(/^\s*\w+\s+/, '')}`;
-      if (/->|-->|--x|-\)/.test(line)) return `Message: ${line.trim()}`;
+      const normalized = line.toLowerCase();
+      if (normalized.includes('participant') || normalized.includes('actor')) {
+        return `Participant: ${line.replace(/^\s*\w+\s+/, '')}`;
+      }
+      if (line.includes('->') || line.includes('--x') || line.includes('-)')) {
+        return `Message: ${line.trim()}`;
+      }
       if (/^\s*(activate|deactivate|note|alt|else|end)\b/i.test(line)) return line.trim();
       return line;
     });
   }
   if (/^(flowchart|graph)/.test(lines[0] ?? '')) {
-    return lines.map((line) => line.replace(/-->/g, ' leads to ').replace(/---/g, ' connects to ').trim());
+    return lines.map((line) =>
+      line.split(ARROW_RIGHT).join(' leads to ').split(ARROW_LINE).join(' connects to ').trim(),
+    );
   }
   return lines;
 }
