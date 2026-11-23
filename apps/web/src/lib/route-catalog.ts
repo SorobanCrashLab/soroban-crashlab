@@ -78,6 +78,10 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('GET', '/api/health', 'public', null, 'none'),
   r('GET', '/api/health/liveness', 'public', null, 'none'),
   r('GET', '/api/health/metrics', 'token', null, 'none'),
+  // Structured log query engine (#075): read-only, session-scoped, and
+  // sensitive fields are masked per caller inside the handlers themselves.
+  r('GET', '/api/logs/search', 'session', { scopes: ['runs:read'] }, 'lenient'),
+  r('GET', '/api/logs/tail', 'session', { scopes: ['runs:read'] }, 'lenient'),
   r('GET', '/api/automation/executions', 'session', null, 'default'),
   r('GET', '/api/automation/rules', 'session', null, 'default'),
   r('POST', '/api/automation/rules', 'session', { role: 'maintainer' }, 'default'),

@@ -7,7 +7,6 @@
     "dev": "next dev",
     "build": "next build",
     "analyze": "ANALYZE=true next build --webpack",
-    "size": "node scripts/check-size-budgets.mjs",
     "perf": "node scripts/perf-harness.mjs",
     "perf:check": "node scripts/perf-harness.mjs --check",
     "perf:check:server": "node scripts/perf-harness.mjs --check --require-runtime",
@@ -34,7 +33,7 @@
     "test:e2e:integrations": "playwright test e2e/integrations.spec.ts",
     "test:e2e:maintainer": "playwright test e2e/maintainer.spec.ts",
     "test:error-boundary": "npx tsc src/components/error-boundary-utils.ts src/components/error-boundary-utils.test.ts --skipLibCheck --module commonjs --target es2020 --rootDir src --outDir build/test-tmp --esModuleInterop --jsx react && node build/test-tmp/components/error-boundary-utils.test.js",
-    "test:features": "npx tsc src/components/charts/transforms/charts.test.ts src/features/runbooks/engine.test.ts src/lib/topology/topology.test.ts src/lib/correlation/correlation.test.ts --module commonjs --target es2020 --outDir build/test-features --esModuleInterop --skipLibCheck && node build/test-features/components/charts/transforms/charts.test.js && node build/test-features/features/runbooks/engine.test.js && node build/test-features/lib/topology/topology.test.js && node build/test-features/lib/correlation/correlation.test.js"
+    "test:features": "npx tsc src/components/charts/transforms/charts.test.ts src/features/runbooks/engine.test.ts src/lib/topology/topology.test.ts src/lib/correlation/correlation.test.ts --module commonjs --target es2020 --outDir build/test-features --esModuleInterop --skipLibCheck && node build/test-features/components/charts/transforms/charts.test.js && node build/test-features/features/runbooks/engine.test.js && node build/test-features/lib/topology/topology.test.js && node build/test-features/lib/correlation/correlation.test.js",
     "test:rate-limit": "vitest run src/lib/rate-limit.test.ts src/rate-limit.test.ts"
   },
   "dependencies": {
