@@ -25,6 +25,9 @@ pub struct HealthSummary {
     /// readable via `#[serde(default)]`.
     #[serde(default)]
     pub plateau: PlateauMetrics,
+    /// Aggregate fee telemetry across recorded outcomes.
+    #[serde(default)]
+    pub fee_totals: FeeTotals,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -87,6 +90,15 @@ impl Default for PlateauMetrics {
     }
 }
 
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FeeTotals {
+    #[serde(default)] pub inclusion_fee_stroops: u64,
+    #[serde(default)] pub rent_bump_fee_stroops: u64,
+    #[serde(default)] pub expensive_successes: u64,
+    #[serde(default)] pub expensive_failures: u64,
+}
+
 pub fn export_health_summary_json(summary: &HealthSummary) -> Result<String, serde_json::Error> {
     serde_json::to_string_pretty(summary)
 }
@@ -104,6 +116,7 @@ pub struct HealthMonitor {
     unhealthy_failure_rate_threshold: f64,
     failure_classes: BTreeMap<String, u64>,
     plateau: PlateauMetrics,
+    fee_totals: FeeTotals,
 }
 
 impl HealthMonitor {
@@ -120,6 +133,7 @@ impl HealthMonitor {
             unhealthy_failure_rate_threshold: 0.5,
             failure_classes: BTreeMap::new(),
             plateau: PlateauMetrics::default(),
+            fee_totals: FeeTotals::default(),
         }
     }
 
@@ -140,11 +154,26 @@ impl HealthMonitor {
             unhealthy_failure_rate_threshold,
             failure_classes: BTreeMap::new(),
             plateau: PlateauMetrics::default(),
+            fee_totals: FeeTotals::default(),
         }
     }
 
     pub fn record_case(&mut self) {
         self.total_cases += 1;
+    }
+
+    pub fn record_outcome_cost(&mut self, diagnostics: &crate::HostDiagnostics) {
+        if let Some(fee) = diagnostics.inclusion_fee {
+            self.fee_totals.inclusion_fee_stroops = self.fee_totals.inclusion_fee_stroops.saturating_add(fee);
+        }
+        if let Some(fee) = diagnostics.rent_bump_fee {
+            self.fee_totals.rent_bump_fee_stroops = self.fee_totals.rent_bump_fee_stroops.saturating_add(fee);
+        }
+        match diagnostics.expensive_marker.as_deref() {
+            Some("expensive_success") => self.fee_totals.expensive_successes = self.fee_totals.expensive_successes.saturating_add(1),
+            Some("expensive_failure") => self.fee_totals.expensive_failures = self.fee_totals.expensive_failures.saturating_add(1),
+            _ => {}
+        }
     }
 
     pub fn record_failure(&mut self, is_new_signature: bool) {
@@ -237,6 +266,7 @@ impl HealthMonitor {
             queue,
             failure_classes: self.failure_classes.clone(),
             plateau: self.plateau.clone(),
+            fee_totals: self.fee_totals.clone(),
         }
     }
 
@@ -284,6 +314,7 @@ impl HealthMonitor {
         self.queue_in_progress = 0;
         self.failure_classes.clear();
         self.plateau = PlateauMetrics::default();
+        self.fee_totals = FeeTotals::default();
     }
 }
 
@@ -442,6 +473,28 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn fee_totals_aggregate_inclusion_rent_and_markers() {
+        let mut monitor = HealthMonitor::new(100);
+        monitor.record_outcome_cost(&crate::HostDiagnostics {
+            inclusion_fee: Some(500),
+            rent_bump_fee: Some(25),
+            expensive_marker: Some("expensive_success".to_string()),
+            ..crate::HostDiagnostics::default()
+        });
+        monitor.record_outcome_cost(&crate::HostDiagnostics {
+            inclusion_fee: Some(300),
+            rent_bump_fee: Some(15),
+            expensive_marker: Some("expensive_failure".to_string()),
+            ..crate::HostDiagnostics::default()
+        });
+        let fees = &monitor.summary().fee_totals;
+        assert_eq!(fees.inclusion_fee_stroops, 800);
+        assert_eq!(fees.rent_bump_fee_stroops, 40);
+        assert_eq!(fees.expensive_successes, 1);
+        assert_eq!(fees.expensive_failures, 1);
+    }
+
     fn exports_health_summary_json() {
         let mut monitor = HealthMonitor::new(100);
         monitor.record_case();

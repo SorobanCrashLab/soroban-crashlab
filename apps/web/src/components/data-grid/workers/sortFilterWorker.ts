@@ -9,10 +9,10 @@
  */
 
 import type { FuzzingRun } from '@/app/types';
-import { sortRuns, compareRuns, isRunSortField } from '@/app/runs-sort-utils';
+import { sortRuns, compareRuns as _compareRuns, isRunSortField } from '@/app/runs-sort-utils';
 import { applyRunFilters, type RunFilters } from '@/app/run-filter-utils';
 
-export interface SortFilterWorkerAPI {
+export type SortFilterWorkerAPI = {
   sort(data: FuzzingRun[], field: string, direction: 'asc' | 'desc'): FuzzingRun[];
   filter(data: FuzzingRun[], filters: RunFilters): FuzzingRun[];
   aggregate(data: FuzzingRun[], field: string): { count: number; sum: number; avg: number; min: number; max: number };
@@ -51,11 +51,13 @@ const api: SortFilterWorkerAPI = {
 export { api };
 
 // Worker message handler — listens for postMessage and dispatches to API.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 if (typeof self !== 'undefined' && typeof (self as any).addEventListener === 'function') {
   (self as unknown as Worker).addEventListener('message', async (event: MessageEvent) => {
     const data = event.data;
     if (!data || !data.__method || data.__correlationId === undefined) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const method = (api as unknown as Record<string, (...args: any[]) => any>)[data.__method];
     if (!method) {
       (self as unknown as Worker).postMessage({

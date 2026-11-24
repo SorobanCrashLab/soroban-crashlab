@@ -16,8 +16,8 @@ const MAX_PAGE_LIMIT = 100;
 
 export const GET = withRouteErrorHandling(
   'GET /api/artifacts',
-  async (request?: Request) => {
-    const { searchParams } = new URL(request?.url ?? 'http://localhost/api/artifacts');
+  async (request: Request) => {
+    const { searchParams } = new URL(request.url);
 
     const limitParam = parseInt(searchParams.get('limit') ?? '', 10);
     const limit = Number.isFinite(limitParam) && limitParam > 0

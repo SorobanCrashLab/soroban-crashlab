@@ -3,72 +3,54 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const appRoot = path.resolve(__dirname);
-const candidateComponentPaths = [
-  path.resolve(appRoot, 'page.tsx'),
-  path.resolve(process.cwd(), 'src/app/integrations/page.tsx'),
-];
-
-const componentPath = candidateComponentPaths.find((candidatePath) =>
-  fs.existsSync(candidatePath),
+const pagePath = path.resolve(appRoot, 'page.tsx');
+const catalogPath = path.resolve(
+  process.cwd(),
+  'src/features/integrations/marketplace/catalog.ts',
+);
+const componentPath = path.resolve(
+  process.cwd(),
+  'src/features/integrations/marketplace/IntegrationCatalog.tsx',
 );
 
 const runAssertions = (): void => {
-  if (!componentPath) {
-    throw new Error(
-      `Component file not found. Checked: ${candidateComponentPaths.join(', ')}`,
-    );
+  for (const candidatePath of [pagePath, catalogPath, componentPath]) {
+    if (!fs.existsSync(candidatePath)) {
+      throw new Error(`Integration marketplace file not found: ${candidatePath}`);
+    }
   }
 
-  const content = fs.readFileSync(componentPath, 'utf-8');
+  const page = fs.readFileSync(pagePath, 'utf-8');
+  const catalog = fs.readFileSync(catalogPath, 'utf-8');
+  const component = fs.readFileSync(componentPath, 'utf-8');
 
   assert.ok(
-    content.includes("'use client'"),
-    'Page should be a client component',
+    page.includes('IntegrationCatalog'),
+    'Integrations page should render the marketplace catalog',
   );
   assert.ok(
-    content.includes('export default function IntegrationsHub()'),
-    'Page should export a default IntegrationsHub component',
+    catalog.includes('export const INTEGRATION_CATALOG'),
+    'Marketplace should define a shared integration catalog',
   );
   assert.ok(
-    content.includes('INTEGRATIONS'),
-    'Page should define INTEGRATIONS array',
+    component.includes('Search integrations'),
+    'Marketplace should provide an integration search field',
   );
   assert.ok(
-    content.includes('type Integration ='),
-    'Page should define Integration type',
+    component.includes('Filter integrations by category'),
+    'Marketplace should provide category filters',
   );
   assert.ok(
-    content.includes('Integrations Hub'),
-    'Page should render an Integrations Hub heading',
+    component.includes('Setup available'),
+    'Marketplace should not claim unverified integrations are active',
   );
   assert.ok(
-    content.includes('/integrations/artifacts'),
-    'Page should link to artifacts integration',
+    component.includes('Prerequisites'),
+    'Marketplace should display integration prerequisites',
   );
   assert.ok(
-    content.includes('Ready to Use'),
-    'Page should have a Ready to Use section',
-  );
-  assert.ok(
-    content.includes('Coming Soon'),
-    'Page should have a Coming Soon section',
-  );
-  assert.ok(
-    content.includes('availableIntegrations'),
-    'Page should filter available integrations',
-  );
-  assert.ok(
-    content.includes('comingSoonIntegrations'),
-    'Page should filter coming soon integrations',
-  );
-  assert.ok(
-    content.includes('Tailwind'),
-    false,
-    'Page should use Tailwind CSS classes',
-  );
-  assert.ok(
-    content.includes('dark:'),
-    'Page should support dark mode',
+    component.includes('Documentation'),
+    'Marketplace should link to integration documentation',
   );
 
   console.log('integrations/page.test.ts: all assertions passed');

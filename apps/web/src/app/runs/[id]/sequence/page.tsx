@@ -34,6 +34,7 @@ export default async function RunSequencePage({ params }: SequencePageProps) {
           Back to run
         </Link>
       </div>
+      <Link href={`/runs/${encodeURIComponent(id)}/payloads?context=trace`} className="mb-4 inline-block underline">Inspect trace XDR payloads</Link>
       <ContractSequenceDiagramView steps={steps} runId={run.id} />
     </div>
   );

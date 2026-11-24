@@ -1,0 +1,53 @@
+{
+  "preferences": {
+    "title": "Notification Preferences",
+    "subtitle": "Configure which notifications you receive and how they are delivered.",
+    "savedMessage": "Preferences saved successfully.",
+    "saveFailedMessage": "Failed to save preferences.",
+    "saveButton": "Save Preferences",
+    "savingButton": "Saving...",
+    "resetButton": "Reset to Defaults",
+    "enabledTypesCount": "{count, plural, one {# notification type enabled} other {# notification types enabled}}"
+  },
+  "types": {
+    "title": "Notification Types",
+    "subtitle": "Choose which types of notifications to display in your notification center.",
+    "info": "Information",
+    "success": "Success",
+    "warning": "Warning",
+    "error": "Error"
+  },
+  "priority": {
+    "title": "Minimum Priority",
+    "subtitle": "Only show notifications at or above this priority level.",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical"
+  },
+  "digest": {
+    "title": "Digest Frequency",
+    "subtitle": "How often would you like to receive notification summaries?",
+    "realtime": "Real-time",
+    "hourly": "Hourly digest",
+    "daily": "Daily digest",
+    "never": "Never"
+  },
+  "channels": {
+    "title": "Delivery Channels",
+    "subtitle": "Choose how notifications are delivered.",
+    "soundLabel": "Sound",
+    "soundDescription": "Play a sound when new notifications arrive",
+    "desktopLabel": "Desktop Notifications",
+    "desktopDescription": "Show browser notifications for important alerts",
+    "emailLabel": "Email Notifications",
+    "emailDescription": "Receive email digests based on your frequency setting"
+  },
+  "quietHours": {
+    "title": "Quiet Hours",
+    "subtitle": "Suppress notifications during specific hours (sound and desktop only).",
+    "enable": "Enable Quiet Hours",
+    "start": "Start Time",
+    "end": "End Time"
+  }
+}

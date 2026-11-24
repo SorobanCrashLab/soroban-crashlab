@@ -474,6 +474,23 @@ test.describe('Artifact API Endpoints', () => {
     }
   });
 
+  test('POST /api/artifacts rejects declared oversized uploads with the standard 413 envelope', async ({ request }) => {
+    // Declare a length above the 20 MiB artifact-class limit without allocating
+    // the payload: the shared gate rejects on content-length before reading.
+    const response = await request.post('/api/artifacts', {
+      headers: {
+        'content-type': 'multipart/form-data; boundary=x',
+        'content-length': String(20 * 1024 * 1024 + 1),
+      },
+      data: '',
+    });
+
+    expect(response.status()).toBe(413);
+    const body = await response.json();
+    expect(body.code).toBe('PAYLOAD_TOO_LARGE');
+    expect(body.limit).toBe(20 * 1024 * 1024);
+  });
+
   test('artifact metadata includes required fields', async ({ request }) => {
     const response = await request.get('/api/artifacts');
 

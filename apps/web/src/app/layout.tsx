@@ -16,6 +16,7 @@ import { UploadthingSsrConfigScript } from "../components/UploadthingSsrConfigSc
 import { extractRouterConfig } from "uploadthing/server";
 import { crashlabFileRouter } from "./api/uploadthing/core";
 import { SentryClientBootstrap } from "../components/SentryClientBootstrap";
+import { SessionReplayBootstrap } from "../components/SessionReplayBootstrap";
 
 /**
  * Nonce-based CSP (issue #1545, see docs/CSP.md). The proxy mints a
@@ -105,6 +106,7 @@ export default async function RootLayout({
         <a href="#main-content" className="skip-link">Skip to main content</a>
         <LocaleProvider>
           <SentryClientBootstrap />
+          <SessionReplayBootstrap />
           <ThemeProvider>
             <AccessibilityProvider>
               <ToastProvider>

@@ -1,0 +1,35 @@
+{
+  "name": "crashlab",
+  "version": "1.0.0",
+  "description": "Unified CLI tool for the Soroban CrashLab Developer Experience Platform",
+  "main": "dist/index.js",
+  "bin": {
+    "crashlab": "./dist/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "crashlab",
+    "soroban",
+    "fuzzing",
+    "developer-tool"
+  ],
+  "author": "Soroban CrashLab",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3"
+  }
+}

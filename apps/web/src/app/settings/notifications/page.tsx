@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { LoadingSpinner } from '../../../components/LoadingSkeleton';
 import { Can } from '../../../components/Can';
 import { explainGate, useEffectiveAccess } from '../../../lib/permissions';
@@ -84,9 +85,17 @@ export default function NotificationSettingsRoute() {
 
   return (
     <div className="px-6 md:px-8 max-w-5xl mx-auto w-full py-14 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold mb-2">Notification Settings</h1>
-        <p className="text-gray-600">Configure how you receive notifications</p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold mb-2">Notification Settings</h1>
+          <p className="text-gray-600">Configure how you receive notifications</p>
+        </div>
+        <Link
+          href="/settings/notifications/rules"
+          className="btn-outline text-xs sm:text-sm px-4 py-2"
+        >
+          Open Notification Rules &amp; Escalation Builder
+        </Link>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 space-y-6">

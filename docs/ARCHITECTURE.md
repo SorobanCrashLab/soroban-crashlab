@@ -105,6 +105,25 @@ start campaign (preset / CLI)
 Web surfaces: run history, triage, replay controls, analytics. Artifacts land in
 the configured storage driver or `CRASHLAB_ARTIFACT_DIR`.
 
+## Command palette
+
+The global Cmd/Ctrl+K palette is mounted with the deferred app chrome and uses
+the server-safe singleton in `apps/web/src/lib/command-palette/registry.ts`.
+Features register static commands through `registerCommand` or
+`useCommandRegistration`; async providers contribute query-driven results and
+can restrict themselves with a route context predicate. The registry applies
+weighted fuzzy matching (title, description, keywords), filters commands by
+the current pathname, and merges recently used ids from browser storage into
+the ranking. Providers receive an abort signal so stale searches are discarded.
+
+The client palette owns keyboard navigation, nested command menus, argument
+prompts, async execution feedback, and accessible combobox announcements.
+Run search is a route-scoped provider in
+`apps/web/src/app/command-palette-runs-provider.ts`; built-in navigation and
+actions are registered from `command-palette-static-entries.ts`. Command
+registration itself does not access browser globals, so the registry and
+feature contributions remain usable during server rendering.
+
 **Capacity (#1904).** `POST /api/campaigns` admits a campaign only if its class
 window is open and the scope's quotas allow it, then records a lease in the
 capacity ledger (`apps/web/src/lib/capacity/`). Runners report progress to
@@ -150,16 +169,137 @@ section.
 
 ---
 
+## Cross-run comparison workbench
+
+The `/analytics/comparison` page lazy-loads
+`apps/web/src/features/runs/comparison/ComparisonWorkbench.tsx`, which replaces
+the legacy two-run side-by-side view. State lives in `comparisonState.ts`
+(2–5 slots, pinned baseline, reorder/remove) and is mirrored into the URL
+(`?runs=…&baseline=…&panel=…&artifact=…`) by `hooks/useComparisonURL.ts` so
+views are shareable.
+
+```
+ComparisonWorkbench
+├── panels/MetricsDeltaPanel   ← metrics.ts (delta %, better/worse classification)
+├── panels/ArtifactDiffPanel   ← hooks/useArtifactDiff.ts → diffing/diffWorkers.ts
+│                                  ├─ diffing/textDiff.ts   (LCS + unified patch)
+│                                  ├─ diffing/jsonDiff.ts   (structural deep diff)
+│                                  └─ diffing/binaryDiff.ts (byte-level chunks/hex)
+├── panels/ReplaySyncPanel     ← sync/ReplaySyncController.ts (one normalised ratio)
+│                                  └─ sync/CrashCorrelator.ts (fingerprint/signature match)
+├── panels/SummaryPanel        ← crash + delta rollups
+└── campaign/CampaignComparisonMode ← campaign/AggregationEngine.ts (p50/p95/p99)
+```
+
+Diff modules are dynamically imported on first use to keep the comparison
+bundle small; `diffWorkers.ts` exposes a queued task API so a wasm bsdiff
+worker can replace the pure-TS binary scanner without changing callers.
+Artifact bytes come from `GET /api/artifacts/:id` via
+`lib/artifact-content-utils.ts`. Exporters are dependency-free: CSV and unified
+patch files download via Blob URLs, and the PDF report uses the browser print
+pipeline (`export/PDFExporter.ts`).
+
+---
+
 ## Directory map (high level)
 
 ```
 apps/web/                 Next.js dashboard + /api routes + storage/migration
+├── src/lib/artifact-security/  Multi-layer artifact security
+│   ├── scanning/           ClamAV + YARA malware scanning
+│   ├── verification/       Sigstore/cosign + Ed25519 signatures
+│   ├── sandbox/            gVisor/Kata reproduction sandbox
+│   ├── supplychain/        SLSA, SBOM, vulnerability scanning
+│   └── quarantine/         Quarantine workflow & review UI
 contracts/crashlab-core/  Rust engine (mutators, runners, campaigns, replay)
+├── src/sandbox/          Core sandbox enhancements
+│   ├── gvisor.rs         gVisor integration
+│   ├── kata.rs           Kata Containers
+│   ├── seccomp.rs        Seccomp profile generation
+│   ├── attestation.rs    Result signing
+│   └── resource_limits.rs cgroups v2 limits
 contracts/soroban-example Example Soroban contract (WASM)
 docs/                     Canonical docs (this file, DEPLOYMENT, ENV, …)
 scripts/                  Maintainer + CI audit scripts
 .github/workflows/        GitHub Actions (no GitLab CI)
+infrastructure/           Deployment artifacts
+├── sandbox/              gVisor/Kata Dockerfiles, seccomp, containerd config
+├── scanning/             ClamAV, YARA rules & Dockerfiles
+└── supplychain/          slsa-verifier, cosign Dockerfiles
 ```
+
+---
+
+## Artifact Security Architecture
+
+### Defense in Depth Layers
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Artifact Security                                    [🔒 Quarantine: 3]    │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  UPLOAD PIPELINE                                                        │ │
+│  │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐  │ │
+│  │  │ Upload  │──▶│ ClamAV  │──▶│ YARA    │──▶│ Sig     │──▶| Quarantine│  │ │
+│  │  │         │   │ Scan    │   │ Rules   │   │ Verify  │   │ / Release │  │ │
+│  │  └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘  │ │
+│  │       │            │            │            │            │             │ │
+│  │       ▼            ▼            ▼            ▼            ▼             │ │
+│  │  Chunked      Multi-engine   Custom rules  Cosign/     Policy:         │ │
+│  │  upload       (ClamAV +      (packers,      Sigstore    - Malware→Q     │ │
+│  │  + resumable  custom)        cryptominers)  verify      - YARA→Q        │ │
+│  │                                                                      │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  REPRODUCTION SANDBOX                                                   │ │
+│  │  ┌───────────────────────────────────────────────────────────────────┐  │ │
+│  │  │  gVisor / Kata Containers                                         │  │ │
+│  │  │  ├── No host network                                              │  │ │
+│  │  │  ├── Read-only rootfs                                             │  │ │
+│  │  │  ├── CPU/memory limits (cgroups v2)                               │  │ │
+│  │  │  ├── Seccomp profile (minimal syscalls)                           │  │ │
+│  │  │  ├── No capability (CAP_DROP=ALL)                                 │  │ │
+│  │  │  └── Ephemeral storage (tmpfs, no persist)                        │  │ │
+│  │  └───────────────────────────────────────────────────────────────────┘  │ │
+│  │  Reproducer Verification:  Sigstore cosign verify --certificate...     │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  SUPPLY CHAIN INTEGRITY                                                 │ │
+│  │  SLSA Level 3:  ✓ Provenance  ✓ Reproducible  ✓ Signed  ✓ Verified    │ │
+│  │  SBOM:  CycloneDX + SPDX  |  Vulnerability Scan:  Grype/Trivy          │ │
+│  │  [Generate Attestation] [Verify Attestation] [View SBOM]               │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Upload Pipeline
+
+1. **Chunked Upload**: Artifacts uploaded via UploadThing with resumable chunks
+2. **ClamAV Scan**: Multi-engine malware detection via clamd daemon
+3. **YARA Rules**: Custom rules for packers, cryptominers, exploit kits
+4. **Signature Verification**: Cosign/Sigstore for reproducers, Ed25519 for crash bundles
+5. **Quarantine Decision**: Policy-based (strict/standard/permissive) with review queue
+
+### Reproduction Sandbox
+
+- **Runtime**: gVisor (ptrace/KVM) or Kata Containers (hardware virtualization)
+- **Isolation**: No network, read-only rootfs, minimal syscalls (seccomp), no capabilities
+- **Resources**: CPU/memory/pids limits via cgroups v2, ephemeral tmpfs storage
+- **Attestation**: Execution results signed by sandbox for verification
+
+### Supply Chain Integrity
+
+- **SLSA Level 3**: Provenance generation, reproducible builds, signed artifacts, verification
+- **SBOM**: CycloneDX 1.6 + SPDX 2.3 for all artifacts
+- **Vulnerability Scanning**: Grype + Trivy integration
+- **Verification**: slsa-verifier and cosign for artifact verification
+
+### Quarantine Management
+
+- **Review Queue**: UI for security team to inspect quarantined artifacts
+- **Approval Workflow**: 2-person approval required for release
+- **Retention**: 90-day auto-delete with manual override
+- **Safe Inspection**: Base64 encoding for web viewing, no direct execution
 
 ---
 
@@ -169,3 +309,9 @@ scripts/                  Maintainer + CI audit scripts
 - [`ENV.md`](ENV.md) — environment variable contract
 - [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) — deterministic replay guarantees
 - [`API.md`](API.md) — HTTP surface of the dashboard
+- [`SECURITY.md`](SECURITY.md) — Security policy and artifact handling procedures
+- [`THREAT_MODEL_ARTIFACT_HANDLING.md`](THREAT_MODEL_ARTIFACT_HANDLING.md) — STRIDE threat model
+
+## Browser XDR inspector
+
+Run/artifact/trace/reproducer navigation opens the client-only [XDR/ScVal inspector](frontend/xdr-scval-inspector.md). A same-origin module worker owns the official codec, typed document and bounded index. React receives paged tree rows, a small byte window and selected editor subtrees; payload processing never falls back to the UI thread. Exact exports and leaf-redacted evidence are distinct. Context links carry identifiers and node paths without payloads; artifact permission flows remain authoritative. See proposed [ADR-0013](adr/0013-worker-xdr-inspection.md).

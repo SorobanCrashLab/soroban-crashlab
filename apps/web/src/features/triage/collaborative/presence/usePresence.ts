@@ -11,7 +11,7 @@ import { AwarenessManager, type PresenceState } from '../yjs/awareness';
 
 export function usePresence(roomId: string) {
   const awarenessRef = useRef<AwarenessManager | null>(null);
-  const [localState, setLocalState] = useState<PresenceState | null>(null);
+  const [localState, setLocalStateValue] = useState<PresenceState | null>(null);
   const [remoteStates, setRemoteStates] = useState<Map<string, PresenceState>>(new Map());
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export function usePresence(roomId: string) {
     awarenessRef.current = manager;
 
     const unsub = manager.onStatesChange(() => {
-      setLocalState(manager.getLocalState());
+      setLocalStateValue(manager.getLocalState());
       setRemoteStates(manager.getRemoteStates());
     });
 

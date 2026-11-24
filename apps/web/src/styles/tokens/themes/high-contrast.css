@@ -1,0 +1,84 @@
+.high-contrast {
+  --ds-color-background: #ffffff;
+  --ds-color-surface: #ffffff;
+  --ds-color-surface-raised: #ffffff;
+  --ds-color-text-primary: #000000;
+  --ds-color-text-secondary: #000000;
+  --ds-color-text-muted: #000000;
+  --ds-color-border: #000000;
+  --ds-color-focus: #000000;
+  --ds-color-action-primary-bg: #000000;
+  --ds-color-action-primary-text: #ffffff;
+  --ds-color-action-primary-hover: #1a1a1a;
+  --ds-color-action-danger-bg: #000000;
+  --ds-color-action-danger-text: #ffffff;
+  --ds-color-action-danger-hover: #1a1a1a;
+  --ds-color-success-text: #000000;
+  --ds-color-success-bg: #ffff00;
+  --ds-color-warning-text: #000000;
+  --ds-color-warning-bg: #ffff00;
+  --ds-color-error-text: #000000;
+  --ds-color-error-bg: #ffff00;
+  --ds-color-info-text: #000000;
+  --ds-color-info-bg: #ffff00;
+  --ds-color-table-row-selected-bg: #ffff00;
+  --ds-color-neutral-text: #000000;
+  --ds-color-neutral-bg: #ffff00;
+
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #000000;
+  --border-color: #000000;
+  --highlight-bg: #ffff00;
+  --hover-bg: #f0f0f0;
+  --card-shadow: none;
+  --card-shadow-hover: none;
+  --input-bg: #ffffff;
+  --input-border: #000000;
+}
+
+.high-contrast.dark,
+.dark.high-contrast,
+.high-contrast[data-theme="dark"] {
+  --ds-color-background: #000000;
+  --ds-color-surface: #000000;
+  --ds-color-surface-raised: #000000;
+  --ds-color-text-primary: #ffffff;
+  --ds-color-text-secondary: #ffffff;
+  --ds-color-text-muted: #ffffff;
+  --ds-color-border: #ffffff;
+  --ds-color-focus: #ffff00;
+  --ds-color-action-primary-bg: #ffffff;
+  --ds-color-action-primary-text: #000000;
+  --ds-color-action-primary-hover: #e5e5e5;
+  --ds-color-action-danger-bg: #ffffff;
+  --ds-color-action-danger-text: #000000;
+  --ds-color-action-danger-hover: #e5e5e5;
+  --ds-color-success-text: #ffffff;
+  --ds-color-success-bg: #000000;
+  --ds-color-warning-text: #ffffff;
+  --ds-color-warning-bg: #000000;
+  --ds-color-error-text: #ffffff;
+  --ds-color-error-bg: #000000;
+  --ds-color-info-text: #ffffff;
+  --ds-color-info-bg: #000000;
+  --ds-color-table-row-selected-bg: #1a1a1a;
+  --ds-color-neutral-text: #ffffff;
+  --ds-color-neutral-bg: #000000;
+
+  --bg: #000000;
+  --surface: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #ffffff;
+  --border-color: #ffffff;
+  --highlight-bg: #1a1a1a;
+  --hover-bg: #1a1a1a;
+  --input-bg: #000000;
+  --input-border: #ffffff;
+}
+
+.high-contrast :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--ds-color-focus);
+  outline-offset: 3px;
+}

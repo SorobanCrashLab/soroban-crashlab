@@ -10,7 +10,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { RunEventStream } from './RunEventStream';
 import type { ConnectionHealth } from './connectionManager';
-import type { AllEventTypes, StreamEnvelope } from './eventTypes';
+import type { AllEventTypes as _AllEventTypes, StreamEnvelope } from './eventTypes';
 
 export interface GlobalRunStreamState {
   connected: boolean;

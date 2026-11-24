@@ -9,8 +9,6 @@ import { createHash, randomBytes } from 'node:crypto';
  *  2. Double-submit token flow for routes where header checks are insufficient.
  */
 
-export type CsrfAuthClass = 'browser-session' | 'bearer-token' | 'public';
-
 export interface CsrfOptions {
   /** How the route is authenticated. */
   authClass?: CsrfAuthClass;
@@ -223,25 +221,33 @@ export function enforceCsrf(
   return null;
 }
 
-/**
- * Generic route-handler shape. `never` parameters keep the wrapper assignable
- * to handlers typed with `NextRequest` while still constraining the return
- * type to a response.
- */
-type RouteHandler = (request: never, context?: never) => Promise<Response | undefined> | Response | undefined;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RouteHandler = (request: any, context?: any) => Promise<Response | undefined> | Response | undefined;
 
 /**
  * Deny-by-default helper: wrap a mutating route handler so that CSRF is
  * enforced unless the route explicitly opts out (e.g. bearer-only non-browser).
+ *
+ * Supports two call shapes used across the codebase:
+ *   withCsrfGuard(handler)
+ *   withCsrfGuard(optionsOrLabel, handler)
  */
 export function withCsrfGuard<H extends RouteHandler>(
-  handler: H,
-  options: CsrfOptions = {},
+  handlerOrOptions: H | string | CsrfOptions,
+  maybeHandler?: H,
 ): H {
+  const handler = (typeof handlerOrOptions === 'function' ? handlerOrOptions : maybeHandler) as H;
+  const options: CsrfOptions =
+    typeof handlerOrOptions === 'object' && handlerOrOptions !== null
+      ? handlerOrOptions
+      : {};
+  if (!handler) throw new Error('withCsrfGuard: missing route handler');
+
   const wrapped = async (request: Request, context: unknown) => {
     const csrfFailure = enforceCsrf(request, options);
     if (csrfFailure) return csrfFailure;
-    return handler(request as never, context as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return handler(request as any, context as any);
   };
   return wrapped as unknown as H;
 }

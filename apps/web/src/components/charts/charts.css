@@ -1,0 +1,292 @@
+.chart-container {
+  display: grid;
+  gap: var(--space-3, 0.75rem);
+  min-width: 0;
+  padding: var(--space-4, 1rem);
+  border: 1px solid var(--ds-color-border, #d4d4d4);
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--ds-color-surface, #fff);
+  color: var(--ds-color-text-primary, #111);
+}
+
+.chart-heading,
+.chart-actions,
+.chart-legend,
+.chart-interactions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+}
+
+.chart-heading {
+  justify-content: space-between;
+  gap: var(--space-4, 1rem);
+}
+
+.chart-title {
+  margin: 0;
+  font: 600 var(--primitive-font-size-lg, 1rem) / 1.25 var(--font-sans, sans-serif);
+}
+
+.chart-description,
+.chart-point-count,
+.chart-table-scroll > p {
+  margin: var(--space-1, 0.25rem) 0 0;
+  color: var(--ds-color-text-secondary, #525252);
+  font-size: var(--primitive-font-size-xs, 0.75rem);
+}
+
+.chart-hover-tooltip {
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+  border: 1px solid var(--ds-color-border, #737373);
+  border-radius: var(--radius-sm, 0.25rem);
+  background: var(--ds-color-surface-raised, #fff);
+  color: var(--ds-color-text-primary, #111);
+  font-size: var(--primitive-font-size-xs, 0.75rem);
+}
+
+.chart-actions button,
+.chart-interactions button {
+  min-height: 2rem;
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  border: 1px solid var(--ds-color-border, #737373);
+  border-radius: var(--radius-sm, 0.25rem);
+  background: var(--ds-color-surface, #fff);
+  color: var(--ds-color-text-primary, #111);
+  font: 500 var(--primitive-font-size-xs, 0.75rem) / 1.25 var(--font-sans, sans-serif);
+  cursor: pointer;
+}
+
+.chart-actions button:hover,
+.chart-interactions button:hover {
+  background: var(--hover-bg, #f5f5f5);
+}
+
+.chart-actions button:focus-visible,
+.chart-interactions button:focus-visible,
+.chart-legend-toggle:focus-visible,
+.chart-plot:focus-visible,
+.chart-interactions input:focus-visible {
+  outline: 2px solid var(--ds-color-focus, #111);
+  outline-offset: 2px;
+}
+
+.chart-legend {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-legend-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+  min-height: 2rem;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-text-primary, #111);
+  font: 500 var(--primitive-font-size-xs, 0.75rem) / 1.25 var(--font-sans, sans-serif);
+  cursor: pointer;
+}
+
+.chart-legend-toggle[aria-pressed="false"] {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.chart-legend-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-full, 9999px);
+}
+
+.chart-plot {
+  overflow: visible;
+  touch-action: pan-y;
+}
+
+.chart-grid-line {
+  stroke: var(--ds-color-border, #d4d4d4);
+  stroke-opacity: 0.35;
+  stroke-dasharray: 3 4;
+}
+
+.chart-axis-line {
+  stroke: var(--ds-color-text-secondary, #737373);
+}
+
+.chart-axis-label {
+  fill: var(--ds-color-text-secondary, #525252);
+  font: 10px var(--font-mono, monospace);
+}
+
+.chart-plot .chart-axis-label {
+  pointer-events: none;
+}
+
+.chart-annotation-label {
+  fill: var(--ds-color-text-primary, currentColor);
+  font: 11px var(--font-sans, sans-serif);
+}
+
+.chart-crosshair {
+  stroke: var(--ds-color-focus, currentColor);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+
+.chart-interactions label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  color: var(--ds-color-text-secondary, #525252);
+  font: 500 var(--primitive-font-size-xs, 0.75rem) / 1.25 var(--font-sans, sans-serif);
+}
+
+.chart-interactions input {
+  width: min(8rem, 22vw);
+  accent-color: var(--ds-color-info-text, #1e40af);
+}
+
+.chart-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font: var(--primitive-font-size-xs, 0.75rem) / 1.5 var(--font-sans, sans-serif);
+}
+
+.chart-table-scroll {
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.chart-data-table caption {
+  padding: var(--space-2, 0.5rem);
+  text-align: left;
+  font-weight: 600;
+}
+
+.chart-data-table th,
+.chart-data-table td {
+  padding: var(--space-2, 0.5rem);
+  border: 1px solid var(--ds-color-border, #d4d4d4);
+}
+
+.chart-heatmap td {
+  min-width: 5rem;
+}
+
+.chart-heatmap-value {
+  display: block;
+}
+
+.chart-heatmap-track {
+  display: block;
+  height: 0.35rem;
+  margin-top: var(--space-1, 0.25rem);
+  overflow: hidden;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--ds-color-neutral-bg, #f5f5f5);
+}
+
+.chart-heatmap-track > span {
+  display: block;
+  width: var(--heatmap-intensity);
+  height: 100%;
+  background: var(--ds-color-info-text, #1e40af);
+}
+
+.chart-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.chart-export-error {
+  margin: 0;
+  color: var(--ds-color-error-text, #b91c1c);
+  font-size: var(--primitive-font-size-xs, 0.75rem);
+}
+
+.chart-gauge {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+}
+
+.chart-gauge-track {
+  height: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--ds-color-border, #737373);
+  border-radius: var(--radius-full, 9999px);
+  background: var(--ds-color-neutral-bg, #f5f5f5);
+}
+
+.chart-gauge-track span {
+  display: block;
+  height: 100%;
+  background: var(--ds-color-success-text, #166534);
+}
+
+.chart-gauge-warning .chart-gauge-track span {
+  background: var(--ds-color-warning-text, #854d0e);
+}
+
+.chart-gauge-danger .chart-gauge-track span {
+  background: var(--ds-color-error-text, #b91c1c);
+}
+
+.chart-gauge p {
+  margin: 0;
+  color: var(--ds-color-text-secondary, #525252);
+  font-size: var(--primitive-font-size-sm, 0.875rem);
+}
+
+.chart-gauge p strong {
+  color: var(--ds-color-text-primary, #111);
+  font-size: var(--primitive-font-size-lg, 1rem);
+}
+
+.chart-annotation-list,
+.chart-threshold-list {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+  margin: 0;
+  padding-left: var(--space-4, 1rem);
+  color: var(--ds-color-text-secondary, #525252);
+  font-size: var(--primitive-font-size-xs, 0.75rem);
+}
+
+.chart-annotation-list li {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+}
+
+@media (max-width: 40rem) {
+  .chart-container {
+    padding: var(--space-3, 0.75rem);
+  }
+
+  .chart-heading {
+    align-items: flex-start;
+  }
+
+  .chart-actions {
+    width: 100%;
+  }
+
+  .chart-actions button {
+    flex: 1 1 auto;
+  }
+}

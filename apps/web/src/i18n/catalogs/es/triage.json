@@ -1,0 +1,26 @@
+{
+  "title": "Triaje",
+  "description": "Triaje y análisis de fallos",
+  "priority": {
+    "critical": "Crítico",
+    "high": "Alto",
+    "medium": "Medio",
+    "low": "Bajo"
+  },
+  "actions": {
+    "acknowledge": "Reconocer",
+    "assignTo": "Asignar A",
+    "markResolved": "Marcar como Resuelto",
+    "reopenIssue": "Reabrir Problema"
+  },
+  "filters": {
+    "unacknowledged": "Sin Reconocer",
+    "inProgress": "En Progreso",
+    "resolved": "Resuelto",
+    "all": "Todos los Problemas"
+  },
+  "empty": {
+    "title": "No hay problemas para triage",
+    "description": "Todos los problemas detectados han sido atendidos"
+  }
+}

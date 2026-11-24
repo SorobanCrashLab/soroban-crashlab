@@ -5,6 +5,7 @@ import { recordTriageAudit } from '@/lib/triage/audit';
 import { buildTriageSeed } from '@/lib/triage/seed';
 import { triageStore } from '@/lib/triage/store';
 import { TRIAGE_STATUSES, type TriageStatus } from '@/lib/triage/types';
+import { standardSizeLimitResponse } from '@/lib/request-size-limits';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) {
-    return errorResponse('The bulk request body is too large.', status.unprocessableEntity);
+    return standardSizeLimitResponse('The bulk request body is too large.', MAX_BODY_BYTES, raw.length);
   }
 
   let body: unknown;

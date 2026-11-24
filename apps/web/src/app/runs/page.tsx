@@ -11,6 +11,7 @@ import {
   getSelectedRuns,
   shouldClearSelectionAfterAction,
 } from '../runs-bulk-actions-utils';
+import { FuzzingRun as _FuzzingRun } from '../types';
 import { recordAuditEvent } from '../../lib/audit/audit-sink';
 import SavedViewsMenu from '../saved-views/SavedViewsMenu';
 import {
@@ -177,7 +178,7 @@ export default function RunsPage() {
   // Invalidate "all matching" selections when the filter identity changes.
   // The updater is derived from external filter state, not rendered values.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- selection must follow query identity
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     setSelection((previous) => applyFilterContext(previous, filterQueryKey, selectionMatchTotal));
   }, [filterQueryKey, selectionMatchTotal]);
 

@@ -1,0 +1,35 @@
+{
+  "title": "[Rúñs]",
+  "description": "[Fúzzíñg rúñ hístórý áñd détáíls]",
+  "columns": {
+    "id": "[ÍD]",
+    "status": "[Státús]",
+    "area": "[Áréá]",
+    "severity": "[Sévérítý]",
+    "duration": "[Dúrátíóñ]",
+    "seedCount": "[Sééds]",
+    "timestamp": "[Tíméstámp]"
+  },
+  "status": {
+    "running": "[Rúññíñg]",
+    "completed": "[Çómplétéd]",
+    "failed": "[Fáíléd]",
+    "cancelled": "[Çáñçélléd]"
+  },
+  "actions": {
+    "viewDetails": "[Víéw Détáíls]",
+    "exportCsv": "[Éxpórt ÇSV]",
+    "retry": "[Rétrý Rúñ]",
+    "cancel": "[Çáñçél Rúñ]"
+  },
+  "empty": {
+    "title": "[Ñó rúñs ýét]",
+    "description": "[Stárt á fúzzíñg çámpáígñ tó séé rúñs héré]"
+  },
+  "filters": {
+    "all": "[Áll Rúñs]",
+    "active": "[Áçtívé]",
+    "completed": "[Çómplétéd]",
+    "failed": "[Fáíléd]"
+  }
+}

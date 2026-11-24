@@ -55,7 +55,7 @@ export class WebSocketTransport {
         this.ws = null;
         this.onClose?.();
       };
-    } catch (err) {
+    } catch {
       this.onError?.(new Event('error'));
     }
   }

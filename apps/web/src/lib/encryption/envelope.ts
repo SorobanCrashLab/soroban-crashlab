@@ -1,8 +1,7 @@
 import crypto from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-/** AES-GCM authentication tag length in bytes (used in tests and docs). */
-export const TAG_LENGTH = 16;
+const _TAG_LENGTH = 16;
 const IV_LENGTH = 12;
 const SALT_LENGTH = 16;
 

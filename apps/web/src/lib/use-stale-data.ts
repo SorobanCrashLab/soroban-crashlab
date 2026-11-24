@@ -54,9 +54,8 @@ export function useStaleData<T>(options: StaleDataOptions<T>): StaleDataState<T>
   const fetchingRef = useRef(false);
   // Stable ref to the latest fetcher so the interval doesn't close over a stale one.
   const fetcherRef = useRef(fetcher);
-  useEffect(() => {
-    fetcherRef.current = fetcher;
-  }, [fetcher]);
+  // eslint-disable-next-line react-hooks/refs -- intentional state sync in this hook
+  fetcherRef.current = fetcher;
 
   const doFetch = useCallback(
     (controller: AbortController) => {

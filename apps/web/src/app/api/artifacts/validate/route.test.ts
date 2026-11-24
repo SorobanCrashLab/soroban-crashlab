@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateCaseBundle, CASE_BUNDLE_SCHEMA_VERSION } from "./route";
+import { validateCaseBundle, CASE_BUNDLE_SCHEMA_VERSION } from "./case-bundle-validation";
 
 /**
  * Helper to build a minimal valid CaseBundle.

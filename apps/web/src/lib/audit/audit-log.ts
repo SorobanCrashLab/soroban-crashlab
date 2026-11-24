@@ -14,8 +14,8 @@
  * a rotation story before this grows unbounded.
  */
 
-import { createHash } from 'node:crypto';
 import { redactMetadata } from './redaction';
+import { sha256Hex } from './sha256';
 
 export const GENESIS_HASH = '0'.repeat(64);
 
@@ -40,7 +40,21 @@ export type AuditAction =
   | 'triage.status'
   | 'triage.assign'
   | 'triage.priority'
-  | 'triage.bulk';
+  | 'triage.bulk'
+  // Artifact storage & provenance manager (#2342)
+  | 'artifact.tag'
+  | 'artifact.retention.update'
+  | 'artifact.hold.create'
+  | 'artifact.hold.release'
+  | 'artifact.deletion.request'
+  | 'artifact.deletion.decide'
+  // Session replay (#2341)
+  | 'replay.view'
+  | 'replay.share'
+  | 'replay.export'
+  // Chaos experiments (#2340)
+  | 'chaos.experiment.save'
+  | 'chaos.experiment.control';
 
 /** Used when no principal could be resolved — availability over attribution. */
 export const SYSTEM_ACTOR = 'system';
@@ -135,7 +149,7 @@ export function entryPreimage(entry: Omit<AuditEntry, 'hash'>): string {
 }
 
 export function hashEntry(entry: Omit<AuditEntry, 'hash'>): string {
-  return createHash('sha256').update(entryPreimage(entry), 'utf8').digest('hex');
+  return sha256Hex(entryPreimage(entry));
 }
 
 export type ChainStatus = 'intact' | 'broken' | 'empty';

@@ -6,8 +6,8 @@ import dynamic from 'next/dynamic';
 import type { FuzzingRun } from '../../types';
 import { fetchRuns } from '../../../lib/api-client';
 
-const AddRunComparisonSideBySideView = dynamic(
-  () => import('../../../features/runs/add-run-comparison-side-by-side-view'),
+const ComparisonWorkbench = dynamic(
+  () => import('../../../features/runs/comparison/ComparisonWorkbench'),
   { ssr: false },
 );
 
@@ -52,11 +52,11 @@ export default function ComparisonPage() {
         </Link>
         <h1 className="heading-page mt-2">Run Comparison</h1>
         <p className="text-meta mt-0.5 sm:mt-1">
-          Compare two fuzzing runs side by side to spot metric drift and metadata differences
+          Compare up to five runs with metric deltas, artifact diffs, replay sync and campaign aggregates
         </p>
       </div>
 
-      <AddRunComparisonSideBySideView runs={runs} dataState={dataState} onRetry={handleRetry} />
+      <ComparisonWorkbench runs={runs} dataState={dataState} onRetry={handleRetry} />
     </div>
   );
 }

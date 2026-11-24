@@ -234,4 +234,3 @@ function replayOrReject(
   return replay;
 }
 
-export { createCampaign };

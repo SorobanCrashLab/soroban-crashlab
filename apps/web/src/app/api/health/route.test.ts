@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   checkDependencyHealth,
   clearHealthCache,
-  GET,
   type HealthCheckDependencies,
-} from './route';
+} from './health-check';
+import { GET } from './route';
 import { getDatabase } from '@/lib/database/db-init';
 import { createPrometheusMetricsExportDependencies } from '@/lib/integrations/prometheus-adapter';
 import { getStoredSmtpConfig } from '@/lib/integrations/smtp-store';

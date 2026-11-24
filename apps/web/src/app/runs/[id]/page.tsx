@@ -83,6 +83,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <DownloadArtifactsButton run={run} ledgerChanges={ledgerChanges} />
+                        <Link href={`/runs/${encodeURIComponent(run.id)}/payloads`} className="btn-outline text-sm">Inspect XDR / ScVal</Link>
                         <Link
                             href={`/runs/${run.id}/sequence`}
                             className="inline-flex items-center justify-center h-10 px-4 rounded-full border border-zinc-300 dark:border-zinc-700 font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition"

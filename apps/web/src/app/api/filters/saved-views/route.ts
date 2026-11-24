@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { SavedView } from '@/features/dashboard/filters/persistence/SavedViewStore';
+import { readJsonBody, withRouteErrorHandling } from '@/lib/route-handler';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +21,11 @@ export async function GET() {
   return NextResponse.json(views);
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
-    const view = (await request.json()) as SavedView;
+    const parsed = await readJsonBody(request);
+    if ('error' in parsed) return parsed.error;
+    const view = parsed.body as SavedView;
     if (!view.id || !view.name) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
@@ -33,9 +36,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
+async function putHandler(request: NextRequest) {
   try {
-    const view = (await request.json()) as SavedView;
+    const parsed = await readJsonBody(request);
+    if ('error' in parsed) return parsed.error;
+    const view = parsed.body as SavedView;
     if (!view.id) {
       return NextResponse.json({ error: 'Missing view id' }, { status: 400 });
     }
@@ -50,7 +55,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+async function deleteHandler(request: NextRequest) {
   const url = new URL(request.url);
   const id = url.searchParams.get('id');
   if (!id) {
@@ -62,3 +67,8 @@ export async function DELETE(request: NextRequest) {
   store.delete(id);
   return NextResponse.json({ success: true });
 }
+
+// Every mutating handler goes through the shared size-limit choke point (#1572).
+export const POST = withRouteErrorHandling('POST /api/filters/saved-views', postHandler);
+export const PUT = withRouteErrorHandling('PUT /api/filters/saved-views', putHandler);
+export const DELETE = withRouteErrorHandling('DELETE /api/filters/saved-views', deleteHandler);

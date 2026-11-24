@@ -33,7 +33,7 @@ export const GET = withRouteErrorHandling('GET /api/schedules', async () => {
   return successResponse({ schedules: enrichedSchedules, history, ledger });
 });
 
-export const POST = withCsrfGuard(withRouteErrorHandling('POST /api/schedules', async (request: NextRequest) => {
+export const POST = withRouteErrorHandling('POST /api/schedules', withCsrfGuard({ authClass: 'browser-session' }, async (request: NextRequest) => {
   const parsedBody = await readJsonBody(request);
   if ('error' in parsedBody) return parsedBody.error;
 

@@ -1,0 +1,35 @@
+{
+  "title": "Ejecuciones",
+  "description": "Historial y detalles de ejecuciones de fuzzing",
+  "columns": {
+    "id": "ID",
+    "status": "Estado",
+    "area": "Área",
+    "severity": "Severidad",
+    "duration": "Duración",
+    "seedCount": "Semillas",
+    "timestamp": "Marca de Tiempo"
+  },
+  "status": {
+    "running": "Ejecutando",
+    "completed": "Completado",
+    "failed": "Fallido",
+    "cancelled": "Cancelado"
+  },
+  "actions": {
+    "viewDetails": "Ver Detalles",
+    "exportCsv": "Exportar CSV",
+    "retry": "Reintentar Ejecución",
+    "cancel": "Cancelar Ejecución"
+  },
+  "empty": {
+    "title": "Aún no hay ejecuciones",
+    "description": "Inicia una campaña de fuzzing para ver ejecuciones aquí"
+  },
+  "filters": {
+    "all": "Todas las Ejecuciones",
+    "active": "Activas",
+    "completed": "Completadas",
+    "failed": "Fallidas"
+  }
+}

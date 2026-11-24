@@ -334,6 +334,12 @@
       "routeOnlyJsGzip": 4864,
       "routeOnlyJsRaw": 12288
     },
+    "/reports/[id]/edit": {
+      "firstLoadJsGzip": 125005,
+      "firstLoadJsRaw": 413712,
+      "routeOnlyJsGzip": 63389,
+      "routeOnlyJsRaw": 203068
+    },
     "/reproduction-snippet": {
       "firstLoadJsGzip": 319232,
       "firstLoadJsRaw": 1070080,

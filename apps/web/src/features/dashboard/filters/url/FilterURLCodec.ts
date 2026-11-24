@@ -6,8 +6,8 @@
  * while remaining bookmarkable.
  */
 
-import type { FilterAST, FilterNode } from '../ast/FilterAST';
-import { createEmptyAST, createCondition, createGroup, generateNodeId, isCondition, isGroup } from '../ast/FilterAST';
+import type { FilterAST, FilterNode, FilterOperator } from '../ast/FilterAST';
+import { createEmptyAST as _createEmptyAST, createCondition as _createCondition, createGroup as _createGroup, generateNodeId, isCondition } from '../ast/FilterAST';
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from './compression';
 
 export const URL_LENGTH_LIMIT = 2000;
@@ -42,7 +42,7 @@ function deserializeNode(data: SerializedNode): FilterNode {
       id: data.id ?? generateNodeId(),
       type: 'condition',
       field: data.field ?? '',
-      operator: (data.operator as any) ?? 'eq',
+      operator: (data.operator as FilterOperator | undefined) ?? 'eq',
       value: data.value ?? '',
     };
   }
