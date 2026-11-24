@@ -33,6 +33,11 @@ const runAssertions = (): void => {
     content.includes('<ArtifactStorageIntegration />'),
     'Page should render the ArtifactStorageIntegration component',
   );
+  assert.ok(
+    content.includes('features/artifacts/storage-manager/ArtifactStorageManager') &&
+      content.includes('<ArtifactStorageManager />'),
+    'Page should lazy-load and render the storage & provenance manager (#2342)',
+  );
 
   console.log('integrations/artifacts/page.test.ts: all assertions passed');
 };

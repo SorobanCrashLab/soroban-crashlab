@@ -40,7 +40,21 @@ export type AuditAction =
   | 'triage.status'
   | 'triage.assign'
   | 'triage.priority'
-  | 'triage.bulk';
+  | 'triage.bulk'
+  // Artifact storage & provenance manager (#2342)
+  | 'artifact.tag'
+  | 'artifact.retention.update'
+  | 'artifact.hold.create'
+  | 'artifact.hold.release'
+  | 'artifact.deletion.request'
+  | 'artifact.deletion.decide'
+  // Session replay (#2341)
+  | 'replay.view'
+  | 'replay.share'
+  | 'replay.export'
+  // Chaos experiments (#2340)
+  | 'chaos.experiment.save'
+  | 'chaos.experiment.control';
 
 /** Used when no principal could be resolved — availability over attribution. */
 export const SYSTEM_ACTOR = 'system';

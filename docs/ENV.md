@@ -28,6 +28,8 @@ Drift is enforced by `node scripts/audit-env.mjs` (wired into `ops-scripts-synta
 | `NEXT_PUBLIC_SENTRY_RELEASE` | public | Release name, set by `next.config.ts` at build | `soroban-crashlab-web@<version>+<sha>` |
 | `NEXT_PUBLIC_VERCEL_ENV` | public | Platform-provided Vercel env label | platform |
 | `NEXT_PUBLIC_VERCEL_ANALYTICS_ID` | public | Optional analytics id | empty |
+| `NEXT_PUBLIC_CRASHLAB_SESSION_REPLAY` | public | Enables session replay capture (`on`); consent still required per browser | off |
+| `NEXT_PUBLIC_CRASHLAB_SESSION_REPLAY_SAMPLE_RATE` | public | Fraction of consenting sessions recorded (0–1) | `0.1` |
 | `DISCORD_WEBHOOK_URL` | secret | Discord webhook notifications | empty |
 | `SLACK_BOT_TOKEN` | secret | Slack `chat:write` bot token | empty |
 | `SLACK_CHANNEL_ID` | server-only | Slack channel for run threads | empty |
@@ -38,6 +40,8 @@ Drift is enforced by `node scripts/audit-env.mjs` (wired into `ops-scripts-synta
 | `CRASHLAB_METRICS_SCRAPE_TOKEN` | secret | Bearer for metrics/health scrape routes | empty |
 | `CRASHLAB_ALLOW_UNAUTHENTICATED_METRICS` | secret | Escape hatch for unauthenticated metrics | empty |
 | `CRASHLAB_API_TOKEN_TTL_DAYS` | server-only | Default API token lifetime (days) | `90` |
+| `CRASHLAB_SESSION_REPLAY_KEY` | secret | Encrypts stored session replays and signs replay share links | random per process |
+| `CRASHLAB_SESSION_REPLAY_RETENTION_DAYS` | server-only | Days captured session replays are kept | `14` |
 | `CRASHLAB_API_TOKEN_ROTATION_GRACE_HOURS` | server-only | Rotated token grace window | `24` |
 | `CRASHLAB_API_RATE_LIMIT_WINDOW_MS` | server-only | Rate-limit window | `60000` |
 | `CRASHLAB_API_RATE_LIMIT_MAX_REQUESTS` | server-only | Max requests per window | `120` |
@@ -285,6 +289,16 @@ Limits apply to the `global` scope; lower-priority classes keep headroom free fo
 | `PROMETHEUS_HEALTH_PATH` | No | `/-/healthy` | Health path queried on the Prometheus endpoint. |
 | `PROMETHEUS_TIMEOUT_MS` | No | `5000` | Timeout in milliseconds for health queries. |
 | `CRASHLAB_METRICS_SCRAPE_TOKEN` | No | *(unset)* | Shared secret that must be presented as `Authorization: Bearer <token>` on `/api/health/metrics` and `/api/integrations/prometheus/health`. When unset, both probes remain open for backward compatibility; when set, missing/mismatched tokens are rejected with `401`. |
+
+### Session Replay (`apps/web/src/features/session-replay/`)
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `NEXT_PUBLIC_CRASHLAB_SESSION_REPLAY` | No | *(off)* | `on` loads the capture host after hydration. Off means the recorder is never downloaded. Capture additionally requires explicit consent in the browser, no Global Privacy Control / Do-Not-Track signal, and sampling. |
+| `NEXT_PUBLIC_CRASHLAB_SESSION_REPLAY_SAMPLE_RATE` | No | `0.1` | Deterministic per-session sampling rate, clamped to 0–1. Developer mode always records locally. |
+| `CRASHLAB_SESSION_REPLAY_KEY` | Recommended in production | *(random per process)* | Secret (32+ chars) used to derive the AES-256-GCM key for stored replays and the HMAC key for share links. Without it replays and share links do not survive a restart. |
+| `CRASHLAB_SESSION_REPLAY_RETENTION_DAYS` | No | `14` | Captured sessions older than this are deleted on the next access (1–365). |
+
+See [`docs/frontend/session-replay-journey-debugger.md`](frontend/session-replay-journey-debugger.md).
 
 ### Notifications Feed Configuration (`apps/web/src/app/api/notifications/route.ts`)
 | Variable | Required | Default | Description |
