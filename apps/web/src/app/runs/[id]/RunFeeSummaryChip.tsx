@@ -75,19 +75,19 @@ export function RunFeeSummaryChip({ run }: RunFeeSummaryChipProps) {
       </span>
       {summary.cpuInstructions !== null && (
         <span>
-          <span className="opacity-70">CPU</span>{' '}
+          <span className="opacity-90">CPU</span>{' '}
           <span className="font-semibold">{formatNumber(summary.cpuInstructions)}</span>
         </span>
       )}
       {summary.memoryBytes !== null && (
         <span>
-          <span className="opacity-70">Memory</span>{' '}
+          <span className="opacity-90">Memory</span>{' '}
           <span className="font-semibold">{formatBytes(summary.memoryBytes)}</span>
         </span>
       )}
       {summary.minResourceFee !== null && (
         <span>
-          <span className="opacity-70">Min fee</span>{' '}
+          <span className="opacity-90">Min fee</span>{' '}
           <span className="font-semibold">{formatFee(summary.minResourceFee)}</span>
         </span>
       )}

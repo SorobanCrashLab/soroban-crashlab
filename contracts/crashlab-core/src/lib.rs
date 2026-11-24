@@ -397,9 +397,6 @@ pub mod address_neighbors;
 pub mod stellar_address;
 pub use address_neighbors::{generate_address_neighbors, AddressNeighbor, AddressNeighborStrategy};
 
-pub mod scval_mutator;
-pub use scval_mutator::{ScValDecodeError, ScValMutatorConfig};
-
 // Re-enable threat model tests (compile-only pass). Obsolete cases can be
 // ignored or updated as follow-ups (see ROADMAP-004).
 #[cfg(test)]

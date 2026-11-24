@@ -87,10 +87,10 @@ export default function DownloadArtifactsButton({
         }
         className={`inline-flex items-center justify-center h-10 px-4 rounded-full font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 ${
           isLoading
-            ? 'bg-green-400 dark:bg-green-800 text-white cursor-not-allowed'
+            ? 'bg-green-800 dark:bg-green-800 text-white cursor-not-allowed'
             : isError
               ? 'bg-red-600 dark:bg-red-700 text-white hover:bg-red-700 dark:hover:bg-red-600'
-              : 'bg-green-600 dark:bg-green-700 text-white hover:bg-green-700 dark:hover:bg-green-600'
+              : 'bg-green-700 dark:bg-green-700 text-white hover:bg-green-800 dark:hover:bg-green-800'
         }`}
       >
         {isLoading ? (

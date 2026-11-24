@@ -117,7 +117,7 @@ export default function CrashDetailDrawer({ run, onClose, onReplayComplete }: Cr
             });
             setStatus('error');
         }
-    }, [canTriggerReplay, onReplayComplete, status, run]);
+    }, [canTriggerReplay, onReplayComplete, status, run, runner, acknowledged]);
 
     const canReplay = Boolean(run.crashDetail);
 

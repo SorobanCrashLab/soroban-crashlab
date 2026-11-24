@@ -14,25 +14,32 @@ test.describe('403 recovery', () => {
     await gotoMaintainer(page);
 
     await expect(page).toHaveURL(FORBIDDEN_URL, { timeout: 60000 });
-    await expect(page.locator('h1')).toContainText('Access denied');
-    await expect(page.getByText('Error 403')).toBeVisible();
 
-    const capability = page.locator('[data-testid="forbidden-capability"]');
+    // The explanation is also mirrored into the route announcer, so scope text
+    // and testid assertions to the visible page shell to avoid strict-mode
+    // duplicates from the hidden copy.
+    const shell = page.locator('#page-shell');
+    await expect(shell.getByRole('heading', { name: 'Access denied', level: 1 })).toBeVisible();
+    await expect(shell.getByText('Error 403')).toBeVisible();
+
+    const capability = shell.locator('[data-testid="forbidden-capability"]');
     await expect(capability).toBeVisible();
-    await expect(page.locator('[data-testid="forbidden-capability-label"]')).toHaveText(
+    await expect(shell.locator('[data-testid="forbidden-capability-label"]')).toHaveText(
       'Administer settings',
     );
-    await expect(page.locator('[data-testid="forbidden-capability-code"]')).toHaveText(
+    await expect(shell.locator('[data-testid="forbidden-capability-code"]')).toHaveText(
       'settings:write',
     );
-    await expect(page.locator('[data-testid="forbidden-required-role"]')).toContainText(
+    await expect(shell.locator('[data-testid="forbidden-required-role"]')).toContainText(
       'maintainer',
     );
-    await expect(page.locator('[data-testid="forbidden-from"]')).toContainText('/maintainer');
+    await expect(shell.locator('[data-testid="forbidden-from"]')).toContainText('/maintainer');
 
-    const access = page.locator('[data-testid="forbidden-request-access"]');
+    const access = shell.locator('[data-testid="forbidden-request-access"]');
     await expect(access).toContainText('Settings → Roles');
     await expect(access).toContainText('browsing anonymously');
+    // Assert the anonymous recovery affordance itself; sign-in moved off the
+    // legacy `/auth/signin` route, so do not pin that href in this assertion.
     await expect(access.getByRole('link', { name: 'Sign in' })).toBeVisible();
   });
 

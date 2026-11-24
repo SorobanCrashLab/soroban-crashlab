@@ -13,9 +13,13 @@ import {
   getRunKeyset,
   paginateKeyset,
 } from '@/app/pagination-utils';
+import {
+  getRunSortKeyset,
+  isRunSortField,
+  type RunSortDirection,
+  type RunSortField,
+} from '@/app/runs-sort-utils';
 import { FuzzingRunSchema } from '@/lib/schemas/runs';
-import type { RunSortField, RunSortDirection } from '@/app/runs-sort-utils';
-import { isRunSortField } from '@/app/runs-sort-utils';
 import { isRedisConfigured } from '@/lib/redis';
 import { withCsrfProtection } from '@/lib/csrf';
 import { upsertRunInSearchIndex } from '@/lib/search/server-index';
@@ -84,13 +88,20 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
     status: rawStatus,
   });
 
+  // Sort key + direction (#1875). Unknown keys fall back to the default so a
+  // hand-edited URL can never trigger an unindexed/slow comparator.
+  const rawSort = sanitizedSearchParams.get('sort');
+  const sortField: RunSortField = isRunSortField(rawSort) ? rawSort : DEFAULT_SORT_FIELD;
+  const sortDirection: RunSortDirection =
+    sanitizedSearchParams.get('order') === 'asc' ? 'asc' : DEFAULT_SORT_DIRECTION;
+
   // Parse keyset pagination parameters from the query string.
   // A legacy offset or v1 cursor is detected and reset gracefully to page 1;
   // a v2 cursor bound to a different filter set is rejected with 400 (#1834).
   const rawCursor = sanitizedSearchParams.get('cursor') ?? undefined;
   const cursorScope = computeCursorScope({
     route: 'runs',
-    sort: 'queuedAt:desc',
+    sort: `${sortField}:${sortDirection}`,
     status: rawStatus ?? '',
   });
 
@@ -100,20 +111,15 @@ export const GET = withRouteErrorHandling('GET /api/runs', async (request: Reque
       ? Math.min(limitParam, MAX_PAGE_LIMIT)
       : DEFAULT_PAGE_LIMIT;
 
-  // Sort key + direction (#1875). Unknown keys fall back to the default so a
-  // hand-edited URL can never trigger an unindexed/slow comparator.
-  const rawSort = sanitizedSearchParams.get('sort');
-  const _sortField: RunSortField = isRunSortField(rawSort) ? rawSort : DEFAULT_SORT_FIELD;
-  const _sortDirection: RunSortDirection =
-    sanitizedSearchParams.get('order') === 'asc' ? 'asc' : DEFAULT_SORT_DIRECTION;
-
   let paginated;
   try {
     paginated = paginateKeyset(allRuns, {
       cursor: rawCursor,
       limit,
-      getItemKeyset: getRunKeyset,
-      direction: 'desc',
+      getItemKeyset: sortField === 'queuedAt' && sortDirection === 'desc'
+        ? getRunKeyset
+        : (run) => getRunSortKeyset(run, sortField),
+      direction: sortDirection,
       scope: cursorScope,
       onLegacyCursor: (offending) => {
         logger.warn('GET /api/runs: legacy or invalid cursor supplied, resetting to page 1', {

@@ -66,7 +66,6 @@ interface CampaignResponse {
  * With no quotas or windows configured every campaign is admitted, as before.
  */
 export const POST = withCsrfGuard(
-  'POST /api/campaigns',
   withRouteErrorHandling('POST /api/campaigns', async (request: NextRequest) => {
     return withIdempotency(request, IDEMPOTENCY_SCOPE, async (ctx) => {
       return createCampaign(request, ctx);

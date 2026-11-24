@@ -577,7 +577,7 @@ export default function VirtualizedRunTable({
                         </span>
                     )}
                 </p>
-                <span className="text-xs text-zinc-400 dark:text-zinc-500 font-mono" aria-live="polite">
+                <span className="text-xs text-zinc-600 dark:text-zinc-300 font-mono" aria-live="polite">
                     {loadingMore
                         ? 'Loading more runs…'
                         : `rows ${virtualWindow.firstIndex + 1}–${Math.min(virtualWindow.lastIndex + 1, effectiveRuns.length)}`}

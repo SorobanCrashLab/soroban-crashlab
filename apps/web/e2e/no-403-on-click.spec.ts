@@ -86,7 +86,9 @@ function watchForbiddenWrites(page: Page): ForbiddenWatch {
 }
 
 async function mockRunsRequest(page: Page) {
-  await page.route('**/api/runs', async (route) => {
+  // The runs list fetches /api/runs?limit=...&sort=...; match the query string
+  // too, otherwise live backend rows leak into the capability-gating walk.
+  await page.route(/\/api\/runs(?:\?|$)/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -129,17 +131,25 @@ async function walkGatedControls(page: Page) {
   await mockRunsRequest(page);
   await page.goto('/runs', { waitUntil: 'domcontentloaded' });
   const table = page.getByRole('region', { name: 'Virtualized fuzzing run table' });
-  await expect(table.locator('tbody tr')).toHaveCount(mockRuns.length, { timeout: 60000 });
+  // Only the virtual window is mounted, and data rows live in the body grid
+  // (the header is a separate table). Assert the grid's rows, not raw
+  // `tbody tr` elements from the whole region.
+  const grid = table.getByRole('grid', { name: 'Fuzzing runs' });
+  await expect(grid).toBeVisible({ timeout: 60000 });
+  for (const run of mockRuns) {
+    await expect(grid.getByRole('row').filter({ hasText: run.id })).toBeVisible();
+  }
+  await expect(grid.getByRole('row')).toHaveCount(mockRuns.length, { timeout: 60000 });
 
   await page.locator('thead input[type="checkbox"]').first().click();
   await expect(page.locator('[data-testid="bulk-action-toolbar"]')).toBeVisible();
 
   await page.getByRole('button', { name: /Bulk Actions/ }).click();
   const menu = page.getByRole('menu');
-  const deleteItem = menu.getByRole('menuitem', { name: /^Delete/ });
+  const deleteItem = menu.getByRole('menuitem', { name: /^delete/i });
   await expect(deleteItem).toBeDisabled();
   await expect(deleteItem).toContainText('Requires the maintainer role.');
-  await expect(menu.getByRole('menuitem', { name: /^Tag/ })).toBeEnabled();
+  await expect(menu.getByRole('menuitem', { name: /^tag/i })).toBeEnabled();
 }
 
 test.describe('No capability 403s while clicking gated UI', () => {

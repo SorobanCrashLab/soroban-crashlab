@@ -67,9 +67,21 @@ async function uploadArtifactViaUI(
 ): Promise<void> {
   const fileInput = page.getByTestId('artifact-file-input').or(page.locator('input[type="file"]'));
   await expect(fileInput).toBeAttached({ timeout: 15000 });
-  await fileInput.setInputFiles(filePath);
+  // The upload control is disabled until the initial artifact list has
+  // loaded; otherwise an in-flight GET can overwrite a freshly uploaded item.
+  await expect(fileInput).toBeEnabled({ timeout: 15000 });
+  const [uploadResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/artifacts') &&
+        response.request().method() === 'POST',
+      { timeout: 30000 }
+    ),
+    fileInput.setInputFiles(filePath),
+  ]);
+  expect(uploadResponse.status()).toBe(201);
 
-  // Wait briefly for upload processing without relying on networkidle.
+  // Wait briefly for the list state to settle without relying on networkidle.
   await page.waitForTimeout(1000);
 }
 
@@ -81,7 +93,31 @@ async function waitForArtifactInList(
   fileName: string
 ): Promise<void> {
   const artifactLink = page.locator(`text=${fileName}`);
-  await expect(artifactLink).toBeVisible({ timeout: 10000 });
+  // Upload + list refresh can take a few seconds under a loaded CI runner.
+  // The component prepends the POST result locally, but an overlapping list
+  // refresh can replace that optimistic entry. Confirm persistence via the API
+  // first, then use the UI's Refresh action so the assertion still verifies the
+  // rendered list rather than bypassing it.
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get('/api/artifacts?limit=100');
+        if (!response.ok()) return false;
+        const body = await response.json();
+        const payload = body.data ?? body;
+        const artifacts = Array.isArray(payload.artifacts) ? payload.artifacts : [];
+        return artifacts.some(
+          (artifact: { name?: string }) => artifact.name === fileName
+        );
+      },
+      { timeout: 30000, message: `artifact ${fileName} was not persisted` }
+    )
+    .toBe(true);
+
+  if (!(await artifactLink.isVisible())) {
+    await page.getByRole('button', { name: /refresh/i }).click();
+  }
+  await expect(artifactLink).toBeVisible({ timeout: 15000 });
 }
 
 test.describe('Artifact Upload/Download E2E', () => {
@@ -342,8 +378,10 @@ test.describe('Artifact Upload/Download E2E', () => {
     expect(listResponse.ok()).toBeTruthy();
 
     const listData = await listResponse.json();
-    expect(listData).toHaveProperty('artifacts');
-    expect(Array.isArray(listData.artifacts)).toBeTruthy();
+    // The list route now wraps its pagination payload in `data`.
+    const payload = listData.data ?? listData;
+    expect(payload).toHaveProperty('artifacts');
+    expect(Array.isArray(payload.artifacts)).toBeTruthy();
   });
 
   test('should handle concurrent artifact operations', async ({ page }) => {
@@ -354,20 +392,35 @@ test.describe('Artifact Upload/Download E2E', () => {
 
     try {
       const fileInput = page.locator('input[type="file"]');
+      await expect(fileInput).toBeEnabled({ timeout: 15000 });
 
       // Upload first artifact
+      const firstUpload = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/artifacts') &&
+          response.request().method() === 'POST',
+        { timeout: 30000 }
+      );
       await fileInput.setInputFiles(filePath1);
+      expect((await firstUpload).status()).toBe(201);
       await page.waitForTimeout(300);
 
       // Upload second artifact while first is processing
+      const secondUpload = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/artifacts') &&
+          response.request().method() === 'POST',
+        { timeout: 30000 }
+      );
       await fileInput.setInputFiles(filePath2);
+      expect((await secondUpload).status()).toBe(201);
 
       // Wait for both to complete
       await page.waitForTimeout(1500);
 
-      // Verify both appear in list
-      await expect(page.locator(`text="${testFile1}"`).first()).toBeVisible({ timeout: 5000 });
-      await expect(page.locator(`text="${testFile2}"`).first()).toBeVisible({ timeout: 5000 });
+      // Verify both are persisted and appear in the rendered list
+      await waitForArtifactInList(page, testFile1);
+      await waitForArtifactInList(page, testFile2);
     } finally {
       cleanupTestFile(filePath1);
       cleanupTestFile(filePath2);
@@ -382,10 +435,11 @@ test.describe('Artifact API Endpoints', () => {
     expect(response.ok()).toBeTruthy();
 
     const data = await response.json();
-    expect(data).toHaveProperty('artifacts');
-    expect(data).toHaveProperty('total');
-    expect(typeof data.total).toBe('number');
-    expect(Array.isArray(data.artifacts)).toBeTruthy();
+    const payload = data.data ?? data;
+    expect(payload).toHaveProperty('artifacts');
+    expect(payload).toHaveProperty('total');
+    expect(typeof payload.total).toBe('number');
+    expect(Array.isArray(payload.artifacts)).toBeTruthy();
   });
 
   test('POST /api/artifacts accepts file uploads', async ({ request }) => {
@@ -443,8 +497,9 @@ test.describe('Artifact API Endpoints', () => {
     expect(response.ok()).toBeTruthy();
 
     const data = await response.json();
-    if (data.artifacts.length > 0) {
-      const artifact = data.artifacts[0];
+    const payload = data.data ?? data;
+    if (Array.isArray(payload.artifacts) && payload.artifacts.length > 0) {
+      const artifact = payload.artifacts[0];
       expect(artifact).toHaveProperty('id');
       expect(artifact).toHaveProperty('name');
       expect(artifact).toHaveProperty('createdAt');

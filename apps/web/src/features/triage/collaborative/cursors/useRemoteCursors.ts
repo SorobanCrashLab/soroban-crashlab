@@ -39,7 +39,8 @@ export function useRemoteCursors(roomId: string, awareness: AwarenessManager | n
 
   const updateLocalCursor = useCallback(
     (field: string, position: number) => {
-      const localState = awareness?.getLocalState();
+      if (!awareness) return;
+      const localState = awareness.getLocalState();
       if (localState) {
         awareness!.setLocalState({ ...localState, cursor: { field, position } });
       }

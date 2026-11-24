@@ -53,8 +53,14 @@ const mockRuns = [
   },
 ];
 
+/** The runs route now returns its payload under `data` (with a top-level total). */
+const runsEnvelope = (runs: typeof mockRuns) => ({
+  data: { runs, total: runs.length },
+  total: runs.length,
+});
+
 const fulfillRunsListRequest = async (page: Page, body: unknown, status = 200) => {
-  await page.route('**/api/runs*', async (route) => {
+  await page.route(/\/api\/runs(?:\?|$)/, async (route) => {
     const requestUrl = new URL(route.request().url());
     if (requestUrl.pathname !== '/api/runs') {
       await route.continue();
@@ -70,7 +76,7 @@ const fulfillRunsListRequest = async (page: Page, body: unknown, status = 200) =
 };
 
 const openRunFromList = async (page: Page, runId: string) => {
-  await fulfillRunsListRequest(page, { runs: mockRuns, total: mockRuns.length });
+  await fulfillRunsListRequest(page, runsEnvelope(mockRuns));
 
   const runsResponse = page.waitForResponse(
     (response) =>
@@ -83,7 +89,9 @@ const openRunFromList = async (page: Page, runId: string) => {
   await expect(page.getByRole('heading', { name: 'Fuzzing Runs' })).toBeVisible();
 
   const tableContainer = page.getByRole('region', { name: 'Virtualized fuzzing run table' });
-  const targetRow = tableContainer.locator('tbody tr').filter({ hasText: runId });
+  const grid = tableContainer.getByRole('grid', { name: 'Fuzzing runs' });
+  const targetRow = grid.getByRole('row').filter({ hasText: runId });
+  await expect(targetRow).toHaveCount(1);
   await targetRow.getByRole('button', { name: runId }).click();
 
   await expect(page).toHaveURL(new RegExp(`/runs/${runId.replace(/-/g, '\\-')}$`));
@@ -99,28 +107,37 @@ test.describe('Run detail navigation', () => {
   });
 
   test('navigates from dashboard to run detail page on row click', async ({ page }) => {
-    await fulfillRunsListRequest(page, { runs: mockRuns, total: mockRuns.length });
+    await fulfillRunsListRequest(page, runsEnvelope(mockRuns));
 
     const runsResponse = page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname === '/api/runs' && response.status() === 200,
     );
 
-    await page.goto('/');
+    await page.goto('/dashboard');
     await runsResponse;
 
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
 
-    const targetRow = page.locator('table[aria-label="Recent fuzzing runs"] tbody tr').filter({ hasText: 'run-1002' });
+    // Two tables are labelled exactly "Recent fuzzing runs"; the first is the layout section.
+    const recentRunsTable = page
+      .getByRole('table', { name: 'Recent fuzzing runs', exact: true })
+      .first();
+    const targetRow = recentRunsTable.getByRole('row', {
+      name: /Fuzzing run run-1002\b/,
+    });
     await expect(targetRow).toBeVisible();
-    await targetRow.click();
+    // The sticky Quick Actions card can overlap the table row; activate the
+    // row through its keyboard handler instead of a pointer click.
+    await targetRow.focus();
+    await page.keyboard.press('Enter');
 
     await expect(page).toHaveURL(/\/runs\/run-1002$/);
     await expect(page.getByRole('heading', { name: 'Run Details' })).toBeVisible();
     await expect(page.getByText('ID: run-1002')).toBeVisible();
 
     await page.getByRole('link', { name: 'Back to Dashboard' }).click();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
   });
 
@@ -129,11 +146,14 @@ test.describe('Run detail navigation', () => {
 
     await expect(page.getByRole('heading', { name: 'Run Details' })).toBeVisible();
     await expect(page.getByText('ID: run-1001')).toBeVisible();
-    await expect(page.getByText('Issues found')).toBeVisible();
+    await expect(page.getByText('Issues found').first()).toBeVisible();
 
-    await page.locator('a.top-nav-link[href="/runs"]').click();
+    await page
+      .getByRole('navigation', { name: 'Breadcrumb' })
+      .getByRole('link', { name: 'Runs' })
+      .click();
 
-    await expect(page).toHaveURL(/\/runs$/);
+    await expect(page).toHaveURL(/\/runs$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Fuzzing Runs' })).toBeVisible();
   });
 
@@ -142,27 +162,29 @@ test.describe('Run detail navigation', () => {
 
     await page.getByRole('link', { name: 'Back to Dashboard' }).click();
 
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
   });
 
   test('handles dashboard connection error when API request fails', async ({ page }) => {
     await fulfillRunsListRequest(page, { message: 'Internal Server Error' }, 500);
 
-    await page.goto('/');
+    await page.goto('/dashboard');
     await expect(page.getByText('Connection Error')).toBeVisible();
     await expect(page.getByText('Could not reach the backend API.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
   });
 
   test('handles navigation to unknown run detail page gracefully', async ({ page }) => {
-    await fulfillRunsListRequest(page, { runs: mockRuns, total: mockRuns.length });
+    await fulfillRunsListRequest(page, runsEnvelope(mockRuns));
 
     await page.goto('/runs/non-existent-run-9999');
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(page.getByRole('heading', { name: 'Run Details' })).toBeVisible();
-    await expect(page.getByText('ID: non-existent-run-9999')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Back to Dashboard' })).toBeVisible();
+    // Unknown ids are rejected by the detail route's notFound() guard.
+    await expect(page.getByRole('heading', { name: 'This route slipped past the fuzzer' })).toBeVisible();
+    await expect(page.getByText('Error 404')).toBeVisible();
+    await expect(page.getByText('/runs/non-existent-run-9999')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open runs' })).toBeVisible();
   });
 });

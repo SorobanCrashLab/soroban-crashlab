@@ -17,6 +17,7 @@ import { CollaborativeTagsEditor } from './editors/CollaborativeTagsEditor';
 import { CollaborativeNotesEditor } from './editors/CollaborativeNotesEditor';
 import { CollaborativeIssueLinks, type IssueLink } from './editors/CollaborativeIssueLinks';
 import { ConflictResolutionBanner } from './editors/ConflictResolutionBanner';
+import type { MockYMap } from './yjs/yjsProvider';
 
 interface CollaborativeTriageSessionProps {
   runId: string;

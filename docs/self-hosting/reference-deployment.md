@@ -70,9 +70,10 @@ CRASHLAB_WEB_IMAGE=ghcr.io/sorobancrashlab/soroban-crashlab-web@sha256:<digest>
 ```
 
 Until signed images are published, `docker compose build web` builds from
-the checked-out source (`apps/web/Dockerfile`, target `runner`). If the build
-cannot reach Google Fonts from inside the build container, add
-`--network host` (`docker build --network host …`).
+the checked-out source (`apps/web/Dockerfile`, target `runner`). The four font
+families are committed under `apps/web/src/app/fonts` and loaded through
+`next/font/local`, so the build container does not need outbound access to
+Google Fonts (or a `--network host` workaround).
 
 ### Secrets
 

@@ -23,11 +23,11 @@
       "category": "xdr",
       "digest": 1101710651467422,
       "signature_hash": 1608215844461007181,
-      "bundle_payload": "ff",
-      "bundle_class": "auth",
-      "bundle_category": "auth",
-      "bundle_digest": 1101710651467677,
-      "bundle_signature_hash": 4956491051363982891
+      "bundle_payload": "01",
+      "bundle_class": "xdr",
+      "bundle_category": "xdr",
+      "bundle_digest": 1101710651467423,
+      "bundle_signature_hash": 1608214744949378970
     },
     {
       "id": 1003,
@@ -49,11 +49,11 @@
       "category": "state",
       "digest": 1103909674723876,
       "signature_hash": 11659818248195718366,
-      "bundle_payload": "df",
-      "bundle_class": "auth",
-      "bundle_category": "auth",
-      "bundle_digest": 1103909674724067,
-      "bundle_signature_hash": 4958478968387409929
+      "bundle_payload": "21",
+      "bundle_class": "state",
+      "bundle_category": "state",
+      "bundle_digest": 1103909674723877,
+      "bundle_signature_hash": 11659819347707346577
     },
     {
       "id": 1005,
@@ -140,11 +140,11 @@
       "category": "oversized-input",
       "digest": 509521247510253449,
       "signature_hash": 6189355596690394474,
-      "bundle_payload": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
-      "bundle_class": "oversized-input",
-      "bundle_category": "oversized-input",
-      "bundle_digest": 509521247510253449,
-      "bundle_signature_hash": 6189355596690394474
+      "bundle_payload": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+      "bundle_class": "auth",
+      "bundle_category": "auth",
+      "bundle_digest": 4618566318265064057,
+      "bundle_signature_hash": 1454228154437374690
     },
     {
       "id": 1012,
@@ -205,11 +205,11 @@
       "category": "state",
       "digest": 4318714156297651204,
       "signature_hash": 9344793664211665987,
-      "bundle_payload": "357ec2e751830d3173b224",
+      "bundle_payload": "51830d317376b224",
       "bundle_class": "state",
       "bundle_category": "state",
-      "bundle_digest": 15344059306398392838,
-      "bundle_signature_hash": 10502615329937567774
+      "bundle_digest": 15460610894520307186,
+      "bundle_signature_hash": 7077672382224592998
     },
     {
       "id": 4,
@@ -257,11 +257,11 @@
       "category": "auth",
       "digest": 1487525558128749439,
       "signature_hash": 6482567029302388103,
-      "bundle_payload": "f7edbf6f49afbc0b32a090db",
-      "bundle_class": "auth",
-      "bundle_category": "auth",
-      "bundle_digest": 16603070449334962287,
-      "bundle_signature_hash": 8358184762732661287
+      "bundle_payload": "49afbc0b90a032db",
+      "bundle_class": "state",
+      "bundle_category": "state",
+      "bundle_digest": 18003284730927608545,
+      "bundle_signature_hash": 12864317558352682002
     },
     {
       "id": 8,
@@ -270,11 +270,11 @@
       "category": "budget",
       "digest": 14998049359446470318,
       "signature_hash": 3285064226623283275,
-      "bundle_payload": "ec03559c04555ad3a65a5a",
-      "bundle_class": "auth",
-      "bundle_category": "auth",
-      "bundle_digest": 10105010191476665298,
-      "bundle_signature_hash": 17062932987918846602
+      "bundle_payload": "9c04555ad3a65a5a",
+      "bundle_class": "budget",
+      "bundle_category": "budget",
+      "bundle_digest": 4794601236205621768,
+      "bundle_signature_hash": 386095047294537984
     },
     {
       "id": 9,

@@ -55,6 +55,8 @@ export const metadata: Metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
+  // Extend the PWA under notches/rounded corners (#2260).
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({

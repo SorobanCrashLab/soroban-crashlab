@@ -18,6 +18,7 @@ This directory contains Architecture Decision Records (ADRs) for Soroban CrashLa
 | [ADR-0010](0010-org-project-tenancy.md) | Org → Project Tenancy | Accepted | Type-enforced tenant scoping, prefixed storage keys, isolation suite and backfill plan. |
 | [ADR-0011](0011-fixture-provenance-hash-chain.md) | Fixture Provenance: Hash Chain vs. Signatures | Accepted | Tamper-evident seed → run → engine → environment provenance sealed by a SHA-256 hash chain. |
 | [ADR-0012](0012-keyset-pagination-snapshot-consistency.md) | Keyset Pagination: Cursor Contract & Snapshot Consistency | Accepted | Total-order (sort_key, id) keyset paging with filter-bound, versioned cursors and property-tested no-loss/no-duplicate guarantees. |
+| [ADR-0012b](0012-capability-driven-ui-gating.md) | Capability-driven UI gating and 403 recovery | Accepted | Declarative capability checks keep unauthorized controls out of the UI while preserving a recoverable 403 path. |
 | [ADR-0013](0013-worker-xdr-inspection.md) | Browser-worker XDR inspection | Proposed | Bounded typed decoding/editing and redacted local exports for adversarial Soroban payloads. |
 
 ---

@@ -68,7 +68,8 @@ test.describe('Mobile responsive layout', () => {
         new URL(response.url()).pathname === '/api/runs' && response.status() === 200,
     );
 
-    await page.goto('/');
+    // `/` is the public landing page; the dashboard lives at `/dashboard`.
+    await page.goto('/dashboard');
     await runsResponse;
 
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
@@ -142,11 +143,12 @@ test.describe('Mobile responsive layout', () => {
     await page.getByRole('button', { name: 'Open navigation menu' }).click();
     await expect(page.locator('.drawer.open')).toBeVisible();
 
-    const backdrop = page.locator('.drawer-backdrop');
-    if (await backdrop.isVisible()) {
-      await backdrop.click();
-      await expect(page.locator('.drawer.open')).toHaveCount(0);
-    }
+    // The scrim is `.drawer-overlay`; click its exposed left strip so the
+    // drawer itself (z-index above the overlay) does not intercept the click.
+    const backdrop = page.locator('.drawer-overlay.open');
+    await expect(backdrop).toBeVisible();
+    await backdrop.click({ position: { x: 8, y: 8 } });
+    await expect(page.locator('.drawer.open')).toHaveCount(0);
   });
 
   test('maintains responsive layout containment on narrow mobile (320px) and tablet (768px) viewports', async ({ page }) => {
@@ -204,8 +206,9 @@ test.describe('Mobile responsive layout', () => {
   });
 
   test('provides 44px minimum touch targets for interactive elements', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('domcontentloaded');
+    // View All Runs is a dashboard action, not a landing-page one.
+    await page.goto('/dashboard');
+    await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible();
 
     const targets = [
       page.getByRole('button', { name: 'Open navigation menu' }),

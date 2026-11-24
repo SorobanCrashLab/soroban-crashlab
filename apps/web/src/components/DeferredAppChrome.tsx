@@ -16,6 +16,9 @@ const CommandPalette = dynamic(() => import('./CommandPalette'), { ssr: false })
 const OnboardingWizardHost = dynamic(() => import('../app/OnboardingWizardHost'), {
   ssr: false,
 });
+const ServiceWorkerRegistrar = dynamic(() => import('./pwa/ServiceWorkerRegistrar'), {
+  ssr: false,
+});
 
 export function DeferredAppChrome() {
   return (
@@ -23,6 +26,7 @@ export function DeferredAppChrome() {
       <AddKeyboardShortcutCheatsheetModal />
       <CommandPalette />
       <OnboardingWizardHost />
+      <ServiceWorkerRegistrar />
     </>
   );
 }

@@ -176,6 +176,7 @@ export default function RunsPage() {
   const selectionMatchTotal = filtersActive ? visibleRuns.length : (total ?? visibleRuns.length);
 
   // Invalidate "all matching" selections when the filter identity changes.
+  // The updater is derived from external filter state, not rendered values.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state sync in this hook
     setSelection((previous) => applyFilterContext(previous, filterQueryKey, selectionMatchTotal));

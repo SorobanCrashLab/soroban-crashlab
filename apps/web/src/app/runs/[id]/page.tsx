@@ -24,6 +24,9 @@ const AddRunReplayHistoryWithTimestamps = nextDynamic(
   () => import('../../../features/runs/add-run-replay-history-with-timestamps'),
 );
 const RunAnnotationThreads = nextDynamic(() => import('./annotation-threads/RunAnnotationThreads'));
+const RunWorkspace = nextDynamic(
+  () => import('../../../features/runs/detail/RunWorkspace'),
+);
 
 import { absoluteShort } from '../../utils/datetime';
 
@@ -70,13 +73,13 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
                     <div>
                         <h1 className="text-3xl font-bold mb-2">Run Details</h1>
-                        <p className="text-zinc-500 dark:text-zinc-400 font-mono bg-zinc-100 dark:bg-zinc-800 py-2 px-3 rounded-lg inline-block">
+                        <p className="text-zinc-700 dark:text-zinc-300 font-mono bg-zinc-100 dark:bg-zinc-800 py-2 px-3 rounded-lg inline-block">
                             ID: {run.id}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
                         <RunDetailAutoRefresh runId={run.id} initialStatus={run.status} />
-                        <Link href="/" className="btn-outline text-sm">Dashboard</Link>
+                        <Link href="/dashboard" className="btn-outline text-sm">Dashboard</Link>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <DownloadArtifactsButton run={run} ledgerChanges={ledgerChanges} />
@@ -88,7 +91,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                             Sequence diagram
                         </Link>
                         <Link
-                            href="/"
+                            href="/dashboard"
                             className="inline-flex items-center justify-center h-10 px-4 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition"
                         >
                             Back to Dashboard
@@ -215,6 +218,23 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
                 </div>
 
                 <RunAnnotationThreads runId={run.id} />
+
+                <RunWorkspace
+                    runId={run.id}
+                    status={run.status}
+                    runs={buildMockRuns().map(({ id, queuedAt }) => ({ id, queuedAt }))}
+                    crashes={run.crashDetail ? [{
+                      id: `crash-${run.crashDetail.signatureHash ?? 0}`,
+                      message: run.crashDetail.failureCategory || run.crashDetail.signature,
+                    }] : []}
+                    logs={[]}
+                    artifacts={run.artifacts?.map((artifact) => ({
+                      id: artifact.id,
+                      name: artifact.name,
+                      sizeBytes: artifact.size,
+                      contentType: artifact.contentType,
+                    }))}
+                />
             </div>
         </div>
         </SwipeNavigationWrapper>

@@ -22,7 +22,10 @@ use crashlab_core::{
     save_run_checkpoint_json,
     HealthSnapshot, HealthStatus, RetentionPolicy, RetentionRecord, LocalArtifactStore,
     ArtifactStore, RunCheckpoint, CaseBundleDocument, FixtureManifest, ProvenancePolicy,
-    load_case_bundle_document_json, verify_corpus_integrity,
+    load_case_bundle_document_json, verify_corpus_integrity, apply_minimization,
+    current_engine_version, import_corpus_json, import_seeds, plan_minimization,
+    seed_content_hash, CorpusRecord, CorpusStore, EngineVersionPolicy, PortableCorpusArchive,
+    TaggedSeed,
 };
 use std::collections::HashSet;
 use std::fs;

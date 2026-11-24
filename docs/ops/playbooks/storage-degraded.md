@@ -5,7 +5,7 @@ looks corrupt, missing or altered.
 
 ## Symptoms
 
-- Auto-issue `CI failure: storage-driver-minio nightly` (S3 contract suite failed).
+- Auto-issue `nightly health: storage-driver-minio` (S3 contract suite failed).
 - `/api/health` dependency `database` `degraded`/`unavailable`.
 - Artifact downloads 404/500, checksum or "unexpected end of JSON" errors,
   bundles that no longer parse, replay failures on previously good fixtures.

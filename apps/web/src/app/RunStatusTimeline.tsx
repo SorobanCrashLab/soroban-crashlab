@@ -173,7 +173,7 @@ export default function RunStatusTimeline({
         </div>
       </div>
 
-      <div className="relative flex flex-col md:flex-row justify-between w-full px-2">
+      <div role="list" className="relative flex flex-col md:flex-row justify-between w-full px-2">
         {/* Connecting Line (Desktop) */}
         <div
           className="hidden md:block absolute top-6 left-12 right-12 h-1 bg-zinc-100 dark:bg-zinc-900 rounded-full"
@@ -255,6 +255,7 @@ export default function RunStatusTimeline({
                 </div>
               </div>
 
+              <div role="list" className="flex flex-1 flex-row items-start gap-6 md:flex-col md:items-center md:gap-4">
                 {steps.map((step) => {
                     const isCompleted = step.isComplete;
                     const isActive = step.isActive;
@@ -307,7 +308,7 @@ export default function RunStatusTimeline({
                                 <span className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-1">
                                     {step.description}
                                 </span>
-                                <span className="text-[10px] uppercase font-mono font-bold tracking-widest text-blue-600/60 dark:text-blue-400/60 mt-3">
+                                <span className="text-[10px] uppercase font-mono font-bold tracking-widest text-blue-700 dark:text-blue-300 mt-3">
                                     {step.time}
                                 </span>
                             </div>
@@ -326,6 +327,7 @@ export default function RunStatusTimeline({
                         </div>
                     );
                 })}
+              </div>
             </div>
           );
         })}

@@ -71,24 +71,39 @@ const fulfillRunsRequest = async (page: Page) => {
   });
 };
 
+const cheatsheetTrigger = (page: Page) =>
+  page.getByRole('button', { name: 'Open keyboard shortcuts cheatsheet' });
+
+const cheatsheetDialog = (page: Page) =>
+  page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
+
+/**
+ * The cheatsheet and palette are deferred chrome (dynamic, client-only). The
+ * trigger's appearance is the signal that their keydown listeners and registry
+ * entries have mounted — pressing a chord immediately after `domcontentloaded`
+ * is silently dropped.
+ */
+async function gotoWithCheatsheetMounted(page: Page) {
+  await page.goto('/');
+  await expect(cheatsheetTrigger(page)).toBeVisible();
+}
+
 test.describe('Keyboard shortcut cheatsheet', () => {
   test('opens with ? with dialog semantics and closes with Escape', async ({ page }) => {
-    await page.goto('/');
+    await gotoWithCheatsheetMounted(page);
 
     // The floating trigger button is visible; the overlay is closed.
-    await expect(
-      page.getByRole('button', { name: 'Open keyboard shortcuts cheatsheet' }),
-    ).toBeVisible();
-    await expect(page.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeHidden();
+    await expect(cheatsheetTrigger(page)).toBeVisible();
+    await expect(cheatsheetDialog(page)).toBeHidden();
 
     // `?` = Shift+/ on a US keyboard.
     await page.keyboard.press('Shift+/');
 
-    const dialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
+    const dialog = cheatsheetDialog(page);
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAttribute('aria-modal', 'true');
 
-    // Search affordance is present and labelled.
+    // The registry-filter input is present and labelled.
     const searchbox = page.getByRole('searchbox', { name: 'Filter shortcuts and commands' });
     await expect(searchbox).toBeVisible();
     await expect(searchbox).toBeFocused();
@@ -99,36 +114,39 @@ test.describe('Keyboard shortcut cheatsheet', () => {
   });
 
   test('Escape restores focus to the trigger button', async ({ page }) => {
-    await page.goto('/');
+    await gotoWithCheatsheetMounted(page);
 
-    const trigger = page.getByRole('button', { name: 'Open keyboard shortcuts cheatsheet' });
+    const trigger = cheatsheetTrigger(page);
     await trigger.click();
-    await expect(page.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeVisible();
+    await expect(cheatsheetDialog(page)).toBeVisible();
 
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeHidden();
+    await expect(cheatsheetDialog(page)).toBeHidden();
     await expect(trigger).toBeFocused();
   });
 
-  test('opens and closes with Ctrl+/', async ({ page }) => {
-    await page.goto('/');
+  test('opens and closes with Ctrl+/ (Cmd+/ on macOS)', async ({ page }) => {
+    await gotoWithCheatsheetMounted(page);
 
-    await page.keyboard.press('Control+/');
-    await expect(page.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeVisible();
+    // The app honours either modifier for the dedicated help chord.
+    const toggleChord = process.platform === 'darwin' ? 'Meta+/' : 'Control+/';
+    await page.keyboard.press(toggleChord);
+    await expect(cheatsheetDialog(page)).toBeVisible();
 
-    await page.keyboard.press('Control+/');
-    await expect(page.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeHidden();
+    await page.keyboard.press(toggleChord);
+    await expect(cheatsheetDialog(page)).toBeHidden();
   });
 
   test('search filters registry commands and click executes navigation', async ({ page }) => {
     await fulfillRunsRequest(page);
-    await page.goto('/');
+    await gotoWithCheatsheetMounted(page);
 
     await page.keyboard.press('Shift+/');
 
     // Commands come from the live palette registry — the navigation group
     // lists "Go to Runs" with its G, R chord.
-    const dialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
+    const dialog = cheatsheetDialog(page);
+    await expect(dialog).toBeVisible();
     await expect(dialog.getByText('Go to Runs')).toBeVisible();
 
     const searchbox = page.getByRole('searchbox', { name: 'Filter shortcuts and commands' });
@@ -139,18 +157,19 @@ test.describe('Keyboard shortcut cheatsheet', () => {
     await runCommand.click();
 
     await expect(page).toHaveURL(/\/runs$/);
-    await expect(page.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeHidden();
+    await expect(cheatsheetDialog(page)).toBeHidden();
   });
 
   test('shows non-existent matches as an empty state', async ({ page }) => {
-    await page.goto('/');
+    await gotoWithCheatsheetMounted(page);
     await page.keyboard.press('Shift+/');
 
     const searchbox = page.getByRole('searchbox', { name: 'Filter shortcuts and commands' });
+    await expect(cheatsheetDialog(page)).toBeVisible();
     await searchbox.fill('zzzz-no-such-thing');
 
     await expect(
-      page.getByRole('dialog', { name: 'Keyboard Shortcuts' }).getByText(/No shortcuts or commands match/),
+      cheatsheetDialog(page).getByText(/No shortcuts or commands match/),
     ).toBeVisible();
   });
 });
