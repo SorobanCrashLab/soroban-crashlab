@@ -60,6 +60,17 @@ const r = (
 export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('GET', '/api/artifacts', 'session', null, 'default'),
   r('POST', '/api/artifacts', 'session', { role: 'analyst' }, 'default'),
+  // Artifact storage & provenance manager (#2342). Static segments are listed
+  // before `/api/artifacts/[id]`, which would otherwise match them first.
+  // Handlers narrow further by role (holds/policies/approvals: maintainer).
+  r('GET', '/api/artifacts/browse', 'session', null, 'default'),
+  r('GET', '/api/artifacts/metadata', 'session', null, 'default'),
+  r('POST', '/api/artifacts/metadata', 'session', { role: 'analyst' }, 'default'),
+  r('GET', '/api/artifacts/lineage', 'session', null, 'default'),
+  r('GET', '/api/artifacts/retention', 'session', null, 'default'),
+  r('POST', '/api/artifacts/retention', 'session', { role: 'analyst' }, 'default'),
+  r('GET', '/api/artifacts/holds', 'session', null, 'default'),
+  r('POST', '/api/artifacts/holds', 'session', { role: 'maintainer' }, 'default'),
   r('DELETE', '/api/artifacts/[id]', 'session', { role: 'analyst' }, 'default'),
   r('GET', '/api/artifacts/[id]', 'session', null, 'default'),
   r('POST', '/api/artifacts/validate', 'session', { role: 'analyst' }, 'default'),
@@ -132,6 +143,21 @@ export const ROUTE_CATALOG: RouteCatalogEntry[] = [
   r('PUT', '/api/networks/active', 'session', { role: 'maintainer' }, 'default'),
   r('GET', '/api/notifications', 'session', null, 'default'),
   r('GET', '/api/openapi', 'public', null, 'default'),
+  // Visual query builder (#2339): read-only execution over POST (the query is
+  // a JSON body). The handler re-validates with the caller's role and redacts
+  // restricted fields, so analysts may run but never read restricted values.
+  r('POST', '/api/query-builder/run', 'session', { role: 'analyst', scopes: ['runs:read'] }, 'default'),
+  // Chaos experiments (#2340). Mutations need analyst; approvals and
+  // staging/prod starts are maintainer-only, enforced by the lifecycle rules.
+  r('GET', '/api/chaos/experiments', 'session', null, 'default'),
+  r('POST', '/api/chaos/experiments', 'session', { role: 'analyst' }, 'strict'),
+  r('GET', '/api/chaos/experiments/[id]/control', 'session', null, 'default'),
+  r('POST', '/api/chaos/experiments/[id]/control', 'session', { role: 'analyst' }, 'strict'),
+  // Session replay (#2341): ingest is high-volume (lenient bucket); viewing
+  // captured sessions needs a signed-in user or a signed share token, and
+  // minting share links is maintainer-only — both enforced in the handler.
+  r('GET', '/api/session-replay', 'session', null, 'default'),
+  r('POST', '/api/session-replay', 'session', { role: 'analyst' }, 'lenient'),
   r('GET', '/api/runs', 'session', { scopes: ['runs:read'] }, 'default'),
   r('POST', '/api/runs', 'session', { role: 'analyst', scopes: ['runs:write'] }, 'default'),
   r('GET', '/api/runs/[id]', 'session', { scopes: ['runs:read'] }, 'default'),
