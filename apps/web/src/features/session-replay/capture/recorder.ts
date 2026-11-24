@@ -305,6 +305,18 @@ export function createRecorder(env: RecorderEnv, options: RecorderOptions = {}):
   };
 }
 
+/**
+ * Unguessable session id from the platform CSPRNG. Ids are capture keys
+ * (ingest appends to whichever id a batch names), so there is deliberately
+ * no `Math.random` fallback: without a CSPRNG this throws and the host does
+ * not record.
+ */
+export function newSessionId(source: Pick<Crypto, 'getRandomValues'> | undefined = globalThis.crypto): string {
+  if (!source || typeof source.getRandomValues !== 'function') throw new Error('No cryptographic random source available.');
+  const bytes = source.getRandomValues(new Uint8Array(16));
+  return `rs-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
 /** Deterministic sampling: the same session id always gets the same decision. */
 export function sampledIn(sessionId: string, rate: number): boolean {
   if (rate >= 1) return true;

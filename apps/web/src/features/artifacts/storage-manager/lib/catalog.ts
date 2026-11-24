@@ -161,7 +161,8 @@ const LOCAL_TYPES: Array<[RegExp, ArtifactType]> = [
   [/\.(zip|tar|tgz|gz)$/i, 'bundle'],
   [/\.(ndjson|log|txt)$/i, 'log'],
   [/\.(md|pdf|html)$/i, 'report'],
-  [/repro|\.json$/i, 'reproducer'],
+  [/repro/i, 'reproducer'],
+  [/\.json$/i, 'reproducer'],
 ];
 
 const LOCAL_CONTENT: Array<[RegExp, string]> = [

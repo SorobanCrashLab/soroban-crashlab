@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRecorder, sampledIn, type RecorderEnv } from './capture/recorder';
+import { createRecorder, newSessionId, sampledIn, type RecorderEnv } from './capture/recorder';
 import { describeElement, maskText, redactUrl, scrubEvent, type ElementLike } from './capture/redaction';
 import { createTransport } from './capture/transport';
 import type { ReplayEvent, SessionMeta } from './capture/schema';
@@ -143,6 +143,18 @@ describe('recorder', () => {
     expect(recorder.droppedEvents()).toBe(1);
     expect(recorder.drain()).toHaveLength(4);
     expect(recorder.drain()).toHaveLength(0);
+  });
+
+  it('generates session ids only from the CSPRNG (CodeQL js/insecure-randomness)', () => {
+    const mathRandom = vi.spyOn(Math, 'random');
+    const ids = new Set(Array.from({ length: 200 }, () => newSessionId()));
+    expect(ids.size).toBe(200);
+    for (const id of ids) expect(id).toMatch(/^rs-[0-9a-f]{32}$/);
+    expect(mathRandom).not.toHaveBeenCalled();
+    mathRandom.mockRestore();
+    const fixed = { getRandomValues: <T extends ArrayBufferView | null>(array: T) => { new Uint8Array((array as unknown as Uint8Array).buffer).fill(0xab); return array; } };
+    expect(newSessionId(fixed as Pick<Crypto, 'getRandomValues'>)).toBe(`rs-${'ab'.repeat(16)}`);
+    expect(() => newSessionId({} as Pick<Crypto, 'getRandomValues'>)).toThrow(/cryptographic/);
   });
 
   it('samples deterministically by session id', () => {

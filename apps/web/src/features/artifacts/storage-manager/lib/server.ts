@@ -141,10 +141,22 @@ export function projectCatalog(catalog: readonly ManagedArtifact[], role: Artifa
   });
 }
 
+/**
+ * True only when the endpoint's *hostname* is `amazonaws.com` or a subdomain
+ * of it. A substring test would also accept `amazonaws.com.evil.example`.
+ */
+export function isAwsEndpoint(endpoint: string): boolean {
+  try {
+    const host = new URL(endpoint).hostname.toLowerCase();
+    return host === 'amazonaws.com' || host.endsWith('.amazonaws.com');
+  } catch {
+    return false;
+  }
+}
+
 export function backendStatuses(catalog: readonly ManagedArtifact[], env: Record<string, string | undefined> = process.env): BackendStatus[] {
   const s3 = readS3Config(env);
-  const endpoint = s3.enabled ? s3.config.endpoint : '';
-  const isAws = /amazonaws\.com/i.test(endpoint);
+  const isAws = s3.enabled && isAwsEndpoint(s3.config.endpoint);
   const configured: Record<StorageBackend, boolean> = {
     local: true,
     s3: s3.enabled && isAws,

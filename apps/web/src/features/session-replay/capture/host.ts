@@ -19,7 +19,7 @@ import {
   subscribePrivacy,
   type CaptureDecision,
 } from '../privacy/consent';
-import { browserEnv, createRecorder, sampledIn, type Recorder } from './recorder';
+import { browserEnv, createRecorder, newSessionId, sampledIn, type Recorder } from './recorder';
 import { REPLAY_SCHEMA_VERSION, type ReplaySession, type SessionMeta } from './schema';
 import { createTransport, INGEST_ENDPOINT, type Transport } from './transport';
 
@@ -33,11 +33,6 @@ interface ActiveCapture {
 
 let active: ActiveCapture | null = null;
 let lastDecision: CaptureDecision = { record: false, reason: 'disabled' };
-
-function newSessionId(): string {
-  const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  return `rs-${random}`.slice(0, 64);
-}
 
 function browserFamily(userAgent: string): string {
   if (/Edg\//.test(userAgent)) return 'Edge';
@@ -58,7 +53,14 @@ export function startReplayCapture(): CaptureDecision {
   if (active) return active.decision;
   const config = readReplayConfig();
   const developerMode = readDeveloperMode();
-  const id = newSessionId();
+  let id: string;
+  try {
+    id = newSessionId();
+  } catch {
+    // No CSPRNG: never fall back to guessable ids — just don't record.
+    lastDecision = { record: false, reason: 'disabled' };
+    return lastDecision;
+  }
   const nav = navigator as Navigator & { globalPrivacyControl?: boolean };
   const decision = decideCapture({
     config,

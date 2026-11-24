@@ -16,7 +16,7 @@ import { buildLineage } from './lineage';
 import type { LegalHold, ManagedArtifact } from './model';
 import { projectArtifact, REDACTED } from './permissions';
 import { browseArtifacts, browseQuerySchema, CursorMismatch, parseBrowseQuery } from './query';
-import { backendStatuses, downloadLink } from './server';
+import { backendStatuses, downloadLink, isAwsEndpoint } from './server';
 
 const catalog = buildDemoCatalog();
 const byId = new Map(catalog.map((artifact) => [artifact.id, artifact]));
@@ -57,6 +57,10 @@ describe('demo catalog', () => {
     const managed = localArtifactToManaged({ id: 'trace.json', name: 'trace.json', createdAt: '2026-01-01T00:00:00Z', sizeBytes: 10 });
     expect(managed).toMatchObject({ id: 'local:trace.json', type: 'reproducer', contentType: 'application/json', source: 'storage' });
     expect(assessIntegrity(managed).level).toBe('warning');
+    const named = (name: string) => localArtifactToManaged({ id: name, name, createdAt: '2026-01-01T00:00:00Z', sizeBytes: 1 }).type;
+    expect(named('repro-case.bin')).toBe('reproducer');
+    expect(named('crash.json')).toBe('reproducer');
+    expect(named('notes.json.bin')).toBe('corpus');
   });
 });
 
@@ -232,6 +236,15 @@ describe('backends and download links', () => {
       CRASHLAB_S3_SECRET_ACCESS_KEY: 'secret',
     });
     expect(minio.find((status) => status.backend === 'minio')!.configured).toBe(true);
+  });
+
+  it('detects AWS by hostname, not substring (CodeQL js/regex/missing-regexp-anchor)', () => {
+    expect(isAwsEndpoint('https://s3.us-east-1.amazonaws.com')).toBe(true);
+    expect(isAwsEndpoint('https://AMAZONAWS.COM')).toBe(true);
+    expect(isAwsEndpoint('https://amazonaws.com.evil.example')).toBe(false);
+    expect(isAwsEndpoint('https://evil.example/amazonaws.com')).toBe(false);
+    expect(isAwsEndpoint('https://notamazonaws.com')).toBe(false);
+    expect(isAwsEndpoint('not a url')).toBe(false);
   });
 
   it('issues proxy links for local files and expiring presigned links for object stores', () => {
