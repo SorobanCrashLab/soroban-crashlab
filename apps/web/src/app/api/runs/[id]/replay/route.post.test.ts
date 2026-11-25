@@ -1,8 +1,34 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { buildMockRuns } from '../../../../mockRuns';
 import { replayJobStore } from '@/lib/replay/job-store';
 import { POST } from './route';
+
+/**
+ * The host runner shells out to `cargo run`, which resolves differently on
+ * every machine: absent on a bare CI image (ENOENT), present and slow where a
+ * Rust toolchain and a warm `target/` exist. Left real, the default-runner
+ * test takes whichever path the host happens to offer and its duration depends
+ * on compilation, which is exactly what made it flaky. Stubbing the child
+ * process makes the default-runner contract deterministic.
+ */
+type ExecFileCallback = (
+  error: (Error & { code?: string }) | null,
+  result?: { stdout: string; stderr: string },
+) => void;
+
+const execFileMock = vi.hoisted(() =>
+  vi.fn(
+    (
+      _command: string,
+      _args: readonly string[],
+      _options: unknown,
+      callback: ExecFileCallback,
+    ) => callback(null, { stdout: 'mock host replay', stderr: '' }),
+  ),
+);
+
+vi.mock('node:child_process', () => ({ execFile: execFileMock }));
 
 const crashed = buildMockRuns().find((run) => run.crashDetail !== null);
 
@@ -21,6 +47,7 @@ function params(id: string) {
 describe('POST /api/runs/[id]/replay (job flow)', () => {
   beforeEach(() => {
     replayJobStore.reset();
+    execFileMock.mockClear();
   });
 
   it('requires a crashed run to exist in the fixture set', () => {
@@ -61,13 +88,21 @@ describe('POST /api/runs/[id]/replay (job flow)', () => {
   it('defaults to the host runner when the body is empty', async () => {
     if (!crashed) return;
     const response = await POST(post({}), params(crashed.id));
-    // On a machine without the Rust toolchain this is the documented
-    // runner-unavailable path; with it, the replay succeeds. Both are valid,
-    // and both must carry a job id.
-    expect([200, 409, 502, 503]).toContain(response.status);
+    expect(response.status).toBe(200);
 
-    const body = (await response.json()) as { data?: { jobId?: string } };
-    expect(body.data?.jobId).toMatch(/^replay-job-/);
+    const body = (await response.json()) as {
+      data: { ok: boolean; jobId: string; runner: string; status: string };
+    };
+    expect(body.data.ok).toBe(true);
+    expect(body.data.runner).toBe('host');
+    expect(body.data.status).toBe('succeeded');
+    expect(body.data.jobId).toMatch(/^replay-job-/);
+    expect(replayJobStore.get(body.data.jobId)?.runner).toBe('host');
+
+    const [command, args] = execFileMock.mock.calls[0] ?? [];
+    expect(command).toBe('cargo');
+    expect(args).toContain('replay');
+    expect(args).toContain('seed');
   });
 
   it('rejects an unknown runner with 400', async () => {
