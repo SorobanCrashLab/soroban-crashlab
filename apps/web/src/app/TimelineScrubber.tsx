@@ -2,26 +2,44 @@
 
 import React, { useState, KeyboardEvent } from 'react';
 import { FuzzingRun } from './types';
+import {
+  addReplayBookmark,
+  formatFrameTime,
+  getNextPlaybackSpeed,
+  seekFrame,
+  synchronizeReplayFrames,
+  type PlaybackSpeed,
+  type ReplayBookmark,
+} from './replay-ui-utils';
 
 interface TimelineScrubberProps {
   runs: FuzzingRun[];
   onSelectRun: (runId: string) => void;
   isLoading?: boolean;
   error?: string | null;
+  syncRunIds?: string[];
+  onFrameChange?: (runId: string, frame: number, instruction: number) => void;
 }
 
 export default function TimelineScrubber({ 
   runs, 
   onSelectRun, 
   isLoading = false, 
-  error = null 
+  error = null,
+  syncRunIds = [],
+  onFrameChange,
 }: TimelineScrubberProps) {
   const [index, setIndex] = useState(0);
+  const [frame, setFrame] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
+  const [bookmarks, setBookmarks] = useState<ReplayBookmark[]>([]);
 
   const handleIndexChange = (newIndex: number) => {
     if (newIndex >= 0 && newIndex < runs.length) {
       setIndex(newIndex);
+      setFrame(seekFrame(frame, newIndex - index, Math.max(1, runs[newIndex].duration || 1) * 60));
       onSelectRun(runs[newIndex].id);
+      onFrameChange?.(runs[newIndex].id, frame, runs[newIndex].cpuInstructions);
     }
   };
 
@@ -29,13 +47,23 @@ export default function TimelineScrubber({
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setFrame((current) => seekFrame(current, 1, runs.length * 60));
       handleIndexChange(index + 1);
     } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setFrame((current) => seekFrame(current, -1, runs.length * 60));
       handleIndexChange(index - 1);
     } else if (e.key === 'Home') {
       handleIndexChange(0);
     } else if (e.key === 'End') {
       handleIndexChange(runs.length - 1);
+    } else if (e.key.toLowerCase() === 'b') {
+      const run = runs[safeIndex];
+      if (run) setBookmarks((current) => addReplayBookmark(current, { runId: run.id, frame, instruction: run.cpuInstructions, label: `Frame ${frame}` }));
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      setPlaybackSpeed((current) => getNextPlaybackSpeed(current));
     }
   };
 
@@ -85,6 +113,8 @@ export default function TimelineScrubber({
   if (runs.length === 0) return null;
 
   const currentRun = runs[safeIndex] || runs[0];
+  const synchronizedRuns = syncRunIds.length > 0 ? runs.filter((run) => syncRunIds.includes(run.id)) : runs;
+  const synchronizedFrames = synchronizeReplayFrames(synchronizedRuns);
   const progress = runs.length > 1 ? (safeIndex / (runs.length - 1)) * 100 : 0;
 
   return (
@@ -112,6 +142,30 @@ export default function TimelineScrubber({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPlaybackSpeed((current) => getNextPlaybackSpeed(current))}
+            className="px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 text-sm font-semibold"
+            title="Cycle playback speed"
+            aria-label="Playback speed"
+          >
+            {playbackSpeed}x
+          </button>
+          <span className="text-xs font-mono text-zinc-500" title="Frame-accurate position">
+            {formatFrameTime(frame)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setBookmarks((current) => addReplayBookmark(current, { runId: currentRun.id, frame, instruction: currentRun.cpuInstructions, label: `Frame ${frame}` }))}
+            className="px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 text-sm"
+            title="Bookmark frame (B)"
+            aria-label="Add bookmark"
+          >
+            Bookmark
+          </button>
+          {synchronizedFrames.length > 1 && (
+            <span className="text-xs text-zinc-500">{synchronizedFrames.length} synchronized runs</span>
+          )}
           <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
               <button 
               onClick={() => handleIndexChange(index - 1)}

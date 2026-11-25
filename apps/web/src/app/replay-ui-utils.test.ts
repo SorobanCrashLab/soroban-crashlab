@@ -5,6 +5,11 @@ import {
   getReplayButtonLabel,
   getRunLineageLabel,
   getRunLineagePath,
+  addReplayBookmark,
+  formatFrameTime,
+  instructionToFrame,
+  seekFrame,
+  synchronizeReplayFrames,
   type ReplayActionData,
   type ReplayButtonStatus,
 } from './replay-ui-utils';
@@ -106,12 +111,24 @@ function testLineageTraversal() {
   assert.deepEqual(getRunLineagePath(greatGrandChild, [root, child, grandChild, greatGrandChild]), ['run-1', 'run-2', 'run-3', 'run-4']);
 }
 
+function testFrameAccurateReplay() {
+  assert.equal(formatFrameTime(367, 60), '00:06:07');
+  assert.equal(instructionToFrame(2500, 1000), 2);
+  assert.equal(seekFrame(10, 5, 12), 12);
+  const frames = synchronizeReplayFrames([{ id: 'a', cpuInstructions: 2000 }, { id: 'b', cpuInstructions: 4000 }]);
+  assert.deepEqual(frames.map((frame) => frame.frame), [2, 4]);
+  const bookmarks = addReplayBookmark([], { runId: 'a', frame: 2, instruction: 2000, label: 'Deploy' });
+  assert.equal(bookmarks.length, 1);
+  assert.equal(addReplayBookmark(bookmarks, { runId: 'a', frame: 2, instruction: 2000, label: 'Duplicate' }).length, 1);
+}
+
 async function main() {
   testGetReplayButtonLabel();
   testCreateReplayPlaceholderRun();
   await testReplayServiceMapping();
   await testSeedSubsetReplayMetadata();
   testLineageTraversal();
+  testFrameAccurateReplay();
   console.log('replay-ui-utils.test.ts: all assertions passed');
 }
 

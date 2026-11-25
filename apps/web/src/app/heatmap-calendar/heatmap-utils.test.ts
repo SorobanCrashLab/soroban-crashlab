@@ -1,4 +1,7 @@
 import {
+  aggregateHeatmapData,
+  createHeatmapShareLink,
+  heatmapToCsv,
   generateMockHeatmapData,
   getHeatmapColor,
   getMonthWeeks,
@@ -24,5 +27,13 @@ console.assert(
 const severeColor = getHeatmapColor(10, 'critical');
 const lowColor = getHeatmapColor(1, 'low');
 console.assert(severeColor !== lowColor, 'Different severities should have different colors');
+
+const aggregated = aggregateHeatmapData([
+  { date: '2024-01-01', count: 2, runs: 3, severity: 'low', gas: 100, runIds: ['a'] },
+  { date: '2024-01-01', count: 4, runs: 5, severity: 'high', gas: 200, runIds: ['b'] },
+]);
+console.assert(aggregated[0].runs === 8 && aggregated[0].count === 6, 'Should aggregate heatmap metrics');
+console.assert(heatmapToCsv(aggregated, 'runs').includes('runs'), 'Should export heatmap CSV');
+console.assert(createHeatmapShareLink('https://example.com/heatmap-calendar', '2024-01-01', 'gas').includes('metric=gas'), 'Should create share link');
 
 console.log('✓ Heatmap utilities tests passed');
